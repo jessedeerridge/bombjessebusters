@@ -62,8 +62,8 @@
   .hidden{display:none!important}
 
   /* 右下の歯車 */
-  .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:40}
-  .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08);z-index:41}
+  .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer}
+  .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08)}
   .menu .btn{width:220px;text-align:left}
 
   /* ------------------------- */
@@ -91,7 +91,8 @@
     height:var(--table-h);
     display:block;
     background:#fff;
-    overflow:hidden; /* はみ出し防止 */
+    /* 情報トークンは枠と重なって良い → はみ出し許可 */
+    overflow:visible;
     width:max-content; /* 中身幅にフィット */
   }
   /* 上部（アンダーライン付きの数字 or 名前） */
@@ -114,15 +115,10 @@
     background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
-  .char-card.blank{background:#fff} /* 未着席のブランク表示 */
+  .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;flex:0 0 auto;position:relative}
 
-  .hand{
-    display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;flex:0 0 auto;position:relative;
-    padding-bottom:28px; /* 下にアルファベット＆トークン帯の余白 */
-  }
-
-  /* カードと下部バッジをひとまとめにするラッパー */
-  .card-wrap{position:relative;flex:0 0 auto;width:var(--card-w);height:var(--card-h)}
+  /* ===== カード＋アルファベット（固定配置） ===== */
+  .card-wrap{position:relative;width:var(--card-w);height:calc(var(--card-h) + 28px);flex:0 0 auto}
   .card{
     width:var(--card-w);height:var(--card-h);border-radius:6px;border:1px solid #ddd;position:absolute;left:0;top:0;
     background:#bbb;display:flex;align-items:flex-start;justify-content:center;cursor:pointer;user-select:none
@@ -138,16 +134,13 @@
     background-size:cover;background-position:center
   }
 
-  /* アルファベット＆トークン：カードの外側・下に配置（前面） */
-  .badge-wrap{
-    position:absolute;left:0;top:calc(var(--card-h) + 4px);width:var(--card-w);
-    display:flex;flex-direction:column;align-items:center;pointer-events:auto;z-index:3
-  }
+  /* アルファベット＆トークン：カードの下に固定（重ならない） */
+  .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:3;pointer-events:auto}
   .alpha{
-    width:100%;text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1;
+    width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1;
     background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0
   }
-  .token{margin-top:2px;font-size:11px;border-radius:4px;padding:1px 4px;border:1px solid rgba(0,0,0,.1)}
+  .token{margin-top:2px;font-size:11px;border-radius:4px;padding:1px 4px}
   .token.equal{background:#ffedd5;color:#000}  /* ＝：薄オレンジ */
   .token.noteq{background:#e0f2fe;color:#000}  /* ≠：水色 */
   .token.x1{background:#fce7f3;color:#000}     /* x1：ピンク */
@@ -268,7 +261,7 @@
   </div>
 </main>
 
-<!--（未使用だが互換のため残置）-->
+<!-- 情報トークン用の小タブ（数字のみ） -->
 <div id="miniPop" class="mini-pop hidden"></div>
 
 <!-- やり直し確認 -->
@@ -381,6 +374,8 @@ const playersEl=document.getElementById('players');
 const specsEl  =document.getElementById('spectators');
 const listsBox =document.getElementById('listsBox');
 
+const miniPop = document.getElementById('miniPop');
+
 const startPop=document.getElementById('startPop');
 const selCount=document.getElementById('selCount');
 const selMission=document.getElementById('selMission');
@@ -409,7 +404,7 @@ function hiragana3(){
 const H = (el,b)=> el.classList.toggle('hidden', !!b);
 function pos(el,x,y){el.style.left=x+'px';el.style.top=y+'px';}
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j]]}return a}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function cssNum(name){
   const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return parseFloat(v.replace('px',''))||0;
@@ -594,19 +589,12 @@ function renderTables(v){
     /* 中段：キャラ＋手札 */
     const content=document.createElement('div'); content.className='t-content';
 
-    // キャラ（着席したら全員に見える／未着席はブランク）
+    // キャラ（誰でも見える）
     const char=document.createElement('div'); char.className='char-card';
-    if(!t.playerId){
-      char.classList.add('blank');
-      char.style.backgroundImage = 'none';
-    }else{
-      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-      char.style.backgroundImage = `url("${face}")`;
-    }
-    char.onclick=async ()=>{
-      // 裏返しは誰でも可能（従来どおり）
-      await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped});
-    };
+    const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+    char.style.backgroundImage = `url("${face}")`;
+    // キャラは誰でも裏返せる仕様のまま（指定があれば制限可）
+    char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
     content.appendChild(char);
 
     // 手札
@@ -637,25 +625,26 @@ function renderTables(v){
       if(card.classList.contains('back')) bot.style.display='none';
       card.appendChild(bot);
 
-      // ▼ アルファベット＆トークン（カードの“外”下に表示）
-      const wrapBadge=document.createElement('div'); wrapBadge.className='badge-wrap';
+      // ▼ アルファベット＆トークン（カードの下に固定）
+      const badge=document.createElement('div'); badge.className='badge-fixed'; badge.style.zIndex=3;
       const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
       if(isMine){
         a.onclick=(ev)=>{
+          ev.stopPropagation();
           openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
             await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { token:{type:'num', value:c.num, style:'black'} });
           });
         };
       }
-      wrapBadge.appendChild(a);
+      badge.appendChild(a);
       if(c.token){
         const tk=document.createElement('div'); tk.className='token ' + (c.token.style||'');
         tk.textContent = (c.token.type==='num' || c.token.style==='black') ? c.token.value : c.token.type;
-        wrapBadge.appendChild(tk);
+        badge.appendChild(tk);
       }
 
       wrap.appendChild(card);
-      wrap.appendChild(wrapBadge);
+      wrap.appendChild(badge);
       hand.appendChild(wrap);
     });
     content.appendChild(hand);
@@ -668,6 +657,7 @@ function renderTables(v){
 /* 数字のみの小ポップ */
 function openNumberMini(x,y, label, cb){
   const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
+  div.addEventListener('click', e=>e.stopPropagation());
   const b1=document.createElement('button'); b1.className='btn small'; b1.textContent=label;
   b1.onclick=()=>{ if(div.isConnected) div.remove(); cb&&cb(); };
   div.appendChild(b1);
@@ -677,6 +667,7 @@ function openNumberMini(x,y, label, cb){
 /* 汎用ミニポップ（アイテム/DI用） */
 function openMini(x,y, leftText,leftCb, rightText,rightCb){
   const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
+  div.addEventListener('click', e=>e.stopPropagation());
   const b1=document.createElement('button'); b1.className='btn small'; b1.textContent=leftText;
   const b2=document.createElement('button'); b2.className='btn small ghost'; b2.textContent=rightText;
   b1.onclick=()=>{ if(div.isConnected) div.remove(); leftCb&&leftCb(); };
@@ -692,7 +683,15 @@ function updateMenuButtons(){
   H(btnLeave, !seated);   // 座っていない時は「席を立つ」を隠す
 }
 const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
-document.addEventListener('click',(e)=>{ outsideClose(e, menuPop); }, true);
+// どこか他所をクリックしたら、すべてのミニポップを即時閉じる
+function closeAllMini(e){
+  document.querySelectorAll('.mini-pop').forEach(pop=>{
+    if(!pop.contains(e.target)) pop.remove();
+  });
+}
+
+document.addEventListener('click',(e)=>{ closeAllMini(e); outsideClose(e, menuPop); }, true);
+
 gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.contains('hidden')) updateMenuButtons(); };
 
 /* 席（タブ即決定） */
@@ -829,14 +828,10 @@ function missionInfo(id){
   }
 }
 
-/* =========================
-   ポップの外側クリックで即クローズ
-   ========================= */
+/* クリック外しで小ポップ閉じる（即時） */
 document.addEventListener('click',(e)=>{
-  // メニュー以外で開いているミニポップを閉じる
-  document.querySelectorAll('.mini-pop').forEach(pop=>{
-    if(!pop.contains(e.target)) pop.remove();
-  });
+  // 旧 miniPop 要素も閉じる
+  if(!miniPop.contains(e.target)) H(miniPop,true);
 }, true);
 </script>
 </body>
