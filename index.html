@@ -1,10 +1,17 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>BOMB BUSTERS</title>
-  <style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BOMB BUSTERS</title>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+<style>
+  
     :root { --bg:#ffffff; --ink:#111; --muted:#6b7280; --brand:#111827; --card:#f3f4f6; --accent:#e5e7eb; --shadow:0 6px 20px rgba(0,0,0,.08); --radius:16px; }
     html,body{height:100%}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:var(--ink);background:var(--bg)}
@@ -345,5 +352,26 @@
     }
   }
   -->
+</body>
+</html>
+
+<script>
+/* ====== Firebase設定（あなたの値に差し替える） ====== */
+const firebaseConfig = {
+  apiKey: "あなたのAPIキー",
+  authDomain: "chat-68c4c.firebaseapp.com",
+  projectId: "chat-68c4c",
+  databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
+  appId: "あなたのApp ID"
+};
+
+/* ====== 初期化 ====== */
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+/* ====== JavaScript本体（前回と同じ） ====== */
+/* ここにキャンバス版の<script>内のコードを貼り付け */
+</script>
 </body>
 </html>
