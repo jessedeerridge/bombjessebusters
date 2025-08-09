@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>BOMB BUSTERS</title>
 <style>
-  :root {
+  :root{
     --gap:10px;
-    --cardW:23px;   /* ← カード幅 */
-    --cardH:70px;   /* ← カード高さ */
-    --cardGap:3px;  /* ← カード間隔 */
-    --letterH:18px; /* 文字ラベルの高さ */
+    --cardW:23px;   /* 指定: 幅23 */
+    --cardH:70px;   /* 指定: 高さ70 */
+    --cardGap:3px;  /* 指定: 間3 */
+    --letterH:18px; /* カード下のa/b/...高さ */
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#fff;color:#111}
@@ -20,7 +20,7 @@
   .panel{border:1px solid #eee;border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);background:#fff}
   .side{width:280px}
   .hidden{display:none !important}
-  input[type="text"]{width:100%;padding:12px;border:1px solid #ddd;border-radius:12px}
+  input[type="text"], input[type="number"]{width:100%;padding:12px;border:1px solid #ddd;border-radius:12px}
   button{padding:10px 14px;border:1px solid #ddd;background:#fff;border-radius:12px;cursor:pointer}
   button.primary{background:#111;color:#fff;border-color:#111}
   button:disabled{opacity:.55;cursor:not-allowed}
@@ -30,32 +30,35 @@
   .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #eee;padding:6px 10px;border-radius:999px;font-size:13px;background:#fafafa}
   .list{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto}
 
-  /* player strip */
-  .player{border:1px solid #eee;border-radius:12px;padding:10px;margin-bottom:10px}
-  .playerHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-  .name{font-weight:700}
+  /* テーブル（席） */
+  .table{border:1px solid #eee;border-radius:12px;padding:8px;margin-bottom:10px}
+  .tableHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .tableTitle{font-weight:700}
+  .occupant{font-size:11px;color:#444}
 
-  /* hands: 横一列15枚想定・改行しない・必要なら横スクロール */
+  /* 手札：横一列15枚想定（nowrap）、必要なら横スクロール */
   .handWrap{overflow-x:auto;padding-bottom:6px}
   .hand{display:flex;gap:var(--cardGap);flex-wrap:nowrap}
 
-  /* 1枚の表示ブロック（カード＋下の文字ラベル） */
+  /* 1枚の表示ブロック（カード＋下の文字） */
   .cardWrap{display:flex;flex-direction:column;align-items:center}
   .letterCell{width:var(--cardW);height:var(--letterH);border:1px solid #eee;border-radius:4px;display:grid;place-items:center;font-size:11px;line-height:1;margin-top:2px}
   .letterCell>button{width:100%;height:100%;border:none;background:transparent;font-size:11px;cursor:pointer}
   .token{font-size:11px;font-weight:700}
 
-  /* 「トークンを置く」ポップ */
+  /* 「トークンを置く」小ボタン */
   .placeBtn{position:absolute;transform:translateY(-6px);font-size:11px;padding:4px 6px;border-radius:8px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);z-index:20}
 
-  /* カード */
+  /* カード本体 */
   .card{width:var(--cardW);height:var(--cardH);border-radius:6px;border:1px solid #ccc;overflow:hidden;user-select:none;cursor:pointer;position:relative}
   .cardInner{display:grid;grid-template-rows:16px 1fr;height:100%}
   .numTop{display:grid;place-items:center;font-weight:700;font-size:11px}
   .lowerArea{width:100%;height:100%}
 
-  /* 表示状態 */
-  /* 他人の未公開：裏面 codeback.png ／ 自分の未公開：白地に数字表示 ／ 公開：黒地＋白字＆下半分画像 */
+  /* 表示状態
+     - 自分の未公開：白地で数字（自分だけ見える）
+     - 他人の未公開：裏面 codeback.png
+     - 公開（全体）：黒地＋白字、下詰めに codenumber.png（＝カード表の仕様） */
   .isBack{
     background:
       url("codeback.png") center/cover no-repeat,
@@ -63,20 +66,21 @@
   }
   .isFaceSelf{background:#fff}
   .isRevealed{background:#000;color:#fff;border-color:#000;outline:2px solid #0a7}
-  .isRevealed .lowerArea{background:url("codenumber.png") center/contain no-repeat}
+  .isRevealed .lowerArea{background:url("codenumber.png") center bottom/contain no-repeat}
   .isBack .numTop{visibility:hidden}
 
-  /* 浮遊メニュー（ホスト設定） */
+  /* 右下の設定メニュー */
   .floating{position:fixed;right:12px;bottom:12px;display:flex;gap:8px}
   .menu{position:relative}
   .menuPopup{position:absolute;right:0;bottom:44px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:8px;display:none}
   .menu.open .menuPopup{display:block}
 
-  /* モーダル（ミッション選択） */
+  /* モーダル（開始ウィザード／座席選択） */
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
-  .sheet{background:#fff;border-radius:16px;max-width:420px;width:calc(100% - 32px);padding:16px;border:1px solid #eee}
+  .sheet{background:#fff;border-radius:16px;max-width:520px;width:calc(100% - 32px);padding:16px;border:1px solid #eee}
   .choices{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px}
   .choice{padding:10px;border:1px solid #ddd;border-radius:10px;text-align:center;cursor:pointer}
+  .rowSmall{display:flex;gap:8px;align-items:center;margin-top:8px}
   @media (max-width:900px){.container{flex-direction:column}.side{width:auto}}
 </style>
 </head>
@@ -122,9 +126,9 @@
       </div>
     </div>
 
-    <!-- Players table -->
-    <div id="tablePanel" class="panel" style="margin-top:12px;">
-      <div id="playersArea"></div>
+    <!-- Tables -->
+    <div id="tablesPanel" class="panel" style="margin-top:12px;">
+      <div id="tablesArea"></div>
     </div>
   </div>
 
@@ -138,23 +142,43 @@
   </aside>
 </section>
 
-<!-- Mission modal -->
-<div id="missionModal" class="modal hidden">
+<!-- Start Wizard -->
+<div id="startModal" class="modal hidden">
   <div class="sheet">
-    <div style="font-weight:800;">ミッションを選択（1〜10）</div>
-    <div class="choices" id="missionChoices"></div>
-    <div class="muted" style="margin-top:8px;">
-      1：1.5のコードが1枚混じる（合計25枚）。/ 2：各自の手札から1枚を右端固定（他は昇順）。
+    <div style="font-weight:800;">プレイ人数を選択</div>
+    <div class="rowSmall">
+      <input id="seatCountInput" type="number" min="2" max="12" value="4" />
+      <button id="seatNext" class="primary" style="flex:none">次へ</button>
+    </div>
+    <div id="missionStep" class="hidden" style="margin-top:12px;">
+      <div style="font-weight:800;">ミッションを選択（1〜10）</div>
+      <div class="choices" id="missionChoices"></div>
+      <div class="muted" style="margin-top:8px;">
+        1：1.5のコードが1枚混じる（合計25枚）。/ 2：各自の手札から1枚を右端固定（他は昇順）。
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Floating host controls -->
-<div id="hostControls" class="floating hidden">
-  <div class="menu" id="hostMenu">
+<!-- Seat selector -->
+<div id="seatSelectModal" class="modal hidden">
+  <div class="sheet">
+    <div style="font-weight:800;">座るテーブルを選択</div>
+    <div id="seatList" class="list" style="margin-top:8px;"></div>
+    <div class="rowSmall">
+      <button id="leaveSeatBtn">席を離れる</button>
+      <div class="muted">※ 退出すると席は空きます（カードは残る）。</div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating controls -->
+<div id="controls" class="floating hidden">
+  <div class="menu" id="menu">
     <button id="settingsBtn">⚙ 設定</button>
-    <div class="menuPopup">
-      <button id="resetBtn">やり直し</button>
+    <div class="menuPopup" id="menuPopup">
+      <button id="chooseSeatBtn">席に座る</button>
+      <button id="resetBtn" class="hidden">やり直し</button>
     </div>
   </div>
 </div>
@@ -167,6 +191,7 @@
     serverTimestamp, onDisconnect, remove, runTransaction
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
+  /* ==== Firebase config (そのまま利用) ==== */
   const firebaseConfig = {
     apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
     authDomain: "chat-68c4c.firebaseapp.com",
@@ -187,13 +212,16 @@
   const startBtn=$("#startBtn"), leaveBtn=$("#leaveBtn");
   const roomCodeLabel=$("#roomCodeLabel"), nameLabel=$("#nameLabel"), roleLabel=$("#roleLabel");
   const playersList=$("#playersList"), spectatorsList=$("#spectatorsList"), sidePanel=$("#sidePanel");
-  const playersArea=$("#playersArea");
-  const missionModal=$("#missionModal"), missionChoices=$("#missionChoices");
-  const hostControls=$("#hostControls"), hostMenu=$("#hostMenu"), settingsBtn=$("#settingsBtn"), resetBtn=$("#resetBtn");
+  const tablesArea=$("#tablesArea");
+  const controls=$("#controls"), menu=$("#menu"), menuPopup=$("#menuPopup"), settingsBtn=$("#settingsBtn");
+  const chooseSeatBtn=$("#chooseSeatBtn"), resetBtn=$("#resetBtn");
+  const startModal=$("#startModal"), seatCountInput=$("#seatCountInput"), seatNext=$("#seatNext"), missionStep=$("#missionStep"), missionChoices=$("#missionChoices");
+  const seatSelectModal=$("#seatSelectModal"), seatList=$("#seatList"), leaveSeatBtn=$("#leaveSeatBtn");
 
   // State
   let state = {
-    roomCode:null, userId:null, name:null, role:null, isHost:false, phase:"lobby", mission:null
+    roomCode:null, userId:null, name:null, role:null, isHost:false,
+    phase:"lobby", mission:null, seatCount:0, mySeat:null
   };
 
   // helpers
@@ -207,16 +235,16 @@
     const A=["赤","青","黄","緑","桃","黒","白","金","銀","茶"],B=["ねこ","いぬ","うさぎ","たぬき","きつね","くま","とり","さかな","ドラゴン","ペンギン"],n=Math.floor(Math.random()*900)+100;
     return A[Math.floor(Math.random()*A.length)]+B[Math.floor(Math.random()*B.length)]+n;
   };
-  const cardVal = txt => parseFloat(txt); // "1.5"対応
-  const indexToLetter = i => String.fromCharCode(65 + i); // 0->A, 11->L, 12->M
+  const cardVal = txt => parseFloat(txt); // 1.5 もOK
+  const indexToLetter = i => String.fromCharCode(97 + i); // 0:a, 11:l, 12:m
 
-  // room ensure
+  // ensure room
   async function ensureRoom(code){
     const r = ref(db, `rooms/${code}`);
     const s = await get(r);
     if(!s.exists()){
-      await set(r,{ createdAt:serverTimestamp(), hostId:null, phase:"lobby", mission:null,
-        players:{}, spectators:{}, hands:{}, tokens:{}, wants:{} });
+      await set(r,{ createdAt:serverTimestamp(), hostId:null, phase:"lobby", mission:null, seatCount:0,
+        players:{}, spectators:{}, wants:{}, seats:{} });
     }
     return r;
   }
@@ -250,7 +278,7 @@
     await set(meRef,{ name:state.name, joinedAt:serverTimestamp() });
     onDisconnect(meRef).remove();
 
-    // 参加希望フラグ（やり直し時の復帰に使用）
+    // 参加希望（やり直し時に復帰）
     await set(ref(db, `rooms/${state.roomCode}/wants/${state.userId}`), { wantsPlayer: role==="player", name: state.name });
     onDisconnect(ref(db, `rooms/${state.roomCode}/wants/${state.userId}`)).remove();
 
@@ -263,15 +291,18 @@
     onValue(roomRef,(snap)=>{
       const v=snap.val()||{};
       state.phase=v.phase||"lobby"; state.mission=v.mission||null; state.isHost=(v.hostId===state.userId);
+      state.seatCount=v.seatCount||0;
 
       startBtn.classList.toggle("hidden", !(state.isHost && state.phase==="lobby" && state.role==="player"));
       sidePanel.classList.toggle("hidden", state.phase!=="lobby");
-      hostControls.classList.toggle("hidden", !(state.isHost && state.phase==="playing"));
+      controls.classList.toggle("hidden", state.phase!=="playing");
+      resetBtn.classList.toggle("hidden", !state.isHost);
 
       renderList(playersList, v.players||{});
       renderList(spectatorsList, v.spectators||{});
 
-      renderAllHands(v);
+      detectMySeat(v);
+      renderTables(v);
     });
 
     onValue(ref(db,`rooms/${code}/players`),(s)=>renderList(playersList,s.val()||{}));
@@ -286,101 +317,269 @@
       const d=div("div","pill"); d.textContent=map[id].name||"???"; container.appendChild(d);
     });
   }
+  const div = (tag,cls,text)=>{const el=document.createElement(tag); if(cls)el.className=cls; if(text!=null)el.textContent=text; return el;};
 
-  function div(tag,cls,text){const el=document.createElement(tag); if(cls)el.className=cls; if(text!=null)el.textContent=text; return el;}
-
-  // ===== Start -> Mission selection -> Deal =====
-  startBtn.addEventListener("click", async ()=>{
+  /* ======= Start（人数→ミッション→配布） ======= */
+  startBtn.addEventListener("click", ()=>{
     if(!(state.isHost && state.phase==="lobby")) return;
-    openMissionModal();
+    missionStep.classList.add("hidden");
+    startModal.classList.remove("hidden");
   });
-
-  function openMissionModal(){
+  seatNext.addEventListener("click", ()=>{
     missionChoices.innerHTML="";
     for(let i=1;i<=10;i++){
       const b=div("button","choice",String(i));
-      b.addEventListener("click", ()=>chooseMission(i));
+      b.addEventListener("click", ()=>startGame(Math.max(2, Math.min(12, parseInt(seatCountInput.value,10)||4)), i));
       missionChoices.appendChild(b);
     }
-    missionModal.classList.remove("hidden");
-  }
+    missionStep.classList.remove("hidden");
+  });
 
-  async function chooseMission(m){
-    missionModal.classList.add("hidden");
+  async function startGame(seatCount, mission){
+    startModal.classList.add("hidden");
     const code=state.roomCode;
 
-    // players
-    const playersSnap=await get(ref(db,`rooms/${code}/players`));
-    const players=playersSnap.val()||{}; const pids=Object.keys(players);
-    if(!pids.length) return alert("参加者がいません。");
-
-    // deck：1..12 *2（=24）
-    let deck=[];
-    let cid=0;
+    // デッキ：1..12×2=24（M1なら+1.5）
+    let deck=[]; let cid=0;
     for(let v=1;v<=12;v++){ deck.push({id:`c${cid++}`,text:String(v)}); deck.push({id:`c${cid++}`,text:String(v)}); }
-    if(m===1){ deck.push({ id:`c${cid++}`, text:"1.5", special:true }); } // 合計25
+    if(mission===1){ deck.push({id:`c${cid++}`,text:"1.5", special:true}); }
 
     // シャッフル
     for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
 
-    // ラウンドロビン配布（余りなし）
-    const hands={}; pids.forEach(pid=>hands[pid]={});
-    let k=0;
+    // 席を作成し、ラウンドロビンで余りなく配布（均等でなくてOK）
+    const seats={};
+    for(let s=1;s<=seatCount;s++){ seats[s]={ hand:{}, tokens:{} }; }
+    let k=0, sidx=1;
     while(k<deck.length){
-      for(const pid of pids){
-        if(k>=deck.length) break;
-        const card=deck[k++]; hands[pid][card.id]={...card, owner:pid, revealed:false};
-      }
+      const c=deck[k++]; seats[sidx].hand[c.id]={...c, revealed:false};
+      sidx++; if(sidx>seatCount) sidx=1;
     }
 
-    // 手札の並び順（保存時に決めて、全員が同じ順で見えるようにする）
-    for(const pid of pids){
-      // ids -> ソート対象
-      let arr = Object.keys(hands[pid]).map(id=>({id, ...hands[pid][id]}));
-      if(m===2){
-        // ランダム1枚を右端固定、残りは昇順
+    // 並び順（規定は昇順）。M2は各席でランダム1枚を右端固定
+    const val = (t)=>parseFloat(t);
+    for(let s=1;s<=seatCount;s++){
+      let arr = Object.keys(seats[s].hand).map(id=>({id, ...seats[s].hand[id]}));
+      if(mission===2 && arr.length){
         const pick = arr[Math.floor(Math.random()*arr.length)];
-        const rest = arr.filter(x=>x.id!==pick.id).sort((a,b)=>cardVal(a.text)-cardVal(b.text));
-        arr = [...rest, { ...pick, pinRight:true }];
+        const rest = arr.filter(x=>x.id!==pick.id).sort((a,b)=>val(a.text)-val(b.text));
+        arr = [...rest, {...pick, pinRight:true}];
       }else{
-        // 規定：昇順
-        arr.sort((a,b)=>cardVal(a.text)-cardVal(b.text));
+        arr.sort((a,b)=>val(a.text)-val(b.text));
       }
-      // order を埋め直し
-      arr.forEach((c,idx)=>{ hands[pid][c.id] = { ...c, order: idx }; });
+      arr.forEach((c,i)=>{ seats[s].hand[c.id]={...c, order:i}; });
     }
 
     await update(ref(db,`rooms/${code}`),{
       phase:"playing",
-      mission:m,
-      hands,
-      tokens:{}    // トークン初期化
+      mission,
+      seatCount,
+      seats
     });
   }
 
-  // ===== 公開/非公開トグル（誰が押しても可） =====
-  async function toggleReveal(ownerId, cardId){
+  /* ======= 設定：座席選択／やり直し ======= */
+  settingsBtn.addEventListener("click", ()=>menu.classList.toggle("open"));
+  chooseSeatBtn.addEventListener("click", openSeatSelector);
+
+  function openSeatSelector(){
     const code=state.roomCode;
-    const path = `rooms/${code}/hands/${ownerId}/${cardId}/revealed`;
+    seatList.innerHTML="";
+    onValue(ref(db,`rooms/${code}/seats`),(snap)=>{
+      const seats=snap.val()||{};
+      seatList.innerHTML="";
+      Object.keys(seats).forEach(idx=>{
+        const occUser = seats[idx].occupantUser;
+        const occName = seats[idx].occupantName;
+        const btn = document.createElement("button");
+        btn.textContent = `テーブル${idx}：` + (occUser ? `${occName} が着席中` : "空席");
+        const occupied = !!occUser && occUser!==state.userId;
+        // 指示: ホスト以外は占有席に座れない（※ホストも上書きはしない実装。希望あれば上書き版に変更可）
+        btn.disabled = occupied; 
+        btn.style.padding="8px"; btn.style.border="1px solid #ddd"; btn.style.borderRadius="10px"; btn.style.background="#fff"; btn.style.textAlign="left";
+        btn.onclick=()=>claimSeat(idx);
+        seatList.appendChild(btn);
+      });
+    }, { onlyOnce:true });
+    seatSelectModal.classList.remove("hidden");
+  }
+
+  async function claimSeat(idx){
+    const code=state.roomCode;
+    // 空席なら自分を設定（占有席はボタン無効なのでここには来ない）
+    const seatUserRef = ref(db,`rooms/${code}/seats/${idx}/occupantUser`);
+    const res = await runTransaction(seatUserRef,(cur)=> cur || state.userId);
+    if(!res.committed || res.snapshot.val()!==state.userId){
+      alert("その席には座れません（既に埋まっています）。");
+      return;
+    }
+    await update(ref(db,`rooms/${code}/seats/${idx}`),{ occupantName: state.name });
+    state.mySeat = String(idx);
+
+    // 離脱時に席だけ空ける（手札やトークンは残す）
+    onDisconnect(ref(db,`rooms/${code}/seats/${idx}/occupantUser`)).remove();
+    onDisconnect(ref(db,`rooms/${code}/seats/${idx}/occupantName`)).remove();
+
+    seatSelectModal.classList.add("hidden");
+    menu.classList.remove("open");
+  }
+
+  leaveSeatBtn.addEventListener("click", async ()=>{
+    if(!state.mySeat){ seatSelectModal.classList.add("hidden"); return; }
+    const code=state.roomCode;
+    await update(ref(db,`rooms/${code}/seats/${state.mySeat}`),{ occupantUser: null, occupantName: null });
+    state.mySeat=null;
+    seatSelectModal.classList.add("hidden");
+  });
+
+  resetBtn.addEventListener("click", async ()=>{
+    if(!state.isHost) return;
+    const ok = confirm("やり直しますか？ロビーに戻り、参加を押していた人は全員プレイヤーに復帰します。");
+    if(!ok) return;
+    const code=state.roomCode;
+
+    const [pS, sS, wS] = await Promise.all([
+      get(ref(db,`rooms/${code}/players`)),
+      get(ref(db,`rooms/${code}/spectators`)),
+      get(ref(db,`rooms/${code}/wants`))
+    ]);
+    const curP = pS.val()||{}, curS=sS.val()||{}, wants=wS.val()||{};
+    const present = { ...curP, ...curS };
+
+    const nextPlayers = {};
+    const nextSpectators = {};
+    Object.keys(present).forEach(uid=>{
+      if(wants[uid]?.wantsPlayer){
+        nextPlayers[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" };
+      }else{
+        nextSpectators[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" };
+      }
+    });
+
+    await update(ref(db,`rooms/${code}`),{
+      phase:"lobby",
+      mission:null,
+      seatCount:0,
+      seats:{},
+      players: nextPlayers,
+      spectators: nextSpectators
+    });
+    menu.classList.remove("open");
+  });
+
+  /* ======= レンダリング ======= */
+  function detectMySeat(roomVal){
+    state.mySeat = null;
+    const seats = roomVal.seats||{};
+    Object.keys(seats).forEach(idx=>{
+      if(seats[idx].occupantUser === state.userId) state.mySeat = String(idx);
+    });
+  }
+
+  function canOperateOnSeat(seatIdx){
+    // 「自分のカードしか押せない」= 自分が着席しているテーブルだけ操作可
+    return state.mySeat && String(seatIdx)===String(state.mySeat);
+  }
+
+  function renderTables(roomVal){
+    tablesArea.innerHTML="";
+    const seats = roomVal.seats||{};
+    const seatKeys = Object.keys(seats);
+    if(!seatKeys.length){
+      tablesArea.appendChild(div("div","muted","（テーブルはまだありません）"));
+      return;
+    }
+
+    seatKeys.forEach(idx=>{
+      const seat = seats[idx];
+      const table = div("div","table");
+      const header = div("div","tableHeader");
+      const title = div("div","tableTitle", `テーブル ${idx}`);
+      const occ = div("div","occupant", seat.occupantName ? `👤 ${seat.occupantName}` : "空席");
+      header.appendChild(title); header.appendChild(occ);
+      table.appendChild(header);
+
+      const handWrap=div("div","handWrap");
+      const handEl=div("div","hand");
+
+      let arr = Object.keys(seat.hand||{}).map(id=>({id, ...seat.hand[id]}));
+      arr.sort((a,b)=>(a.order??0)-(b.order??0));
+
+      arr.forEach((c,i)=>{
+        const wrap = div("div","cardWrap");
+        const card = div("div","card");
+        const inner = div("div","cardInner");
+        const top = div("div","numTop","");
+        const lower = div("div","lowerArea");
+
+        const revealed = !!c.revealed;
+        const isMineSeat = canOperateOnSeat(idx);
+
+        if(revealed){
+          card.classList.add("isRevealed");
+          top.textContent = c.text;
+        }else{
+          if(isMineSeat){
+            // 自分だけ表を見られる（白地＋数字）
+            card.classList.add("isFaceSelf");
+            top.textContent = c.text;
+          }else{
+            // 他者には裏
+            card.classList.add("isBack");
+          }
+        }
+
+        inner.appendChild(top);
+        inner.appendChild(lower);
+        card.appendChild(inner);
+
+        // クリックで公開/非公開トグル（自分の席のカードだけ）
+        if(isMineSeat){
+          card.title = revealed ? "クリックで裏に戻す" : "クリックで公開";
+          card.onclick = ()=>toggleReveal(idx,c.id);
+        }else{
+          card.title = "";
+          card.style.cursor = "default";
+        }
+
+        // 文字ラベル（a,b,c... 1枚につき1文字）
+        const letter = indexToLetter(i);
+        const letterCell = makeLetterCell(idx,c,letter,isMineSeat);
+
+        wrap.appendChild(card);
+        wrap.appendChild(letterCell);
+        handEl.appendChild(wrap);
+      });
+
+      handWrap.appendChild(handEl);
+      table.appendChild(handWrap);
+      tablesArea.appendChild(table);
+    });
+  }
+
+  /* ======= 公開/非公開トグル（自席のみ） ======= */
+  async function toggleReveal(seatIdx, cardId){
+    if(!canOperateOnSeat(seatIdx)) return;
+    const code=state.roomCode;
+    const path = `rooms/${code}/seats/${seatIdx}/hand/${cardId}/revealed`;
     await runTransaction(ref(db,path),(prev)=>!prev);
   }
 
-  // ===== トークン関連 =====
-  function makeLetterCell(ownerId, card, letter, anchorEl){
+  /* ======= トークン ======= */
+  function makeLetterCell(seatIdx, card, letter, isMineSeat){
     const cell=div("div","letterCell");
-    const tokenRef = ref(db, `rooms/${state.roomCode}/tokens/${ownerId}/${card.id}`);
+    const tokenRef = ref(db, `rooms/${state.roomCode}/seats/${seatIdx}/tokens/${card.id}`);
     onValue(tokenRef,(s)=>{
       cell.innerHTML="";
       const v=s.val();
       if(v==null){
-        if(ownerId===state.userId && state.phase==="playing"){
+        if(isMineSeat){
           const b=document.createElement("button");
           b.textContent=letter;
           b.onclick=(ev)=>{
-            // 小さな「トークンを置く」ボタン
             showPlaceBtn(ev.currentTarget, ()=>{
               update(ref(db),{
-                [`rooms/${state.roomCode}/tokens/${ownerId}/${card.id}`]: card.text
+                [`rooms/${state.roomCode}/seats/${seatIdx}/tokens/${card.id}`]: card.text
               });
             });
           };
@@ -409,112 +608,15 @@
     setTimeout(()=>document.addEventListener("click",closer,true),0);
   }
 
-  // ===== 全員の手札表示（順序は保存された order に従う） =====
-  function renderAllHands(roomVal){
-    playersArea.innerHTML="";
-    const players = roomVal.players||{};
-    const hands = roomVal.hands||{};
-    const hostId = roomVal.hostId;
-
-    Object.keys(players).forEach(pid=>{
-      const strip=div("div","player");
-      const header=div("div","playerHeader");
-      header.appendChild(div("div","name", (players[pid].name||"???") + (pid===hostId?"（ホスト）":"")));
-      strip.appendChild(header);
-
-      const handWrap=div("div","handWrap");
-      const handEl=div("div","hand");
-
-      let arr = Object.keys(hands[pid]||{}).map(id=>({id, ...hands[pid][id]}));
-      // order で統一表示（自分も他人も同じ見た目の順序）
-      arr.sort((a,b)=>(a.order??0)-(b.order??0));
-
-      arr.forEach((c,idx)=>{
-        const wrap = div("div","cardWrap");
-        const card = div("div","card");
-        const inner = div("div","cardInner");
-        const top = div("div","numTop", "");
-        const lower = div("div","lowerArea");
-
-        const revealed = !!c.revealed;
-        const isSelf = pid===state.userId;
-
-        if(revealed){
-          card.classList.add("isRevealed");
-          top.textContent = c.text;
-        }else{
-          if(isSelf){
-            card.classList.add("isFaceSelf");
-            top.textContent = c.text;
-          }else{
-            card.classList.add("isBack");
-          }
-        }
-
-        inner.appendChild(top);
-        inner.appendChild(lower);
-        card.appendChild(inner);
-        card.title = revealed ? "クリックで裏に戻す" : "クリックで公開";
-        card.onclick = ()=>toggleReveal(pid,c.id);
-
-        // 文字ラベル（A,B,C...）
-        const letter = indexToLetter(idx); // 0:A, 11:L, 12:M
-        const letterCell = makeLetterCell(pid,c,letter,card);
-
-        wrap.appendChild(card);
-        wrap.appendChild(letterCell);
-        handEl.appendChild(wrap);
-      });
-
-      handWrap.appendChild(handEl);
-      strip.appendChild(handWrap);
-      playersArea.appendChild(strip);
-    });
-  }
-
-  // ===== ホスト設定（やり直し） =====
-  settingsBtn.addEventListener("click", ()=>hostMenu.classList.toggle("open"));
-  resetBtn.addEventListener("click", async ()=>{
-    if(!state.isHost) return;
-    const ok = confirm("ゲームをやり直しますか？ロビーに戻り、参加希望の人は全員プレイヤーに復帰します。");
-    if(!ok) return;
-    const code=state.roomCode;
-
-    const [pS, sS, wS] = await Promise.all([
-      get(ref(db,`rooms/${code}/players`)),
-      get(ref(db,`rooms/${code}/spectators`)),
-      get(ref(db,`rooms/${code}/wants`))
-    ]);
-    const curP = pS.val()||{}, curS=sS.val()||{}, wants=wS.val()||{};
-    const present = { ...curP, ...curS };
-
-    const nextPlayers = {};
-    const nextSpectators = {};
-    Object.keys(present).forEach(uid=>{
-      if(wants[uid]?.wantsPlayer){
-        nextPlayers[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" };
-      }else{
-        nextSpectators[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" };
-      }
-    });
-
-    await update(ref(db,`rooms/${code}`),{
-      phase:"lobby",
-      mission:null,
-      hands:{},
-      tokens:{},
-      players: nextPlayers,
-      spectators: nextSpectators
-    });
-    hostMenu.classList.remove("open");
-  });
-
-  // 退室
+  /* ======= 退室 ======= */
   leaveBtn.addEventListener("click", async ()=>{
     const code=state.roomCode; if(!code) return;
+    // 席から外す（カードは残す）
+    if(state.mySeat){
+      await update(ref(db,`rooms/${code}/seats/${state.mySeat}`),{ occupantUser:null, occupantName:null });
+    }
     const base = state.role==="player" ? "players" : "spectators";
     await remove(ref(db,`rooms/${code}/${base}/${state.userId}`));
-    await remove(ref(db,`rooms/${code}/hands/${state.userId}`));
     await remove(ref(db,`rooms/${code}/wants/${state.userId}`));
     location.href = location.origin + location.pathname;
   });
@@ -525,7 +627,7 @@
     const code=cleanCode(url.searchParams.get("room")||"");
     if(code) roomCodeInput.value=code;
     setView("join");
-    document.addEventListener("click",(e)=>{ if(!hostMenu.contains(e.target)) hostMenu.classList.remove("open"); });
+    document.addEventListener("click",(e)=>{ if(!menu.contains(e.target)) menu.classList.remove("open"); });
   })();
 </script>
 </body>
