@@ -5,117 +5,65 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>BOMB BUSTERS</title>
   <style>
-    :root {
-      --bg: #ffffff;
-      --ink: #111111;
-      --muted: #6b7280;
-      --brand: #111827;
-      --card: #f3f4f6;
-      --accent: #e5e7eb;
-      --ok: #16a34a;
-      --danger: #dc2626;
-      --shadow: 0 6px 20px rgba(0,0,0,.08);
-      --radius: 16px;
-    }
-    html, body { height: 100%; }
-    body {
-      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
-      color: var(--ink); background: var(--bg);
-    }
-
-    /* App Shell */
-    .app {
-      min-height: 100%; display: grid; grid-template-rows: auto 1fr;
-    }
-    header {
-      position: sticky; top: 0; z-index: 10;
-      background: var(--bg); box-shadow: var(--shadow);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 16px; gap: 8px;
-    }
-    .title {
-      font-weight: 800; letter-spacing: .02em; font-size: 20px;
-    }
-    .sub { color: var(--muted); font-size: 12px; }
-    .right-tools { display:flex; align-items:center; gap:8px; }
-    .btn { appearance:none; border:0; background: var(--brand); color:#fff; padding:10px 14px; border-radius: 999px; font-weight:700; font-size:14px; box-shadow: var(--shadow); }
-    .btn[disabled] { opacity:.5; }
-    .btn-ghost { background: transparent; color: var(--brand); border: 1px solid var(--accent); }
-    .chip { font-size:12px; background: var(--accent); padding: 4px 10px; border-radius: 999px; }
-
-    /* Layout: mobile-first (smartphone width) */
-    .main {
-      display: grid; grid-template-columns: 1fr; gap: 12px;
-      padding: 12px; max-width: 520px; margin: 0 auto 80px;
-    }
-
-    /* Right column (lists) becomes a slide-in panel on mobile */
-    .lists-panel {
-      position: relative; border: 1px solid var(--accent); border-radius: var(--radius);
-      background: #fff; overflow: clip; box-shadow: var(--shadow);
-    }
-    .lists-header { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:#fafafa; border-bottom:1px solid var(--accent); }
-    .lists {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px;
-    }
-    .list { background: var(--card); border-radius: 12px; padding: 8px; }
-    .list h4 { margin: 0 0 6px; font-size: 12px; color: var(--muted); }
-    .list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-    .pill { padding: 6px 10px; background: #fff; border-radius: 999px; border:1px solid var(--accent); font-size: 13px; }
-
-    /* Join / Lobby */
-    .card { background: #fff; border: 1px solid var(--accent); border-radius: var(--radius); box-shadow: var(--shadow); overflow: clip; }
-    .card .card-h { padding: 12px; background: #fafafa; border-bottom: 1px solid var(--accent); font-weight: 700; }
-    .card .card-c { padding: 12px; display: grid; gap: 10px; }
-    .row { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; }
-    .row input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--accent); font-size: 14px; }
-
-    /* Game table */
-    .table { display: grid; gap: 12px; }
-    .players { display: grid; gap: 12px; }
-    .player {
-      border: 1px solid var(--accent); border-radius: 14px; overflow: clip; background: #fff;
-    }
-    .player-h { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#fafafa; border-bottom:1px solid var(--accent); }
-    .player-h .name { font-weight: 700; }
-    .tags { display:flex; gap:6px; align-items:center; }
-
-    .hand { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(36px, 1fr); gap: 6px; padding: 10px; overflow-x: auto; }
-    .cardv { aspect-ratio: 3/4; border-radius: 8px; display:grid; place-items:center; font-weight:800; font-size: 16px; background: #fff; border: 1px solid var(--accent); position: relative; }
-    .cardv.revealed { background: #fff; }
-    .cardv.face-down { background: #f9fafb; }
-    .cardv img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
-
-    .muted { color: var(--muted); }
-
-    /* Floating Host Settings (right-bottom) */
-    .fab {
-      position: fixed; right: 16px; bottom: 16px; z-index: 30; display:none;
-    }
-    .fab .gear { width: 56px; height: 56px; border-radius: 999px; background: var(--brand); color:#fff; display:grid; place-items:center; box-shadow: var(--shadow); border: none; }
-    .menu { position: absolute; right: 0; bottom: 70px; background:#fff; border:1px solid var(--accent); border-radius: 12px; box-shadow: var(--shadow); display:none; min-width: 200px; overflow: hidden; }
-    .menu button { width: 100%; display:block; padding: 12px; text-align:left; border: none; background: #fff; }
-    .menu button:hover { background:#fafafa; }
-
-    /* Modal */
-    dialog { border: 1px solid var(--accent); border-radius: 16px; padding: 0; box-shadow: var(--shadow); }
-    .modal-h { padding: 12px; font-weight: 700; border-bottom: 1px solid var(--accent); background:#fafafa; }
-    .modal-c { padding: 12px; display:grid; gap:8px; }
-    .modal-f { display:flex; justify-content:flex-end; gap:8px; padding: 12px; border-top: 1px solid var(--accent); }
-
-    /* Small screens stick to single column, but if screen ≥ 480px show lists on the right */
-    @media (min-width: 480px) {
-      .main { grid-template-columns: 1fr 210px; align-items: start; }
-      .lists-panel { position: sticky; top: 72px; }
-    }
+    :root { --bg:#ffffff; --ink:#111; --muted:#6b7280; --brand:#111827; --card:#f3f4f6; --accent:#e5e7eb; --shadow:0 6px 20px rgba(0,0,0,.08); --radius:16px; }
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:var(--ink);background:var(--bg)}
+    .app{min-height:100%;display:grid;grid-template-rows:auto 1fr}
+    header{position:sticky;top:0;z-index:10;background:var(--bg);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;padding:12px 16px;gap:8px}
+    .title{font-weight:800;letter-spacing:.02em;font-size:20px}
+    .sub{color:var(--muted);font-size:12px}
+    .right-tools{display:flex;align-items:center;gap:8px}
+    .btn{appearance:none;border:0;background:var(--brand);color:#fff;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;box-shadow:var(--shadow)}
+    .btn[disabled]{opacity:.5}
+    .btn-ghost{background:transparent;color:var(--brand);border:1px solid var(--accent)}
+    .chip{font-size:12px;background:var(--accent);padding:4px 10px;border-radius:999px}
+    .main{display:grid;grid-template-columns:1fr;gap:12px;padding:12px;max-width:520px;margin:0 auto 80px}
+    .lists-panel{position:relative;border:1px solid var(--accent);border-radius:var(--radius);background:#fff;overflow:clip;box-shadow:var(--shadow)}
+    .lists-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#fafafa;border-bottom:1px solid var(--accent)}
+    .lists{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}
+    .list{background:var(--card);border-radius:12px;padding:8px}
+    .list h4{margin:0 0 6px;font-size:12px;color:var(--muted)}
+    .list ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+    .pill{padding:6px 10px;background:#fff;border-radius:999px;border:1px solid var(--accent);font-size:13px}
+    .card{background:#fff;border:1px solid var(--accent);border-radius:var(--radius);box-shadow:var(--shadow);overflow:clip}
+    .card .card-h{padding:12px;background:#fafafa;border-bottom:1px solid var(--accent);font-weight:700}
+    .card .card-c{padding:12px;display:grid;gap:10px}
+    .row{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:8px}
+    .row input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--accent);font-size:14px}
+    .table{display:grid;gap:12px}
+    .players{display:grid;gap:12px}
+    .player{border:1px solid var(--accent);border-radius:14px;overflow:clip;background:#fff}
+    .player-h{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fafafa;border-bottom:1px solid var(--accent)}
+    .player-h .name{font-weight:700}
+    .tags{display:flex;gap:6px;align-items:center}
+    .hand{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(36px,1fr);gap:6px;padding:10px;overflow-x:auto}
+    .cardv{aspect-ratio:3/4;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:16px;background:#fff;border:1px solid var(--accent);position:relative}
+    .cardv.revealed{background:#fff}
+    .cardv.face-down{background:#f9fafb}
+    .cardv img{width:100%;height:100%;object-fit:cover;border-radius:8px}
+    .muted{color:var(--muted)}
+    .fab{position:fixed;right:16px;bottom:16px;z-index:30;display:none}
+    .fab .gear{width:56px;height:56px;border-radius:999px;background:var(--brand);color:#fff;display:grid;place-items:center;box-shadow:var(--shadow);border:none}
+    .menu{position:absolute;right:0;bottom:70px;background:#fff;border:1px solid var(--accent);border-radius:12px;box-shadow:var(--shadow);display:none;min-width:200px;overflow:hidden}
+    .menu button{width:100%;display:block;padding:12px;text-align:left;border:none;background:#fff}
+    .menu button:hover{background:#fafafa}
+    dialog{border:1px solid var(--accent);border-radius:16px;padding:0;box-shadow:var(--shadow)}
+    .modal-h{padding:12px;font-weight:700;border-bottom:1px solid var(--accent);background:#fafafa}
+    .modal-c{padding:12px;display:grid;gap:8px}
+    .modal-f{display:flex;justify-content:flex-end;gap:8px;padding:12px;border-top:1px solid var(--accent)}
+    @media (min-width:480px){.main{grid-template-columns:1fr 210px;align-items:start}.lists-panel{position:sticky;top:72px}}
   </style>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 <body>
   <div class="app">
     <header>
       <div>
         <div class="title">BOMB&nbsp;BUSTERS</div>
-        <div class="sub">スマホ向けUIデモ（フロントのみ）</div>
+        <div class="sub">スマホ向けUI＋Firestore同期（最小実装）</div>
       </div>
       <div class="right-tools">
         <span id="roomStatus" class="chip">未入室</span>
@@ -124,100 +72,69 @@
     </header>
 
     <main class="main">
-      <!-- LEFT: Lobby + Table -->
       <section class="table">
-        <!-- Lobby Card -->
         <div id="lobby" class="card">
           <div class="card-h">入室</div>
           <div class="card-c">
-            <div class="row">
-              <label for="name">名前</label>
-              <input id="name" maxlength="12" placeholder="たろう" />
-            </div>
-            <div class="row">
-              <label for="room">ルーム</label>
-              <input id="room" inputmode="numeric" pattern="[0-9]*" placeholder="4桁コード" />
-            </div>
-            <div style="display:flex; gap:8px; align-items:center;">
+            <div class="row"><label for="name">名前</label><input id="name" maxlength="12" placeholder="たろう" /></div>
+            <div class="row"><label for="room">ルーム</label><input id="room" inputmode="numeric" pattern="[0-9]*" placeholder="4桁コード" /></div>
+            <div style="display:flex;gap:8px;align-items:center;">
               <button id="joinBtn" class="btn">入室</button>
-              <span class="muted" style="font-size:12px;">同じルームコードで同室へ</span>
+              <span class="muted" style="font-size:12px;">同じルームコードで同室へ（リアルタイム）</span>
             </div>
           </div>
         </div>
 
-        <!-- Player Area (appears after joined) -->
         <div id="tableArea" class="players" hidden></div>
-
-        <!-- Note about assets -->
-        <p class="muted" style="font-size:12px; margin: 0 6px;">※ 裏向きカード画像のファイル名は「code裏.png」を参照（同フォルダに配置してください）。画像が無い場合はグレーのカードで代替します。</p>
+        <p class="muted" style="font-size:12px;margin:0 6px;">※ 裏向きカード画像のファイル名は「code裏.png」。無ければグレー表示。</p>
       </section>
 
-      <!-- RIGHT: Lists -->
       <aside id="listsWrap" class="lists-panel">
-        <div class="lists-header">
-          <div>現在の部屋</div>
-          <div class="chip" id="roomLabel">----</div>
-        </div>
+        <div class="lists-header"><div>現在の部屋</div><div class="chip" id="roomLabel">----</div></div>
         <div class="lists">
-          <div class="list">
-            <h4>参加者</h4>
-            <ul id="participants"></ul>
-          </div>
-          <div class="list">
-            <h4>観戦者</h4>
-            <ul id="spectators"></ul>
-          </div>
+          <div class="list"><h4>参加者</h4><ul id="participants"></ul></div>
+          <div class="list"><h4>観戦者</h4><ul id="spectators"></ul></div>
         </div>
       </aside>
     </main>
 
-    <!-- Floating Host Settings -->
     <div class="fab" id="hostFab">
       <button class="gear" id="gearBtn" aria-label="設定">⚙️</button>
-      <div class="menu" id="hostMenu">
-        <button id="resetBtn">ゲームリセット</button>
-      </div>
+      <div class="menu" id="hostMenu"><button id="resetBtn">ゲームリセット</button></div>
     </div>
   </div>
 
-  <!-- Choose role modal -->
   <dialog id="roleModal">
     <div class="modal-h">役割を選択</div>
     <div class="modal-c">
       <button id="asPlayer" class="btn">参加者として入室</button>
       <button id="asSpectator" class="btn btn-ghost">観戦者として入室</button>
-      <p class="muted" id="joinNote" style="font-size:12px; margin:6px 0 0;">ゲーム開始後は参加として入っても観戦になります。</p>
+      <p class="muted" id="joinNote" style="font-size:12px;margin:6px 0 0;">ゲーム開始後は参加で入っても観戦になります。</p>
     </div>
-    <div class="modal-f">
-      <button id="closeRole" class="btn btn-ghost">閉じる</button>
-    </div>
+    <div class="modal-f"><button id="closeRole" class="btn btn-ghost">閉じる</button></div>
   </dialog>
 
   <script>
-    /**
-     * シンプルなフロントエンド実装（リアルタイム同期なし）
-     * - 1~12 のカードを2枚ずつ（合計24枚）
-     * - シャッフル後、参加者へ均等配布
-     * - 自分の手札は昇順表示＆表向き。他プレイヤーは裏向き（クリックで公開=全体に公開された扱い）
-     * - 参加者/観戦者リストは右側。ゲーム開始後は非表示
-     * - ホストのみ「ゲーム開始」ボタン＆右下の設定（リセット）
-     *
-     * ※ 実際の複数人同期はサーバ実装が必要です。本デモはUIとローカル状態の動作のみ。
-     */
-
-    const el = (id) => document.getElementById(id);
-
-    // 状態
-    const state = {
-      selfId: null,
-      selfName: "",
-      room: null,
-      players: [], // {id, name, role:"player"|"spectator", isHost: bool, hand: number[], publicReveals: Set<string>}
-      gameStarted: false,
-      deck: [],
+    // =======================
+    // 🔧 Firebase 初期化
+    // =======================
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT",
+      appId: "YOUR_APP_ID"
     };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
 
-    // DOM 参照
+    // 匿名ログイン
+    auth.signInAnonymously().catch(console.error);
+
+    // =======================
+    // ローカル状態
+    // =======================
+    const el = (id)=>document.getElementById(id);
     const participantsUl = el('participants');
     const spectatorsUl = el('spectators');
     const startBtn = el('startBtn');
@@ -229,206 +146,204 @@
     const hostFab = el('hostFab');
     const hostMenu = el('hostMenu');
 
-    // 画像存在チェック（code裏.png が無い場合のフォールバック）
-    let backImageAvailable = false;
-    (function checkBackImg(){
-      const testImg = new Image();
-      testImg.onload = () => backImageAvailable = true;
-      testImg.onerror = () => backImageAvailable = false;
-      testImg.src = 'code裏.png';
-    })();
+    let self = { id:null, name:"", room:null, role:null, isHost:false };
+    let unsubRoom = null, unsubPlayers = null;
+    let backImageAvailable = false; (function(){ const t=new Image(); t.onload=()=>backImageAvailable=true; t.onerror=()=>backImageAvailable=false; t.src='code裏.png'; })();
 
-    // ユーティリティ
-    function uid(){ return Math.random().toString(36).slice(2,10) }
-    function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
+    function sortAscending(a){ return [...a].sort((x,y)=>x-y); }
 
-    function renderLists(){
-      participantsUl.innerHTML = '';
-      spectatorsUl.innerHTML = '';
-      state.players.filter(p=>p.role==='player').forEach(p=>{
-        const li = document.createElement('li');
-        li.className = 'pill';
-        li.textContent = `${p.name}${p.isHost?'（ホスト）':''}${p.id===state.selfId?'（自分）':''}`;
-        participantsUl.appendChild(li);
+    function renderLists(players){
+      participantsUl.innerHTML=''; spectatorsUl.innerHTML='';
+      players.filter(p=>p.role==='player').forEach(p=>{
+        const li=document.createElement('li'); li.className='pill';
+        li.textContent=`${p.name}${p.isHost?'（ホスト）':''}${p.id===self.id?'（自分）':''}`; participantsUl.appendChild(li);
       });
-      state.players.filter(p=>p.role==='spectator').forEach(p=>{
-        const li = document.createElement('li'); li.className = 'pill'; li.textContent = `${p.name}${p.id===state.selfId?'（自分）':''}`; spectatorsUl.appendChild(li);
+      players.filter(p=>p.role==='spectator').forEach(p=>{
+        const li=document.createElement('li'); li.className='pill'; li.textContent=`${p.name}${p.id===self.id?'（自分）':''}`; spectatorsUl.appendChild(li);
       });
     }
 
-    function sortAscending(arr){ return [...arr].sort((a,b)=>a-b) }
+    function renderTable(players, state){
+      tableArea.innerHTML='';
+      const ps = players.filter(p=>p.role==='player');
+      ps.forEach(p=>{
+        const wrap=document.createElement('div'); wrap.className='player';
+        const head=document.createElement('div'); head.className='player-h';
+        const name=document.createElement('div'); name.className='name'; name.textContent=p.name+(p.id===self.id?'（自分）':'');
+        const tags=document.createElement('div'); tags.className='tags'; if(p.isHost){ const t=document.createElement('span'); t.className='chip'; t.textContent='ホスト'; tags.appendChild(t);} head.appendChild(name); head.appendChild(tags); wrap.appendChild(head);
 
-    function buildDeck(){
-      const d = [];
-      for(let n=1;n<=12;n++){ d.push(n,n); }
-      return shuffle(d);
-    }
-
-    function deal(){
-      // 参加者のみ対象
-      const players = state.players.filter(p=>p.role==='player');
-      if(players.length===0) return;
-      const deck = buildDeck();
-      state.deck = deck;
-      players.forEach(p=>{ p.hand = [] ; p.publicReveals = new Set(); });
-      let i=0; while(deck.length){ players[i%players.length].hand.push(deck.pop()); i++; }
-      players.forEach(p=> p.hand = sortAscending(p.hand));
-    }
-
-    function renderTable(){
-      tableArea.innerHTML = '';
-      const players = state.players.filter(p=>p.role==='player');
-      players.forEach(p=>{
-        const wrap = document.createElement('div'); wrap.className = 'player';
-        const head = document.createElement('div'); head.className = 'player-h';
-        const name = document.createElement('div'); name.className = 'name'; name.textContent = p.name + (p.id===state.selfId?'（自分）':'');
-        const tags = document.createElement('div'); tags.className='tags';
-        if(p.isHost){ const t=document.createElement('span'); t.className='chip'; t.textContent='ホスト'; tags.appendChild(t); }
-        head.appendChild(name); head.appendChild(tags); wrap.appendChild(head);
-
-        const hand = document.createElement('div'); hand.className='hand';
-
-        // 自分：常に表（昇順）
-        if(p.id === state.selfId){
-          p.hand.forEach((n,idx)=>{
-            const c = document.createElement('div'); c.className='cardv revealed'; c.textContent = n; c.title = `#${idx+1}`; hand.appendChild(c);
-          });
+        const hand=document.createElement('div'); hand.className='hand';
+        const reveals=new Set(p.publicReveals||[]);
+        if(p.id===self.id){
+          (p.hand||[]).forEach((n,idx)=>{ const c=document.createElement('div'); c.className='cardv revealed'; c.textContent=n; c.title=`#${idx+1}`; hand.appendChild(c); });
         } else {
-          // 他人：基本 裏向き。公開済みのものだけ表。
-          p.hand.forEach((n,idx)=>{
-            const key = `${p.id}:${idx}`;
-            const isRevealed = p.publicReveals && p.publicReveals.has(key);
-            const c = document.createElement('div'); c.className = 'cardv ' + (isRevealed? 'revealed' : 'face-down');
-            if(isRevealed){
-              c.textContent = n;
-            } else {
-              if(backImageAvailable){
-                const img = document.createElement('img'); img.alt='裏'; img.src='code裏.png'; c.appendChild(img);
-              } else {
-                c.textContent = '裏';
+          (p.hand||[]).forEach((n,idx)=>{
+            const key=`${p.id}:${idx}`; const isRevealed=reveals.has(key);
+            const c=document.createElement('div'); c.className='cardv '+(isRevealed?'revealed':'face-down');
+            if(isRevealed){ c.textContent=n; }
+            else {
+              if(backImageAvailable){ const img=document.createElement('img'); img.alt='裏'; img.src='code裏.png'; c.appendChild(img);} else { c.textContent='裏'; }
+              if(state.gameStarted){
+                c.style.cursor='pointer'; c.title='クリックで公開';
+                c.addEventListener('click', async ()=>{
+                  // 公開は誰が押しても全体に反映（デモ用）
+                  const roomRef = db.collection('rooms').doc(self.room);
+                  const pRef = roomRef.collection('players').doc(p.id);
+                  await db.runTransaction(async (tx)=>{
+                    const snap = await tx.get(pRef); const data=snap.data()||{}; const arr=new Set(data.publicReveals||[]); arr.add(key); tx.update(pRef,{ publicReveals:[...arr] });
+                  });
+                });
               }
-              // クリックで公開（= 全体に公開される）
-              c.style.cursor = 'pointer';
-              c.title = 'クリックで公開';
-              c.addEventListener('click', ()=>{
-                // 公開状態に
-                p.publicReveals = p.publicReveals || new Set();
-                p.publicReveals.add(key);
-                renderTable();
-              });
             }
             hand.appendChild(c);
           });
         }
-        wrap.appendChild(hand);
-        tableArea.appendChild(wrap);
+        wrap.appendChild(hand); tableArea.appendChild(wrap);
       });
 
-      // 観戦のみのとき、案内
-      if(!players.length){
-        const empty = document.createElement('div');
-        empty.className='card';
-        empty.innerHTML = '<div class="card-h">テーブル</div><div class="card-c"><span class="muted">参加者がいません。参加者が揃うとここにカードが表示されます。</span></div>';
-        tableArea.appendChild(empty);
-      }
+      if(!ps.length){ const empty=document.createElement('div'); empty.className='card'; empty.innerHTML='<div class="card-h">テーブル</div><div class="card-c"><span class="muted">参加者がいません。参加者が揃うとここにカードが表示されます。</span></div>'; tableArea.appendChild(empty); }
     }
 
-    function updateChrome(){
-      roomStatus.textContent = state.room ? `ルーム ${state.room}` : '未入室';
-      roomLabel.textContent = state.room || '----';
+    function updateChrome(roomState, players){
+      roomStatus.textContent = self.room ? `ルーム ${self.room}` : '未入室';
+      roomLabel.textContent = self.room || '----';
 
-      // ボタン制御
-      const me = state.players.find(p=>p.id===state.selfId);
-      const amHost = !!(me && me.isHost);
-      const canStart = amHost && !state.gameStarted && state.players.some(p=>p.role==='player');
+      const me = players.find(p=>p.id===self.id) || self;
+      const amHost = !!me.isHost; const canStart = amHost && !roomState.gameStarted && players.some(p=>p.role==='player');
       startBtn.disabled = !canStart;
-
-      // ホスト FAB
-      hostFab.style.display = amHost && state.gameStarted ? 'block' : 'none';
-
-      // リストの表示/非表示
-      listsWrap.style.display = state.gameStarted ? 'none' : 'block';
-
-      // ロビーの表示/非表示
-      lobbyCard.style.display = state.room ? 'none' : 'block';
-
-      // テーブル領域
-      tableArea.hidden = !state.room;
+      hostFab.style.display = (amHost && roomState.gameStarted) ? 'block' : 'none';
+      listsWrap.style.display = roomState.gameStarted ? 'none' : 'block';
+      lobbyCard.style.display = self.room ? 'none' : 'block';
+      tableArea.hidden = !self.room;
     }
 
-    function startGame(){
-      state.gameStarted = true;
-      deal();
-      renderLists();
-      renderTable();
-      updateChrome();
+    function buildDeck(){ const d=[]; for(let n=1;n<=12;n++){ d.push(n,n); } return d.sort(()=>Math.random()-0.5); }
+
+    async function startGame(roomRef){
+      const playersSnap = await roomRef.collection('players').where('role','==','player').get();
+      const players = playersSnap.docs.map(d=>({ id:d.id, ...d.data() }));
+      if(!players.length) { alert('参加者が必要です'); return; }
+      const deck = buildDeck();
+      const hands = {}; players.forEach(p=>hands[p.id]=[]);
+      let i=0; while(deck.length){ hands[players[i%players.length].id].push(deck.pop()); i++; }
+      for(const p of players){ hands[p.id].sort((a,b)=>a-b); }
+      const batch = db.batch();
+      players.forEach(p=>{ batch.update(roomRef.collection('players').doc(p.id), { hand:hands[p.id], publicReveals:[] }); });
+      batch.update(roomRef, { gameStarted:true });
+      await batch.commit();
     }
 
-    function resetGame(){
-      state.gameStarted = false;
-      // 手札・公開情報クリア
-      state.players.forEach(p=>{ p.hand = []; p.publicReveals = new Set(); });
-      renderLists(); renderTable(); updateChrome();
+    async function resetGame(roomRef){
+      const playersSnap = await roomRef.collection('players').get();
+      const batch = db.batch();
+      playersSnap.forEach(doc=> batch.update(doc.ref, { hand:[], publicReveals:[] }) );
+      batch.update(roomRef, { gameStarted:false });
+      await batch.commit();
+    }
+
+    function watchRoom(roomCode){
+      const roomRef = db.collection('rooms').doc(roomCode);
+      // ルームの初期作成（存在しなければ）
+      roomRef.get().then(s=>{ if(!s.exists){ roomRef.set({ createdAt: firebase.firestore.FieldValue.serverTimestamp(), gameStarted:false, hostId:self.id }); } });
+
+      if(unsubRoom) unsubRoom(); if(unsubPlayers) unsubPlayers();
+
+      unsubRoom = roomRef.onSnapshot(snap=>{
+        const data = snap.data() || { gameStarted:false, hostId:null };
+        // ホストの引き継ぎ（最初の参加者がホスト）
+        if(!data.hostId){ roomRef.update({ hostId: self.id }); }
+        currentRoomState = data; rerender();
+      });
+
+      unsubPlayers = roomRef.collection('players').orderBy('joinedAt','asc').onSnapshot(snap=>{
+        currentPlayers = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+        rerender();
+      });
+
+      // UIイベント
+      startBtn.onclick = ()=> startGame(roomRef);
+      el('resetBtn').onclick = async ()=> { if(confirm('ゲームをリセットしますか？')) await resetGame(roomRef); };
+    }
+
+    // 現在のスナップショットを保持
+    let currentRoomState = { gameStarted:false, hostId:null };
+    let currentPlayers = [];
+
+    function rerender(){
+      // 自分のホスト判定
+      const me = currentPlayers.find(p=>p.id===self.id);
+      self.isHost = !!(me && currentRoomState.hostId === self.id);
+
+      renderLists(currentPlayers);
+      renderTable(currentPlayers, currentRoomState);
+      updateChrome(currentRoomState, currentPlayers);
     }
 
     // 入室フロー
     const roleModal = el('roleModal');
     el('joinBtn').addEventListener('click', ()=>{
-      const name = el('name').value.trim();
-      const room = el('room').value.trim();
-      if(!name || !room){ alert('名前とルームコードを入力してください'); return; }
-      // 値を保持
-      state.selfName = name; state.room = room; updateChrome();
-
-      // すでに誰かが居ればホストは既存のまま。誰もいなければ自分がホスト候補。
-      const firstInRoom = state.players.length === 0;
-
-      // 役割選択
-      // ただしゲーム中なら「参加」を選んでも観戦になる
-      roleModal.showModal();
-
-      function choose(role){
-        const id = uid(); state.selfId = id;
-        const effectiveRole = (state.gameStarted && role==='player') ? 'spectator' : role;
-        state.players.push({ id, name, role: effectiveRole, isHost: firstInRoom, hand: [], publicReveals: new Set() });
-        renderLists(); renderTable(); updateChrome();
-        roleModal.close();
-        // 役割説明
-        if(role==='player' && effectiveRole==='spectator'){
-          alert('ゲーム中のため、観戦として入室しました。');
-        }
-      }
-
-      el('asPlayer').onclick = ()=>choose('player');
-      el('asSpectator').onclick = ()=>choose('spectator');
+      const name=el('name').value.trim(); const room=el('room').value.trim();
+      if(!name||!room){ alert('名前とルームコードを入力してください'); return; }
+      self.name=name; self.room=room; roomStatus.textContent=`ルーム ${room}`; roomLabel.textContent=room; roleModal.showModal();
     });
     el('closeRole').addEventListener('click', ()=> roleModal.close());
 
-    // ゲーム開始（ホストのみ）
-    startBtn.addEventListener('click', ()=>{
-      if(startBtn.disabled) return;
-      if(state.players.filter(p=>p.role==='player').length < 1){ alert('参加者が必要です'); return; }
-      startGame();
-    });
-
-    // 設定メニュー（ホストのみ、ゲーム中）
-    el('gearBtn').addEventListener('click', ()=>{
-      hostMenu.style.display = hostMenu.style.display==='block' ? 'none' : 'block';
-    });
-    document.addEventListener('click', (e)=>{
-      if(!hostMenu.contains(e.target) && e.target !== el('gearBtn')) hostMenu.style.display='none';
-    });
-    el('resetBtn').addEventListener('click', ()=>{
-      const me = state.players.find(p=>p.id===state.selfId);
-      if(!(me && me.isHost)) return;
-      if(confirm('ゲームをリセットしますか？')){
-        resetGame();
-        alert('リセットしました。参加者として入室していれば再び参加できます。');
+    async function joinWithRole(role){
+      const uid = auth.currentUser?.uid || Math.random().toString(36).slice(2,10);
+      self.id = uid; self.role = role;
+      const roomRef = db.collection('rooms').doc(self.room);
+      // ルーム監視開始
+      watchRoom(self.room);
+      // 参加登録（ドキュメントはUIDで一意に）
+      const pRef = roomRef.collection('players').doc(uid);
+      const roomSnap = await roomRef.get(); const gameStarted = roomSnap.exists ? !!roomSnap.data().gameStarted : false;
+      const effectiveRole = (gameStarted && role==='player') ? 'spectator' : role;
+      await pRef.set({ name:self.name, role:effectiveRole, isHost:false, hand:[], publicReveals:[], joinedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge:true });
+      // 最初の人をホストに
+      const playersSnap = await roomRef.collection('players').get();
+      if(playersSnap.size===1){ await roomRef.update({ hostId: uid }); await pRef.update({ isHost:true }); self.isHost=true; }
+      else {
+        // 既存ホストを反映
+        const hostId = (await roomRef.get()).data().hostId; await pRef.update({ isHost: hostId===uid });
       }
-    });
+      roleModal.close();
+    }
 
-    // 初期描画
-    renderLists(); renderTable(); updateChrome();
+    el('asPlayer').onclick = ()=> joinWithRole('player');
+    el('asSpectator').onclick = ()=> joinWithRole('spectator');
+
+    // 設定メニュー表示切替
+    el('gearBtn').addEventListener('click', ()=>{ hostMenu.style.display = hostMenu.style.display==='block' ? 'none' : 'block'; });
+    document.addEventListener('click', (e)=>{ if(!hostMenu.contains(e.target) && e.target !== el('gearBtn')) hostMenu.style.display='none'; });
+
+    // 退室時のクリーンアップ（簡易）
+    window.addEventListener('beforeunload', async ()=>{
+      try{
+        if(self.room && self.id){
+          const roomRef = db.collection('rooms').doc(self.room);
+          await roomRef.collection('players').doc(self.id).delete();
+          // ホストがいなくなったら次の人に引き継ぐ
+          const ps = await roomRef.collection('players').orderBy('joinedAt','asc').get();
+          if(!ps.empty){ await roomRef.update({ hostId: ps.docs[0].id }); }
+          else { await roomRef.delete().catch(()=>{}); }
+        }
+      }catch(e){ /* noop */ }
+    });
   </script>
+
+  <!--
+  ==========================
+  Firestore ルール（目安）
+  ==========================
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /rooms/{room} {
+        allow read, write: if true; // デモ用（本番は認可を実装）
+        match /players/{player} { allow read, write: if true; }
+      }
+    }
+  }
+  -->
 </body>
 </html>
