@@ -1,484 +1,1166 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>BOMB BUSTERS</title>
-  <style>
-    :root{
-      --bg:#fff;--ink:#111;--muted:#6b7280;--line:#e5e7eb;--solid:#111;--soft:#f4f4f5;
-      --card-bg:#e9ecef;--card-ink:#fff;--public-bg:#111;--public-ink:#fff;
-      --token-bg:#111;--token-ink:#fff;
-      --eq-bg:#ffedd5;--neq-bg:#e0f2fe;--x1-bg:#ffe4ef;--mark-ink:#111;
-    }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,Arial,sans-serif}
-    .container{max-width:560px;margin:0 auto;padding:12px 12px 100px}
-    h1{font-size:22px;letter-spacing:1px;margin:8px 0 12px;text-align:center}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    input[type=text]{flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font-size:16px}
-    button{appearance:none;border:1px solid var(--solid);background:var(--solid);color:#fff;padding:10px 12px;border-radius:12px;font-weight:700;font-size:14px}
-    button.ghost{background:#fff;color:var(--solid)}
-    button.small{padding:6px 10px;border-radius:10px;font-size:12px}
-    .pill{border-radius:999px;border:1px solid var(--solid);padding:6px 10px;display:inline-flex;gap:6px;align-items:center}
-    .controls{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
-    .tabs{display:flex;gap:6px;overflow:auto;padding-bottom:2px}
-    .tabs::-webkit-scrollbar{height:6px}
-    .hint{color:var(--muted);font-size:12px}
-    .divider{height:1px;background:var(--line);margin:12px 0}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>BOMB BUSTERS</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        /* --- 全体的なスタイル --- */
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #ffffff;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            -webkit-user-select: none; /* テキスト選択を無効化 */
+            user-select: none;
+            overflow-x: hidden; /* 横スクロールを禁止 */
+        }
 
-    /* lobby */
-    .lobby-list{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(255,255,255,.92),#fff 60%);backdrop-filter:blur(4px);border-top:1px solid var(--line);padding:8px 12px}
-    .lobby-list h3{margin:0 0 6px;font-size:13px;color:#444}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;margin:3px 3px 0 0}
+        .screen {
+            display: none;
+            width: 100%;
+            max-width: 480px; /* スマホサイズを想定した最大幅 */
+            margin: 0 auto;
+            padding: 15px;
+            box-sizing: border-box;
+        }
 
-    /* tables */
-    .tables{display:flex;flex-direction:column;gap:10px;margin-top:12px}
-    .table{border:1px solid var(--line);border-radius:16px;padding:8px;min-height:90px;position:relative;background:#fff}
-    .seatBadge,.seatName{position:absolute;left:8px;top:6px;font-size:12px;color:#333;text-decoration:underline}
-    .charcard{position:absolute;left:8px;top:24px;width:40px;height:60px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#f6f6f6;display:grid;place-items:center}
-    .charcard img{width:100%;height:100%;object-fit:cover;display:block}
+        #lobby-screen { display: block; }
+        h1 { text-align: center; }
+        button, select {
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #f0f0f0; }
+        button:disabled { cursor: not-allowed; background-color: #e0e0e0; }
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
 
-    .handArea{position:absolute;left:60px;right:8px;top:6px;height:90px;display:flex;flex-direction:column;justify-content:center}
-    .cards{display:flex;align-items:center;gap:3px;max-width:100%;overflow:auto}
-    .card{width:24px;height:50px;border-radius:6px;border:1px solid #ccc;background:var(--card-bg);position:relative;flex:0 0 auto}
-    .card .num{position:absolute;left:0;right:0;top:2px;text-align:center;font-size:16px;line-height:1;color:var(--card-ink);font-weight:bold}
-    .card.public{background:var(--public-bg);border-color:#000}
-    .card.public .num{color:var(--public-ink)}
-    .card .band{position:absolute;left:0;right:0;bottom:0;height:16px;background-position:center bottom;background-repeat:no-repeat;background-size:contain}
-    .band.normal{background-image:url('./assets/codenumber.png')}
-    .band.red{background-image:url('./assets/redcode.png')}
-    .band.yellow{background-image:url('./assets/yellowcode.png')}
-    .card.back{background:#ccc url('./assets/codeback.png') center/cover no-repeat}
+        .hidden { display: none !important; }
 
-    .alphaRow{display:flex;gap:3px;margin-top:4px}
-    .alpha{width:24px;text-align:center;font-size:10px;border:1px solid #ddd;border-radius:6px;padding:2px 0;background:#fff}
-    .token{margin-top:2px;width:24px;text-align:center;font-size:10px;border:1px solid #000;border-radius:6px;padding:2px 0;background:var(--token-bg);color:var(--token-ink)}
-    .stoken{margin-top:2px;width:24px;text-align:center;font-size:10px;border:1px solid #000;border-radius:6px;padding:2px 0;color:var(--mark-ink)}
-    .stoken.eq{background:var(--eq-bg)}
-    .stoken.neq{background:var(--neq-bg)}
-    .stoken.x1{background:var(--x1-bg)}
+        /* --- ロビー画面 --- */
+        .lobby-controls, .game-options, .player-list-container {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        #room-code-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #d9534f;
+            margin: 10px 0;
+        }
+        #player-list {
+            list-style: none;
+            padding: 0;
+        }
+        #player-list li {
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+        }
+        #start-game-btn {
+            width: 80%;
+            padding: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            background-color: #d9534f;
+            color: white;
+            border: none;
+        }
 
-    /* items */
-    .itemsBar{display:none;gap:6px;overflow:auto;padding:8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:5}
-    .item{flex:0 0 auto;width:50px;height:70px;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;background:#fafafa;position:relative}
-    .item img{width:100%;height:100%;object-fit:cover;border-radius:10px;display:block}
-    .item.used::after{content:"";position:absolute;inset:0;background:url('./assets/itemback.jpg') center/cover no-repeat;border-radius:10px}
+        /* --- ゲーム画面 --- */
+        #game-screen {
+            display: none; /* 初期状態は非表示 */
+            position: relative;
+        }
 
-    .diceBox{display:none;align-items:center;gap:8px;padding:8px}
-    .dice{width:70px;height:70px;border-radius:12px;border:1px solid var(--line);overflow:hidden}
-    .dice img{width:100%;height:100%;object-fit:cover;display:block}
+        /* アイテムエリア */
+        #item-area {
+            display: flex;
+            overflow-x: auto; /* スマホでスクロール可能に */
+            padding: 10px 0;
+            align-items: center;
+            border-bottom: 2px solid #eee;
+            margin-bottom: 15px;
+        }
+        .item-card, #di-counter {
+            flex-shrink: 0;
+            position: relative;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        .item-card img, #di-counter img {
+            display: block;
+        }
+        .item-card { width: 50px; height: 70px; }
+        #di-counter { width: 70px; height: 70px; margin-left: auto; }
+        
+        .item-card.used {
+            opacity: 0.6;
+        }
 
-    /* gear & overlays */
-    .gear{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:16px;border:1px solid var(--solid);background:var(--solid);color:#fff;display:grid;place-items:center;font-size:22px}
-    .menu{position:fixed;right:12px;bottom:72px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.08);padding:8px;display:none;min-width:190px}
-    .menu.show{display:block}
-    .menu button{width:100%;text-align:left;margin:4px 0}
+        /* プレイヤーテーブルエリア */
+        #players-area {
+            width: 100%;
+        }
+        .player-table {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            height: 90px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .player-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-right: 10px;
+        }
+        .player-name-display {
+            font-size: 16px;
+            font-weight: bold;
+            border-bottom: 2px solid #333;
+            padding-bottom: 2px;
+            min-width: 60px; /* 名前表示エリアの最小幅 */
+            text-align: center;
+        }
+        .table-player-name {
+            position: absolute;
+            top: -5px;
+            left: 0;
+            font-size: 12px;
+            color: #555;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 1px 3px;
+            border-radius: 2px;
+        }
+        .character-card {
+            width: 40px;
+            height: 60px;
+            margin-top: 5px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+        }
 
-    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.12);display:none}
-    .overlay.show{display:block}
-    .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:12px;min-width:260px;display:none}
-    .modal.show{display:block}
+        /* 手札とカード */
+        .hand-container {
+            display: flex;
+            overflow-x: auto; /* 手札がはみ出た場合にスクロール */
+            flex-grow: 1;
+        }
+        .hand {
+            display: flex;
+            align-items: flex-start; /* カードとアルファベットをグループ化 */
+        }
+        .card-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-right: 3px;
+            position: relative;
+        }
+        .card {
+            width: 24px;
+            height: 50px;
+            border: 1px solid #333;
+            border-radius: 3px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            position: relative;
+            background-size: cover;
+            background-position: center;
+        }
+        .card-number {
+            font-size: 16px;
+            padding-top: 2px;
+        }
+        .card-icon {
+            width: 100%;
+            height: 15px; /* アイコンの高さを指定 */
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: bottom center;
+        }
+        
+        .card.my-card { background-color: #f0f0f0; color: #333; }
+        .card.revealed { background-color: #000000; color: #ffffff; }
+        .card.face-down { background-image: url('codeback.png'); }
 
-    /* mission text */
-    .mission{margin:16px 0 24px}
-    .mission h4{margin:0 0 8px;font-size:14px}
-    .mission pre{margin:0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;white-space:pre-wrap;font-size:13px}
+        .card-swap-indicator {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+            color: #d9534f;
+            animation: fadeOut 5s forwards;
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        
+        /* アルファベットとトークン */
+        .alphabet-label {
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 4px;
+            border: 1px solid #aaa;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 3px;
+            background-color: #fff;
+        }
+        .info-token {
+            font-size: 12px;
+            margin-top: 2px;
+            border: 1px solid #333;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 3px;
+        }
+        .info-token.normal { background-color: #000; color: #fff; }
+        .info-token.equal { background-color: #ffc107; color: #000; }
+        .info-token.not-equal { background-color: #03a9f4; color: #000; }
+        .info-token.x1 { background-color: #e91e63; color: #000; }
 
-    .foot-space{height:100px}
-  </style>
+        /* 設定ボタンとメニュー */
+        #settings-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #555;
+            color: white;
+            font-size: 24px;
+            border: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #settings-menu {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1001;
+        }
+        #settings-menu div {
+            padding: 12px 20px;
+            cursor: pointer;
+        }
+        #settings-menu div:hover { background-color: #f0f0f0; }
+
+        /* ポップアップ/モーダル */
+        .popup-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .popup-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .popup-content button { margin: 0 10px; }
+        #restart-confirm-btn { font-size: 12px; }
+        #restart-cancel-btn { font-size: 16px; padding: 10px 20px; }
+
+        /* ミッション詳細 */
+        #mission-details-container {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #fafafa;
+            border-radius: 5px;
+            height: 150px; /* 高さを固定 */
+            overflow-y: auto; /* 縦スクロールを有効化 */
+        }
+        #mission-title {
+            font-weight: bold;
+        }
+
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>BOMB&nbsp;BUSTERS</h1>
 
-    <!-- Top controls -->
-    <div class="row">
-      <input id="codeInput" type="text" inputmode="numeric" maxlength="4" placeholder="ルームコード(4桁)" />
-      <button id="joinBtn">入室</button>
-      <button id="makeBtn" class="ghost">コード作成</button>
+    <div id="lobby-screen" class="screen">
+        <h1>BOMB BUSTERS</h1>
+        
+        <div class="lobby-controls">
+            <input type="text" id="room-code-input" placeholder="ルームコード" maxlength="4">
+            <button id="join-room-btn">入室</button>
+        </div>
+        <div class="lobby-controls">
+            <button id="create-room-btn">コード作成</button>
+            <div id="room-code-display"></div>
+        </div>
+
+        <div class="game-options">
+            <label>人数: </label>
+            <select id="player-count-select">
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+            <label>ミッション: </label>
+            <select id="mission-select">
+                <option value="1">#1</option>
+                <option value="2">#2</option>
+                <option value="3">#3</option>
+                <option value="4">#4</option>
+                <option value="5">#5</option>
+            </select>
+        </div>
+
+        <div class="player-list-container">
+            <h3>参加者リスト</h3>
+            <ul id="player-list"></ul>
+        </div>
+        
+        <div style="text-align: center;">
+            <button id="start-game-btn" disabled>爆弾を解除！</button>
+        </div>
     </div>
 
-    <div class="controls">
-      <span class="pill" id="youTag">あなた: <b id="yourName">---</b></span>
-      <span class="pill">人数:
-        <button class="small" data-p="4">4</button>
-        <button class="small" data-p="5">5</button>
-      </span>
-      <span class="pill tabs" id="missionTabs">
-        <button class="small" data-m="1">#1</button>
-        <button class="small" data-m="2">#2</button>
-        <button class="small" data-m="3">#3</button>
-        <button class="small" data-m="4">#4</button>
-        <button class="small" data-m="5">#5</button>
-      </span>
-      <button id="startBtn">爆弾を解除！</button>
-    </div>
-    <div class="hint">※「爆弾を解除！」はホストのみ。開始前は下部に入室者リストが表示。</div>
+    <div id="game-screen" class="screen">
+        <div id="item-area">
+            <div id="di-counter"><img src="di4.png"></div>
+        </div>
 
-    <div class="divider"></div>
+        <div id="players-area">
+            </div>
 
-    <!-- Items (sticky while playing) -->
-    <div id="itemsBar" class="itemsBar" aria-label="アイテム"></div>
-    <div id="diceBox" class="diceBox">
-      <div>進行</div>
-      <div id="dice" class="dice"><img id="diceImg" alt="di" /></div>
+        <button id="settings-btn" class="hidden">⚙️</button>
+        <div id="settings-menu" class="hidden">
+            </div>
+        
+        <div id="mission-details-container">
+            <div id="mission-title"></div>
+            <div id="mission-body"></div>
+        </div>
     </div>
 
-    <div id="tables" class="tables" aria-live="polite"></div>
+    <div id="popup-container" class="hidden"></div>
 
-    <section id="missionPanel" class="mission" hidden>
-      <h4 id="missionTitle"></h4>
-      <pre id="missionText"></pre>
-    </section>
 
-    <div class="foot-space"></div>
-  </div>
-
-  <!-- sticky lobby list -->
-  <div id="lobby" class="lobby-list" hidden>
-    <h3>入室者</h3>
-    <div id="lobbyChips"></div>
-  </div>
-
-  <!-- gear & menus -->
-  <button id="gear" class="gear" title="設定">⚙️</button>
-  <div id="menu" class="menu" role="menu">
-    <button id="sitBtn">席に座る</button>
-    <button id="leaveSeatBtn">席を立つ</button>
-    <button id="retryBtn">やり直し</button>
-  </div>
-
-  <!-- overlays -->
-  <div id="overlay" class="overlay"></div>
-  <div id="modal" class="modal"></div>
-
-  <script>
-  // ========================= Firebase setup =========================
-  const firebaseConfig = {
-    apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
-    authDomain: "chat-68c4c.firebaseapp.com",
-    databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
-    projectId: "chat-68c4c",
-    storageBucket: "chat-68c4c.appspot.com",
-    messagingSenderId: "172284325975",
-    appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
-  };
-  </script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
-  <script>
-  // ========================= Utilities & State =========================
-  firebase.initializeApp(firebaseConfig);
-  const db=firebase.database();
-  const $ = (q)=>document.querySelector(q);
-  const $$ = (q)=>Array.from(document.querySelectorAll(q));
-
-  const randHiraganaName = () => {
-    const hira = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん";
-    let s = ""; for(let i=0;i<3;i++) s += hira[Math.floor(Math.random()*hira.length)];
-    return s;
-  };
-
-  const uid = (()=> Math.random().toString(36).slice(2)+Date.now().toString(36))();
-  let yourName = localStorage.getItem('bb_name') || randHiraganaName();
-  localStorage.setItem('bb_name', yourName);
-  $('#yourName').textContent = yourName;
-
-  let roomCode=null; let isHost=false; let unsubRoom=null; let currentRoomSnap=null; let seatedTable=null; let playing=false;
-  let usingMarkType=null; // 'eq'|'neq'|'x1' while selecting alpha
-
-  const asNum=(v)=>Number(v||0);
-  const escapeHtml=(s)=> (s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-
-  // Paths
-  const rRef=()=>db.ref('rooms/'+roomCode);
-  const playersRef=()=>db.ref('rooms/'+roomCode+'/players');
-  const stateRef=()=>db.ref('rooms/'+roomCode+'/state');
-  const settingsRef=()=>db.ref('rooms/'+roomCode+'/settings');
-  const tablesRef=()=>db.ref('rooms/'+roomCode+'/tables');
-  const itemsRef=()=>db.ref('rooms/'+roomCode+'/items');
-
-  // ========================= Mission text =========================
-  const missionDefs={
-    1: ()=>{
-      const choices=[1.5,2.5,3.5,4.5];
-      const x=choices[Math.floor(Math.random()*choices.length)];
-      return {title:'#1 爆弾', text:`#1 爆弾\n${x}が1つ` , vars:{x}};
-    },
-    2: ()=>({title:'#2', text:'手札の内1枚がランダムに選ばれて一番右に置く。他は昇順。'}),
-    3: ()=>{
-      const pool=[1.5,2.5,3.5,4.5];
-      const shuffled=pool.sort(()=>Math.random()-0.5).slice(0,3);
-      return {title:'#3 さらい爆弾', text:`#3 さらい爆弾\n${shuffled.join(' – ')}のうち1つ` , vars:{x:shuffled[0],y:shuffled[1],z:shuffled[2]}};
-    }
-  };
-
-  // ========================= Room create / join =========================
-  const genCode=()=>(''+Math.floor(1000+Math.random()*9000));
-
-  const ensureRoom=async(code)=>{
-    const ref=db.ref('rooms/'+code); const snap=await ref.get();
-    if(!snap.exists()){
-      const now=firebase.database.ServerValue.TIMESTAMP; isHost=true;
-      await ref.set({
-        createdAt:now,hostId:uid,playerCount:0,
-        state:{status:'lobby',startedAt:0,captain:null,marks:{eq:0,neq:0,x1:0}},
-        settings:{players:4,mission:1}, tables:[],
-        items:{}
-      });
-    }else{ isHost = snap.val().hostId===uid; }
-    return ref;
-  };
-
-  const joinRoom=async(code)=>{
-    roomCode=code; const ref=await ensureRoom(code);
-    const pRef=playersRef().child(uid);
-    const now=firebase.database.ServerValue.TIMESTAMP;
-    const player={name:yourName,seatedTable:null,isHost:isHost,online:true,lastSeen:now};
-    await pRef.set(player);
-    await rRef().child('playerCount').transaction(n=>asNum(n)+1);
-    pRef.onDisconnect().remove();
-    rRef().child('playerCount').onDisconnect().transaction(n=>Math.max(0,asNum(n)-1));
-
-    if(unsubRoom) unsubRoom();
-    unsubRoom = rRef().on('value', snap=>{ currentRoomSnap=snap; renderRoom(snap.val()); });
-    $('#lobby').hidden=false;
-  };
-
-  const leaveRoom=async()=>{
-    if(!roomCode) return; try{
-      await playersRef().child(uid).remove();
-      await rRef().child('playerCount').transaction(n=>Math.max(0,asNum(n)-1));
-    }catch(e){}
-  };
-  window.addEventListener('beforeunload', leaveRoom);
-
-  // ========================= Settings & Game start =========================
-  const setPlayers=(p)=> settingsRef().update({players:p});
-  const setMission=(m)=> settingsRef().update({mission:m});
-
-  const startGame=async()=>{
-    if(!isHost) return alert('ホストだけ開始できます');
-    const room=(await rRef().get()).val(); const P=room.settings?.players||4;
-
-    // tables
-    const tables=Array.from({length:P},(_,i)=>({
-      name:'_'+(i+1),playerId:null,character:{img:null,face:'front'},
-      hand:{cards:[],public:{}}, tokens:{}, stokens:{} // stokens: special (=,≠,x1)
-    }));
-
-    // captain & character images
-    const idxCaptain=Math.floor(Math.random()*P);
-    const others=[1,2,3,4].sort(()=>Math.random()-0.5); let oi=0;
-    for(let i=0;i<P;i++){
-      tables[i].character.img = (i===idxCaptain)?'./assets/member (5).jpg':`./assets/member (${others[oi%4]}).jpg`; oi++;
-    }
-
-    // build deck 1..12 (x4) => 48 and deal round-robin to tables
-    const deck=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) deck.push({value:n,type:'normal'}); }
-    deck.sort(()=>Math.random()-0.5);
-    for(let i=0;i<deck.length;i++){ tables[i%P].hand.cards.push(deck[i]); }
-    // sort each hand ascending
-    tables.forEach(t=> t.hand.cards.sort((a,b)=>a.value-b.value));
-
-    // mission effects
-    const m=room.settings?.mission||1; let mText={title:'',text:''};
-    if(missionDefs[m]){ const mt=missionDefs[m](); mText=mt; }
-
-    // items: simple distribution (人数分)
-    const items={};
-    const pool=[1,3,6,17,16,5,7,10,8,13,9,14,15,2];
-    const giveCount=Math.min(pool.length, P);
-    for(let i=0;i<giveCount;i++) items[i]={id:pool[i],face:'front'};
-
-    await rRef().update({
-      state:{status:'playing',startedAt:firebase.database.ServerValue.TIMESTAMP,captain:idxCaptain,marks:{eq:0,neq:0,x1:0},missionText:mText,dice:{max:P,cur:P}},
-      tables,items
-    });
-  };
-
-  const retryGame=async()=>{
-    if(!isHost) return;
-    tinyConfirm('やり直しますか？',{okLabel:'やり直す',cancelLabel:'キャンセル',okClass:'small'}, async(ok)=>{
-      if(!ok) return;
-      await rRef().update({ state:{status:'lobby',startedAt:0,captain:null,marks:{eq:0,neq:0,x1:0}}, tables:[], items:{} });
-      const ps=(await playersRef().get()).val()||{}; const up={}; Object.keys(ps).forEach(id=> up[id+'/seatedTable']=null ); await playersRef().update(up);
-      alert('ルームをリセットしました。');
-    });
-  };
-
-  // ========================= Render =========================
-  function renderRoom(room){ if(!room) return; playing = room.state?.status==='playing';
-    $('#startBtn').disabled=!isHost; $('#startBtn').style.opacity=isHost?1:.6;
-
-    const players=room.players||{}; const chips=Object.entries(players).map(([id,p])=>{
-      const taken=p.seatedTable!=null?` / 着席:${asNum(p.seatedTable)+1}`:''; const host=p.isHost?'👑':''; return `<span class="chip">${host}${escapeHtml(p.name)}${taken}</span>`;
-    }).join('');
-    $('#lobbyChips').innerHTML=chips||'<span class="hint">（まだ誰もいません）</span>';
-    $('#lobby').hidden=playing;
-
-    $$('[data-p]').forEach(btn=>{ const p=Number(btn.dataset.p); btn.style.background=(room.settings?.players===p?'#111':'#fff'); btn.style.color=(room.settings?.players===p?'#fff':'#111'); btn.onclick=()=> isHost && setPlayers(p); });
-    $$('[data-m]').forEach(btn=>{ const m=Number(btn.dataset.m); btn.style.background=(room.settings?.mission===m?'#111':'#fff'); btn.style.color=(room.settings?.mission===m?'#fff':'#111'); btn.onclick=()=> isHost && setMission(m); });
-
-    renderItems(room);
-    renderDice(room);
-
-    const mp=$('#missionPanel'); const mt=room.state?.missionText; if(playing && mt){ mp.hidden=false; $('#missionTitle').textContent=mt.title; $('#missionText').textContent=mt.text; } else { mp.hidden=true; }
-
-    const wrap=$('#tables'); wrap.innerHTML=''; const tables=room.tables||[];
-    tables.forEach((t,idx)=>{
-      const div=document.createElement('div'); div.className='table';
-      const seatLabel=(t.playerId && players[t.playerId])?`<span class="seatName">${escapeHtml(players[t.playerId].name)}</span>`:`<span class="seatBadge">_${idx+1}</span>`; div.insertAdjacentHTML('afterbegin', seatLabel);
-
-      const char=document.createElement('div'); char.className='charcard'; char.onclick=()=>{ const face=(t.character?.face==='front')?'back':'front'; tablesRef().child(idx+'/character/face').set(face); };
-      const img=document.createElement('img'); img.src = (t.character?.face==='back')?'./assets/battery.jpg':(t.character?.img||''); char.replaceChildren(img); div.appendChild(char);
-
-      const handArea=document.createElement('div'); handArea.className='handArea'; const cardsRow=document.createElement('div'); cardsRow.className='cards';
-      const isYourSeat=(seatedTable===idx); const cards=(t.hand?.cards||[]); const pub=(t.hand?.public||{});
-
-      cards.forEach((card,ci)=>{
-        const c=document.createElement('div'); c.className='card';
-        const revealedPublic=!!pub[ci]; const faceUpForYou=isYourSeat; const showFront=revealedPublic || faceUpForYou;
-        if(!showFront){ c.classList.add('back'); } else { if(revealedPublic) c.classList.add('public');
-          const num=document.createElement('div'); num.className='num'; num.textContent=String(card.value);
-          const band=document.createElement('div'); band.className='band '+(card.type||'normal'); c.appendChild(num); c.appendChild(band);
-        }
-        c.onclick=()=>{ if(isYourSeat){ /* private view only */ } else { const up={}; up[ci]=true; tablesRef().child(idx+'/hand/public').update(up); } };
-        cardsRow.appendChild(c);
-      });
-
-      const alphaRow=document.createElement('div'); alphaRow.className='alphaRow';
-      const tokenRow=document.createElement('div'); tokenRow.className='alphaRow';
-      const sTokenRow=document.createElement('div'); sTokenRow.className='alphaRow';
-
-      for (let i=0;i<cards.length;i++){
-        const a=document.createElement('div'); a.className='alpha'; a.textContent=String.fromCharCode(97+i); a.title='情報トークン';
-        if(isYourSeat){ a.style.cursor='pointer'; a.onclick=()=> onAlphaClick(idx,i,cards[i]); }
-        alphaRow.appendChild(a);
-
-        const token=document.createElement('div'); token.className='token'; const tv=(t.tokens||{})[i]; token.textContent=(tv==null)?'':tv; tokenRow.appendChild(token);
-
-        const st=document.createElement('div'); st.className='stoken'; const sv=(t.stokens||{})[i]; if(sv){ st.classList.add(sv.kind); st.textContent = sv.kind==='x1'?'x1': (sv.kind==='eq'?'＝':'≠'); }
-        sTokenRow.appendChild(st);
-      }
-
-      handArea.appendChild(cardsRow); handArea.appendChild(alphaRow); handArea.appendChild(tokenRow); handArea.appendChild(sTokenRow);
-      div.appendChild(handArea); wrap.appendChild(div);
-    });
-  }
-
-  // ========================= Items & Dice =========================
-  function renderItems(room){
-    const ib=$('#itemsBar'); const list=room.items||{}; const playingNow=room.state?.status==='playing';
-    ib.style.display = playingNow? 'flex':'none'; ib.innerHTML='';
-    Object.entries(list).forEach(([key,it])=>{
-      const div=document.createElement('div'); div.className='item';
-      const img=document.createElement('img');
-      img.src = (it.face==='back')? './assets/itemback.jpg' : `./assets/item (${it.id}).jpg`;
-      div.replaceChildren(img); // overwrite only
-      if(it.face==='back') div.classList.add('used'); else div.classList.remove('used');
-      div.onclick=(ev)=> onItemClick(key,it);
-      ib.appendChild(div);
-    });
-  }
-
-  function renderDice(room){
-    const box=$('#diceBox'); const d=room.state?.dice; const playingNow=room.state?.status==='playing';
-    if(!playingNow||!d){ box.style.display='none'; return; }
-    box.style.display='flex'; const img=$('#diceImg'); img.src = `./assets/di${d.cur}.png`;
-    $('#dice').onclick=()=>{
-      tinyPanel('進行', `<div class=\"row\"><button id=\"fw\" class=\"small\">進める</button><button id=\"bw\" class=\"small\">戻す</button></div>`, root=>{
-        root.querySelector('#fw').onclick=()=>{ const nd=Math.max(0,(d.cur-1)); rRef().child('state/dice/cur').set(nd); overlay.classList.remove('show'); modal.classList.remove('show'); };
-        root.querySelector('#bw').onclick=()=>{ const nd=Math.min(d.max,(d.cur+1)); rRef().child('state/dice/cur').set(nd); overlay.classList.remove('show'); modal.classList.remove('show'); };
-      });
-    };
-  }
-
-  // ========================= Alpha click (info tokens & special marks) =========================
-  function onAlphaClick(tableIdx, cardIdx, card){
-    const room=currentRoomSnap?.val(); if(!room) return; const marks=room.state?.marks||{eq:0,neq:0,x1:0};
-    const opts=[`数字(${card?.value??'-'})を公開`];
-    if(usingMarkType==='eq' && marks.eq<2) opts.push('＝ を付与');
-    if(usingMarkType==='neq' && marks.neq<2) opts.push('≠ を付与');
-    if(usingMarkType==='x1' && marks.x1<2) opts.push('x1 を付与');
-
-    tinyPanel('公開/マーク', opts.map((o,i)=>`<button class=\"small\" data-i=\"${i}\">${o}</button>`).join(' '), (root)=>{
-      root.querySelectorAll('button[data-i]').forEach(btn=>{
-        btn.onclick=async()=>{
-          const idx=Number(btn.dataset.i);
-          if(idx===0){
-            const up={}; up[cardIdx]=card.value; tablesRef().child(tableIdx+'/tokens').update(up);
-          } else {
-            const kind=usingMarkType; if(!kind) return;
-            const sup={}; sup[cardIdx]={kind}; tablesRef().child(tableIdx+'/stokens').update(sup);
-            const mref=rRef().child('state/marks/'+kind); await mref.transaction(n=>Math.min(2,asNum(n)+1));
-            usingMarkType=null;
-          }
-          overlay.classList.remove('show'); modal.classList.remove('show');
+    <script>
+        // Firebase設定（ここにあなたの情報を入力してください）
+        const firebaseConfig = {
+            apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
+            authDomain: "chat-68c4c.firebaseapp.com",
+            databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
+            projectId: "chat-68c4c",
+            storageBucket: "chat-68c4c.appspot.com",
+            messagingSenderId: "172284325975",
+            appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
         };
-      });
-    });
-  }
 
-  // ========================= Gear & seating =========================
-  const gear=$('#gear'), menu=$('#menu'), overlay=$('#overlay'), modal=$('#modal');
-  gear.onclick=()=> menu.classList.toggle('show');
-  overlay.onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); };
+        // Firebaseの初期化
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-  $('#sitBtn').onclick=async()=>{
-    if(!currentRoomSnap) return; const room=currentRoomSnap.val(); if(room.state?.status!=='playing') return alert('ゲーム開始後に席を選べます');
-    const tables=room.tables||[]; const players=room.players||{}; const taken=new Set(Object.values(players).filter(p=>p.seatedTable!=null).map(p=>p.seatedTable));
-    const choices=tables.map((_,i)=>({i,free:!taken.has(i)}));
-    const list=choices.map(c=>`<button class=\"small\" data-i=\"${c.i}\" ${c.free?'':'disabled'}>テーブル ${c.i+1} ${c.free?'':'（使用中）'}</button>`).join(' ');
-    tinyPanel('席を選択', `<div class=\"tabs\">${list}</div>`, (root)=>{
-      root.querySelectorAll('button[data-i]').forEach(btn=>{
-        btn.onclick=async()=>{ const idx=Number(btn.dataset.i); if(!choices[idx].free) return;
-          await playersRef().transaction(cur=>{ cur=cur||{}; const used=Object.keys(cur).some(id=>cur[id]?.seatedTable===idx); if(used) return cur; if(!cur[uid]) cur[uid]={name:yourName,online:true}; cur[uid].seatedTable=idx; return cur; });
-          menu.classList.remove('show'); overlay.classList.remove('show'); modal.classList.remove('show'); seatedTable=idx; };
-      });
-    });
-  };
+        // --- グローバル変数 ---
+        let currentRoomId = null;
+        let currentPlayerId = null;
+        let currentPlayerName = null;
+        let isHost = false;
+        let roomDataUnsubscriber = null; // リアルタイム更新の購読解除用
 
-  $('#leaveSeatBtn').onclick=async()=>{ const pRef=playersRef().child(uid); const p=(await pRef.get()).val(); if(!p||p.seatedTable==null) return; await pRef.update({seatedTable:null}); seatedTable=null; menu.classList.remove('show'); };
-  $('#retryBtn').onclick=()=> retryGame();
+        // --- DOM要素 ---
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const createRoomBtn = document.getElementById('create-room-btn');
+        const joinRoomBtn = document.getElementById('join-room-btn');
+        const roomCodeInput = document.getElementById('room-code-input');
+        const roomCodeDisplay = document.getElementById('room-code-display');
+        const playerCountSelect = document.getElementById('player-count-select');
+        const missionSelect = document.getElementById('mission-select');
+        const playerList = document.getElementById('player-list');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const playersArea = document.getElementById('players-area');
+        const itemArea = document.getElementById('item-area');
+        const diCounter = document.getElementById('di-counter');
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsMenu = document.getElementById('settings-menu');
+        const popupContainer = document.getElementById('popup-container');
+        const missionTitleEl = document.getElementById('mission-title');
+        const missionBodyEl = document.getElementById('mission-body');
 
-  // ========================= Items interaction =========================
-  function onItemClick(key,it){
-    const front = it.face!=='back';
-    if(!front){
-      tinyConfirm('表にしますか？',{okLabel:'表にする',cancelLabel:'やめる'}, async(ok)=>{ if(!ok) return; await itemsRef().child(key+'/face').set('front'); });
-      return;
-    }
-    tinyPanel('アイテム', `<div class=\"row\"><button id=\"useBtn\" class=\"small\">使用する</button><button id=\"cancelBtn\" class=\"small ghost\">キャンセル</button></div>`, (root)=>{
-      root.querySelector('#useBtn').onclick=async()=>{
-        if(it.id===13){ usingMarkType='eq'; }
-        else if(it.id===9){ usingMarkType='x1'; }
-        else if(it.id===4){ await giveExtraItems(2); }
-        else if(it.id===2){ alert('手札交換: 次に実装します'); }
-        else if(it.id===12){ usingMarkType='neq'; }
-        await itemsRef().child(key+'/face').set('back');
-        overlay.classList.remove('show'); modal.classList.remove('show');
-      };
-      root.querySelector('#cancelBtn').onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); };
-    });
-  }
 
-  async function giveExtraItems(n){
-    const snap=await itemsRef().get(); const items=snap.val()||{}; const usedIds=new Set(Object.values(items).map(it=>it.id));
-    const candidates=[1,3,5,6,7,8,9,10,12,13,14,15,16,17,2].filter(x=>!usedIds.has(x));
-    let added=0; for(const id of candidates){ await itemsRef().push({id,face:'front'}); added++; if(added>=n) break; }
-  }
+        // --- ユーティリティ関数 ---
 
-  // ========================= Tiny modal helpers =========================
-  function tinyPanel(title, html, onMount){ overlay.classList.add('show'); modal.classList.add('show'); modal.innerHTML=`<div style="font-weight:700;margin-bottom:8px">${title}</div><div>${html}</div><div class="row" style="justify-content:flex-end;margin-top:8px"><button class="ghost" id="closeM">閉じる</button></div>`; $('#closeM').onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); }; if(onMount) onMount(modal); }
-  function tinyConfirm(msg, opts, cb){ opts=Object.assign({okLabel:'OK',cancelLabel:'キャンセル',okClass:''},opts||{}); overlay.classList.add('show'); modal.classList.add('show'); modal.innerHTML=`<div style="margin-bottom:8px">${msg}</div><div class="row" style="justify-content:flex-end;margin-top:8px"><button class="ghost" id="cancelM">${opts.cancelLabel}</button><button class="${opts.okClass}" id="okM">${opts.okLabel}</button></div>`; $('#cancelM').onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); cb(false); }; $('#okM').onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); cb(true); }; }
+        // ランダムなひらがな3文字の名前を生成
+        const generatePlayerName = () => {
+            const hiragana = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん";
+            let name = "";
+            for (let i = 0; i < 3; i++) {
+                name += hiragana[Math.floor(Math.random() * hiragana.length)];
+            }
+            return name;
+        };
 
-  // ========================= Top controls =========================
-  $('#makeBtn').onclick=()=>{ const code=genCode(); $('#codeInput').value=code; };
-  $('#joinBtn').onclick=async()=>{ const code=($('#codeInput').value||'').replace(/\D/g,'').slice(0,4); if(code.length!==4) return alert('4桁のコードを入れてください'); await joinRoom(code); };
-  $('#startBtn').onclick=()=> startGame();
-  $('#youTag').onclick=()=>{ tinyConfirm('ランダムな名前（ひらがな3文字）を再生成しますか？',{okLabel:'変える',cancelLabel:'やめる'}, (ok)=>{ if(!ok) return; yourName=randHiraganaName(); localStorage.setItem('bb_name',yourName); $('#yourName').textContent=yourName; if(roomCode) playersRef().child(uid).update({name:yourName}); }); };
-  </script>
+        // 配列をシャッフル（Fisher-Yatesアルゴリズム）
+        const shuffleArray = (array) => {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        };
+
+        // --- ロビー機能 ---
+
+        // ルーム作成
+        createRoomBtn.addEventListener('click', async () => {
+            isHost = true;
+            const newRoomId = Math.floor(1000 + Math.random() * 9000).toString();
+            roomCodeDisplay.textContent = newRoomId;
+            roomCodeInput.value = newRoomId;
+            roomCodeInput.disabled = true;
+            createRoomBtn.disabled = true;
+            joinRoomBtn.disabled = true;
+
+            await joinRoom(newRoomId);
+        });
+
+        // ルーム入室
+        joinRoomBtn.addEventListener('click', () => {
+            const roomId = roomCodeInput.value.trim();
+            if (roomId.length === 4) {
+                joinRoom(roomId);
+            } else {
+                alert('4桁のルームコードを入力してください。');
+            }
+        });
+        
+        // 人数やミッションの選択をホストのみ可能にし、Firebaseに保存
+        [playerCountSelect, missionSelect].forEach(select => {
+            select.addEventListener('change', () => {
+                if (isHost && currentRoomId) {
+                    const updates = {};
+                    updates[`/rooms/${currentRoomId}/settings/playerCount`] = parseInt(playerCountSelect.value);
+                    updates[`/rooms/${currentRoomId}/settings/missionId`] = parseInt(missionSelect.value);
+                    db.ref().update(updates);
+                }
+            });
+        });
+
+        // 共通の入室処理
+        const joinRoom = async (roomId) => {
+            const roomRef = db.ref(`rooms/${roomId}`);
+            const snapshot = await roomRef.once('value');
+            
+            // 新規ルーム作成処理
+            if (isHost && !snapshot.exists()) {
+                currentPlayerId = db.ref().push().key;
+                currentPlayerName = generatePlayerName();
+                
+                const initialRoomData = {
+                    hostId: currentPlayerId,
+                    players: {
+                        [currentPlayerId]: { name: currentPlayerName, joinedAt: firebase.database.ServerValue.TIMESTAMP }
+                    },
+                    settings: {
+                        playerCount: parseInt(playerCountSelect.value),
+                        missionId: parseInt(missionSelect.value)
+                    },
+                    status: 'lobby',
+                    createdAt: firebase.database.ServerValue.TIMESTAMP
+                };
+                await roomRef.set(initialRoomData);
+            } 
+            // 既存ルームへの参加処理
+            else if (!isHost && snapshot.exists()) {
+                const roomData = snapshot.val();
+                if (Object.keys(roomData.players || {}).length >= roomData.settings.playerCount) {
+                    alert('このルームは満員です。');
+                    return;
+                }
+                 if (roomData.status !== 'lobby') {
+                    alert('このゲームは既に開始されています。');
+                    return;
+                }
+
+                currentPlayerId = db.ref().push().key;
+                currentPlayerName = generatePlayerName();
+                await roomRef.child('players').child(currentPlayerId).set({
+                    name: currentPlayerName,
+                    joinedAt: firebase.database.ServerValue.TIMESTAMP
+                });
+            } else if (!isHost && !snapshot.exists()){
+                 alert('ルームが見つかりません。');
+                 return;
+            }
+
+            currentRoomId = roomId;
+            // ページを離れるときにプレイヤーを削除する
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            listenToRoomUpdates(roomId);
+        };
+        
+        // ページ離脱時の処理
+        const handleBeforeUnload = () => {
+            if (currentRoomId && currentPlayerId) {
+                const playerRef = db.ref(`rooms/${currentRoomId}/players/${currentPlayerId}`);
+                playerRef.remove(); // 同期的に削除
+            }
+        };
+
+        // ルーム情報のリアルタイム監視
+        const listenToRoomUpdates = (roomId) => {
+            if (roomDataUnsubscriber) roomDataUnsubscriber(); // 古いリスナーを解除
+            const roomRef = db.ref(`rooms/${roomId}`);
+            roomDataUnsubscriber = roomRef.on('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    // ルームが削除された場合
+                    alert('ルームが解散しました。');
+                    resetToLobby();
+                    return;
+                }
+                const roomData = snapshot.val();
+                
+                // プレイヤーが誰もいなくなったらルームを削除
+                if (isHost && (!roomData.players || Object.keys(roomData.players).length === 0)) {
+                    db.ref(`rooms/${currentRoomId}`).remove();
+                    return;
+                }
+                
+                if (roomData.status === 'lobby') {
+                    updateLobbyUI(roomData);
+                } else if (roomData.status === 'playing') {
+                    // 監視を続けるが、UIのレンダリングは renderGameUI で制御
+                    renderGameUI(roomData);
+                }
+            });
+        };
+
+        // ロビーUIの更新
+        const updateLobbyUI = (roomData) => {
+            lobbyScreen.style.display = 'block';
+            gameScreen.style.display = 'none';
+
+            // 参加者リストを更新
+            playerList.innerHTML = '';
+            const players = roomData.players || {};
+            Object.values(players).forEach(player => {
+                const li = document.createElement('li');
+                li.textContent = player.name;
+                playerList.appendChild(li);
+            });
+            
+            // ホスト用のUI制御
+            if (isHost) {
+                startGameBtn.disabled = Object.keys(players).length !== roomData.settings.playerCount;
+                playerCountSelect.disabled = false;
+                missionSelect.disabled = false;
+            } else {
+                startGameBtn.style.display = 'none';
+                playerCountSelect.disabled = true;
+                missionSelect.disabled = true;
+                playerCountSelect.value = roomData.settings.playerCount;
+                missionSelect.value = roomData.settings.missionId;
+            }
+        };
+        
+        // ロビー状態にリセット
+        const resetToLobby = () => {
+             if (roomDataUnsubscriber) roomDataUnsubscriber();
+             window.removeEventListener('beforeunload', handleBeforeUnload);
+             
+             currentRoomId = null;
+             currentPlayerId = null;
+             currentPlayerName = null;
+             isHost = false;
+             
+             lobbyScreen.style.display = 'block';
+             gameScreen.style.display = 'none';
+             settingsBtn.classList.add('hidden');
+             
+             roomCodeInput.value = '';
+             roomCodeInput.disabled = false;
+             roomCodeDisplay.textContent = '';
+             createRoomBtn.disabled = false;
+             joinRoomBtn.disabled = false;
+             playerList.innerHTML = '';
+             startGameBtn.disabled = true;
+             startGameBtn.style.display = 'block';
+        };
+
+        // --- ゲーム開始処理 ---
+        startGameBtn.addEventListener('click', () => {
+            if (isHost) {
+                initializeGame();
+            }
+        });
+        
+        // ゲームの初期化
+        const initializeGame = async () => {
+            const roomRef = db.ref(`rooms/${currentRoomId}`);
+            const snapshot = await roomRef.once('value');
+            const roomData = snapshot.val();
+            
+            const playerCount = roomData.settings.playerCount;
+            const missionId = roomData.settings.missionId;
+            const playerIds = Object.keys(roomData.players);
+            
+            // 1. カード生成
+            let cards = [];
+            for (let i = 1; i <= 12; i++) {
+                cards.push(i, i, i, i);
+            }
+            
+            let missionParams = {};
+            // ミッションに応じたカード変更
+            if (missionId === 1 || missionId === 3) {
+                const redCodes = [1.5, 2.5, 3.5, 4.5];
+                let chosenCard;
+                if (missionId === 1) {
+                    chosenCard = redCodes[Math.floor(Math.random() * redCodes.length)];
+                    missionParams.x = chosenCard;
+                }
+                if (missionId === 3) {
+                    const shuffledRed = shuffleArray([...redCodes]);
+                    missionParams.x = shuffledRed[0];
+                    missionParams.y = shuffledRed[1];
+                    missionParams.z = shuffledRed[2];
+                    chosenCard = shuffledRed[Math.floor(Math.random() * 3)];
+                }
+                cards.push(chosenCard); // 25枚ではなく、1枚追加して49枚
+            }
+
+            cards = shuffleArray(cards);
+            
+            // 2. カード配布
+            const hands = {};
+            playerIds.forEach(pid => {
+                hands[pid] = { cards: [], tokens: {} };
+            });
+            
+            let p_idx = 0;
+            cards.forEach(card => {
+                hands[playerIds[p_idx]].cards.push({ value: card, isRevealed: false });
+                p_idx = (p_idx + 1) % playerCount;
+            });
+            
+            // 各手札をソート
+            Object.values(hands).forEach(hand => {
+                hand.cards.sort((a, b) => a.value - b.value);
+            });
+            
+            // ミッション2の処理
+            if (missionId === 2) {
+                Object.values(hands).forEach(hand => {
+                    if(hand.cards.length > 1) {
+                        const randomIndex = Math.floor(Math.random() * hand.cards.length);
+                        const [removedCard] = hand.cards.splice(randomIndex, 1);
+                        hand.cards.push(removedCard);
+                    }
+                });
+            }
+
+            // 3. 役割とキャラクターカード配布
+            const shuffledPlayerIds = shuffleArray([...playerIds]);
+            const captainId = shuffledPlayerIds[0];
+            const characterCards = {};
+            const availableChars = [1, 2, 3, 4];
+            shuffleArray(availableChars);
+
+            shuffledPlayerIds.forEach((pid, index) => {
+                if (pid === captainId) {
+                    characterCards[pid] = { number: 5, isFlipped: false };
+                } else {
+                    // 隊長以外に1-4を割り当てる
+                    characterCards[pid] = { number: availableChars.pop(), isFlipped: false };
+                }
+            });
+
+            // 4. アイテムカード配布
+            let allItems = [1,2,3,4,5,6,7,8,9,10,11,12,13]; // 14-18はミッション42まで出ない
+            // TODO: 将来的にミッション番号でアイテムプールを切り替える
+            // if (missionId > 42) allItems.push(14, 15, 16, 17, 18);
+            
+            shuffleArray(allItems);
+            const items = {};
+            for (let i = 0; i < playerCount; i++) {
+                items[i] = { id: allItems[i], used: false };
+            }
+            
+            // 5. ゲーム状態をFirebaseに書き込む
+            const gameState = {
+                hands: hands,
+                characterCards: characterCards,
+                captainId: captainId, // 表示はしないが、データとして保持
+                items: items,
+                diCounter: playerCount,
+                tables: Array(playerCount).fill(null).map((_, i) => ({ seat: null })),
+                missionParams: missionParams || {}
+            };
+            
+            const updates = {};
+            updates[`/rooms/${currentRoomId}/status`] = 'playing';
+            updates[`/rooms/${currentRoomId}/gameState`] = gameState;
+            
+            await db.ref().update(updates);
+        };
+
+        // --- ゲーム画面の描画 ---
+        
+        const renderGameUI = (roomData) => {
+            if (lobbyScreen.style.display !== 'none') {
+                lobbyScreen.style.display = 'none';
+                gameScreen.style.display = 'block';
+                settingsBtn.classList.remove('hidden');
+            }
+
+            const { settings, gameState, players } = roomData;
+            const myHand = gameState.hands[currentPlayerId];
+            const myTableIndex = gameState.tables.findIndex(t => t.seat === currentPlayerId);
+            const amISeated = myTableIndex !== -1;
+
+            // 1. アイテムエリア描画
+            renderItems(gameState.items, gameState.hands);
+            
+            // 2. DIカウンター描画
+            diCounter.innerHTML = `<img src="di${gameState.diCounter}.png" alt="DI Counter">`;
+
+            // 3. プレイヤーテーブル描画
+            playersArea.innerHTML = '';
+            gameState.tables.forEach((table, tableIndex) => {
+                const seatedPlayerId = table.seat;
+                const seatedPlayer = seatedPlayerId ? players[seatedPlayerId] : null;
+                const handData = gameState.hands[Object.keys(gameState.hands)[tableIndex]]; // TODO: この紐付けは不安定。IDで紐づけるべき。
+                
+                const tableDiv = document.createElement('div');
+                tableDiv.className = 'player-table';
+                
+                // プレイヤー情報（名前/数字、キャラクターカード）
+                const playerInfoDiv = document.createElement('div');
+                playerInfoDiv.className = 'player-info';
+                
+                const nameDisplay = document.createElement('div');
+                nameDisplay.className = 'player-name-display';
+                nameDisplay.textContent = seatedPlayer ? seatedPlayer.name : (tableIndex + 1);
+                
+                const charCardImg = document.createElement('img');
+                charCardImg.className = 'character-card';
+                const charCardData = seatedPlayerId ? gameState.characterCards[seatedPlayerId] : null;
+
+                if (amISeated && seatedPlayerId && charCardData) {
+                    charCardImg.src = charCardData.isFlipped ? 'battery.jpg' : `member (${charCardData.number}).jpg`;
+                } else {
+                     charCardImg.src = 'member (blank).jpg'; // 仮のブランク画像
+                }
+                charCardImg.dataset.tableIndex = tableIndex;
+
+                playerInfoDiv.append(nameDisplay, charCardImg);
+
+                // 手札コンテナ
+                const handContainerDiv = document.createElement('div');
+                handContainerDiv.className = 'hand-container';
+                const handDiv = document.createElement('div');
+                handDiv.className = 'hand';
+
+                handData.cards.forEach((card, cardIndex) => {
+                    const cardWrapper = document.createElement('div');
+                    cardWrapper.className = 'card-wrapper';
+
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'card';
+                    cardDiv.dataset.tableIndex = tableIndex;
+                    cardDiv.dataset.cardIndex = cardIndex;
+                    
+                    const canSeeCard = amISeated && (tableIndex === myTableIndex) || card.isRevealed;
+
+                    if (canSeeCard) {
+                        cardDiv.classList.add(card.isRevealed ? 'revealed' : 'my-card');
+                        const numberSpan = document.createElement('span');
+                        numberSpan.className = 'card-number';
+                        numberSpan.textContent = card.value;
+                        
+                        const iconDiv = document.createElement('div');
+                        iconDiv.className = 'card-icon';
+                        if (card.value.toString().includes('.5')) {
+                             iconDiv.style.backgroundImage = "url('redcode.png')";
+                        } else if (card.value.toString().includes('.1')) {
+                            iconDiv.style.backgroundImage = "url('yellowcode.png')";
+                        } else {
+                            iconDiv.style.backgroundImage = "url('codenumber.png')";
+                        }
+                        cardDiv.append(numberSpan, iconDiv);
+                    } else {
+                         cardDiv.classList.add('face-down');
+                    }
+
+                    // アルファベットラベル
+                    const alphabet = String.fromCharCode(97 + cardIndex); // a, b, c...
+                    const alphabetLabel = document.createElement('div');
+                    alphabetLabel.className = 'alphabet-label';
+                    alphabetLabel.textContent = alphabet;
+                    alphabetLabel.dataset.tableIndex = tableIndex;
+                    alphabetLabel.dataset.cardIndex = cardIndex;
+                    
+                    cardWrapper.append(cardDiv, alphabetLabel);
+
+                    // 情報トークン
+                    const tokenValue = handData.tokens ? handData.tokens[alphabet] : null;
+                    if (tokenValue) {
+                        const tokenDiv = document.createElement('div');
+                        tokenDiv.className = 'info-token';
+                        tokenDiv.textContent = tokenValue.value;
+                        tokenDiv.classList.add(tokenValue.type || 'normal');
+                        cardWrapper.appendChild(tokenDiv);
+                    }
+                    
+                    // カード交換インジケーター
+                    if (card.showSwapIndicator) {
+                        const indicator = document.createElement('div');
+                        indicator.className = 'card-swap-indicator';
+                        indicator.textContent = '▼';
+                        cardDiv.appendChild(indicator);
+                        // 5秒後にFirebaseからフラグを削除する
+                        setTimeout(() => {
+                            const handKey = Object.keys(gameState.hands)[tableIndex];
+                            db.ref(`rooms/${currentRoomId}/gameState/hands/${handKey}/cards/${cardIndex}/showSwapIndicator`).remove();
+                        }, 5000);
+                    }
+
+                    handDiv.appendChild(cardWrapper);
+                });
+                handContainerDiv.appendChild(handDiv);
+                
+                tableDiv.append(playerInfoDiv, handContainerDiv);
+
+                // 着席プレイヤー名（左上）
+                if (seatedPlayer) {
+                    const tableName = document.createElement('div');
+                    tableName.className = 'table-player-name';
+                    tableName.textContent = seatedPlayer.name;
+                    tableDiv.appendChild(tableName);
+                }
+                playersArea.appendChild(tableDiv);
+            });
+
+            // 4. ミッション詳細描画
+            renderMissionDetails(settings.missionId, gameState.missionParams);
+        };
+        
+        // ミッション詳細の表示
+        const renderMissionDetails = (missionId, params) => {
+            let title = '', body = '';
+            switch(missionId) {
+                case 1:
+                    title = "#1 爆弾";
+                    body = `${params.x}が1つ`;
+                    break;
+                case 2:
+                    title = "#2 シャッフル";
+                    body = `手札の1枚が一番右に移動しています。`;
+                    break;
+                case 3:
+                    title = "#3 さらい爆弾";
+                    body = `${params.x} - ${params.y} - ${params.z} のうち1つ`;
+                    break;
+                // 他のミッションもここに追加
+                default:
+                    title = `#${missionId} 未設定のミッション`;
+                    body = 'ミッション詳細がありません。';
+            }
+            missionTitleEl.textContent = title;
+            missionBodyEl.textContent = body;
+        };
+
+        // アイテムの描画と有効/無効化
+        const renderItems = (items, hands) => {
+            const itemContainer = itemArea.querySelector('#di-counter'); // di-counterを基準に挿入
+            // 既存のアイテムをクリア
+            itemArea.querySelectorAll('.item-card').forEach(el => el.remove());
+            
+            Object.values(items).forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'item-card';
+                if(item.used) itemDiv.classList.add('used');
+                
+                const itemImg = document.createElement('img');
+                itemImg.src = item.used ? 'itemback.jpg' : `item (${item.id}).jpg`;
+                itemImg.style.width = '50px';
+                itemImg.style.height = '70px';
+                
+                itemDiv.appendChild(itemImg);
+                itemDiv.dataset.itemId = item.id;
+                
+                // アイテム13の有効化条件
+                if (item.id === 13) {
+                    let yellowRevealedCount = 0;
+                    Object.values(hands).forEach(hand => {
+                        hand.cards.forEach(card => {
+                            if (card.isRevealed && card.value.toString().includes('.1')) {
+                                yellowRevealedCount++;
+                            }
+                        });
+                    });
+                    if (yellowRevealedCount < 2) {
+                        itemDiv.style.opacity = '0.5';
+                        itemDiv.style.pointerEvents = 'none';
+                    }
+                }
+                
+                itemArea.insertBefore(itemDiv, itemContainer);
+            });
+        };
+
+        // --- ゲーム中のインタラクション ---
+        
+        // 設定ボタン
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const roomData = JSON.parse(document.body.dataset.roomData || '{}');
+            const amISeated = roomData.gameState.tables.some(t => t.seat === currentPlayerId);
+
+            settingsMenu.innerHTML = '';
+            if (amISeated) {
+                const leaveSeat = document.createElement('div');
+                leaveSeat.textContent = '席を立つ';
+                leaveSeat.onclick = handleLeaveSeat;
+                settingsMenu.appendChild(leaveSeat);
+            } else {
+                const sitDown = document.createElement('div');
+                sitDown.textContent = '席に座る';
+                sitDown.onclick = handleSitDown;
+                settingsMenu.appendChild(sitDown);
+            }
+            
+            if (isHost) {
+                const restart = document.createElement('div');
+                restart.textContent = 'やり直す';
+                restart.onclick = handleRestart;
+                settingsMenu.appendChild(restart);
+            }
+
+            settingsMenu.classList.toggle('hidden');
+        });
+        
+        // 席を立つ
+        const handleLeaveSeat = () => {
+             const roomRef = db.ref(`rooms/${currentRoomId}`);
+             roomRef.once('value').then(snapshot => {
+                 const roomData = snapshot.val();
+                 const myTableIndex = roomData.gameState.tables.findIndex(t => t.seat === currentPlayerId);
+                 if (myTableIndex !== -1) {
+                     db.ref(`rooms/${currentRoomId}/gameState/tables/${myTableIndex}/seat`).set(null);
+                 }
+                 settingsMenu.classList.add('hidden');
+             });
+        };
+        
+        // 席に座る
+        const handleSitDown = () => {
+            // TODO: 空いている席を選択するUIを実装
+            // 今は単純に最初の空席に座る
+             const roomRef = db.ref(`rooms/${currentRoomId}`);
+             roomRef.once('value').then(snapshot => {
+                 const roomData = snapshot.val();
+                 const availableTableIndex = roomData.gameState.tables.findIndex(t => t.seat === null);
+                 if (availableTableIndex !== -1) {
+                     db.ref(`rooms/${currentRoomId}/gameState/tables/${availableTableIndex}/seat`).set(currentPlayerId);
+                 } else {
+                     alert("空いている席がありません。");
+                 }
+                 settingsMenu.classList.add('hidden');
+             });
+        };
+        
+        // やり直し
+        const handleRestart = () => {
+             settingsMenu.classList.add('hidden');
+             showPopup(`
+                <p>本当にゲームをやり直しますか？</p>
+                <button id="restart-cancel-btn">キャンセル</button>
+                <button id="restart-confirm-btn">やり直す</button>
+             `, (popupEl) => {
+                 popupEl.querySelector('#restart-confirm-btn').onclick = () => {
+                     // ロビー状態に戻す
+                    db.ref(`rooms/${currentRoomId}/status`).set('lobby');
+                    db.ref(`rooms/${currentRoomId}/gameState`).remove();
+                    hidePopup();
+                 };
+                 popupEl.querySelector('#restart-cancel-btn').onclick = hidePopup;
+             });
+        };
+        
+        // ポップアップ表示
+        const showPopup = (html, callback) => {
+            popupContainer.innerHTML = `<div class="popup-overlay"><div class="popup-content">${html}</div></div>`;
+            popupContainer.classList.remove('hidden');
+            if (callback) callback(popupContainer.querySelector('.popup-content'));
+        };
+
+        const hidePopup = () => {
+            popupContainer.classList.add('hidden');
+            popupContainer.innerHTML = '';
+        };
+
+        // メニュー外クリックで閉じる
+        document.addEventListener('click', () => {
+            if (!settingsMenu.classList.contains('hidden')) {
+                settingsMenu.classList.add('hidden');
+            }
+        });
+        
+        // 汎用クリックイベントリスナー
+        document.addEventListener('click', (e) => {
+            const target = e.target;
+            const roomDataRef = db.ref(`rooms/${currentRoomId}`);
+
+            // カードクリック
+            if (target.closest('.card')) {
+                const cardEl = target.closest('.card');
+                const { tableIndex, cardIndex } = cardEl.dataset;
+                
+                roomDataRef.once('value').then(snapshot => {
+                    const roomData = snapshot.val();
+                    const myTableIndex = roomData.gameState.tables.findIndex(t => t.seat === currentPlayerId);
+                    
+                    if (parseInt(tableIndex) === myTableIndex) {
+                        // 自分のカード（現在は機能なし）
+                    } else {
+                        // 他人のカードを公開
+                        const handKey = Object.keys(roomData.gameState.hands)[tableIndex];
+                        db.ref(`rooms/${currentRoomId}/gameState/hands/${handKey}/cards/${cardIndex}/isRevealed`).set(true);
+                    }
+                });
+            }
+            
+            // キャラクターカードクリック
+            if (target.matches('.character-card')) {
+                const { tableIndex } = target.dataset;
+                 roomDataRef.once('value').then(snapshot => {
+                    const roomData = snapshot.val();
+                    const seatedPlayerId = roomData.gameState.tables[tableIndex].seat;
+                    if(seatedPlayerId){
+                       const currentFlipState = roomData.gameState.characterCards[seatedPlayerId].isFlipped;
+                       db.ref(`rooms/${currentRoomId}/gameState/characterCards/${seatedPlayerId}/isFlipped`).set(!currentFlipState);
+                    }
+                 });
+            }
+            
+            // アルファベットクリック
+            if (target.matches('.alphabet-label')) {
+                 roomDataRef.once('value').then(snapshot => {
+                    const roomData = snapshot.val();
+                    const { tableIndex, cardIndex } = target.dataset;
+                    const handKey = Object.keys(roomData.gameState.hands)[tableIndex];
+                    const cardValue = roomData.gameState.hands[handKey].cards[cardIndex].value;
+                    const alphabet = String.fromCharCode(97 + parseInt(cardIndex));
+                    
+                    // TODO: トークン選択UIを実装
+                    // とりあえず数字トークンを置く
+                    const tokenData = { value: cardValue, type: 'normal' };
+                    db.ref(`rooms/${currentRoomId}/gameState/hands/${handKey}/tokens/${alphabet}`).set(tokenData);
+                 });
+            }
+            
+             // DIカウンタークリック
+            if(target.closest('#di-counter')){
+                // TODO: 「進める」「戻す」のUIを出す
+                // とりあえずクリックで進める
+                roomDataRef.child('gameState/diCounter').transaction(currentVal => {
+                    return (currentVal > 0) ? currentVal - 1 : currentVal;
+                });
+            }
+
+        });
+
+
+        // --- 初期化処理 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // セッションストレージからIDを復元しようと試みる（リロード対策）
+            const storedRoomId = sessionStorage.getItem('bombBustersRoomId');
+            const storedPlayerId = sessionStorage.getItem('bombBustersPlayerId');
+            const storedPlayerName = sessionStorage.getItem('bombBustersPlayerName');
+            const storedIsHost = sessionStorage.getItem('bombBustersIsHost') === 'true';
+
+            if (storedRoomId && storedPlayerId) {
+                currentRoomId = storedRoomId;
+                currentPlayerId = storedPlayerId;
+                currentPlayerName = storedPlayerName;
+                isHost = storedIsHost;
+                
+                // プレイヤーがまだルームに存在するか確認
+                db.ref(`rooms/${currentRoomId}/players/${currentPlayerId}`).once('value', snapshot => {
+                    if (snapshot.exists()) {
+                         // 存在すればリスナーを再設定
+                         window.addEventListener('beforeunload', handleBeforeUnload);
+                         listenToRoomUpdates(currentRoomId);
+                    } else {
+                        // 存在しなければリセット
+                        sessionStorage.clear();
+                        resetToLobby();
+                    }
+                });
+            }
+        });
+        
+        // 状態をセッションストレージに保存
+        const saveSession = () => {
+             if (currentRoomId && currentPlayerId) {
+                sessionStorage.setItem('bombBustersRoomId', currentRoomId);
+                sessionStorage.setItem('bombBustersPlayerId', currentPlayerId);
+                sessionStorage.setItem('bombBustersPlayerName', currentPlayerName);
+                sessionStorage.setItem('bombBustersIsHost', isHost);
+            }
+        };
+        
+        // 監視関数内で定期的にセッションを保存
+        const originalListenFn = listenToRoomUpdates;
+        listenToRoomUpdates = (roomId) => {
+            saveSession();
+            originalListenFn(roomId);
+        }
+
+        // bodyにデータを保持して他関数から参照可能にする（簡易的な状態管理）
+         const originalRenderFn = renderGameUI;
+         renderGameUI = (roomData) => {
+            document.body.dataset.roomData = JSON.stringify(roomData);
+            originalRenderFn(roomData);
+         }
+
+
+    </script>
 </body>
 </html>
