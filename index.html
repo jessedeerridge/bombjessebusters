@@ -1,444 +1,466 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>BOMB BUSTERS</title>
-  <style>
-    :root { --gap:12px; --cardW:72px; --cardH:104px; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; background:#fff; color:#111; }
-    header { padding:16px; border-bottom:1px solid #eee; text-align:center; font-weight:800; letter-spacing:0.04em; }
-    .container { display:flex; gap:var(--gap); padding:16px; }
-    .main, .side { background:#fff; }
-    .main { flex:1; min-width:0; }
-    .card-row { display:flex; flex-wrap:wrap; gap:10px; }
-    .panel { border:1px solid #eee; border-radius:14px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
-    .side { width:280px; }
-    .hidden { display:none !important; }
-    input[type="text"] { width:100%; padding:12px; border:1px solid #ddd; border-radius:12px; }
-    button { padding:10px 14px; border:1px solid #ddd; background:#fff; border-radius:12px; cursor:pointer; }
-    button.primary { background:#111; color:#fff; border-color:#111; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    .row { display:flex; gap:10px; align-items:center; }
-    .row > * { flex:1; }
-    .muted { color:#666; font-size:12px; }
-    .pill { display:inline-flex; align-items:center; gap:6px; border:1px solid #eee; padding:6px 10px; border-radius:999px; font-size:13px; background:#fafafa; }
-    .list { display:flex; flex-direction:column; gap:6px; max-height:40vh; overflow:auto; }
-    /* Cards */
-    .card { width:var(--cardW); height:var(--cardH); border-radius:12px; border:1px solid #ddd; display:grid; place-items:center; user-select:none; }
-    .card.face { background:#fff; }
-    .card.back { background:repeating-linear-gradient(45deg,#f3f3f3, #f3f3f3 8px, #e5e5e5 8px, #e5e5e5 16px); }
-    .card.public { outline:3px solid #0a7; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:10px; }
-    .section-title { font-weight:700; margin:10px 0 6px; }
-    .cta { display:flex; gap:10px; align-items:center; }
-    .notice { background:#f6f9ff; border:1px solid #dfe8ff; padding:10px; border-radius:12px; font-size:13px; }
-    @media (max-width: 900px) {
-      .container { flex-direction:column; }
-      .side { width:auto; order:2; }
-      .main { order:1; }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>BOMB BUSTERS</title>
+<style>
+  :root { --gap:12px; --cardW:74px; --cardH:106px; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#fff;color:#111}
+  header{padding:16px;border-bottom:1px solid #eee;text-align:center;font-weight:800;letter-spacing:.04em}
+  .container{display:flex;gap:var(--gap);padding:16px}
+  .main{flex:1;min-width:0}
+  .panel{border:1px solid #eee;border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);background:#fff}
+  .side{width:280px}
+  .hidden{display:none !important}
+  input[type="text"]{width:100%;padding:12px;border:1px solid #ddd;border-radius:12px}
+  button{padding:10px 14px;border:1px solid #ddd;background:#fff;border-radius:12px;cursor:pointer}
+  button.primary{background:#111;color:#fff;border-color:#111}
+  button:disabled{opacity:.55;cursor:not-allowed}
+  .row{display:flex;gap:10px;align-items:center}
+  .row>*{flex:1}
+  .muted{color:#666;font-size:12px}
+  .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #eee;padding:6px 10px;border-radius:999px;font-size:13px;background:#fafafa}
+  .list{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto}
+  /* player strip */
+  .player{border:1px solid #eee;border-radius:12px;padding:10px;margin-bottom:10px}
+  .playerHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .name{font-weight:700}
+  /* cards */
+  .hand{display:flex;flex-wrap:wrap;gap:8px}
+  .card{width:var(--cardW);height:var(--cardH);border-radius:12px;border:1px solid #ddd;display:grid;grid-template-rows:auto 28px;overflow:hidden;user-select:none}
+  .face .front{display:grid;place-items:center;font-weight:700;font-size:18px}
+  .back .front{display:none}
+  .back{background:
+    url("code裏.png") center/cover no-repeat,
+    repeating-linear-gradient(45deg,#f3f3f3,#f3f3f3 8px,#e5e5e5 8px,#e5e5e5 16px)
+  }
+  .revealed{outline:3px solid #0a7}
+  .letters{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;border-top:1px solid #eee;background:#fafafa}
+  .letter{font-size:12px;text-align:center;padding:4px 0;border-right:1px solid #eee}
+  .letter:last-child{border-right:none}
+  .letter button{width:100%;height:100%;border:none;background:transparent;padding:4px 0;cursor:pointer}
+  .token{font-size:12px;font-weight:700}
+  /* floating controls */
+  .floating{position:fixed;right:12px;bottom:12px;display:flex;gap:8px}
+  .menu{position:relative}
+  .menuPopup{position:absolute;right:0;bottom:44px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:8px;display:none}
+  .menu.open .menuPopup{display:block}
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
+  .sheet{background:#fff;border-radius:16px;max-width:420px;width:calc(100% - 32px);padding:16px;border:1px solid #eee}
+  .choices{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px}
+  .choice{padding:10px;border:1px solid #ddd;border-radius:10px;text-align:center;cursor:pointer}
+  @media (max-width:900px){.container{flex-direction:column}.side{width:auto}}
+</style>
 </head>
 <body>
-  <header>BOMB BUSTERS</header>
+<header>BOMB BUSTERS</header>
 
-  <!-- Join screen -->
-  <section id="joinView" class="container">
-    <div class="main panel" style="max-width:560px;margin:0 auto;">
-      <div class="section-title">部屋に入る</div>
-      <div class="row">
-        <input id="roomCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="ルームコード（例: 1234）">
-        <button id="joinBtn" class="primary">入室</button>
-      </div>
-      <div class="muted" style="margin-top:8px;">※ 入室後に「参加」か「観戦」を選べます。名前は自動で割り当て。</div>
+<!-- Join -->
+<section id="joinView" class="container">
+  <div class="main panel" style="max-width:560px;margin:0 auto;">
+    <div class="row">
+      <input id="roomCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="ルームコード（例: 1234）">
+      <button id="joinBtn" class="primary">入室</button>
     </div>
-  </section>
+    <div class="muted" style="margin-top:8px;">入室後に「参加」か「観戦」を選べます。名前は自動付与。</div>
+  </div>
+</section>
 
-  <!-- Role select -->
-  <section id="roleView" class="container hidden">
-    <div class="main panel" style="max-width:560px;margin:0 auto;">
-      <div class="section-title">入室モードを選択</div>
-      <div class="row">
-        <button id="asPlayer" class="primary">参加</button>
-        <button id="asSpectator">観戦</button>
-      </div>
-      <div id="whoami" class="muted" style="margin-top:8px;"></div>
+<!-- Role select -->
+<section id="roleView" class="container hidden">
+  <div class="main panel" style="max-width:560px;margin:0 auto;">
+    <div class="row" style="justify-content:center">
+      <button id="asPlayer" class="primary">参加</button>
+      <button id="asSpectator">観戦</button>
     </div>
-  </section>
+    <div id="whoami" class="muted" style="margin-top:8px;"></div>
+  </div>
+</section>
 
-  <!-- Lobby / Game -->
-  <section id="gameView" class="container hidden">
-    <div class="main">
-      <!-- Lobby info -->
-      <div id="lobbyPanel" class="panel">
-        <div class="row" style="justify-content:space-between;">
-          <div>
-            <div class="section-title">ルームコード: <span id="roomCodeLabel"></span></div>
-            <div class="muted">あなた: <span id="nameLabel"></span>（<span id="roleLabel"></span>）</div>
-          </div>
-          <div class="cta">
-            <button id="startBtn" class="primary hidden">ゲーム開始</button>
-            <button id="leaveBtn">退室</button>
-          </div>
+<!-- Lobby/Game -->
+<section id="gameView" class="container hidden">
+  <div class="main">
+    <div id="lobbyPanel" class="panel">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <div class="muted">ルームコード</div>
+          <div class="section-title" style="font-weight:800">#<span id="roomCodeLabel"></span></div>
+          <div class="muted">あなた: <span id="nameLabel"></span>（<span id="roleLabel"></span>）</div>
+        </div>
+        <div class="row" style="flex:none;gap:8px">
+          <button id="startBtn" class="primary hidden">爆弾を解除！</button>
+          <button id="leaveBtn">退室</button>
         </div>
       </div>
-
-      <!-- Hands -->
-      <div id="handsPanel" class="panel" style="margin-top:12px;">
-        <div class="section-title">あなたの手札</div>
-        <div id="myHand" class="card-row"></div>
-        <div class="muted" style="margin-top:6px;">※ 自分のカードは表。他の人には裏で見えます。クリックで全体公開。</div>
-      </div>
-
-      <!-- Table / public -->
-      <div id="publicPanel" class="panel" style="margin-top:12px;">
-        <div class="section-title">公開されたカード</div>
-        <div id="publicBoard" class="grid"></div>
-      </div>
     </div>
 
-    <!-- Right side: players & spectators (lobby only) -->
-    <aside id="sidePanel" class="side panel">
-      <div class="section-title">参加者</div>
-      <div id="playersList" class="list"></div>
-      <div class="section-title" style="margin-top:12px;">観戦者</div>
-      <div id="spectatorsList" class="list"></div>
-      <div class="notice" style="margin-top:12px;">
-        ゲーム開始後、このリストは非表示になります。
-      </div>
-    </aside>
-  </section>
+    <!-- All players area -->
+    <div id="tablePanel" class="panel" style="margin-top:12px;">
+      <div id="playersArea"></div>
+    </div>
+  </div>
 
-  <!-- Firebase + App -->
-  <script type="module">
-    // ==== Firebase SDK (v9 modular) ====
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import {
-      getDatabase, ref, child, get, set, update, onValue, push,
-      serverTimestamp, onDisconnect, remove, runTransaction
-    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+  <!-- Side: lists (hidden after start) -->
+  <aside id="sidePanel" class="side panel">
+    <div class="section-title">参加者</div>
+    <div id="playersList" class="list"></div>
+    <div class="section-title" style="margin-top:12px;">観戦者</div>
+    <div id="spectatorsList" class="list"></div>
+    <div class="muted" style="margin-top:12px;">※ ゲーム開始後、この枠は非表示になります。</div>
+  </aside>
+</section>
 
-    // ==== Your Firebase config ====
-    const firebaseConfig = {
-      apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
-      authDomain: "chat-68c4c.firebaseapp.com",
-      databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
-      projectId: "chat-68c4c",
-      storageBucket: "chat-68c4c.appspot.com",
-      messagingSenderId: "172284325975",
-      appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+<!-- Mission modal -->
+<div id="missionModal" class="modal hidden">
+  <div class="sheet">
+    <div style="font-weight:800;">ミッションを選択（1〜10）</div>
+    <div class="choices" id="missionChoices"></div>
+    <div class="muted" style="margin-top:8px;">※ ミッション1：1.5のコードが1枚混じっている</div>
+  </div>
+</div>
 
-    // ==== DOM helpers ====
-    const $ = (sel) => document.querySelector(sel);
-    const joinView = $("#joinView");
-    const roleView = $("#roleView");
-    const gameView = $("#gameView");
-    const lobbyPanel = $("#lobbyPanel");
-    const sidePanel = $("#sidePanel");
-    const startBtn = $("#startBtn");
-    const leaveBtn = $("#leaveBtn");
-    const roomCodeInput = $("#roomCodeInput");
-    const joinBtn = $("#joinBtn");
-    const asPlayerBtn = $("#asPlayer");
-    const asSpectatorBtn = $("#asSpectator");
-    const nameLabel = $("#nameLabel");
-    const roleLabel = $("#roleLabel");
-    const roomCodeLabel = $("#roomCodeLabel");
-    const playersList = $("#playersList");
-    const spectatorsList = $("#spectatorsList");
-    const myHandEl = $("#myHand");
-    const publicBoardEl = $("#publicBoard");
-    const whoami = $("#whoami");
+<!-- Floating host controls -->
+<div id="hostControls" class="floating hidden">
+  <div class="menu" id="hostMenu">
+    <button id="settingsBtn">⚙ 設定</button>
+    <div class="menuPopup">
+      <button id="resetBtn">やり直し</button>
+    </div>
+  </div>
+</div>
 
-    // ==== State ====
-    let state = {
-      roomCode: null,
-      userId: null,
-      name: null,
-      role: null, // "player" | "spectator"
-      isHost: false,
-      gameState: "lobby" // "lobby" | "playing"
-    };
+<!-- Firebase + App -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import {
+    getDatabase, ref, child, get, set, update, onValue, push,
+    serverTimestamp, onDisconnect, remove, runTransaction
+  } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-    // ==== Utils ====
-    function randomName() {
-      const A = ["赤","青","黄","緑","桃","黒","白","金","銀","茶"];
-      const B = ["ねこ","いぬ","うさぎ","たぬき","きつね","くま","とり","さかな","ドラゴン","ペンギン"];
-      const n = Math.floor(Math.random()*900)+100;
-      return A[Math.floor(Math.random()*A.length)] + B[Math.floor(Math.random()*B.length)] + n;
+  const firebaseConfig = {
+    apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
+    authDomain: "chat-68c4c.firebaseapp.com",
+    databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
+    projectId: "chat-68c4c",
+    storageBucket: "chat-68c4c.appspot.com",
+    messagingSenderId: "172284325975",
+    appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // DOM
+  const $ = s=>document.querySelector(s);
+  const joinView=$("#joinView"), roleView=$("#roleView"), gameView=$("#gameView");
+  const roomCodeInput=$("#roomCodeInput"), joinBtn=$("#joinBtn");
+  const asPlayerBtn=$("#asPlayer"), asSpectatorBtn=$("#asSpectator"), whoami=$("#whoami");
+  const startBtn=$("#startBtn"), leaveBtn=$("#leaveBtn");
+  const roomCodeLabel=$("#roomCodeLabel"), nameLabel=$("#nameLabel"), roleLabel=$("#roleLabel");
+  const playersList=$("#playersList"), spectatorsList=$("#spectatorsList"), sidePanel=$("#sidePanel");
+  const playersArea=$("#playersArea");
+  const missionModal=$("#missionModal"), missionChoices=$("#missionChoices");
+  const hostControls=$("#hostControls"), hostMenu=$("#hostMenu"), settingsBtn=$("#settingsBtn"), resetBtn=$("#resetBtn");
+
+  // State
+  let state = {
+    roomCode:null, userId:null, name:null, role:null, isHost:false, phase:"lobby", mission:null
+  };
+
+  // helpers
+  const cleanCode = s => (s||"").replace(/\D/g,"").slice(0,6);
+  const setView = v=>{
+    joinView.classList.toggle("hidden", v!=="join");
+    roleView.classList.toggle("hidden", v!=="role");
+    gameView.classList.toggle("hidden", v!=="game");
+  };
+  const randName = ()=>{
+    const A=["赤","青","黄","緑","桃","黒","白","金","銀","茶"],B=["ねこ","いぬ","うさぎ","たぬき","きつね","くま","とり","さかな","ドラゴン","ペンギン"],n=Math.floor(Math.random()*900)+100;
+    return A[Math.floor(Math.random()*A.length)]+B[Math.floor(Math.random()*B.length)]+n;
+  };
+  const cardValue = txt => parseFloat(txt); // "1.5" OK
+
+  // room ensure
+  async function ensureRoom(code){
+    const r = ref(db, `rooms/${code}`);
+    const s = await get(r);
+    if(!s.exists()){
+      await set(r,{ createdAt:serverTimestamp(), hostId:null, phase:"lobby", mission:null,
+        players:{}, spectators:{}, hands:{}, revealed:{}, tokens:{} });
     }
-    function cleanCode(s){ return (s||"").replace(/\D/g,"").slice(0,6); }
-    function setView(which){
-      joinView.classList.toggle("hidden", which!=="join");
-      roleView.classList.toggle("hidden", which!=="role");
-      gameView.classList.toggle("hidden", which!=="game");
-    }
-    function cardLabel(card){
-      // card = {id, text} e.g., "A♠", "7♦", or custom
-      return card.text;
-    }
-    function createEl(tag, cls, text){ const el=document.createElement(tag); if(cls) el.className=cls; if(text) el.textContent=text; return el; }
+    return r;
+  }
 
-    // ==== Room lifecycle ====
-    async function ensureRoom(code) {
-      const roomRef = ref(db, `rooms/${code}`);
-      const snap = await get(roomRef);
-      if (!snap.exists()) {
-        // Create room
-        await set(roomRef, {
-          createdAt: serverTimestamp(),
-          state: "lobby",
-          hostId: null,
-          players: {},
-          spectators: {},
-          public: { cards: {} }
-        });
+  // join flow
+  joinBtn.addEventListener("click", async ()=>{
+    const code=cleanCode(roomCodeInput.value);
+    if(!code) return alert("ルームコードを数字で入力してください。");
+    state.roomCode=code; state.userId=state.userId || push(ref(db,"clients")).key; state.name=state.name||randName();
+    whoami.textContent=`暫定名: ${state.name}`;
+    setView("role");
+    const url=new URL(location.href); url.searchParams.set("room",code); history.replaceState(null,"",url.toString());
+  });
+
+  asPlayerBtn.addEventListener("click", ()=>enterAs("player"));
+  asSpectatorBtn.addEventListener("click", ()=>enterAs("spectator"));
+
+  async function enterAs(role){
+    state.role=role;
+    roomCodeLabel.textContent=state.roomCode; nameLabel.textContent=state.name; roleLabel.textContent=(role==="player"?"参加者":"観戦者");
+    const roomRef=await ensureRoom(state.roomCode);
+    const snap=await get(roomRef); const v=snap.val()||{};
+    if(role==="player" && !v.hostId) await update(roomRef,{ hostId:state.userId });
+
+    // if already playing, force spectator
+    const actual = (v.phase==="playing") ? "spectator" : role;
+    state.role=actual; roleLabel.textContent=(actual==="player"?"参加者":"観戦者");
+
+    const basePath = actual==="player" ? `rooms/${state.roomCode}/players/${state.userId}` : `rooms/${state.roomCode}/spectators/${state.userId}`;
+    const meRef = ref(db, basePath);
+    await set(meRef,{ name:state.name, joinedAt:serverTimestamp(), wantsPlayer:(actual==="player")?true:false });
+    onDisconnect(meRef).remove();
+
+    // keep a flag if user wanted to be player originally
+    const wantRef = ref(db, `rooms/${state.roomCode}/wants/${state.userId}`);
+    await set(wantRef, { wantsPlayer: role==="player" });
+    onDisconnect(wantRef).remove();
+
+    setupRealtime(state.roomCode);
+    setView("game");
+  }
+
+  function setupRealtime(code){
+    const roomRef = ref(db, `rooms/${code}`);
+    onValue(roomRef,(snap)=>{
+      const v=snap.val()||{};
+      state.phase=v.phase||"lobby"; state.mission=v.mission||null; state.isHost=(v.hostId===state.userId);
+
+      // Start button (host only, lobby, player)
+      startBtn.classList.toggle("hidden", !(state.isHost && state.phase==="lobby" && state.role==="player"));
+
+      // Side panel hidden after start
+      sidePanel.classList.toggle("hidden", state.phase!=="lobby");
+
+      // Host floating controls visible only when playing
+      hostControls.classList.toggle("hidden", !(state.isHost && state.phase==="playing"));
+
+      // render lists
+      renderList(playersList, v.players||{});
+      renderList(spectatorsList, v.spectators||{});
+
+      // render table: all players (and optionally spectators with 0 cards)
+      renderAllHands(v);
+    });
+
+    // presence lists
+    onValue(ref(db,`rooms/${code}/players`),(s)=>renderList(playersList,s.val()||{}));
+    onValue(ref(db,`rooms/${code}/spectators`),(s)=>renderList(spectatorsList,s.val()||{}));
+  }
+
+  function renderList(container,map){
+    container.innerHTML="";
+    const ids=Object.keys(map);
+    if(!ids.length){ container.appendChild(div("div","muted","（なし）")); return; }
+    ids.forEach(id=>{
+      const d=div("div","pill"); d.textContent=map[id].name||"???"; container.appendChild(d);
+    });
+  }
+
+  function div(tag,cls,text){const el=document.createElement(tag); if(cls)el.className=cls; if(text!=null)el.textContent=text; return el;}
+
+  // ===== Start -> Mission selection -> Deal =====
+  startBtn.addEventListener("click", async ()=>{
+    if(!(state.isHost && state.phase==="lobby")) return;
+    // open mission modal for host only
+    openMissionModal();
+  });
+
+  function openMissionModal(){
+    missionChoices.innerHTML="";
+    for(let i=1;i<=10;i++){
+      const b=div("button","choice",String(i));
+      b.addEventListener("click", ()=>chooseMission(i));
+      missionChoices.appendChild(b);
+    }
+    missionModal.classList.remove("hidden");
+  }
+  async function chooseMission(m){
+    missionModal.classList.add("hidden");
+    const code=state.roomCode;
+    // validate players count divides 24
+    const playersSnap=await get(ref(db,`rooms/${code}/players`));
+    const players=playersSnap.val()||{}; const pids=Object.keys(players);
+    if(!pids.length) return alert("参加者がいません。");
+    if(24 % pids.length !== 0) return alert(`参加人数(${pids.length})では均等配布できません（24÷人数が整数になる必要があります）。`);
+
+    // build deck 1..12 two each
+    let deck=[];
+    let cid=0;
+    for(let v=1;v<=12;v++){ deck.push({id:`c${cid++}`,text:String(v)}); deck.push({id:`c${cid++}`,text:String(v)}); }
+
+    // Mission 1: include one 1.5 (replace one '1')
+    if(m===1){
+      const idx = deck.findIndex(c=>c.text==="1");
+      if(idx>=0) deck[idx]={ id:`c${cid++}`, text:"1.5", special:true };
+    }
+
+    // shuffle
+    for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
+
+    // deal evenly
+    const per = deck.length / pids.length; // integer ensured
+    const hands={};
+    pids.forEach(pid=>hands[pid]={});
+    let k=0;
+    for(const pid of pids){
+      for(let t=0;t<per;t++){
+        const card=deck[k++]; hands[pid][card.id]={...card, owner:pid, revealed:false};
       }
-      return roomRef;
     }
 
-    async function joinRoom(code) {
-      state.roomCode = code;
-      state.userId = state.userId || push(ref(db, "clients")).key;
-      state.name = state.name || randomName();
+    // sort each hand ascending (own-side sort will be by UI, but keep stable order here)
+    // save
+    await update(ref(db,`rooms/${code}`),{
+      phase:"playing",
+      mission:m,
+      hands,
+      revealed:{}, // revealed flags are mirrored under hands[*][id].revealed
+      tokens:{}    // clear info tokens
+    });
+  }
 
-      // Show role selection
-      $("#whoami").textContent = `暫定名: ${state.name}`;
-      setView("role");
-    }
+  // ===== Render table (all players) & interactions =====
+  async function toggleReveal(ownerId, cardId){
+    // anyone can toggle per仕様
+    const code=state.roomCode;
+    const path = `rooms/${code}/hands/${ownerId}/${cardId}/revealed`;
+    await runTransaction(ref(db,path),(prev)=>!prev);
+  }
 
-    async function enterAs(role) {
-      state.role = role; // "player" or "spectator"
-      const code = state.roomCode;
-      roomCodeLabel.textContent = code;
-      nameLabel.textContent = state.name;
-      roleLabel.textContent = (role==="player"?"参加者":"観戦者");
-
-      const roomRef = await ensureRoom(code);
-      const roomSnap = await get(roomRef);
-      const roomVal = roomSnap.val() || {};
-
-      // Assign host if none and joining as player
-      if (role === "player" && !roomVal.hostId) {
-        await update(roomRef, { hostId: state.userId });
-      }
-
-      // If game already started, force spectatorship
-      const currentState = roomVal.state || "lobby";
-      const actualRole = (currentState === "playing" ? "spectator" : role);
-      state.role = actualRole;
-      roleLabel.textContent = (actualRole==="player"?"参加者":"観戦者");
-
-      // Register presence
-      const basePath = actualRole === "player" ? `rooms/${code}/players/${state.userId}` : `rooms/${code}/spectators/${state.userId}`;
-      const meRef = ref(db, basePath);
-      await set(meRef, { name: state.name, joinedAt: serverTimestamp() });
-      onDisconnect(meRef).remove();
-
-      // Also remove hand on disconnect (cleanup)
-      const myHandRef = ref(db, `rooms/${code}/hands/${state.userId}`);
-      onDisconnect(myHandRef).remove();
-
-      // Listen room
-      setupRealtime(code);
-
-      setView("game");
-    }
-
-    function setupRealtime(code){
-      const roomRef = ref(db, `rooms/${code}`);
-
-      // Host / state
-      onValue(roomRef, (snap)=>{
-        const v = snap.val() || {};
-        state.gameState = v.state || "lobby";
-        state.isHost = (v.hostId === state.userId);
-
-        // Start button visibility
-        startBtn.classList.toggle("hidden", !(state.isHost && state.gameState==="lobby" && state.role==="player"));
-
-        // Side panel visibility (hidden once playing)
-        sidePanel.classList.toggle("hidden", state.gameState!=="lobby");
-        lobbyPanel.classList.toggle("hidden", false);
-
-        // If playing and role is spectator, hide own hand panel
-        $("#handsPanel").classList.toggle("hidden", state.gameState!=="playing" ? (state.role!=="player") : (state.role!=="player"));
-
-        // Public board
-        renderPublic(v.public?.cards || {});
-      });
-
-      // Players & spectators (lobby list)
-      onValue(ref(db, `rooms/${code}/players`), (snap)=>{
-        renderList(playersList, snap.val() || {});
-      });
-      onValue(ref(db, `rooms/${code}/spectators`), (snap)=>{
-        renderList(spectatorsList, snap.val() || {});
-      });
-
-      // My hand
-      onValue(ref(db, `rooms/${code}/hands/${state.userId}`), (snap)=>{
-        const hand = snap.val() || {};
-        renderMyHand(hand);
-      });
-    }
-
-    function renderList(container, map){
-      container.innerHTML = "";
-      const ids = Object.keys(map);
-      if (!ids.length) {
-        container.appendChild(createEl("div","muted","（なし）"));
-        return;
-      }
-      ids.forEach(id=>{
-        const item = createEl("div","pill");
-        item.textContent = map[id].name || "???";
-        container.appendChild(item);
-      });
-    }
-
-    // ==== Game flow ====
-    startBtn.addEventListener("click", async ()=>{
-      if (!state.isHost || state.gameState!=="lobby") return;
-
-      const code = state.roomCode;
-      const roomRef = ref(db, `rooms/${code}`);
-
-      // Build deck (example: 24枚 = 1〜6 × 4スート)
-      const suits = ["♠","♥","♦","♣"];
-      const values = ["A","2","3","4","5","6"];
-      const deck = [];
-      let cid = 0;
-      for (const s of suits) for (const v of values) deck.push({ id:`c${cid++}`, text:`${v}${s}` });
-
-      // Shuffle
-      for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
-      }
-
-      // Snapshot players
-      const playersSnap = await get(child(roomRef, "players"));
-      const players = playersSnap.val() || {};
-      const pids = Object.keys(players);
-      if (!pids.length) return alert("参加者がいません。");
-
-      // Deal 4 cards each
-      const hands = {};
-      pids.forEach(pid => { hands[pid] = {}; });
-      let ptr = 0;
-      for (let r=0;r<4;r++){
-        for (const pid of pids){
-          const card = deck[ptr++];
-          if (!card) break;
-          hands[pid][card.id] = { ...card, revealed:false, owner:pid };
+  function letterRow(ownerId, card){
+    const row=div("div","letters");
+    ["a","b","c"].forEach(ch=>{
+      const cell=div("div","letter");
+      const tokenSlotId = `rooms/${state.roomCode}/tokens/${ownerId}/${card.id}/${ch}`;
+      const btn = document.createElement("button");
+      btn.textContent = ch;
+      // read token live
+      const tokenRef = ref(db, tokenSlotId);
+      onValue(tokenRef,(s)=>{
+        const v=s.val();
+        cell.innerHTML="";
+        if(v==null){
+          // only owner can place
+          if(ownerId===state.userId && state.phase==="playing"){
+            cell.appendChild(btn);
+            btn.onclick=()=>prepareToken(ownerId,card,ch);
+          }else{
+            cell.appendChild(div("div","",ch));
+          }
+        }else{
+          cell.appendChild(div("div","token",String(v)));
         }
-      }
-
-      // Save hands and flip to playing
-      await update(roomRef, {
-        state: "playing",
-        public: { cards:{} },
-        hands
       });
+      row.appendChild(cell);
     });
+    return row;
+  }
 
-    // Reveal a card publicly
-    async function revealCard(cardId, cardObj){
-      const code = state.roomCode;
-      const isOwner = cardObj.owner === state.userId;
-      if (!isOwner) return;
-      if (cardObj.revealed) return;
-
-      const updates = {};
-      updates[`rooms/${code}/hands/${state.userId}/${cardId}/revealed`] = true;
-      // also copy to public board
-      const pubId = push(ref(db, `rooms/${code}/public/cards`)).key;
-      updates[`rooms/${code}/public/cards/${pubId}`] = { ...cardObj, revealed:true, revealedAt: serverTimestamp(), by: state.name };
-
-      await update(ref(db), updates);
-    }
-
-    function renderMyHand(handMap){
-      myHandEl.innerHTML = "";
-      const ids = Object.keys(handMap);
-      if (!ids.length) {
-        myHandEl.appendChild(createEl("div","muted","（手札なし）"));
-        return;
-      }
-      ids.forEach(id=>{
-        const card = handMap[id];
-        const isMe = card.owner === state.userId;
-        const showFace = isMe; // 自分には表で見える
-        const el = createEl("div", `card ${showFace ? "face":"back"} ${card.revealed?"public":""}`);
-        el.title = showFace ? "クリックで公開" : "";
-        el.textContent = showFace ? cardLabel(card) : "";
-        if (showFace && !card.revealed) {
-          el.style.cursor = "pointer";
-          el.addEventListener("click", ()=>revealCard(id, card));
-        }
-        myHandEl.appendChild(el);
-      });
-    }
-
-    function renderPublic(pubMap){
-      publicBoardEl.innerHTML = "";
-      const ids = Object.keys(pubMap);
-      if (!ids.length) {
-        publicBoardEl.appendChild(createEl("div","muted","（まだ公開カードはありません）"));
-        return;
-      }
-      ids.sort((a,b)=>{
-        const A = pubMap[a].revealedAt || 0;
-        const B = pubMap[b].revealedAt || 0;
-        return A - B;
-      });
-      ids.forEach(id=>{
-        const card = pubMap[id];
-        const el = createEl("div","card face public");
-        el.textContent = cardLabel(card);
-        publicBoardEl.appendChild(el);
-      });
-    }
-
-    // Leave room
-    leaveBtn.addEventListener("click", async ()=>{
-      if (!state.roomCode || !state.userId) return;
-      const code = state.roomCode;
-      const base = state.role==="player" ? "players" : "spectators";
-      await remove(ref(db, `rooms/${code}/${base}/${state.userId}`));
-      await remove(ref(db, `rooms/${code}/hands/${state.userId}`));
-      // Not demoting host here for simplicity
-      location.href = location.origin + location.pathname; // reload to reset
+  // click own card letter -> show "トークンを置く"
+  function prepareToken(ownerId, card, ch){
+    if(ownerId!==state.userId) return;
+    const ok = confirm(`カード「${card.text}」の '${ch}' に情報トークン（${card.text}）を置きますか？`);
+    if(!ok) return;
+    const code=state.roomCode;
+    update(ref(db),{
+      [`rooms/${code}/tokens/${ownerId}/${card.id}/${ch}`]: card.text
     });
+  }
 
-    // Join flow
-    joinBtn.addEventListener("click", async ()=>{
-      const code = cleanCode(roomCodeInput.value);
-      if (!code) return alert("ルームコードを数字で入力してください。");
-      await joinRoom(code);
-      const url = new URL(location.href);
-      url.searchParams.set("room", code);
-      history.replaceState(null, "", url.toString());
-    });
+  function renderAllHands(roomVal){
+    playersArea.innerHTML="";
+    const players = roomVal.players||{};
+    const spectators = roomVal.spectators||{};
+    const hands = roomVal.hands||{};
 
-    asPlayerBtn.addEventListener("click", ()=>enterAs("player"));
-    asSpectatorBtn.addEventListener("click", ()=>enterAs("spectator"));
+    // render players only (観戦者は手札なし)
+    Object.keys(players).forEach(pid=>{
+      const strip=div("div","player");
+      const header=div("div","playerHeader");
+      header.appendChild(div("div","name", players[pid].name||"???"));
+      const tag=div("div","pill", pid===roomVal.hostId?"ホスト":"参加者");
+      header.appendChild(tag);
+      strip.appendChild(header);
 
-    // Deep-link by ?room=XXXX
-    (function boot(){
-      const url = new URL(location.href);
-      const code = cleanCode(url.searchParams.get("room")||"");
-      if (code) {
-        roomCodeInput.value = code;
+      const handEl=div("div","hand");
+      const cardsObj = hands[pid]||{};
+
+      // sort: for the viewer, if pid===self -> numeric ascending; else keep stable order
+      let cards = Object.keys(cardsObj).map(id=>({id, ...cardsObj[id]}));
+      if(pid===state.userId){
+        cards.sort((a,b)=>cardValue(a.text)-cardValue(b.text));
       }
-      setView("join");
-    })();
-  </script>
+
+      cards.forEach(c=>{
+        const card=div("div",`card ${c.revealed?"face revealed":"back"}`);
+        const front=div("div","front", c.revealed ? c.text : (pid===state.userId ? c.text : "")); // 自分には表、他人は裏。ただし公開中は全員に表
+        card.appendChild(front);
+        card.appendChild( letterRow(pid,c) );
+
+        // click behavior:
+        // - 他人のカード: 公開/非公開トグル
+        // - 自分のカード: そのまま（公開トグルも可にしておく）
+        card.style.cursor="pointer";
+        card.title = c.revealed ? "クリックで非公開" : "クリックで公開";
+        card.addEventListener("click", ()=>toggleReveal(pid,c.id));
+
+        handEl.appendChild(card);
+      });
+
+      strip.appendChild(handEl);
+      playersArea.appendChild(strip);
+    });
+  }
+
+  // ===== Host menu (reset) =====
+  settingsBtn.addEventListener("click", ()=>hostMenu.classList.toggle("open"));
+  resetBtn.addEventListener("click", async ()=>{
+    if(!state.isHost) return;
+    const ok = confirm("ゲームをやり直しますか？ロビーに戻ります。");
+    if(!ok) return;
+    const code=state.roomCode;
+
+    // keep current players as players（観戦は観戦のまま）
+    // 既存の players / spectators は温存し、hands / tokens / mission をクリア、phase=lobby
+    await update(ref(db,`rooms/${code}`),{
+      phase:"lobby",
+      mission:null,
+      hands:{},
+      revealed:{},
+      tokens:{}
+    });
+    hostMenu.classList.remove("open");
+  });
+
+  // leave
+  leaveBtn.addEventListener("click", async ()=>{
+    const code=state.roomCode; if(!code) return;
+    const base = state.role==="player" ? "players" : "spectators";
+    await remove(ref(db,`rooms/${code}/${base}/${state.userId}`));
+    await remove(ref(db,`rooms/${code}/hands/${state.userId}`));
+    location.href = location.origin + location.pathname;
+  });
+
+  // boot
+  (function boot(){
+    const url=new URL(location.href);
+    const code=cleanCode(url.searchParams.get("room")||"");
+    if(code) roomCodeInput.value=code;
+    setView("join");
+    document.addEventListener("click",(e)=>{ if(!hostMenu.contains(e.target)) hostMenu.classList.remove("open"); });
+  })();
+</script>
 </body>
 </html>
