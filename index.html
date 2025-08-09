@@ -5,7 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>BOMB BUSTERS</title>
 <style>
-  :root { --gap:10px; --cardW:22px; --cardH:120px; --letterH:22px; }
+  :root {
+    --gap:10px;
+    --cardW:23px;   /* ← カード幅 */
+    --cardH:70px;   /* ← カード高さ */
+    --cardGap:3px;  /* ← カード間隔 */
+    --letterH:18px; /* 文字ラベルの高さ */
+  }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#fff;color:#111}
   header{padding:16px;border-bottom:1px solid #eee;text-align:center;font-weight:800;letter-spacing:.04em}
@@ -29,38 +35,38 @@
   .playerHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
   .name{font-weight:700}
 
-  /* hands: 横一列に15枚入るよう細幅カード。必要なら横スクロール */
+  /* hands: 横一列15枚想定・改行しない・必要なら横スクロール */
   .handWrap{overflow-x:auto;padding-bottom:6px}
-  .hand{display:flex;gap:2px;flex-wrap:nowrap}
+  .hand{display:flex;gap:var(--cardGap);flex-wrap:nowrap}
 
-  /* card block (カード本体 + 外側のアルファベット列) */
+  /* 1枚の表示ブロック（カード＋下の文字ラベル） */
   .cardWrap{display:flex;flex-direction:column;align-items:center}
-  .letters{display:grid;grid-template-columns:repeat(3,1fr);width:var(--cardW);height:var(--letterH);gap:1px;margin-top:2px}
-  .letterCell{border:1px solid #eee;border-radius:4px;display:grid;place-items:center;font-size:11px;line-height:1}
-  .letterCell > button{width:100%;height:100%;border:none;background:transparent;font-size:11px;cursor:pointer}
+  .letterCell{width:var(--cardW);height:var(--letterH);border:1px solid #eee;border-radius:4px;display:grid;place-items:center;font-size:11px;line-height:1;margin-top:2px}
+  .letterCell>button{width:100%;height:100%;border:none;background:transparent;font-size:11px;cursor:pointer}
   .token{font-size:11px;font-weight:700}
 
-  /* トークン操作ボタン（押した時だけ出す小ボタン） */
-  .placeBtn{position:absolute;transform:translateY(-6px);font-size:11px;padding:4px 6px;border-radius:8px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+  /* 「トークンを置く」ポップ */
+  .placeBtn{position:absolute;transform:translateY(-6px);font-size:11px;padding:4px 6px;border-radius:8px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);z-index:20}
 
   /* カード */
   .card{width:var(--cardW);height:var(--cardH);border-radius:6px;border:1px solid #ccc;overflow:hidden;user-select:none;cursor:pointer;position:relative}
-  .cardInner{display:grid;grid-template-rows:28px 1fr;height:100%}
-  .numTop{display:grid;place-items:center;font-weight:700;font-size:12px}
+  .cardInner{display:grid;grid-template-rows:16px 1fr;height:100%}
+  .numTop{display:grid;place-items:center;font-weight:700;font-size:11px}
   .lowerArea{width:100%;height:100%}
 
-  /* 状態別表示 */
-  /* 自分の未公開＝白地に黒字（数字表示）。他人の未公開＝裏面。公開＝黒地で白字、下半分に画像 */
+  /* 表示状態 */
+  /* 他人の未公開：裏面 codeback.png ／ 自分の未公開：白地に数字表示 ／ 公開：黒地＋白字＆下半分画像 */
   .isBack{
-    background: url("code裏.png") center/cover no-repeat,
-                repeating-linear-gradient(45deg,#f3f3f3,#f3f3f3 8px,#e5e5e5 8px,#e5e5e5 16px);
+    background:
+      url("codeback.png") center/cover no-repeat,
+      repeating-linear-gradient(45deg,#f3f3f3,#f3f3f3 8px,#e5e5e5 8px,#e5e5e5 16px);
   }
   .isFaceSelf{background:#fff}
   .isRevealed{background:#000;color:#fff;border-color:#000;outline:2px solid #0a7}
   .isRevealed .lowerArea{background:url("codenumber.png") center/contain no-repeat}
   .isBack .numTop{visibility:hidden}
 
-  /* フローティング（ホスト設定） */
+  /* 浮遊メニュー（ホスト設定） */
   .floating{position:fixed;right:12px;bottom:12px;display:flex;gap:8px}
   .menu{position:relative}
   .menuPopup{position:absolute;right:0;bottom:44px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:8px;display:none}
@@ -201,7 +207,8 @@
     const A=["赤","青","黄","緑","桃","黒","白","金","銀","茶"],B=["ねこ","いぬ","うさぎ","たぬき","きつね","くま","とり","さかな","ドラゴン","ペンギン"],n=Math.floor(Math.random()*900)+100;
     return A[Math.floor(Math.random()*A.length)]+B[Math.floor(Math.random()*B.length)]+n;
   };
-  const cardVal = txt => parseFloat(txt); // "1.5"もOK
+  const cardVal = txt => parseFloat(txt); // "1.5"対応
+  const indexToLetter = i => String.fromCharCode(65 + i); // 0->A, 11->L, 12->M
 
   // room ensure
   async function ensureRoom(code){
@@ -234,7 +241,7 @@
     const snap=await get(roomRef); const v=snap.val()||{};
     if(role==="player" && !v.hostId) await update(roomRef,{ hostId:state.userId });
 
-    // if already playing, force spectator
+    // 進行中は観戦固定
     const actual = (v.phase==="playing") ? "spectator" : role;
     state.role=actual; roleLabel.textContent=(actual==="player"?"参加者":"観戦者");
 
@@ -243,7 +250,7 @@
     await set(meRef,{ name:state.name, joinedAt:serverTimestamp() });
     onDisconnect(meRef).remove();
 
-    // remember intent (参加希望かどうか) → やり直し時に反映
+    // 参加希望フラグ（やり直し時の復帰に使用）
     await set(ref(db, `rooms/${state.roomCode}/wants/${state.userId}`), { wantsPlayer: role==="player", name: state.name });
     onDisconnect(ref(db, `rooms/${state.roomCode}/wants/${state.userId}`)).remove();
 
@@ -257,13 +264,8 @@
       const v=snap.val()||{};
       state.phase=v.phase||"lobby"; state.mission=v.mission||null; state.isHost=(v.hostId===state.userId);
 
-      // Start button (host only, lobby, player)
       startBtn.classList.toggle("hidden", !(state.isHost && state.phase==="lobby" && state.role==="player"));
-
-      // Side panel hidden after start
       sidePanel.classList.toggle("hidden", state.phase!=="lobby");
-
-      // Host floating controls visible only when playing
       hostControls.classList.toggle("hidden", !(state.isHost && state.phase==="playing"));
 
       renderList(playersList, v.players||{});
@@ -312,18 +314,16 @@
     const players=playersSnap.val()||{}; const pids=Object.keys(players);
     if(!pids.length) return alert("参加者がいません。");
 
-    // build deck 1..12 two each (24)
+    // deck：1..12 *2（=24）
     let deck=[];
     let cid=0;
     for(let v=1;v<=12;v++){ deck.push({id:`c${cid++}`,text:String(v)}); deck.push({id:`c${cid++}`,text:String(v)}); }
+    if(m===1){ deck.push({ id:`c${cid++}`, text:"1.5", special:true }); } // 合計25
 
-    // Mission 1: add one 1.5 -> 25 cards
-    if(m===1){ deck.push({ id:`c${cid++}`, text:"1.5", special:true }); }
-
-    // shuffle
+    // シャッフル
     for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
 
-    // deal round-robin (余りなく順番に配る / 均等でなくてOK)
+    // ラウンドロビン配布（余りなし）
     const hands={}; pids.forEach(pid=>hands[pid]={});
     let k=0;
     while(k<deck.length){
@@ -333,87 +333,83 @@
       }
     }
 
-    // Mission 2: for each player, pick one random card and mark pinRight:true
-    if(m===2){
-      for(const pid of pids){
-        const ids = Object.keys(hands[pid]);
-        if(ids.length){
-          const pick = ids[Math.floor(Math.random()*ids.length)];
-          hands[pid][pick].pinRight = true;
-        }
+    // 手札の並び順（保存時に決めて、全員が同じ順で見えるようにする）
+    for(const pid of pids){
+      // ids -> ソート対象
+      let arr = Object.keys(hands[pid]).map(id=>({id, ...hands[pid][id]}));
+      if(m===2){
+        // ランダム1枚を右端固定、残りは昇順
+        const pick = arr[Math.floor(Math.random()*arr.length)];
+        const rest = arr.filter(x=>x.id!==pick.id).sort((a,b)=>cardVal(a.text)-cardVal(b.text));
+        arr = [...rest, { ...pick, pinRight:true }];
+      }else{
+        // 規定：昇順
+        arr.sort((a,b)=>cardVal(a.text)-cardVal(b.text));
       }
+      // order を埋め直し
+      arr.forEach((c,idx)=>{ hands[pid][c.id] = { ...c, order: idx }; });
     }
 
     await update(ref(db,`rooms/${code}`),{
       phase:"playing",
       mission:m,
       hands,
-      tokens:{}    // クリア
+      tokens:{}    // トークン初期化
     });
   }
 
-  // ===== Toggle reveal (公開/非公開) =====
+  // ===== 公開/非公開トグル（誰が押しても可） =====
   async function toggleReveal(ownerId, cardId){
     const code=state.roomCode;
     const path = `rooms/${code}/hands/${ownerId}/${cardId}/revealed`;
     await runTransaction(ref(db,path),(prev)=>!prev);
   }
 
-  // ===== Token handling =====
-  function makeLetterRow(ownerId, card){
-    const row=div("div","letters");
-    ["a","b","c"].forEach(ch=>{
-      const cell=div("div","letterCell");
-      const slotRef = ref(db, `rooms/${state.roomCode}/tokens/${ownerId}/${card.id}/${ch}`);
-      onValue(slotRef,(s)=>{
-        cell.innerHTML="";
-        const v=s.val();
-        if(v==null){
-          if(ownerId===state.userId && state.phase==="playing"){
-            // 押すと「トークンを置く」ボタンを出す
-            const b=document.createElement("button");
-            b.textContent=ch;
-            b.onclick=(ev)=>{
-              // 小さな「トークンを置く」ボタンを表示
-              showPlaceBtn(ev.currentTarget, ()=>{
-                update(ref(db),{
-                  [`rooms/${state.roomCode}/tokens/${ownerId}/${card.id}/${ch}`]: card.text
-                });
+  // ===== トークン関連 =====
+  function makeLetterCell(ownerId, card, letter, anchorEl){
+    const cell=div("div","letterCell");
+    const tokenRef = ref(db, `rooms/${state.roomCode}/tokens/${ownerId}/${card.id}`);
+    onValue(tokenRef,(s)=>{
+      cell.innerHTML="";
+      const v=s.val();
+      if(v==null){
+        if(ownerId===state.userId && state.phase==="playing"){
+          const b=document.createElement("button");
+          b.textContent=letter;
+          b.onclick=(ev)=>{
+            // 小さな「トークンを置く」ボタン
+            showPlaceBtn(ev.currentTarget, ()=>{
+              update(ref(db),{
+                [`rooms/${state.roomCode}/tokens/${ownerId}/${card.id}`]: card.text
               });
-            };
-            cell.appendChild(b);
-          }else{
-            cell.textContent=ch;
-          }
+            });
+          };
+          cell.appendChild(b);
         }else{
-          cell.appendChild(div("div","token",String(v)));
+          cell.textContent=letter;
         }
-      });
-      row.appendChild(cell);
+      }else{
+        cell.appendChild(div("div","token",String(v)));
+      }
     });
-    return row;
+    return cell;
   }
 
-  // 小さな配置ボタン（押した時にだけ出る）
   function showPlaceBtn(anchorEl, onConfirm){
-    // 既存のを消す
     document.querySelectorAll(".placeBtn").forEach(x=>x.remove());
     const btn=document.createElement("button");
     btn.className="placeBtn";
     btn.textContent="トークンを置く";
-    const rect=anchorEl.getBoundingClientRect();
-    btn.style.left = (rect.left + window.scrollX) + "px";
-    btn.style.top  = (rect.top  + window.scrollY - 28) + "px";
-    btn.onclick=()=>{
-      onConfirm(); btn.remove();
-    };
+    const r=anchorEl.getBoundingClientRect();
+    btn.style.left=(r.left+window.scrollX)+"px";
+    btn.style.top =(r.top +window.scrollY-28)+"px";
+    btn.onclick=()=>{ onConfirm(); btn.remove(); };
     document.body.appendChild(btn);
-    // どこか他をクリックで閉じる
     const closer=(e)=>{ if(e.target!==btn){ btn.remove(); document.removeEventListener("click",closer,true);} };
     setTimeout(()=>document.addEventListener("click",closer,true),0);
   }
 
-  // ===== Render all players & cards =====
+  // ===== 全員の手札表示（順序は保存された order に従う） =====
   function renderAllHands(roomVal){
     playersArea.innerHTML="";
     const players = roomVal.players||{};
@@ -429,22 +425,11 @@
       const handWrap=div("div","handWrap");
       const handEl=div("div","hand");
 
-      // 取得
       let arr = Object.keys(hands[pid]||{}).map(id=>({id, ...hands[pid][id]}));
+      // order で統一表示（自分も他人も同じ見た目の順序）
+      arr.sort((a,b)=>(a.order??0)-(b.order??0));
 
-      // 表示順
-      if(pid===state.userId){
-        // 自分：基本は昇順。Mission2なら pinRight のカードを最後に、それ以外を昇順。
-        const right = arr.find(c=>c.pinRight);
-        const rest = arr.filter(c=>!c.pinRight).sort((a,b)=>cardVal(a.text)-cardVal(b.text));
-        arr = right ? [...rest, right] : rest.sort((a,b)=>cardVal(a.text)-cardVal(b.text));
-      }else{
-        // 他人：配った順（公開しても順は維持）
-        // そのまま
-      }
-
-      arr.forEach(c=>{
-        // カード本体
+      arr.forEach((c,idx)=>{
         const wrap = div("div","cardWrap");
         const card = div("div","card");
         const inner = div("div","cardInner");
@@ -454,7 +439,6 @@
         const revealed = !!c.revealed;
         const isSelf = pid===state.userId;
 
-        // クラス割り当て
         if(revealed){
           card.classList.add("isRevealed");
           top.textContent = c.text;
@@ -470,15 +454,15 @@
         inner.appendChild(top);
         inner.appendChild(lower);
         card.appendChild(inner);
-        // クリックで公開/非公開トグル
         card.title = revealed ? "クリックで裏に戻す" : "クリックで公開";
         card.onclick = ()=>toggleReveal(pid,c.id);
 
-        // 外側のアルファベット列
-        const letters = makeLetterRow(pid,c);
+        // 文字ラベル（A,B,C...）
+        const letter = indexToLetter(idx); // 0:A, 11:L, 12:M
+        const letterCell = makeLetterCell(pid,c,letter,card);
 
         wrap.appendChild(card);
-        wrap.appendChild(letters);
+        wrap.appendChild(letterCell);
         handEl.appendChild(wrap);
       });
 
@@ -488,7 +472,7 @@
     });
   }
 
-  // ===== Host menu (やり直し) =====
+  // ===== ホスト設定（やり直し） =====
   settingsBtn.addEventListener("click", ()=>hostMenu.classList.toggle("open"));
   resetBtn.addEventListener("click", async ()=>{
     if(!state.isHost) return;
@@ -496,7 +480,6 @@
     if(!ok) return;
     const code=state.roomCode;
 
-    // 現在の入室者（players / spectators）と wants を読み取り、wantsPlayer=true の入室者を全員 players に。
     const [pS, sS, wS] = await Promise.all([
       get(ref(db,`rooms/${code}/players`)),
       get(ref(db,`rooms/${code}/spectators`)),
@@ -507,12 +490,11 @@
 
     const nextPlayers = {};
     const nextSpectators = {};
-
     Object.keys(present).forEach(uid=>{
       if(wants[uid]?.wantsPlayer){
-        nextPlayers[uid] = { name: present[uid].name || wants[uid].name || "???" };
+        nextPlayers[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" };
       }else{
-        nextSpectators[uid] = { name: present[uid].name || wants[uid]?.name || "???" };
+        nextSpectators[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" };
       }
     });
 
@@ -527,7 +509,7 @@
     hostMenu.classList.remove("open");
   });
 
-  // leave
+  // 退室
   leaveBtn.addEventListener("click", async ()=>{
     const code=state.roomCode; if(!code) return;
     const base = state.role==="player" ? "players" : "spectators";
