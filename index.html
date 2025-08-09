@@ -94,7 +94,11 @@
     /* 情報トークンは枠と重なって良い → はみ出し許可 */
     overflow:visible;
     width:max-content; /* 中身幅にフィット */
+    z-index:0;
   }
+  /* トークンを持つ/操作中のテーブルは前面へ */
+  .table.elevated{ z-index:100; }
+
   /* 上部（アンダーライン付きの数字 or 名前） */
   .t-header{
     height:var(--header-h);display:flex;align-items:center;gap:8px;
@@ -115,6 +119,13 @@
     background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
+  /* 着席前はブランク表示 */
+  .char-card.blank{
+    background:#f3f4f6;
+    border:1px dashed #d1d5db;
+    cursor:default;
+  }
+
   .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;flex:0 0 auto;position:relative}
 
   /* ===== カード＋アルファベット（固定配置） ===== */
@@ -135,7 +146,10 @@
   }
 
   /* アルファベット＆トークン：カードの下に固定（重ならない） */
-  .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:3;pointer-events:auto}
+  .badge-fixed{
+    position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);
+    display:flex;flex-direction:column;align-items:center;z-index:50;pointer-events:auto;
+  }
   .alpha{
     width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1;
     background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0
@@ -148,7 +162,7 @@
 
   /* 小ポップ */
   .mini-pop{
-    position:fixed;z-index:50;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
+    position:fixed;z-index:200;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
     display:flex;gap:6px
   }
 
@@ -172,7 +186,7 @@
   .restart-pop,.start-pop,.seat-pop{
     position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
     background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
-    padding:14px;z-index:60;display:flex;flex-direction:column;gap:10px;min-width:280px
+    padding:14px;z-index:220;display:flex;flex-direction:column;gap:10px;min-width:280px
   }
   .start-pop .row,.seat-pop .row{display:flex;gap:8px;align-items:center}
   .start-pop label,.seat-pop label{width:84px;font-size:13px}
@@ -572,10 +586,15 @@ function renderTables(v){
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
 
   (v.tables||[]).forEach((t, idx)=>{
-    const box=document.createElement('div'); box.className='table';
-    // ▼ 下段テーブルの前面に情報トークンが出るよう、上のテーブルほどz-indexを高くする
-    box.style.zIndex = String((v.tables||[]).length - idx);
-    box.style.position = 'relative';
+    const box=document.createElement('div'); 
+    box.className='table';
+
+    /* ホバー中は前面へ。ただしトークンが無いなら離脱時に解除 */
+    box.addEventListener('mouseenter', ()=> box.classList.add('elevated'));
+    box.addEventListener('mouseleave', ()=> {
+      const hasTokenLater = (t.hand||[]).some(c=> !!c.token);
+      if(!hasTokenLater) box.classList.remove('elevated');
+    });
 
     /* 横幅 = キャラ幅 + 手札幅 + 余白 */
     const n = (t.hand||[]).length;
@@ -592,17 +611,19 @@ function renderTables(v){
     /* 中段：キャラ＋手札 */
     const content=document.createElement('div'); content.className='t-content';
 
-    // キャラ（着席するまではブランク表示）
+    // キャラ：未着席はブランク、着席後のみ画像・反転可
     const char=document.createElement('div'); char.className='char-card';
-    let face;
     if(!t.playerId){
-      face = './blank.jpg'; // 事前に用意してください
-    }else{
-      face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+      char.classList.add('blank');
+    } else {
+      const face = t.character?.flipped 
+        ? './battery.jpg' 
+        : `./${t.character?.face || 'member (1).jpg'}`;
+      char.style.backgroundImage = `url("${face}")`;
+      char.onclick=async ()=>{
+        await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped});
+      };
     }
-    char.style.backgroundImage = `url("${face}")`;
-    // キャラは誰でも裏返せる仕様（必要なら着席者のみ許可に変更可）
-    char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
     content.appendChild(char);
 
     // 手札
@@ -617,24 +638,7 @@ function renderTables(v){
       if(c.open) card.classList.add('open');
 
       if(isMine){
-        a.onclick=(ev)=>{
-          ev.stopPropagation();
-          if(c.token){
-            // 既に情報トークンがある → 消すポップ
-            openMini(ev.clientX, ev.clientY,
-              '消す', async ()=>{
-                await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { token:null });
-              },
-              'キャンセル', ()=>{}
-            );
-          }else{
-            // まだ無い → 数字トークン付与
-            openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
-              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { token:{type:'num', value:c.num, style:'black'} });
-            });
-          }
-        };
-      }
+        card.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open}); };
       }
 
       const num=document.createElement('div'); num.className='num';
@@ -651,17 +655,36 @@ function renderTables(v){
       card.appendChild(bot);
 
       // ▼ アルファベット＆トークン（カードの下に固定）
-      const badge=document.createElement('div'); badge.className='badge-fixed'; badge.style.zIndex=3;
+      const badge=document.createElement('div'); badge.className='badge-fixed';
       const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
       if(isMine){
         a.onclick=(ev)=>{
           ev.stopPropagation();
-          openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
-            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { token:{type:'num', value:c.num, style:'black'} });
-          });
+          const tablePath = `rooms/${state.roomCode}/tables/${idx}`;
+          const cardPath  = `${tablePath}/hand/${ci}`;
+
+          if(c.token){
+            // 既にトークンが付いている → 「消す」ポップ
+            openMini(ev.clientX, ev.clientY,
+              '消す', async ()=>{
+                await update(ref(db, cardPath), { token:null });
+                // トークン再判定：無くなればテーブルの持ち上げ解除
+                const afterHas = (t.hand||[]).some(cc => cc !== c && !!cc.token);
+                box.classList.toggle('elevated', afterHas);
+              },
+              'キャンセル', ()=>{}
+            );
+          }else{
+            // トークン未設定 → 数字トークンを付ける（黒地白字）
+            openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
+              await update(ref(db, cardPath), { token:{type:'num', value:c.num, style:'black'} });
+              box.classList.add('elevated'); // 付いたら前面に
+            });
+          }
         };
       }
       badge.appendChild(a);
+
       if(c.token){
         const tk=document.createElement('div'); tk.className='token ' + (c.token.style||'');
         tk.textContent = (c.token.type==='num' || c.token.style==='black') ? c.token.value : c.token.type;
@@ -674,6 +697,10 @@ function renderTables(v){
     });
     content.appendChild(hand);
     box.appendChild(content);
+
+    // 手札描画完了後：トークンが1つでもあれば前面へ
+    const hasToken = (t.hand||[]).some(c=> !!c.token);
+    box.classList.toggle('elevated', hasToken);
 
     tablesEl.appendChild(box);
   });
@@ -689,7 +716,7 @@ function openNumberMini(x,y, label, cb){
   document.body.appendChild(div);
 }
 
-/* 汎用ミニポップ（アイテム/DI用） */
+/* 汎用ミニポップ（アイテム/DI/トークン削除用） */
 function openMini(x,y, leftText,leftCb, rightText,rightCb){
   const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
   div.addEventListener('click', e=>e.stopPropagation());
@@ -855,8 +882,7 @@ function missionInfo(id){
 
 /* クリック外しで小ポップ閉じる（即時） */
 document.addEventListener('click',(e)=>{
-  // 旧 miniPop 要素も閉じる
-  if(!miniPop.contains(e.target)) H(miniPop,true);
+  if(!miniPop.contains(e.target)) H(miniPop,true); // 旧 miniPop 互換
 }, true);
 </script>
 </body>
