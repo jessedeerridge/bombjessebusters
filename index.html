@@ -1,17 +1,14 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BOMB BUSTERS</title>
-
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-
-<style>
-  
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>BOMB BUSTERS</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <style>
     :root { --bg:#ffffff; --ink:#111; --muted:#6b7280; --brand:#111827; --card:#f3f4f6; --accent:#e5e7eb; --shadow:0 6px 20px rgba(0,0,0,.08); --radius:16px; }
     html,body{height:100%}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:var(--ink);background:var(--bg)}
@@ -60,21 +57,17 @@
     .modal-f{display:flex;justify-content:flex-end;gap:8px;padding:12px;border-top:1px solid var(--accent)}
     @media (min-width:480px){.main{grid-template-columns:1fr 210px;align-items:start}.lists-panel{position:sticky;top:72px}}
   </style>
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 <body>
   <div class="app">
     <header>
       <div>
         <div class="title">BOMB&nbsp;BUSTERS</div>
-        <div class="sub">スマホ向けUI＋Firestore同期（最小実装）</div>
+        <div class="sub">スマホ向けUI＋Firestore同期（GitHub Pages対応）</div>
       </div>
       <div class="right-tools">
         <span id="roomStatus" class="chip">未入室</span>
-        <button id="startBtn" class="btn" disabled>ゲーム開始</button>
+        <button id="startBtn" class="btn" disabled>爆弾を解除！</button>
       </div>
     </header>
 
@@ -83,11 +76,10 @@
         <div id="lobby" class="card">
           <div class="card-h">入室</div>
           <div class="card-c">
-            <div class="row"><label for="name">名前</label><input id="name" maxlength="12" placeholder="たろう" /></div>
             <div class="row"><label for="room">ルーム</label><input id="room" inputmode="numeric" pattern="[0-9]*" placeholder="4桁コード" /></div>
             <div style="display:flex;gap:8px;align-items:center;">
               <button id="joinBtn" class="btn">入室</button>
-              <span class="muted" style="font-size:12px;">同じルームコードで同室へ（リアルタイム）</span>
+              <span class="muted" style="font-size:12px;">同じルームコードで同室へ（名前は自動割当）</span>
             </div>
           </div>
         </div>
@@ -107,7 +99,7 @@
 
     <div class="fab" id="hostFab">
       <button class="gear" id="gearBtn" aria-label="設定">⚙️</button>
-      <div class="menu" id="hostMenu"><button id="resetBtn">ゲームリセット</button></div>
+      <div class="menu" id="hostMenu"><button id="resetBtn">やり直し</button></div>
     </div>
   </div>
 
@@ -116,30 +108,31 @@
     <div class="modal-c">
       <button id="asPlayer" class="btn">参加者として入室</button>
       <button id="asSpectator" class="btn btn-ghost">観戦者として入室</button>
-      <p class="muted" id="joinNote" style="font-size:12px;margin:6px 0 0;">ゲーム開始後は参加で入っても観戦になります。</p>
+      <p class="muted" style="font-size:12px;margin:6px 0 0;">ゲーム開始後は参加で入っても観戦になります。やり直し後は参加者に戻ります。</p>
     </div>
     <div class="modal-f"><button id="closeRole" class="btn btn-ghost">閉じる</button></div>
   </dialog>
 
   <script>
     // =======================
-    // 🔧 Firebase 初期化
+    // Firebase 初期化（あなたの設定を組込済み）
     // =======================
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT",
-      appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
+      authDomain: "chat-68c4c.firebaseapp.com",
+      databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
+      projectId: "chat-68c4c",
+      storageBucket: "chat-68c4c.appspot.com",
+      messagingSenderId: "172284325975",
+      appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
-
-    // 匿名ログイン
     auth.signInAnonymously().catch(console.error);
 
     // =======================
-    // ローカル状態
+    // 状態とDOM
     // =======================
     const el = (id)=>document.getElementById(id);
     const participantsUl = el('participants');
@@ -153,8 +146,20 @@
     const hostFab = el('hostFab');
     const hostMenu = el('hostMenu');
 
-    let self = { id:null, name:"", room:null, role:null, isHost:false };
+    let self = { id:null, name:"", room:null, role:null, preferredRole:null, isHost:false };
     let unsubRoom = null, unsubPlayers = null;
+
+    // ランダム名（日本語＋ID）
+    function randomName(){
+      const animals = ['ネコ','イヌ','タヌキ','キツネ','フクロウ','ペンギン','パンダ','クマ','トラ','イルカ','ウサギ'];
+      const adj = ['静かな','元気な','速い','勇敢な','器用な','賢い','鋭い','陽気な','影の','白い','黒い'];
+      const a = animals[Math.floor(Math.random()*animals.length)];
+      const b = adj[Math.floor(Math.random()*adj.length)];
+      const id = Math.random().toString(36).slice(2,6);
+      return `${b}${a}-${id}`;
+    }
+
+    // 裏面画像の有無
     let backImageAvailable = false; (function(){ const t=new Image(); t.onload=()=>backImageAvailable=true; t.onerror=()=>backImageAvailable=false; t.src='code裏.png'; })();
 
     function sortAscending(a){ return [...a].sort((x,y)=>x-y); }
@@ -170,7 +175,7 @@
       });
     }
 
-    function renderTable(players, state){
+    function renderTable(players, roomState){
       tableArea.innerHTML='';
       const ps = players.filter(p=>p.role==='player');
       ps.forEach(p=>{
@@ -190,14 +195,16 @@
             if(isRevealed){ c.textContent=n; }
             else {
               if(backImageAvailable){ const img=document.createElement('img'); img.alt='裏'; img.src='code裏.png'; c.appendChild(img);} else { c.textContent='裏'; }
-              if(state.gameStarted){
+              if(roomState.gameStarted){
                 c.style.cursor='pointer'; c.title='クリックで公開';
                 c.addEventListener('click', async ()=>{
-                  // 公開は誰が押しても全体に反映（デモ用）
+                  // トグル公開
                   const roomRef = db.collection('rooms').doc(self.room);
                   const pRef = roomRef.collection('players').doc(p.id);
                   await db.runTransaction(async (tx)=>{
-                    const snap = await tx.get(pRef); const data=snap.data()||{}; const arr=new Set(data.publicReveals||[]); arr.add(key); tx.update(pRef,{ publicReveals:[...arr] });
+                    const snap = await tx.get(pRef); const data=snap.data()||{}; const arr=new Set(data.publicReveals||[]);
+                    if(arr.has(key)) arr.delete(key); else arr.add(key);
+                    tx.update(pRef,{ publicReveals:[...arr] });
                   });
                 });
               }
@@ -216,7 +223,8 @@
       roomLabel.textContent = self.room || '----';
 
       const me = players.find(p=>p.id===self.id) || self;
-      const amHost = !!me.isHost; const canStart = amHost && !roomState.gameStarted && players.some(p=>p.role==='player');
+      const amHost = !!(roomState.hostId === self.id);
+      const canStart = amHost && !roomState.gameStarted && players.some(p=>p.role==='player');
       startBtn.disabled = !canStart;
       hostFab.style.display = (amHost && roomState.gameStarted) ? 'block' : 'none';
       listsWrap.style.display = roomState.gameStarted ? 'none' : 'block';
@@ -226,14 +234,25 @@
 
     function buildDeck(){ const d=[]; for(let n=1;n<=12;n++){ d.push(n,n); } return d.sort(()=>Math.random()-0.5); }
 
+    function isValidPlayerCount(count){
+      // 24枚を余りなく配る: 24 % count === 0
+      const divisors = [1,2,3,4,6,8,12,24];
+      return divisors.includes(count);
+    }
+
     async function startGame(roomRef){
-      const playersSnap = await roomRef.collection('players').where('role','==','player').get();
+      const playersSnap = await roomRef.collection('players').where('role','==','player').orderBy('joinedAt','asc').get();
       const players = playersSnap.docs.map(d=>({ id:d.id, ...d.data() }));
-      if(!players.length) { alert('参加者が必要です'); return; }
+      const pc = players.length;
+      if(!pc){ alert('参加者が必要です'); return; }
+      if(!isValidPlayerCount(pc)){ alert(`参加者の人数を 1,2,3,4,6,8,12,24 のいずれかにしてください（24枚を余りなく配るため）
+現在: ${pc}人`); return; }
+
       const deck = buildDeck();
       const hands = {}; players.forEach(p=>hands[p.id]=[]);
-      let i=0; while(deck.length){ hands[players[i%players.length].id].push(deck.pop()); i++; }
+      let i=0; while(deck.length){ hands[players[i%pc].id].push(deck.pop()); i++; }
       for(const p of players){ hands[p.id].sort((a,b)=>a-b); }
+
       const batch = db.batch();
       players.forEach(p=>{ batch.update(roomRef.collection('players').doc(p.id), { hand:hands[p.id], publicReveals:[] }); });
       batch.update(roomRef, { gameStarted:true });
@@ -243,21 +262,25 @@
     async function resetGame(roomRef){
       const playersSnap = await roomRef.collection('players').get();
       const batch = db.batch();
-      playersSnap.forEach(doc=> batch.update(doc.ref, { hand:[], publicReveals:[] }) );
+      // やり直し後は preferredRole==='player' の人を player に戻す
+      playersSnap.forEach(doc=>{
+        const data = doc.data() || {};
+        const nextRole = (data.preferredRole === 'player') ? 'player' : data.role;
+        batch.update(doc.ref, { hand:[], publicReveals:[], role: nextRole });
+      });
       batch.update(roomRef, { gameStarted:false });
       await batch.commit();
     }
 
     function watchRoom(roomCode){
       const roomRef = db.collection('rooms').doc(roomCode);
-      // ルームの初期作成（存在しなければ）
+      // 初期作成（存在しなければ）
       roomRef.get().then(s=>{ if(!s.exists){ roomRef.set({ createdAt: firebase.firestore.FieldValue.serverTimestamp(), gameStarted:false, hostId:self.id }); } });
 
       if(unsubRoom) unsubRoom(); if(unsubPlayers) unsubPlayers();
 
       unsubRoom = roomRef.onSnapshot(snap=>{
         const data = snap.data() || { gameStarted:false, hostId:null };
-        // ホストの引き継ぎ（最初の参加者がホスト）
         if(!data.hostId){ roomRef.update({ hostId: self.id }); }
         currentRoomState = data; rerender();
       });
@@ -269,7 +292,7 @@
 
       // UIイベント
       startBtn.onclick = ()=> startGame(roomRef);
-      el('resetBtn').onclick = async ()=> { if(confirm('ゲームをリセットしますか？')) await resetGame(roomRef); };
+      el('resetBtn').onclick = async ()=> { if(confirm('やり直しますか？')) await resetGame(roomRef); };
     }
 
     // 現在のスナップショットを保持
@@ -277,40 +300,36 @@
     let currentPlayers = [];
 
     function rerender(){
-      // 自分のホスト判定
-      const me = currentPlayers.find(p=>p.id===self.id);
-      self.isHost = !!(me && currentRoomState.hostId === self.id);
-
+      self.isHost = (currentRoomState.hostId === self.id);
       renderLists(currentPlayers);
       renderTable(currentPlayers, currentRoomState);
       updateChrome(currentRoomState, currentPlayers);
     }
 
-    // 入室フロー
+    // 入室フロー（ルームコードのみ、名前は自動）
     const roleModal = el('roleModal');
     el('joinBtn').addEventListener('click', ()=>{
-      const name=el('name').value.trim(); const room=el('room').value.trim();
-      if(!name||!room){ alert('名前とルームコードを入力してください'); return; }
-      self.name=name; self.room=room; roomStatus.textContent=`ルーム ${room}`; roomLabel.textContent=room; roleModal.showModal();
+      const room=el('room').value.trim();
+      if(!room){ alert('ルームコードを入力してください'); return; }
+      self.name = randomName();
+      self.room = room;
+      roomStatus.textContent=`ルーム ${room}`; roomLabel.textContent=room; roleModal.showModal();
     });
     el('closeRole').addEventListener('click', ()=> roleModal.close());
 
     async function joinWithRole(role){
       const uid = auth.currentUser?.uid || Math.random().toString(36).slice(2,10);
-      self.id = uid; self.role = role;
+      self.id = uid; self.role = role; self.preferredRole = role;
       const roomRef = db.collection('rooms').doc(self.room);
-      // ルーム監視開始
       watchRoom(self.room);
-      // 参加登録（ドキュメントはUIDで一意に）
       const pRef = roomRef.collection('players').doc(uid);
       const roomSnap = await roomRef.get(); const gameStarted = roomSnap.exists ? !!roomSnap.data().gameStarted : false;
       const effectiveRole = (gameStarted && role==='player') ? 'spectator' : role;
-      await pRef.set({ name:self.name, role:effectiveRole, isHost:false, hand:[], publicReveals:[], joinedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge:true });
+      await pRef.set({ name:self.name, role:effectiveRole, preferredRole: role, isHost:false, hand:[], publicReveals:[], joinedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge:true });
       // 最初の人をホストに
       const playersSnap = await roomRef.collection('players').get();
       if(playersSnap.size===1){ await roomRef.update({ hostId: uid }); await pRef.update({ isHost:true }); self.isHost=true; }
       else {
-        // 既存ホストを反映
         const hostId = (await roomRef.get()).data().hostId; await pRef.update({ isHost: hostId===uid });
       }
       roleModal.close();
@@ -329,9 +348,8 @@
         if(self.room && self.id){
           const roomRef = db.collection('rooms').doc(self.room);
           await roomRef.collection('players').doc(self.id).delete();
-          // ホストがいなくなったら次の人に引き継ぐ
           const ps = await roomRef.collection('players').orderBy('joinedAt','asc').get();
-          if(!ps.empty){ await roomRef.update({ hostId: ps.docs[0].id }); }
+          if(!ps.empty){ const newHost = ps.docs[0].id; await roomRef.update({ hostId: newHost }); }
           else { await roomRef.delete().catch(()=>{}); }
         }
       }catch(e){ /* noop */ }
@@ -340,38 +358,17 @@
 
   <!--
   ==========================
-  Firestore ルール（目安）
+  Firestore ルール（デモ用）
   ==========================
   rules_version = '2';
   service cloud.firestore {
     match /databases/{database}/documents {
       match /rooms/{room} {
-        allow read, write: if true; // デモ用（本番は認可を実装）
+        allow read, write: if true; // デモ用。本番では認可を実装
         match /players/{player} { allow read, write: if true; }
       }
     }
   }
   -->
-</body>
-</html>
-
-<script>
-/* ====== Firebase設定（あなたの値に差し替える） ====== */
-const firebaseConfig = {
-  apiKey: "あなたのAPIキー",
-  authDomain: "chat-68c4c.firebaseapp.com",
-  projectId: "chat-68c4c",
-  databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
-  appId: "あなたのApp ID"
-};
-
-/* ====== 初期化 ====== */
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const auth = firebase.auth();
-
-/* ====== JavaScript本体（前回と同じ） ====== */
-/* ここにキャンバス版の<script>内のコードを貼り付け */
-</script>
 </body>
 </html>
