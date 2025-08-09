@@ -17,13 +17,13 @@
 
     /* アイテムカード（指定サイズ） */
     --item-w:50px;
-    --item-h:65px;
+    --item-h:75px;
 
     /* DI */
     --di-w:70px;
     --di-h:70px;
 
-    /* テーブルをさらにコンパクトに */
+    /* テーブルをコンパクトに */
     --table-h:80px;
     --header-h:8px;
     --content-h: calc(var(--table-h) - var(--header-h) - 6px);
@@ -85,7 +85,7 @@
   }
   .table.elevated{ z-index:9999; }
 
-  /* タイトルをさらに上へ */
+  /* タイトルを上へ */
   .t-header{
     height:var(--header-h);display:flex;align-items:center;gap:6px;
     font-size:12px;margin-top:0;
@@ -436,7 +436,11 @@ function baseRoom(hostId){
     di:{value:0,max:6},
     captainTable:null,
     mission:null,
-    players:{}, spectators:{}
+    players:{}, spectators:{},
+    meta:{
+      itemUses:{i1:0,i12:0,i14:0},
+      tokenCounts:{equal:0,noteq:0,x1:0}
+    }
   };
 }
 
@@ -507,15 +511,21 @@ function renderItemsAndDi(v){
     div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item (${it.no}).jpg")`;
     div.onclick=(ev)=>{
-      // 使用済み→「表にする」だけ、未使用→「使用する」だけ（キャンセル無し）
+      // 使用済み→「表にする」だけ、未使用→「使用する」だけ
       if(it.used){
         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
+          // 使用回数ロールバック（安全のため適用しない。必要ならここで減算）
         });
       }else{
         openOneMini(ev.clientX, ev.clientY, '使用する', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
-          // ※各アイテム固有効果は今後ここに分岐実装
+          // ====== アイテム効果の使用回数カウント ======
+          const path=`rooms/${state.roomCode}/meta/itemUses`;
+          const uses = state.watching?.meta?.itemUses || {i1:0,i12:0,i14:0};
+          if(it.no===1)   await update(ref(db, path), {i1:(uses.i1||0)+1});
+          if(it.no===12)  await update(ref(db, path), {i12:(uses.i12||0)+1});
+          if(it.no===14)  await update(ref(db, path), {i14:(uses.i14||0)+1});
         });
       }
     };
@@ -548,6 +558,15 @@ function renderTables(v){
 
   // だれか1人でも着席していたら、全員のキャラカードを表示する
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
+
+  // 上限取得
+  const uses = v.meta?.itemUses || {i1:0,i12:0,i14:0};
+  const caps = {
+    equal: uses.i1>=2 ? 4 : (uses.i1>=1 ? 2 : 0),
+    noteq: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0),
+    x1:    uses.i14>=2 ? 2 : (uses.i14>=1 ? 1 : 0)
+  };
+  const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div');
@@ -621,19 +640,64 @@ function renderTables(v){
           const tablePath = `rooms/${state.roomCode}/tables/${idx}`;
           const cardPath  = `${tablePath}/hand/${ci}`;
 
+          const canEqual = (counts.equal < caps.equal);
+          const canNoteq = (counts.noteq < caps.noteq);
+          const canX1    = (counts.x1 < caps.x1);
+
+          // 既にトークンがある場合：タイプ別に「消す」or 数字再指定
           if(c.token){
-            // ▼ キャンセル無しで「消す」だけ表示
-            openOneMini(ev.clientX, ev.clientY, '消す', async ()=>{
+            const entries = [];
+            // 再指定（数字はそのカードの数）
+            if(c.token.type==='equal' || c.token.type==='noteq' || c.token.type==='x1' || c.token.style==='black'){
+              entries.push({label:String(c.num), action: async ()=>{
+                // 既に同タイプなら値だけ更新、タイプ違いならカウント調整無し（値のみ）
+                await update(ref(db, cardPath), { token:{...(c.token.style==='black'?{type:'num',style:'black'}:{type:c.token.type}), value:c.num, style:(c.token.style|| (c.token.type==='equal'?'equal':c.token.type==='noteq'?'noteq':c.token.type==='x1'?'x1':'black'))} });
+              }});
+            }
+            // 消す（グローバルカウントも減算）
+            entries.push({label:'消す', action: async ()=>{
+              const t = c.token;
               await update(ref(db, cardPath), { token:null });
+              if(t?.type==='equal') await incToken('equal', -1);
+              if(t?.type==='noteq') await incToken('noteq', -1);
+              if(t?.type==='x1')    await incToken('x1', -1);
               const afterHas = (t.hand||[]).some(cc => cc !== c && !!cc.token);
               box.classList.toggle('elevated', afterHas);
-            });
+            }});
+            openMenu(ev.clientX, ev.clientY, entries);
           }else{
-            // 数字トークンを付ける（黒地白字）
-            openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
+            // 何も付いていない場合：選択肢を動的に
+            const entries = [];
+            // 常に「数字トークン」（黒）を許可
+            entries.push({label:String(c.num), action: async ()=>{
               await update(ref(db, cardPath), { token:{type:'num', value:c.num, style:'black'} });
               box.classList.add('elevated');
-            });
+            }});
+            // アイテム1（=）
+            if(canEqual){
+              entries.push({label:'＝', action: async ()=>{
+                await update(ref(db, cardPath), { token:{type:'equal', value:c.num, style:'equal'} });
+                await incToken('equal', +1);
+                box.classList.add('elevated');
+              }});
+            }
+            // アイテム12（≠）
+            if(canNoteq){
+              entries.push({label:'≠', action: async ()=>{
+                await update(ref(db, cardPath), { token:{type:'noteq', value:c.num, style:'noteq'} });
+                await incToken('noteq', +1);
+                box.classList.add('elevated');
+              }});
+            }
+            // アイテム14（x1）
+            if(canX1){
+              entries.push({label:'x1', action: async ()=>{
+                await update(ref(db, cardPath), { token:{type:'x1', value:c.num, style:'x1'} });
+                await incToken('x1', +1);
+                box.classList.add('elevated');
+              }});
+            }
+            openMenu(ev.clientX, ev.clientY, entries);
           }
         };
       }
@@ -641,7 +705,10 @@ function renderTables(v){
 
       if(c.token){
         const tk=document.createElement('div'); tk.className='token ' + (c.token.style||'');
-        tk.textContent = (c.token.type==='num' || c.token.style==='black') ? c.token.value : c.token.type;
+        tk.textContent = (c.token.type==='equal') ? '＝'
+                    : (c.token.type==='noteq') ? '≠'
+                    : (c.token.type==='x1') ? 'x1'
+                    : (c.token.type==='num' || c.token.style==='black') ? c.token.value : '';
         badge.appendChild(tk);
       }
 
@@ -657,6 +724,13 @@ function renderTables(v){
 
     tablesEl.appendChild(box);
   });
+
+  // トークンカウントの加減算
+  async function incToken(kind, delta){
+    const path = `rooms/${state.roomCode}/meta/tokenCounts`;
+    const now = (state.watching?.meta?.tokenCounts||{})[kind]||0;
+    await update(ref(db, path), {[kind]: Math.max(0, now + delta)});
+  }
 }
 
 /* ========= ポップ ========= */
@@ -669,18 +743,20 @@ function openOneMini(x,y, label, cb){
   div.appendChild(b);
   document.body.appendChild(div);
 }
-/* 数字のみの小ポップ（ワンボタン） */
-function openNumberMini(x,y, label, cb){ openOneMini(x,y,label,cb); }
-/* 2択（DIなど用） */
-function openMini(x,y, leftText,leftCb, rightText,rightCb){
+/* 可変メニュー */
+function openMenu(x,y, entries){
   const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
   div.addEventListener('click', e=>e.stopPropagation());
-  const b1=document.createElement('button'); b1.className='btn small'; b1.textContent=leftText;
-  const b2=document.createElement('button'); b2.className='btn small ghost'; b2.textContent=rightText;
-  b1.onclick=()=>{ if(div.isConnected) div.remove(); leftCb&&leftCb(); };
-  b2.onclick=()=>{ if(div.isConnected) div.remove(); rightCb&&rightCb(); };
-  div.appendChild(b1); div.appendChild(b2);
+  entries.forEach(ent=>{
+    const b=document.createElement('button'); b.className='btn small'; b.textContent=ent.label;
+    b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); };
+    div.appendChild(b);
+  });
   document.body.appendChild(div);
+}
+/* 2択（DIなど用） */
+function openMini(x,y, leftText,leftCb, rightText,rightCb){
+  openMenu(x,y,[{label:leftText,action:leftCb},{label:rightText,action:rightCb}]);
 }
 
 /* 歯車 */
@@ -790,7 +866,7 @@ async function startGame(playerCount, missionId){
   // アイテム：ミッション指定が無ければ人数ぶん／ミッション42までは14-18を除外
   const pool = itemDeckNumbers(missionId);
   shuffle(pool);
-  const itemCount = playerCount; // ※必要なら mission に応じて上書きできる
+  const itemCount = playerCount;
   const items = pool.slice(0, Math.min(itemCount, pool.length))
                     .map(no=>({id:crypto.randomUUID(),no,used:false}));
 
@@ -804,7 +880,11 @@ async function startGame(playerCount, missionId){
     tables, items,
     di:{value:playerCount, max:6},
     captainTable: captainIndex,
-    mission: missionMeta
+    mission: missionMeta,
+    meta:{
+      itemUses:{i1:0,i12:0,i14:0},
+      tokenCounts:{equal:0,noteq:0,x1:0}
+    }
   });
 
   H(gear,false);
