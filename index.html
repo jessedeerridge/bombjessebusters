@@ -134,9 +134,9 @@
   /* 下段：アルファベット＋トークンをテーブル下部に固定 */
   .t-tokens{
     position:absolute;left:8px;right:8px;bottom:2px;height:var(--token-h);
-    display:flex;gap:var(--card-gap);align-items:flex-end
+    display:flex;gap:var(--card-gap);align-items:flex-end;overflow-x:auto
   }
-  .alpha{width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1}
+  .alpha{width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0}
   .token{margin-top:2px;font-size:11px;border-radius:4px;padding:1px 0}
   .token.equal{background:#ffedd5;color:#000}  /* ＝：薄オレンジ */
   .token.noteq{background:#e0f2fe;color:#000}  /* ≠：水色 */
@@ -368,6 +368,11 @@ const menuPop = document.getElementById('menuPopup');
 const btnSit  = document.getElementById('btnSit');
 const btnLeave= document.getElementById('btnLeaveSeat');
 const btnRestart=document.getElementById('btnRestart');
+function updateMenuButtons(){
+  const seated = state.seatedTable!=null;
+  H(btnSit, seated);      // 座っている時は「席に座る」を隠す
+  H(btnLeave, !seated);   // 座っていない時は「席を立つ」を隠す
+}
 const restartPop=document.getElementById('restartPop');
 const btnRestartOk=document.getElementById('btnRestartOk');
 const btnRestartCancel=document.getElementById('btnRestartCancel');
@@ -388,6 +393,7 @@ const btnStartCancel=document.getElementById('btnStartCancel');
 
 const missionTitle=document.getElementById('missionTitle');
 const missionText =document.getElementById('missionText');
+const missionBox  =document.getElementById('missionBox');
 
 const missionFooter = document.getElementById('missionFooter');
 const missionDetailTitle = document.getElementById('missionDetailTitle');
@@ -500,16 +506,16 @@ function renderMissionPanels(v){
     missionDetailTitle.textContent='';
     missionDetailBody.innerHTML='';
     H(missionFooter, true);
+    H(missionBox, false); // 未開始時は右パネル表示
     return;
   }
-  missionTitle.textContent = `#${v.mission.id} ${v.mission.name||''}`.trim();
-  missionText.textContent  = v.mission.desc || '';
-
-  // 画面下の詳細（ゲーム中のみ表示）
+  // ゲーム開始後は下部のみ詳細表示（重複回避）
   missionDetailTitle.textContent = v.mission.display?.[0] || '';
   missionDetailBody.innerHTML = (v.mission.display||[]).slice(1).map(line=>`<div class="line">${line}</div>`).join('');
   H(missionFooter, !v.started);
+  H(missionBox, !!v.started); // 開始後は右パネルを隠す
 }
+
 
 /* リスト描画 */
 function renderLists(v){
@@ -598,10 +604,17 @@ function renderTables(v){
 
     // キャラ（誰でも裏返せる）
     const char=document.createElement('div'); char.className='char-card';
-    const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-    char.style.backgroundImage = `url("${face}")`;
-    char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
-    content.appendChild(char);
+const canSeeChars = state.seatedTable!=null;
+if(canSeeChars){
+  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+  char.style.backgroundImage = `url("${face}")`;
+  char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
+} else {
+  char.style.backgroundImage = 'none';
+  char.style.background = '#eee';
+  char.style.pointerEvents='none';
+}
+content.appendChild(char);
 
     // 手札
     const hand=document.createElement('div'); hand.className='hand';
@@ -636,6 +649,8 @@ function renderTables(v){
 
     /* 下段：アルファベット＋トークン（固定で見切れない） */
     const tokens=document.createElement('div'); tokens.className='t-tokens';
+// スクロール同期（手札とアルファベット行を完全一致）
+hand.addEventListener('scroll', ()=>{ tokens.scrollLeft = hand.scrollLeft; });
     (t.hand||[]).forEach((c,ci)=>{
       const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
       if(c.token){
@@ -677,7 +692,7 @@ function openMini(x,y, leftText,leftCb, rightText,rightCb){
 /* 歯車 */
 const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
 document.addEventListener('click',(e)=>{ outsideClose(e, menuPop); if(!miniPop.contains(e.target)) H(miniPop,true); }, true);
-gear.onclick=()=> menuPop.classList.toggle('hidden');
+gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.contains('hidden')) updateMenuButtons(); };
 
 /* 席（タブで選ぶ） */
 btnSit.onclick = ()=>{
