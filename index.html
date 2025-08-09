@@ -45,8 +45,8 @@
   .small{font-size:12px;opacity:.75}
   .bold{font-weight:700}
 
-  main{padding:10px 12px;display:flex;gap:12px}
-  .col{flex:1;min-width:0}
+  main{padding:10px 12px;display:flex;gap:12px; overflow:visible;} /* ← 親のクリップ解除 */
+  .col{flex:1;min-width:0; overflow:visible;}                      /* ← クリップ解除 */
   .side{width:38%;max-width:420px}
 
   /* ------------------------- */
@@ -69,7 +69,6 @@
   /* ------------------------- */
   /* ゲームレイアウト設定      */
   /* ------------------------- */
-  /* アイテム行（待機中は非表示） */
   .items-bar{display:flex;align-items:center;gap:8px;margin-top:10px}
   .items{display:flex;gap:6px;align-items:center;overflow-x:auto}
   .item{
@@ -83,7 +82,11 @@
   }
 
   /* テーブル群（縦並び） */
-  .tables{display:flex;flex-direction:column;gap:10px;margin-top:10px;overflow-x:auto}
+  .tables{
+    display:flex;flex-direction:column;gap:10px;margin-top:10px;
+    overflow:visible;       /* ← クリップ解除（最重要） */
+    position:relative;      /* stacking基準 */
+  }
   .table{
     position:relative;
     border:1px dashed #ddd;border-radius:10px;
@@ -91,13 +94,12 @@
     height:var(--table-h);
     display:block;
     background:#fff;
-    /* 情報トークンは枠と重なって良い → はみ出し許可 */
-    overflow:visible;
-    width:max-content; /* 中身幅にフィット */
+    overflow:visible;       /* ← 枠外OK */
+    width:max-content;      /* 中身幅にフィット */
     z-index:0;
   }
-  /* トークンを持つ/操作中のテーブルは前面へ */
-  .table.elevated{ z-index:100; }
+  /* トークンを持つ/操作中のテーブルは前面へ（強めのz-index） */
+  .table.elevated{ z-index:9999; }
 
   /* 上部（アンダーライン付きの数字 or 名前） */
   .t-header{
@@ -113,6 +115,7 @@
     bottom:4px;
     display:flex;gap:8px;align-items:flex-start;
     min-height:var(--content-h);
+    overflow:visible;       /* 念のため可視 */
   }
   .char-card{
     width:var(--char-w);height:var(--char-h);
@@ -126,10 +129,10 @@
     cursor:default;
   }
 
-  .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;flex:0 0 auto;position:relative}
+  .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow:visible;flex:0 0 auto;position:relative}
 
   /* ===== カード＋アルファベット（固定配置） ===== */
-  .card-wrap{position:relative;width:var(--card-w);height:calc(var(--card-h) + 28px);flex:0 0 auto}
+  .card-wrap{position:relative;width:var(--card-w);height:calc(var(--card-h) + 28px);flex:0 0 auto; overflow:visible;}
   .card{
     width:var(--card-w);height:var(--card-h);border-radius:6px;border:1px solid #ddd;position:absolute;left:0;top:0;
     background:#bbb;display:flex;align-items:flex-start;justify-content:center;cursor:pointer;user-select:none
@@ -148,7 +151,9 @@
   /* アルファベット＆トークン：カードの下に固定（重ならない） */
   .badge-fixed{
     position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);
-    display:flex;flex-direction:column;align-items:center;z-index:50;pointer-events:auto;
+    display:flex;flex-direction:column;align-items:center;
+    z-index:10000;            /* ← 最前面に */
+    pointer-events:auto;
   }
   .alpha{
     width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1;
@@ -160,9 +165,9 @@
   .token.x1{background:#fce7f3;color:#000}     /* x1：ピンク */
   .token.black{background:#000;color:#fff}     /* 黒地白字（No.16用など） */
 
-  /* 小ポップ */
+  /* 小ポップ（最上位） */
   .mini-pop{
-    position:fixed;z-index:200;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
+    position:fixed;z-index:12000;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
     display:flex;gap:6px
   }
 
