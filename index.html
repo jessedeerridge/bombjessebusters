@@ -5,72 +5,86 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>BOMB BUSTERS</title>
   <style>
-    :root {
-      --bg: #fff;
-      --ink: #111;
-      --muted: #666;
-      --accent: #111;
-      --card-bg: #eaeaea;
-      --card-ink: #fff;
-      --public-bg: #111;
-      --public-ink: #fff;
-      --token-bg: #111;
-      --token-ink: #fff;
-      --chip: 8px;
+    :root{
+      --bg:#fff;--ink:#111;--muted:#6b7280;--line:#e5e7eb;--solid:#111;--soft:#f4f4f5;
+      --card-bg:#e9ecef;--card-ink:#fff;--public-bg:#111;--public-ink:#fff;
+      --token-bg:#111;--token-ink:#fff;
+      --eq-bg:#ffedd5;--neq-bg:#e0f2fe;--x1-bg:#ffe4ef;--mark-ink:#111;
     }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, Arial, sans-serif;}
-    .container{max-width:560px;margin:0 auto;padding:12px 12px 80px;}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,Arial,sans-serif}
+    .container{max-width:560px;margin:0 auto;padding:12px 12px 100px}
     h1{font-size:22px;letter-spacing:1px;margin:8px 0 12px;text-align:center}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    input[type="text"]{flex:1;min-width:140px;padding:10px 12px;border:1px solid #ddd;border-radius:12px;font-size:16px}
-    button{appearance:none;border:1px solid #111;background:#111;color:#fff;padding:10px 12px;border-radius:12px;font-weight:700;font-size:14px}
-    button.ghost{background:#fff;color:#111}
+    input[type=text]{flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font-size:16px}
+    button{appearance:none;border:1px solid var(--solid);background:var(--solid);color:#fff;padding:10px 12px;border-radius:12px;font-weight:700;font-size:14px}
+    button.ghost{background:#fff;color:var(--solid)}
     button.small{padding:6px 10px;border-radius:10px;font-size:12px}
-    .pill{border-radius:999px;border:1px solid #111;padding:6px 10px;display:inline-flex;gap:6px;align-items:center}
+    .pill{border-radius:999px;border:1px solid var(--solid);padding:6px 10px;display:inline-flex;gap:6px;align-items:center}
     .controls{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
     .tabs{display:flex;gap:6px;overflow:auto;padding-bottom:2px}
     .tabs::-webkit-scrollbar{height:6px}
     .hint{color:var(--muted);font-size:12px}
-    .divider{height:1px;background:#eee;margin:12px 0}
+    .divider{height:1px;background:var(--line);margin:12px 0}
 
-    .lobby-list{position:sticky;bottom:0;background:linear-gradient(180deg, rgba(255,255,255,.92), #fff 60%);backdrop-filter: blur(4px);border-top:1px solid #eee;padding:8px 12px;}
+    /* lobby */
+    .lobby-list{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(255,255,255,.92),#fff 60%);backdrop-filter:blur(4px);border-top:1px solid var(--line);padding:8px 12px}
     .lobby-list h3{margin:0 0 6px;font-size:13px;color:#444}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #ddd;border-radius:999px;font-size:12px;margin:3px 3px 0 0}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;margin:3px 3px 0 0}
 
+    /* tables */
     .tables{display:flex;flex-direction:column;gap:10px;margin-top:12px}
-    .table{border:1px solid #ddd;border-radius:16px;padding:8px;min-height:90px;position:relative;overflow:hidden}
-    .seatBadge{position:absolute;left:8px;top:6px;font-size:12px;color:#333;text-decoration:underline;}
-    .seatName{position:absolute;left:8px;top:6px;font-size:12px;color:#333;text-decoration:underline;}
-    .charcard{position:absolute;left:8px;top:24px;width:40px;height:60px;border-radius:8px;overflow:hidden;border:1px solid #ddd;background:#f6f6f6;display:grid;place-items:center}
+    .table{border:1px solid var(--line);border-radius:16px;padding:8px;min-height:90px;position:relative;background:#fff}
+    .seatBadge,.seatName{position:absolute;left:8px;top:6px;font-size:12px;color:#333;text-decoration:underline}
+    .charcard{position:absolute;left:8px;top:24px;width:40px;height:60px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#f6f6f6;display:grid;place-items:center}
     .charcard img{width:100%;height:100%;object-fit:cover;display:block}
 
     .handArea{position:absolute;left:60px;right:8px;top:6px;height:90px;display:flex;flex-direction:column;justify-content:center}
     .cards{display:flex;align-items:center;gap:3px;max-width:100%;overflow:auto}
     .card{width:24px;height:50px;border-radius:6px;border:1px solid #ccc;background:var(--card-bg);position:relative;flex:0 0 auto}
-    .card .num{position:absolute;left:0;right:0;top:2px;text-align:center;font-size:16px;line-height:1;color:var(--card-ink);font-weight:700;}
+    .card .num{position:absolute;left:0;right:0;top:2px;text-align:center;font-size:16px;line-height:1;color:var(--card-ink);font-weight:bold}
     .card.public{background:var(--public-bg);border-color:#000}
     .card.public .num{color:var(--public-ink)}
     .card .band{position:absolute;left:0;right:0;bottom:0;height:16px;background-position:center bottom;background-repeat:no-repeat;background-size:contain}
-    .band.normal{background-image:url('./assets/codenumber.png');}
-    .band.red{background-image:url('./assets/redcode.png');}
-    .band.yellow{background-image:url('./assets/yellowcode.png');}
+    .band.normal{background-image:url('./assets/codenumber.png')}
+    .band.red{background-image:url('./assets/redcode.png')}
+    .band.yellow{background-image:url('./assets/yellowcode.png')}
     .card.back{background:#ccc url('./assets/codeback.png') center/cover no-repeat}
 
     .alphaRow{display:flex;gap:3px;margin-top:4px}
     .alpha{width:24px;text-align:center;font-size:10px;border:1px solid #ddd;border-radius:6px;padding:2px 0;background:#fff}
     .token{margin-top:2px;width:24px;text-align:center;font-size:10px;border:1px solid #000;border-radius:6px;padding:2px 0;background:var(--token-bg);color:var(--token-ink)}
+    .stoken{margin-top:2px;width:24px;text-align:center;font-size:10px;border:1px solid #000;border-radius:6px;padding:2px 0;color:var(--mark-ink)}
+    .stoken.eq{background:var(--eq-bg)}
+    .stoken.neq{background:var(--neq-bg)}
+    .stoken.x1{background:var(--x1-bg)}
 
-    .gear{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:16px;border:1px solid #111;background:#111;color:#fff;display:grid;place-items:center;font-size:22px}
-    .menu{position:fixed;right:12px;bottom:72px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.08);padding:8px;display:none;min-width:180px}
+    /* items */
+    .itemsBar{display:none;gap:6px;overflow:auto;padding:8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:5}
+    .item{flex:0 0 auto;width:50px;height:70px;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;background:#fafafa;position:relative}
+    .item img{width:100%;height:100%;object-fit:cover;border-radius:10px;display:block}
+    .item.used::after{content:"";position:absolute;inset:0;background:url('./assets/itemback.jpg') center/cover no-repeat;border-radius:10px}
+
+    .diceBox{display:none;align-items:center;gap:8px;padding:8px}
+    .dice{width:70px;height:70px;border-radius:12px;border:1px solid var(--line);overflow:hidden}
+    .dice img{width:100%;height:100%;object-fit:cover;display:block}
+
+    /* gear & overlays */
+    .gear{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:16px;border:1px solid var(--solid);background:var(--solid);color:#fff;display:grid;place-items:center;font-size:22px}
+    .menu{position:fixed;right:12px;bottom:72px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.08);padding:8px;display:none;min-width:190px}
     .menu.show{display:block}
     .menu button{width:100%;text-align:left;margin:4px 0}
 
     .overlay{position:fixed;inset:0;background:rgba(0,0,0,.12);display:none}
     .overlay.show{display:block}
-    .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:12px;min-width:240px;display:none}
+    .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:12px;min-width:260px;display:none}
     .modal.show{display:block}
 
-    .foot-space{height:80px}
+    /* mission text */
+    .mission{margin:16px 0 24px}
+    .mission h4{margin:0 0 8px;font-size:14px}
+    .mission pre{margin:0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;white-space:pre-wrap;font-size:13px}
+
+    .foot-space{height:100px}
   </style>
 </head>
 <body>
@@ -90,7 +104,7 @@
         <button class="small" data-p="4">4</button>
         <button class="small" data-p="5">5</button>
       </span>
-      <span class="pill">ミッション:
+      <span class="pill tabs" id="missionTabs">
         <button class="small" data-m="1">#1</button>
         <button class="small" data-m="2">#2</button>
         <button class="small" data-m="3">#3</button>
@@ -99,11 +113,23 @@
       </span>
       <button id="startBtn">爆弾を解除！</button>
     </div>
-    <div class="hint">※「爆弾を解除！」は最初に部屋を建てた人（ホスト）だけ押せます。ゲーム開始前は下部に入室者リストが見えます。</div>
+    <div class="hint">※「爆弾を解除！」はホストのみ。開始前は下部に入室者リストが表示。</div>
 
     <div class="divider"></div>
 
+    <!-- Items (sticky while playing) -->
+    <div id="itemsBar" class="itemsBar" aria-label="アイテム"></div>
+    <div id="diceBox" class="diceBox">
+      <div>進行</div>
+      <div id="dice" class="dice"><img id="diceImg" alt="di" /></div>
+    </div>
+
     <div id="tables" class="tables" aria-live="polite"></div>
+
+    <section id="missionPanel" class="mission" hidden>
+      <h4 id="missionTitle"></h4>
+      <pre id="missionText"></pre>
+    </section>
 
     <div class="foot-space"></div>
   </div>
@@ -127,9 +153,7 @@
   <div id="modal" class="modal"></div>
 
   <script>
-  // =========================
-  // Firebase setup
-  // =========================
+  // ========================= Firebase setup =========================
   const firebaseConfig = {
     apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
     authDomain: "chat-68c4c.firebaseapp.com",
@@ -144,19 +168,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
-  // =========================
-  // Utilities & State
-  // =========================
+  // ========================= Utilities & State =========================
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-
-  const $ = (q) => document.querySelector(q);
-  const $$ = (q) => Array.from(document.querySelectorAll(q));
+  const db=firebase.database();
+  const $ = (q)=>document.querySelector(q);
+  const $$ = (q)=>Array.from(document.querySelectorAll(q));
 
   const randHiraganaName = () => {
     const hira = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん";
-    let s = "";
-    for (let i=0;i<3;i++) s += hira[Math.floor(Math.random()*hira.length)];
+    let s = ""; for(let i=0;i<3;i++) s += hira[Math.floor(Math.random()*hira.length)];
     return s;
   };
 
@@ -165,432 +185,300 @@
   localStorage.setItem('bb_name', yourName);
   $('#yourName').textContent = yourName;
 
-  let roomCode = null;     // 4 digits
-  let isHost = false;      // first creator
-  let unsubRoom = null;    // off listener fn
-  let currentRoomSnap = null;
-  let seatedTable = null;  // index
-  let playing = false;
+  let roomCode=null; let isHost=false; let unsubRoom=null; let currentRoomSnap=null; let seatedTable=null; let playing=false;
+  let usingMarkType=null; // 'eq'|'neq'|'x1' while selecting alpha
 
-  const asNum = (v)=> Number(v||0);
+  const asNum=(v)=>Number(v||0);
+  const escapeHtml=(s)=> (s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 
-  // =========================
-  // Realtime paths
-  // =========================
-  const rRef = ()=> db.ref('rooms/'+roomCode);
-  const playersRef = ()=> db.ref('rooms/'+roomCode+'/players');
-  const stateRef = ()=> db.ref('rooms/'+roomCode+'/state');
-  const settingsRef = ()=> db.ref('rooms/'+roomCode+'/settings');
-  const tablesRef = ()=> db.ref('rooms/'+roomCode+'/tables');
+  // Paths
+  const rRef=()=>db.ref('rooms/'+roomCode);
+  const playersRef=()=>db.ref('rooms/'+roomCode+'/players');
+  const stateRef=()=>db.ref('rooms/'+roomCode+'/state');
+  const settingsRef=()=>db.ref('rooms/'+roomCode+'/settings');
+  const tablesRef=()=>db.ref('rooms/'+roomCode+'/tables');
+  const itemsRef=()=>db.ref('rooms/'+roomCode+'/items');
 
-  // =========================
-  // Room create / join
-  // =========================
-  const genCode = () => (''+Math.floor(1000+Math.random()*9000));
-
-  const ensureRoom = async(code) => {
-    const ref = db.ref('rooms/'+code);
-    const snap = await ref.get();
-    if (!snap.exists()) {
-      const now = firebase.database.ServerValue.TIMESTAMP;
-      isHost = true;
-      await ref.set({
-        createdAt: now,
-        hostId: uid,
-        playerCount: 0,
-        state: { status: 'lobby', startedAt: 0 },
-        settings: { players: 4, mission: 1 },
-        tables: []
-      });
-    } else {
-      const data = snap.val();
-      isHost = data.hostId === uid; // usually false when joining
+  // ========================= Mission text =========================
+  const missionDefs={
+    1: ()=>{
+      const choices=[1.5,2.5,3.5,4.5];
+      const x=choices[Math.floor(Math.random()*choices.length)];
+      return {title:'#1 爆弾', text:`#1 爆弾\n${x}が1つ` , vars:{x}};
+    },
+    2: ()=>({title:'#2', text:'手札の内1枚がランダムに選ばれて一番右に置く。他は昇順。'}),
+    3: ()=>{
+      const pool=[1.5,2.5,3.5,4.5];
+      const shuffled=pool.sort(()=>Math.random()-0.5).slice(0,3);
+      return {title:'#3 さらい爆弾', text:`#3 さらい爆弾\n${shuffled.join(' – ')}のうち1つ` , vars:{x:shuffled[0],y:shuffled[1],z:shuffled[2]}};
     }
+  };
+
+  // ========================= Room create / join =========================
+  const genCode=()=>(''+Math.floor(1000+Math.random()*9000));
+
+  const ensureRoom=async(code)=>{
+    const ref=db.ref('rooms/'+code); const snap=await ref.get();
+    if(!snap.exists()){
+      const now=firebase.database.ServerValue.TIMESTAMP; isHost=true;
+      await ref.set({
+        createdAt:now,hostId:uid,playerCount:0,
+        state:{status:'lobby',startedAt:0,captain:null,marks:{eq:0,neq:0,x1:0}},
+        settings:{players:4,mission:1}, tables:[],
+        items:{}
+      });
+    }else{ isHost = snap.val().hostId===uid; }
     return ref;
   };
 
-  const joinRoom = async(code) => {
-    roomCode = code;
-    const ref = await ensureRoom(code);
-
-    // presence entry
-    const pRef = playersRef().child(uid);
-    const now = firebase.database.ServerValue.TIMESTAMP;
-    const player = { name: yourName, seatedTable: null, isHost: isHost, online: true, lastSeen: now };
+  const joinRoom=async(code)=>{
+    roomCode=code; const ref=await ensureRoom(code);
+    const pRef=playersRef().child(uid);
+    const now=firebase.database.ServerValue.TIMESTAMP;
+    const player={name:yourName,seatedTable:null,isHost:isHost,online:true,lastSeen:now};
     await pRef.set(player);
-
-    // playerCount ++
-    await rRef().child('playerCount').transaction(n => (asNum(n)+1));
-
-    // onDisconnect clean player & decrement
+    await rRef().child('playerCount').transaction(n=>asNum(n)+1);
     pRef.onDisconnect().remove();
-    rRef().child('playerCount').onDisconnect().transaction(n => Math.max(0, asNum(n)-1));
+    rRef().child('playerCount').onDisconnect().transaction(n=>Math.max(0,asNum(n)-1));
 
-    // listener
-    if (unsubRoom) unsubRoom();
-    unsubRoom = rRef().on('value', (snap)=>{
-      currentRoomSnap = snap;
-      renderRoom(snap.val());
-    });
-
-    // show lobby until playing
-    $('#lobby').hidden = false;
+    if(unsubRoom) unsubRoom();
+    unsubRoom = rRef().on('value', snap=>{ currentRoomSnap=snap; renderRoom(snap.val()); });
+    $('#lobby').hidden=false;
   };
 
-  const leaveRoom = async() => {
-    if (!roomCode) return;
-    try {
+  const leaveRoom=async()=>{
+    if(!roomCode) return; try{
       await playersRef().child(uid).remove();
-      await rRef().child('playerCount').transaction(n => Math.max(0, asNum(n)-1));
-    } catch(e){}
+      await rRef().child('playerCount').transaction(n=>Math.max(0,asNum(n)-1));
+    }catch(e){}
   };
-
   window.addEventListener('beforeunload', leaveRoom);
 
-  // =========================
-  // Settings actions
-  // =========================
-  const setPlayers = (p)=> settingsRef().update({ players: p });
-  const setMission = (m)=> settingsRef().update({ mission: m });
+  // ========================= Settings & Game start =========================
+  const setPlayers=(p)=> settingsRef().update({players:p});
+  const setMission=(m)=> settingsRef().update({mission:m});
 
-  const startGame = async()=>{
-    if (!isHost) return alert('ホストだけ開始できます');
-    const room = (await rRef().get()).val();
+  const startGame=async()=>{
+    if(!isHost) return alert('ホストだけ開始できます');
+    const room=(await rRef().get()).val(); const P=room.settings?.players||4;
 
-    // tables by selected players
-    const P = room.settings?.players || 4;
-    const tables = Array.from({length:P}, (_,i)=>({
-      name: '_'+(i+1), // will underline via CSS – placeholder; replaced by player name when seated
-      playerId: null,
-      character: { img: null, face: 'front' },
-      hand: { cards: [], public: {} }, // public[index]=true if revealed globally
-      tokens: {} // index -> number
+    // tables
+    const tables=Array.from({length:P},(_,i)=>({
+      name:'_'+(i+1),playerId:null,character:{img:null,face:'front'},
+      hand:{cards:[],public:{}}, tokens:{}, stokens:{} // stokens: special (=,≠,x1)
     }));
 
-    // assign character images: one table gets member(5), others shuffled 1..4
-    const idxCaptain = Math.floor(Math.random()*P); // 隊長（表示しない）
-    const others = [1,2,3,4].sort(()=>Math.random()-0.5);
-    let oi = 0;
-    for (let i=0;i<P;i++){
-      if (i===idxCaptain){
-        tables[i].character.img = './assets/member (5).jpg';
-      } else {
-        tables[i].character.img = `./assets/member (${others[oi%4]}).jpg`;
-        oi++;
-      }
+    // captain & character images
+    const idxCaptain=Math.floor(Math.random()*P);
+    const others=[1,2,3,4].sort(()=>Math.random()-0.5); let oi=0;
+    for(let i=0;i<P;i++){
+      tables[i].character.img = (i===idxCaptain)?'./assets/member (5).jpg':`./assets/member (${others[oi%4]}).jpg`; oi++;
     }
 
-    // build deck 1..12 (x4) => 48
+    // build deck 1..12 (x4) => 48 and deal round-robin to tables
     const deck=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) deck.push({value:n,type:'normal'}); }
     deck.sort(()=>Math.random()-0.5);
+    for(let i=0;i<deck.length;i++){ tables[i%P].hand.cards.push(deck[i]); }
+    // sort each hand ascending
+    tables.forEach(t=> t.hand.cards.sort((a,b)=>a.value-b.value));
 
-    // Deal round-robin to seated players later; initially hands empty; once players sit, they will be bound to a table and see their hand
-    // But spec: "参加者にできるだけ一枚ずつ漏らすことなく配布" ⇒ distribute immediately to tables count
-    for (let i=0;i<deck.length;i++){
-      const t = i % P;
-      tables[t].hand.cards.push(deck[i]);
-    }
+    // mission effects
+    const m=room.settings?.mission||1; let mText={title:'',text:''};
+    if(missionDefs[m]){ const mt=missionDefs[m](); mText=mt; }
+
+    // items: simple distribution (人数分)
+    const items={};
+    const pool=[1,3,6,17,16,5,7,10,8,13,9,14,15,2];
+    const giveCount=Math.min(pool.length, P);
+    for(let i=0;i<giveCount;i++) items[i]={id:pool[i],face:'front'};
 
     await rRef().update({
-      state: { status: 'playing', startedAt: firebase.database.ServerValue.TIMESTAMP, captain: idxCaptain },
-      tables
+      state:{status:'playing',startedAt:firebase.database.ServerValue.TIMESTAMP,captain:idxCaptain,marks:{eq:0,neq:0,x1:0},missionText:mText,dice:{max:P,cur:P}},
+      tables,items
     });
   };
 
-  const retryGame = async()=>{
-    if (!isHost) return;
-    // Confirm UI
-    tinyConfirm('やり直しますか？',{okLabel:'やり直す', cancelLabel:'キャンセル', okClass:'small'}, async(ok)=>{
-      if (!ok) return;
-      // Everyone who is currently joined becomes participant again; reset state to lobby
-      await rRef().update({ state: { status:'lobby', startedAt: 0 }, tables: [] });
-      // seated flags cleared
-      const ps = (await playersRef().get()).val()||{};
-      const updates={};
-      Object.keys(ps).forEach(id=> updates[id+'/seatedTable']=null );
-      await playersRef().update(updates);
+  const retryGame=async()=>{
+    if(!isHost) return;
+    tinyConfirm('やり直しますか？',{okLabel:'やり直す',cancelLabel:'キャンセル',okClass:'small'}, async(ok)=>{
+      if(!ok) return;
+      await rRef().update({ state:{status:'lobby',startedAt:0,captain:null,marks:{eq:0,neq:0,x1:0}}, tables:[], items:{} });
+      const ps=(await playersRef().get()).val()||{}; const up={}; Object.keys(ps).forEach(id=> up[id+'/seatedTable']=null ); await playersRef().update(up);
       alert('ルームをリセットしました。');
     });
   };
 
-  // =========================
-  // Render
-  // =========================
-  function renderRoom(room){
-    if(!room) return;
-    playing = room.state?.status === 'playing';
+  // ========================= Render =========================
+  function renderRoom(room){ if(!room) return; playing = room.state?.status==='playing';
+    $('#startBtn').disabled=!isHost; $('#startBtn').style.opacity=isHost?1:.6;
 
-    // host only start visible
-    $('#startBtn').disabled = !isHost;
-    $('#startBtn').style.opacity = isHost?1:.6;
-
-    // lobby list
-    const players = room.players||{};
-    const chips = Object.entries(players).map(([id,p])=>{
-      const taken = p.seatedTable!=null ? ` / 着席: ${asNum(p.seatedTable)+1}`:'';
-      const host = p.isHost? '👑':'';
-      return `<span class="chip">${host}${escapeHtml(p.name)}${taken}</span>`;
+    const players=room.players||{}; const chips=Object.entries(players).map(([id,p])=>{
+      const taken=p.seatedTable!=null?` / 着席:${asNum(p.seatedTable)+1}`:''; const host=p.isHost?'👑':''; return `<span class="chip">${host}${escapeHtml(p.name)}${taken}</span>`;
     }).join('');
-    $('#lobbyChips').innerHTML = chips || '<span class="hint">（まだ誰もいません）</span>';
-    $('#lobby').hidden = playing; // ゲーム開始後は非表示
+    $('#lobbyChips').innerHTML=chips||'<span class="hint">（まだ誰もいません）</span>';
+    $('#lobby').hidden=playing;
 
-    // settings reflection
-    document.querySelectorAll('[data-p]').forEach(btn=>{
-      const p = Number(btn.getAttribute('data-p'));
-      btn.style.background = (room.settings?.players===p?'#111':'#fff');
-      btn.style.color = (room.settings?.players===p?'#fff':'#111');
-      btn.onclick = ()=> isHost && setPlayers(p);
-    });
-    document.querySelectorAll('[data-m]').forEach(btn=>{
-      const m = Number(btn.getAttribute('data-m'));
-      btn.style.background = (room.settings?.mission===m?'#111':'#fff');
-      btn.style.color = (room.settings?.mission===m?'#fff':'#111');
-      btn.onclick = ()=> isHost && setMission(m);
-    });
+    $$('[data-p]').forEach(btn=>{ const p=Number(btn.dataset.p); btn.style.background=(room.settings?.players===p?'#111':'#fff'); btn.style.color=(room.settings?.players===p?'#fff':'#111'); btn.onclick=()=> isHost && setPlayers(p); });
+    $$('[data-m]').forEach(btn=>{ const m=Number(btn.dataset.m); btn.style.background=(room.settings?.mission===m?'#111':'#fff'); btn.style.color=(room.settings?.mission===m?'#fff':'#111'); btn.onclick=()=> isHost && setMission(m); });
 
-    // render tables vertical
-    const wrap = $('#tables');
-    wrap.innerHTML = '';
-    const tables = room.tables || [];
+    renderItems(room);
+    renderDice(room);
+
+    const mp=$('#missionPanel'); const mt=room.state?.missionText; if(playing && mt){ mp.hidden=false; $('#missionTitle').textContent=mt.title; $('#missionText').textContent=mt.text; } else { mp.hidden=true; }
+
+    const wrap=$('#tables'); wrap.innerHTML=''; const tables=room.tables||[];
     tables.forEach((t,idx)=>{
-      const div = document.createElement('div');
-      div.className = 'table';
+      const div=document.createElement('div'); div.className='table';
+      const seatLabel=(t.playerId && players[t.playerId])?`<span class="seatName">${escapeHtml(players[t.playerId].name)}</span>`:`<span class="seatBadge">_${idx+1}</span>`; div.insertAdjacentHTML('afterbegin', seatLabel);
 
-      const seatLabel = (t.playerId && players[t.playerId]) ? `<span class="seatName">${escapeHtml(players[t.playerId].name)}</span>` : `<span class="seatBadge">_${idx+1}</span>`;
-      div.insertAdjacentHTML('afterbegin', seatLabel);
+      const char=document.createElement('div'); char.className='charcard'; char.onclick=()=>{ const face=(t.character?.face==='front')?'back':'front'; tablesRef().child(idx+'/character/face').set(face); };
+      const img=document.createElement('img'); img.src = (t.character?.face==='back')?'./assets/battery.jpg':(t.character?.img||''); char.replaceChildren(img); div.appendChild(char);
 
-      // character card
-      const char = document.createElement('div');
-      char.className = 'charcard';
-      char.onclick = ()=>{
-        // anyone can flip character; flipping replaces image (overwrite, not add)
-        const face = (t.character?.face==='front')?'back':'front';
-        tablesRef().child(idx+'/character/face').set(face);
-      };
-      const img = document.createElement('img');
-      if (t.character?.face === 'back') {
-        img.src = './assets/battery.jpg';
-      } else {
-        img.src = t.character?.img || '';
-      }
-      char.replaceChildren(img); // overwrite image strictly
-      div.appendChild(char);
+      const handArea=document.createElement('div'); handArea.className='handArea'; const cardsRow=document.createElement('div'); cardsRow.className='cards';
+      const isYourSeat=(seatedTable===idx); const cards=(t.hand?.cards||[]); const pub=(t.hand?.public||{});
 
-      // hand area
-      const handArea = document.createElement('div');
-      handArea.className = 'handArea';
-
-      const cardsRow = document.createElement('div');
-      cardsRow.className = 'cards';
-
-      const isYourSeat = (seatedTable===idx);
-
-      const cards = (t.hand?.cards||[]);
-      const pub = (t.hand?.public||{});
-
-      cards.forEach((card, ci)=>{
-        const c = document.createElement('div');
-        c.className = 'card';
-
-        const revealedPublic = !!pub[ci];
-
-        // your own hand shows face (toggle allowed); others are back unless public
-        const faceUpForYou = isYourSeat;
-        const showFront = revealedPublic || faceUpForYou;
-
-        if (!showFront) {
-          c.classList.add('back');
-        } else {
-          if (revealedPublic) c.classList.add('public');
-          const num = document.createElement('div');
-          num.className = 'num';
-          num.textContent = String(card.value);
-          const band = document.createElement('div');
-          band.className = 'band ' + (card.type||'normal');
-          c.appendChild(num);
-          c.appendChild(band);
+      cards.forEach((card,ci)=>{
+        const c=document.createElement('div'); c.className='card';
+        const revealedPublic=!!pub[ci]; const faceUpForYou=isYourSeat; const showFront=revealedPublic || faceUpForYou;
+        if(!showFront){ c.classList.add('back'); } else { if(revealedPublic) c.classList.add('public');
+          const num=document.createElement('div'); num.className='num'; num.textContent=String(card.value);
+          const band=document.createElement('div'); band.className='band '+(card.type||'normal'); c.appendChild(num); c.appendChild(band);
         }
-
-        // click behavior
-        c.onclick = ()=>{
-          if (isYourSeat) {
-            // toggle own card front/back (local intent = public? keep public visible)
-            // If already public, nothing to toggle (still shown)
-            if (revealedPublic) return;
-            // we simulate local visibility by toggling seat to re-render; but requirement: 自分だけが表を見れる ⇒ already handled by isYourSeat
-            // nothing to write to DB for private flip
-          } else {
-            // reveal publicly (anyone can click)
-            const updates = {}; updates[ci] = true;
-            tablesRef().child(idx+'/hand/public').update(updates);
-          }
-        };
-
+        c.onclick=()=>{ if(isYourSeat){ /* private view only */ } else { const up={}; up[ci]=true; tablesRef().child(idx+'/hand/public').update(up); } };
         cardsRow.appendChild(c);
       });
 
-      const alphaRow = document.createElement('div');
-      alphaRow.className = 'alphaRow';
-      const tokenRow = document.createElement('div');
-      tokenRow.className = 'alphaRow';
+      const alphaRow=document.createElement('div'); alphaRow.className='alphaRow';
+      const tokenRow=document.createElement('div'); tokenRow.className='alphaRow';
+      const sTokenRow=document.createElement('div'); sTokenRow.className='alphaRow';
 
       for (let i=0;i<cards.length;i++){
-        const a = document.createElement('div');
-        a.className = 'alpha';
-        a.textContent = String.fromCharCode(97+i); // a,b,c...
-        a.title = '情報トークン';
-        if (isYourSeat) {
-          a.style.cursor = 'pointer';
-          a.onclick = ()=>{
-            const num = cards[i]?.value;
-            if (num==null) return;
-            tinyConfirm(`「${String.fromCharCode(97+i)}」の下に ${num} を公開しますか？`, {okLabel:'公開', cancelLabel:'やめる'}, (ok)=>{
-              if (!ok) return;
-              const up={}; up[i]=num;
-              tablesRef().child(idx+'/tokens').update(up);
-            });
-          };
-        }
+        const a=document.createElement('div'); a.className='alpha'; a.textContent=String.fromCharCode(97+i); a.title='情報トークン';
+        if(isYourSeat){ a.style.cursor='pointer'; a.onclick=()=> onAlphaClick(idx,i,cards[i]); }
         alphaRow.appendChild(a);
 
-        const token = document.createElement('div');
-        token.className = 'token';
-        const tv = (t.tokens||{})[i];
-        token.textContent = (tv==null)?'':tv;
-        tokenRow.appendChild(token);
+        const token=document.createElement('div'); token.className='token'; const tv=(t.tokens||{})[i]; token.textContent=(tv==null)?'':tv; tokenRow.appendChild(token);
+
+        const st=document.createElement('div'); st.className='stoken'; const sv=(t.stokens||{})[i]; if(sv){ st.classList.add(sv.kind); st.textContent = sv.kind==='x1'?'x1': (sv.kind==='eq'?'＝':'≠'); }
+        sTokenRow.appendChild(st);
       }
 
-      handArea.appendChild(cardsRow);
-      handArea.appendChild(alphaRow);
-      handArea.appendChild(tokenRow);
-
-      div.appendChild(handArea);
-
-      wrap.appendChild(div);
+      handArea.appendChild(cardsRow); handArea.appendChild(alphaRow); handArea.appendChild(tokenRow); handArea.appendChild(sTokenRow);
+      div.appendChild(handArea); wrap.appendChild(div);
     });
   }
 
-  function escapeHtml(s){
-    return (s||'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+  // ========================= Items & Dice =========================
+  function renderItems(room){
+    const ib=$('#itemsBar'); const list=room.items||{}; const playingNow=room.state?.status==='playing';
+    ib.style.display = playingNow? 'flex':'none'; ib.innerHTML='';
+    Object.entries(list).forEach(([key,it])=>{
+      const div=document.createElement('div'); div.className='item';
+      const img=document.createElement('img');
+      img.src = (it.face==='back')? './assets/itemback.jpg' : `./assets/item (${it.id}).jpg`;
+      div.replaceChildren(img); // overwrite only
+      if(it.face==='back') div.classList.add('used'); else div.classList.remove('used');
+      div.onclick=(ev)=> onItemClick(key,it);
+      ib.appendChild(div);
+    });
   }
 
-  // =========================
-  // Gear menu & seat logic
-  // =========================
-  const gear = $('#gear');
-  const menu = $('#menu');
-  const overlay = $('#overlay');
-  const modal = $('#modal');
+  function renderDice(room){
+    const box=$('#diceBox'); const d=room.state?.dice; const playingNow=room.state?.status==='playing';
+    if(!playingNow||!d){ box.style.display='none'; return; }
+    box.style.display='flex'; const img=$('#diceImg'); img.src = `./assets/di${d.cur}.png`;
+    $('#dice').onclick=()=>{
+      tinyPanel('進行', `<div class=\"row\"><button id=\"fw\" class=\"small\">進める</button><button id=\"bw\" class=\"small\">戻す</button></div>`, root=>{
+        root.querySelector('#fw').onclick=()=>{ const nd=Math.max(0,(d.cur-1)); rRef().child('state/dice/cur').set(nd); overlay.classList.remove('show'); modal.classList.remove('show'); };
+        root.querySelector('#bw').onclick=()=>{ const nd=Math.min(d.max,(d.cur+1)); rRef().child('state/dice/cur').set(nd); overlay.classList.remove('show'); modal.classList.remove('show'); };
+      });
+    };
+  }
 
-  gear.onclick = ()=> menu.classList.toggle('show');
-  overlay.onclick = ()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); };
+  // ========================= Alpha click (info tokens & special marks) =========================
+  function onAlphaClick(tableIdx, cardIdx, card){
+    const room=currentRoomSnap?.val(); if(!room) return; const marks=room.state?.marks||{eq:0,neq:0,x1:0};
+    const opts=[`数字(${card?.value??'-'})を公開`];
+    if(usingMarkType==='eq' && marks.eq<2) opts.push('＝ を付与');
+    if(usingMarkType==='neq' && marks.neq<2) opts.push('≠ を付与');
+    if(usingMarkType==='x1' && marks.x1<2) opts.push('x1 を付与');
 
-  $('#sitBtn').onclick = async()=>{
-    if (!currentRoomSnap) return;
-    const room = currentRoomSnap.val();
-    if (room.state?.status !== 'playing') return alert('ゲーム開始後に席を選べます');
-    // choose a free table
-    const tables = room.tables||[];
-    const players = room.players||{};
-
-    const taken = new Set(Object.values(players).filter(p=>p.seatedTable!=null).map(p=>p.seatedTable));
-    const choices = tables.map((_,i)=>({i, free:!taken.has(i)}));
-
-    const list = choices.map(c=> `<button class="small" data-i="${c.i}" ${c.free?'':'disabled'}>テーブル ${c.i+1} ${c.free?'':'（使用中）'}</button>`).join(' ');
-    tinyPanel('席を選択', `<div class="tabs">${list}</div>`, (root)=>{
+    tinyPanel('公開/マーク', opts.map((o,i)=>`<button class=\"small\" data-i=\"${i}\">${o}</button>`).join(' '), (root)=>{
       root.querySelectorAll('button[data-i]').forEach(btn=>{
-        btn.onclick = async()=>{
-          const idx = Number(btn.getAttribute('data-i'));
-          if (!choices[idx].free) return;
-          // set seat if free (prevent racing)
-          const ok = await playersRef().transaction(cur=>{
-            cur = cur||{};
-            const ids = Object.keys(cur);
-            // is someone already seated at idx?
-            const used = ids.some(id=> cur[id]?.seatedTable===idx);
-            if (used) return cur; // no-op
-            if (!cur[uid]) cur[uid]={name:yourName, online:true};
-            cur[uid].seatedTable = idx;
-            return cur;
-          });
+        btn.onclick=async()=>{
+          const idx=Number(btn.dataset.i);
+          if(idx===0){
+            const up={}; up[cardIdx]=card.value; tablesRef().child(tableIdx+'/tokens').update(up);
+          } else {
+            const kind=usingMarkType; if(!kind) return;
+            const sup={}; sup[cardIdx]={kind}; tablesRef().child(tableIdx+'/stokens').update(sup);
+            const mref=rRef().child('state/marks/'+kind); await mref.transaction(n=>Math.min(2,asNum(n)+1));
+            usingMarkType=null;
+          }
           overlay.classList.remove('show'); modal.classList.remove('show');
-          menu.classList.remove('show');
-          seatedTable = idx;
         };
+      });
+    });
+  }
+
+  // ========================= Gear & seating =========================
+  const gear=$('#gear'), menu=$('#menu'), overlay=$('#overlay'), modal=$('#modal');
+  gear.onclick=()=> menu.classList.toggle('show');
+  overlay.onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); };
+
+  $('#sitBtn').onclick=async()=>{
+    if(!currentRoomSnap) return; const room=currentRoomSnap.val(); if(room.state?.status!=='playing') return alert('ゲーム開始後に席を選べます');
+    const tables=room.tables||[]; const players=room.players||{}; const taken=new Set(Object.values(players).filter(p=>p.seatedTable!=null).map(p=>p.seatedTable));
+    const choices=tables.map((_,i)=>({i,free:!taken.has(i)}));
+    const list=choices.map(c=>`<button class=\"small\" data-i=\"${c.i}\" ${c.free?'':'disabled'}>テーブル ${c.i+1} ${c.free?'':'（使用中）'}</button>`).join(' ');
+    tinyPanel('席を選択', `<div class=\"tabs\">${list}</div>`, (root)=>{
+      root.querySelectorAll('button[data-i]').forEach(btn=>{
+        btn.onclick=async()=>{ const idx=Number(btn.dataset.i); if(!choices[idx].free) return;
+          await playersRef().transaction(cur=>{ cur=cur||{}; const used=Object.keys(cur).some(id=>cur[id]?.seatedTable===idx); if(used) return cur; if(!cur[uid]) cur[uid]={name:yourName,online:true}; cur[uid].seatedTable=idx; return cur; });
+          menu.classList.remove('show'); overlay.classList.remove('show'); modal.classList.remove('show'); seatedTable=idx; };
       });
     });
   };
 
-  $('#leaveSeatBtn').onclick = async()=>{
-    const pRef = playersRef().child(uid);
-    const pSnap = await pRef.get();
-    const p = pSnap.val();
-    if (!p || p.seatedTable==null) return;
-    await pRef.update({ seatedTable: null });
-    seatedTable = null;
-    menu.classList.remove('show');
-  };
+  $('#leaveSeatBtn').onclick=async()=>{ const pRef=playersRef().child(uid); const p=(await pRef.get()).val(); if(!p||p.seatedTable==null) return; await pRef.update({seatedTable:null}); seatedTable=null; menu.classList.remove('show'); };
+  $('#retryBtn').onclick=()=> retryGame();
 
-  $('#retryBtn').onclick = ()=> retryGame();
-
-  // =========================
-  // Tiny modal helpers
-  // =========================
-  function tinyPanel(title, html, onMount){
-    overlay.classList.add('show');
-    modal.classList.add('show');
-    modal.innerHTML = `
-      <div style="font-weight:700;margin-bottom:8px">${title}</div>
-      <div>${html}</div>
-      <div class="row" style="justify-content:flex-end;margin-top:8px">
-        <button class="ghost" id="closeM">閉じる</button>
-      </div>
-    `;
-    $('#closeM').onclick = ()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); };
-    if (onMount) onMount(modal);
-  }
-  function tinyConfirm(msg, opts, cb){
-    opts = Object.assign({okLabel:'OK', cancelLabel:'キャンセル', okClass:''}, opts||{});
-    overlay.classList.add('show');
-    modal.classList.add('show');
-    modal.innerHTML = `
-      <div style="margin-bottom:8px">${msg}</div>
-      <div class="row" style="justify-content:flex-end;margin-top:8px">
-        <button class="ghost" id="cancelM">${opts.cancelLabel}</button>
-        <button class="${opts.okClass}" id="okM">${opts.okLabel}</button>
-      </div>
-    `;
-    $('#cancelM').onclick = ()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); cb(false); };
-    $('#okM').onclick = ()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); cb(true); };
-  }
-
-  // =========================
-  // Top controls handlers
-  // =========================
-  $('#makeBtn').onclick = ()=>{
-    const code = genCode();
-    $('#codeInput').value = code;
-  };
-
-  $('#joinBtn').onclick = async()=>{
-    const code = ($('#codeInput').value||'').replace(/\D/g,'').slice(0,4);
-    if (code.length!==4) return alert('4桁のコードを入れてください');
-    await joinRoom(code);
-  };
-
-  $('#startBtn').onclick = ()=> startGame();
-
-  // expose name pill click to re-roll name (optional)
-  $('#youTag').onclick = ()=>{
-    tinyConfirm('ランダムな名前（ひらがな3文字）を再生成しますか？',{okLabel:'変える', cancelLabel:'やめる'}, (ok)=>{
-      if (!ok) return;
-      yourName = randHiraganaName();
-      localStorage.setItem('bb_name', yourName);
-      $('#yourName').textContent = yourName;
-      if (roomCode) playersRef().child(uid).update({name: yourName});
+  // ========================= Items interaction =========================
+  function onItemClick(key,it){
+    const front = it.face!=='back';
+    if(!front){
+      tinyConfirm('表にしますか？',{okLabel:'表にする',cancelLabel:'やめる'}, async(ok)=>{ if(!ok) return; await itemsRef().child(key+'/face').set('front'); });
+      return;
+    }
+    tinyPanel('アイテム', `<div class=\"row\"><button id=\"useBtn\" class=\"small\">使用する</button><button id=\"cancelBtn\" class=\"small ghost\">キャンセル</button></div>`, (root)=>{
+      root.querySelector('#useBtn').onclick=async()=>{
+        if(it.id===13){ usingMarkType='eq'; }
+        else if(it.id===9){ usingMarkType='x1'; }
+        else if(it.id===4){ await giveExtraItems(2); }
+        else if(it.id===2){ alert('手札交換: 次に実装します'); }
+        else if(it.id===12){ usingMarkType='neq'; }
+        await itemsRef().child(key+'/face').set('back');
+        overlay.classList.remove('show'); modal.classList.remove('show');
+      };
+      root.querySelector('#cancelBtn').onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); };
     });
-  };
+  }
 
+  async function giveExtraItems(n){
+    const snap=await itemsRef().get(); const items=snap.val()||{}; const usedIds=new Set(Object.values(items).map(it=>it.id));
+    const candidates=[1,3,5,6,7,8,9,10,12,13,14,15,16,17,2].filter(x=>!usedIds.has(x));
+    let added=0; for(const id of candidates){ await itemsRef().push({id,face:'front'}); added++; if(added>=n) break; }
+  }
+
+  // ========================= Tiny modal helpers =========================
+  function tinyPanel(title, html, onMount){ overlay.classList.add('show'); modal.classList.add('show'); modal.innerHTML=`<div style="font-weight:700;margin-bottom:8px">${title}</div><div>${html}</div><div class="row" style="justify-content:flex-end;margin-top:8px"><button class="ghost" id="closeM">閉じる</button></div>`; $('#closeM').onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); }; if(onMount) onMount(modal); }
+  function tinyConfirm(msg, opts, cb){ opts=Object.assign({okLabel:'OK',cancelLabel:'キャンセル',okClass:''},opts||{}); overlay.classList.add('show'); modal.classList.add('show'); modal.innerHTML=`<div style="margin-bottom:8px">${msg}</div><div class="row" style="justify-content:flex-end;margin-top:8px"><button class="ghost" id="cancelM">${opts.cancelLabel}</button><button class="${opts.okClass}" id="okM">${opts.okLabel}</button></div>`; $('#cancelM').onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); cb(false); }; $('#okM').onclick=()=>{ overlay.classList.remove('show'); modal.classList.remove('show'); cb(true); }; }
+
+  // ========================= Top controls =========================
+  $('#makeBtn').onclick=()=>{ const code=genCode(); $('#codeInput').value=code; };
+  $('#joinBtn').onclick=async()=>{ const code=($('#codeInput').value||'').replace(/\D/g,'').slice(0,4); if(code.length!==4) return alert('4桁のコードを入れてください'); await joinRoom(code); };
+  $('#startBtn').onclick=()=> startGame();
+  $('#youTag').onclick=()=>{ tinyConfirm('ランダムな名前（ひらがな3文字）を再生成しますか？',{okLabel:'変える',cancelLabel:'やめる'}, (ok)=>{ if(!ok) return; yourName=randHiraganaName(); localStorage.setItem('bb_name',yourName); $('#yourName').textContent=yourName; if(roomCode) playersRef().child(uid).update({name:yourName}); }); };
   </script>
 </body>
 </html>
