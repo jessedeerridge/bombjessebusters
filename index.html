@@ -11,7 +11,7 @@
   :root{
     /* 手札カード（仕様固定） */
     --card-w:24px;
-    --card-h:50px;
+    --card-h:40px;   /* ← 40px に変更 */
     --card-gap:3px;
 
     /* キャラカード（仕様固定） */
@@ -122,7 +122,7 @@
     background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
-  /* 着席前はブランク表示 */
+  /* 着席前はブランク表示（＝誰も座っていない間は全テーブルでブランク） */
   .char-card.blank{
     background:#f3f4f6;
     border:1px dashed #d1d5db;
@@ -590,6 +590,9 @@ function renderTables(v){
 
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
 
+  /* だれか1人でも着席していたら、全員のキャラカードを表示する */
+  const seatedAny = (v.tables||[]).some(T => !!T.playerId);
+
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); 
     box.className='table';
@@ -616,15 +619,16 @@ function renderTables(v){
     /* 中段：キャラ＋手札 */
     const content=document.createElement('div'); content.className='t-content';
 
-    // キャラ：未着席はブランク、着席後のみ画像・反転可
+    // キャラ：誰も座っていない間は全ブランク、誰か座ったら全テーブルで表示
     const char=document.createElement('div'); char.className='char-card';
-    if(!t.playerId){
+    if(!seatedAny){
       char.classList.add('blank');
     } else {
       const face = t.character?.flipped 
         ? './battery.jpg' 
         : `./${t.character?.face || 'member (1).jpg'}`;
       char.style.backgroundImage = `url("${face}")`;
+      // 反転は従来通り誰でも可（必要なら制限可）
       char.onclick=async ()=>{
         await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped});
       };
