@@ -1,65 +1,67 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BOMB BUSTERS</title>
-  <style>
-    :root { 
-      --bg: #ffffff; 
-      --panel: #f3f6f9; 
-      --line: #d0d5da; 
-      --muted: #666; 
-      --text: #111; 
-      --accent: #2a7be4; 
-      --danger: #ff3b3b; 
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html,body { height: 100%; }
-    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BOMB BUSTERS</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --panel: #f8f8f8;
+  --line: #ccc;
+  --muted: #666;
+  --text: #000;
+  --accent: #2196f3;
+  --danger: #f44336;
+}
 
-    .wrap { max-width: 1200px; margin: auto; padding: 8px; }
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+* { box-sizing: border-box; margin:0; padding:0; }
+html,body { height:100%; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
 
-    header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: #fff; }
-    header h1 { font-size: 16px; font-weight: bold; }
-    header .badge { background: var(--accent); color: #fff; padding: 4px 8px; border-radius: 999px; font-size: 11px; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 8px; }
+.card { background: var(--panel); border:1px solid var(--line); border-radius: 8px; }
 
-    .layout { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 8px; }
-    @media (min-width: 800px) { .layout { grid-template-columns: 220px 1fr 220px; } }
+header { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid var(--line); }
+header h1 { font-size:18px; margin:0; }
+header .badge { background:#eee; padding:2px 8px; border-radius: 999px; font-size: 12px; }
 
-    .panel { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.layout { display:grid; grid-template-columns: 220px 1fr 220px; gap:8px; padding:8px; }
+@media(max-width: 720px){ .layout { grid-template-columns: 1fr; } }
 
-    #join { display: grid; gap: 8px; }
-    #join .row { display: flex; gap: 6px; flex-wrap: wrap; }
-    input, select, button { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 14px; }
-    button { cursor: pointer; background: var(--accent); color: #fff; border: none; }
-    button.secondary { background: #ccc; color: #000; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
+.panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px; }
 
-    .list h3 { margin: 4px 0; font-size: 13px; color: var(--muted); }
-    .pill { display: inline-block; padding: 3px 6px; font-size: 11px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; margin: 2px; }
-    .me { outline: 2px solid var(--accent); }
+#join { display:grid; gap:8px; }
+.row { display:flex; gap:6px; flex-wrap:wrap; }
+input, select, button { border:1px solid #ccc; padding:6px 8px; border-radius:6px; font-size:14px; }
+button { cursor:pointer; background: var(--accent); color:#fff; border:none; }
+button.secondary { background:#aaa; }
+button:disabled { opacity:0.5; cursor:not-allowed; }
 
-    #table { display: grid; gap: 8px; }
-    .seat { border: 1px solid var(--line); border-radius: 6px; padding: 6px; background: var(--panel); }
-    .seat .meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.list h3 { font-size:14px; margin:6px 0; }
+.pill { display:inline-flex; align-items:center; padding:4px 8px; border:1px solid #ccc; border-radius:999px; margin:2px; font-size:12px; background:#f5f5f5; }
+.me { outline:2px solid var(--accent); }
+.host { border-color:#ff9800; }
 
-    .cards { display: flex; gap: 4px; }
-    .cardv { background: #fff; border: 1px solid var(--line); border-radius: 4px; display: grid; place-items: center; font-weight: bold; }
-    .mine.face { background: #dfeeff; border-color: var(--accent); }
-    .back { background: #eee; }
-    .number { font-variant-numeric: tabular-nums; }
+#table { display:grid; gap:8px; }
+.seat { border:1px solid #ddd; border-radius:6px; padding:6px; }
+.meta { font-size:12px; color:var(--muted); margin-bottom:6px; }
 
-    /* スマホ時: 枚数に応じてカード幅を自動計算 */
-    @media (max-width: 720px) {
-      .cards { flex-wrap: nowrap; justify-content: center; }
-      .cardv { flex: 0 0 var(--cardW); width: var(--cardW); height: calc(var(--cardW) * 1.36); }
-    }
+.cards { display:flex; justify-content:center; gap:4px; }
+.cardv {
+  flex: 0 0 auto;
+  border-radius:4px;
+  border:1px solid #999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
+  background:#fff;
+}
+.mine.face { background:#e3f2fd; border-color:#64b5f6; }
+.back { background:#ddd; }
 
-    /* ホスト用設定ボタン（右下固定） */
-    #settingsBtn { position: fixed; bottom: 16px; right: 16px; padding: 8px 12px; font-size: 14px; background: var(--accent); color: #fff; border-radius: 4px; display: none; }
-  </style>
+.settings { position:fixed; bottom:10px; right:10px; }
+</style>
 </head>
 <body>
 <div class="wrap card">
@@ -71,11 +73,14 @@
     <section class="panel" id="left">
       <div id="join">
         <div class="row">
-          <input id="name" placeholder="名前" autocomplete="off" />
+          <input id="name" placeholder="名前" />
           <input id="room" placeholder="ルーム4桁" maxlength="4" />
         </div>
         <div class="row">
-          <select id="role"><option value="player">参加</option><option value="spectator">観戦</option></select>
+          <select id="role">
+            <option value="player">参加</option>
+            <option value="spectator">観戦</option>
+          </select>
           <button id="enter">入室</button>
         </div>
       </div>
@@ -94,9 +99,9 @@
     </aside>
   </div>
 </div>
-
-<button id="settingsBtn">設定</button>
-
+<div class="settings" id="settings" style="display:none;">
+  <button id="resetBtn" class="secondary">ゲームリセット</button>
+</div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getDatabase, ref, set, get, update, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
@@ -110,160 +115,152 @@ const firebaseConfig = {
   messagingSenderId: "172284325975",
   appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+
+let me = { name:"", room:"", role:"player" };
+let host = null;
+let gameStarted = false;
 
 const nameEl = document.querySelector('#name');
 const roomEl = document.querySelector('#room');
 const roleEl = document.querySelector('#role');
 const enterBtn = document.querySelector('#enter');
 const startBtn = document.querySelector('#start');
+const tableEl = document.querySelector('#table');
+const playersEl = document.querySelector('#players');
+const spectatorsEl = document.querySelector('#spectators');
 const joinPanel = document.querySelector('#join');
-const playersDiv = document.querySelector('#players');
-const spectatorsDiv = document.querySelector('#spectators');
-const settingsBtn = document.querySelector('#settingsBtn');
-
-let me = { name: "", room: "", role: "player" };
-let host = null;
-let gameStarted = false;
+const settingsEl = document.querySelector('#settings');
+const resetBtn = document.querySelector('#resetBtn');
 
 roomEl.addEventListener('input', () => {
-  roomEl.value = roomEl.value.replace(/\\D/g, '').slice(0, 4);
+  roomEl.value = roomEl.value.replace(/\\D/g,'').slice(0,4);
 });
-
 enterBtn.addEventListener('click', joinRoom);
 startBtn.addEventListener('click', startGame);
-settingsBtn.addEventListener('click', resetGame);
+resetBtn.addEventListener('click', resetGame);
 
-async function joinRoom() {
+async function joinRoom(){
   const name = nameEl.value.trim();
   const room = roomEl.value.trim();
-  let role = roleEl.value;
-  if (!name || !/^[0-9]{4}$/.test(room)) return alert('名前と4桁ルームコードを入力');
+  const role = roleEl.value;
+  if(!name || !/^[0-9]{4}$/.test(room)) return alert("名前と4桁ルームを入力");
 
-  const hostSnap = await get(ref(db, `rooms/${room}/host`));
-  if (!hostSnap.exists()) {
-    await set(ref(db, `rooms/${room}/host`), name);
+  const hostRef = ref(db,`rooms/${room}/host`);
+  const snap = await get(hostRef);
+  if(!snap.exists()) {
+    await set(hostRef, name);
     host = name;
   } else {
-    host = hostSnap.val();
-  }
-
-  // すでにゲーム開始中なら観戦に
-  const gameSnap = await get(ref(db, `rooms/${room}/game/started`));
-  if (gameSnap.exists() && gameSnap.val()) {
-    role = "spectator";
-    alert("ゲーム中のため観戦になります");
+    host = snap.val();
   }
 
   me = { name, room, role };
-  const playerRef = ref(db, `rooms/${room}/${role === 'player' ? 'players' : 'spectators'}/${name}`);
-  await update(playerRef, { name, role, online: true, joinedAt: Date.now() });
-  onDisconnect(playerRef).remove();
+  const playersRef = ref(db,`rooms/${room}/players/${name}`);
+  await update(playersRef,{ name, role, online:true });
+  onDisconnect(playersRef).remove();
 
-  joinPanel.style.display = 'none';
+  joinPanel.style.display='none';
+  listenRoom();
 }
 
-function startGame() {
-  const cards = [];
-  for (let i = 1; i <= 12; i++) { cards.push(i, i); }
-  cards.sort(() => Math.random() - 0.5);
-
-  // 参加者取得
-  get(ref(db, `rooms/${me.room}/players`)).then(snap => {
-    const players = Object.keys(snap.val() || {});
-    const hands = {};
-    let idx = 0;
-    players.forEach(p => {
-      hands[p] = [];
-      for (let c = 0; c < cards.length / players.length; c++) {
-        hands[p].push(cards[idx++]);
+function listenRoom(){
+  const roomRef = ref(db,`rooms/${me.room}`);
+  onValue(roomRef, snap => {
+    if(!snap.exists()) return;
+    const data = snap.val();
+    gameStarted = !!data.started;
+    renderLists(data);
+    renderTable(data);
+    if(me.name === data.host) {
+      startBtn.disabled = gameStarted;
+      settingsEl.style.display = gameStarted ? 'block' : 'none';
+    }
+    if(gameStarted) {
+      document.querySelector('#left').style.display='none';
+      document.querySelector('#right').style.display='none';
+      if(me.role === 'player' && !data.players[me.name]) {
+        me.role = 'spectator';
       }
-      hands[p].sort((a,b)=>a-b);
-    });
-
-    set(ref(db, `rooms/${me.room}/game`), {
-      started: true,
-      hands
-    });
+    }
   });
 }
 
-function resetGame() {
-  set(ref(db, `rooms/${me.room}/game`), { started: false });
+function renderLists(data){
+  playersEl.innerHTML = '';
+  spectatorsEl.innerHTML = '';
+  Object.values(data.players||{}).forEach(p=>{
+    if(p.role==='player'){
+      playersEl.innerHTML += `<span class="pill${p.name===me.name?' me':''}${p.name===data.host?' host':''}">${p.name}</span>`;
+    } else {
+      spectatorsEl.innerHTML += `<span class="pill">${p.name}</span>`;
+    }
+  });
 }
 
-onValue(ref(db, `rooms`), snap => {
-  const data = snap.val() || {};
-  const roomData = data[me.room] || {};
-  host = roomData.host;
-
-  gameStarted = roomData.game && roomData.game.started;
-
-  // UI制御
-  if (gameStarted) {
-    document.querySelector('#left').style.display = 'none';
-    document.querySelector('#right').style.display = 'none';
-    if (me.name === host) settingsBtn.style.display = 'block';
-  } else {
-    document.querySelector('#left').style.display = '';
-    document.querySelector('#right').style.display = '';
-    settingsBtn.style.display = 'none';
-  }
-
-  // リスト更新
-  playersDiv.innerHTML = "";
-  spectatorsDiv.innerHTML = "";
-  Object.values(roomData.players || {}).forEach(p => {
-    const pill = document.createElement('div');
-    pill.className = 'pill' + (p.name === me.name ? ' me' : '');
-    pill.textContent = p.name;
-    playersDiv.appendChild(pill);
-  });
-  Object.values(roomData.spectators || {}).forEach(p => {
-    const pill = document.createElement('div');
-    pill.className = 'pill' + (p.name === me.name ? ' me' : '');
-    pill.textContent = p.name;
-    spectatorsDiv.appendChild(pill);
-  });
-
-  // ゲーム表示
-  const table = document.querySelector('#table');
-  table.innerHTML = "";
-  if (roomData.game && roomData.game.hands) {
-    Object.entries(roomData.game.hands).forEach(([pname, hand]) => {
-      const seat = document.createElement('div');
-      seat.className = 'seat';
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = pname;
-      seat.appendChild(meta);
-
-      const cardsDiv = document.createElement('div');
-      cardsDiv.className = 'cards';
-      // スマホ用にカード幅調整
-      cardsDiv.style.setProperty('--cardW', `calc((100vw - 16px) / ${hand.length})`);
-
-      hand.forEach(num => {
-        const card = document.createElement('div');
-        card.className = 'cardv';
-        if (pname === me.name) {
-          card.classList.add('mine', 'face');
-          card.innerHTML = `<div class="number">${num}</div>`;
-        } else {
-          card.classList.add('back');
-          card.onclick = () => { card.className = 'cardv mine face'; card.innerHTML = `<div class=\"number\">${num}</div>`; };
-        }
-        cardsDiv.appendChild(card);
-      });
-      seat.appendChild(cardsDiv);
-      table.appendChild(seat);
+function renderTable(data){
+  tableEl.innerHTML='';
+  Object.values(data.players||{}).forEach(p=>{
+    const seat = document.createElement('div');
+    seat.className='seat';
+    seat.innerHTML = `<div class="meta">${p.name}</div>`;
+    const cardsWrap = document.createElement('div');
+    cardsWrap.className='cards';
+    const cards = p.cards||[];
+    const cardCount = cards.length||1;
+    const cardW = (window.innerWidth - 32) / cardCount;
+    cardsWrap.style.setProperty('--cardW', cardW+'px');
+    cards.forEach(card=>{
+      const div = document.createElement('div');
+      div.className='cardv';
+      div.style.width=cardW+'px';
+      div.style.height=(cardW*1.36)+'px';
+      if(p.name===me.name){
+        div.classList.add('mine','face');
+        div.textContent=card;
+      } else if(card.revealed){
+        div.textContent=card.num;
+      } else {
+        div.classList.add('back');
+        div.onclick=()=>revealCard(p.name,card);
+      }
+      cardsWrap.appendChild(div);
     });
-  }
+    seat.appendChild(cardsWrap);
+    tableEl.appendChild(seat);
+  });
+}
 
-  startBtn.disabled = !(me.name === host && !gameStarted);
-});
+function startGame(){
+  const cards = [];
+  for(let i=1;i<=12;i++){ cards.push(i,i); }
+  shuffle(cards);
+  const players = Object.values(document.querySelectorAll('#players .pill')).map(el=>el.textContent);
+  const per = Math.floor(cards.length / players.length);
+  const updates={};
+  players.forEach((n,idx)=>{
+    updates[`rooms/${me.room}/players/${n}/cards`] = cards.slice(idx*per,(idx+1)*per).sort((a,b)=>a-b).map(num=>({num}));
+  });
+  updates[`rooms/${me.room}/started`] = true;
+  update(ref(db), updates);
+}
+
+function resetGame(){
+  update(ref(db,`rooms/${me.room}`), { started:false });
+}
+
+function revealCard(playerName, card){
+  card.revealed = true;
+  update(ref(db,`rooms/${me.room}/players/${playerName}/cards`), card);
+}
+
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+}
 </script>
 </body>
 </html>
