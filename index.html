@@ -17,8 +17,8 @@
     --avatarW:40px;
     --avatarH:60px;
 
-    /* ラベル列（卓番号＋下線＋キャラカード）幅 */
-    --labelW:56px;
+    /* ラベル列（席ラベル＋下線＋キャラカード）幅 */
+    --labelW:72px;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#fff;color:#111}
@@ -41,23 +41,18 @@
 
   /* ====== テーブル（席） ====== */
   .tablesArea{display:flex;flex-direction:column;gap:10px} /* 縦並び */
-  .table{border:1px solid #eee;border-radius:12px;padding:8px;display:inline-block;max-width:100%;overflow-x:auto;overflow-y:hidden;height:110px} /* ← 高さ固定 */
+  .table{border:1px solid #eee;border-radius:12px;padding:8px;display:inline-block;max-width:100%;overflow-x:auto;overflow-y:hidden;height:90px} /* ← 高さ固定 */
   .tableRow{display:grid;grid-template-columns: var(--labelW) auto; gap:8px; align-items:stretch; width:fit-content}
   .tableLabel{display:flex;flex-direction:column;align-items:center;gap:4px;width:var(--labelW)}
-  .tableLabel .num{font-size:12px;font-weight:700;line-height:1}
-  .tableLabel .underline{width:100%;border-top:2px solid #111;margin-top:2px}
+  .labelMain{font-size:12px;font-weight:700;line-height:1;text-align:center;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .underline{width:100%;border-top:2px solid #111;margin-top:4px}
   .avatar{width:var(--avatarW);height:var(--avatarH);border:1px solid #ccc;border-radius:6px;cursor:pointer;background:#fff center/cover no-repeat}
-
-  /* 着席者名（小） */
-  .occupant{font-size:11px;color:#444;margin-bottom:4px}
 
   /* 手札（横一列, 15枚並ぶ幅感） */
   .hand{display:flex;gap:var(--cardGap);flex-wrap:nowrap}
 
   /* 1枚（カード＋下の文字） */
   .cardWrap{display:flex;flex-direction:column;align-items:center;position:relative}
-  .swapMark{position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:12px}
-
   .letterCell{width:var(--cardW);border:1px solid #eee;border-radius:4px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px;margin-top:2px}
   .letterLabel{font-size:10px;line-height:1;cursor:pointer;user-select:none}
   .token{font-size:10px;font-weight:700}
@@ -65,7 +60,7 @@
   .neqMark{font-size:10px;font-weight:700;padding:2px 4px;border-radius:6px;background:#cfefff;border:1px solid #74b6e3;color:#000;cursor:pointer}
   .x1Mark{font-size:10px;font-weight:700;padding:2px 4px;border-radius:6px;background:#ffc1d6;border:1px solid #e08aae;color:#000;cursor:pointer}
 
-  /* 浮かせる小タブ（レタークリック時） */
+  /* 小タブ（レタークリック時） */
   .floatTab{position:absolute;font-size:11px;padding:6px 8px;border-radius:10px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.12);z-index:40}
 
   /* ====== 数字カード ====== */
@@ -82,7 +77,7 @@
   .itemsPanel{display:flex;flex-direction:column;gap:6px}
   .itemsRowWrap{display:flex;gap:10px;align-items:center}
   .itemsRow{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;flex:1}
-  .itemImg{width:60px;height:80px;border:1px solid #ddd;border-radius:8px;background:#fff center/cover no-repeat;cursor:pointer;user-select:none;position:relative}
+  .itemImg{width:50px;height:80px;border:1px solid #ddd;border-radius:8px;background:#fff center/cover no-repeat;cursor:pointer;user-select:none;position:relative}
   .itemUsed{background:#fff url("itemback.jpg") center/cover no-repeat !important;cursor:default}
   .itemOverlay{position:absolute;inset:auto 4px 4px 4px;min-height:18px;border-radius:6px;background:#000;color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
 
@@ -102,7 +97,7 @@
       <input id="roomCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="ルームコード（例: 1234）">
       <button id="joinBtn" class="primary">入室</button>
     </div>
-    <div class="muted" style="margin-top:8px;">入室後に「参加」か「観戦」を選べます。名前は自動付与。</div>
+    <div class="muted" style="margin-top:8px;">入室後に「参加」か「観戦」を選べます。名前は自動付与（ひらがな3文字）。</div>
   </div>
 </section>
 
@@ -145,12 +140,12 @@
       </div>
     </div>
 
-    <!-- Tables (縦並び) -->
+    <!-- Tables（縦並び） -->
     <div id="tablesPanel" class="panel" style="margin-top:12px;">
       <div id="tablesArea" class="tablesArea"></div>
     </div>
 
-    <!-- Mission details（「ミッション詳細」というタイトルは出さない） -->
+    <!-- Mission details（タイトルは出さない） -->
     <div id="missionPanel" class="panel hidden">
       <div id="missionLines"></div>
     </div>
@@ -282,7 +277,7 @@
     const t = String(txt).replace(",",".");
     if(t.endsWith(".5")) return "redcode.png";     // 赤コード
     if(t.endsWith(".1")) return "yellowcode.png";  // 黄コード
-    return "codenumber.png";
+    return "codenumber.png";                       // 通常
   };
 
   // アイテム画像（UIでは名前を出さない。内部参照のみ）
@@ -349,7 +344,7 @@
     if(!s.exists()){
       await set(r,{
         createdAt:serverTimestamp(), hostId:null, phase:"lobby", mission:null, seatCount:0,
-        players:{}, spectators:{}, wants:{}, seats:{}, missionTextLines:[], items:{}, effects:{}, diIndex:0
+        players:{}, spectators:{}, wants:{}, seats:{}, missionTextLines:[], items:{}, effects:{}, diIndex:0, leaderSeat:null
       });
     }
     return r;
@@ -383,7 +378,7 @@
     });
 
     onValue(ref(db,`rooms/${code}/players`),(s)=>renderList(playersList,s.val()||{}));
-    onValue(ref(db,`rooms/${code}/spectators`),(s)=>renderList(spectatorsList,s.val()||{}));
+    onValue(ref(db,`rooms/${code}/spectators`),(s)=>renderList(s.val()||{}));
   }
 
   function renderList(container,map){
@@ -413,7 +408,7 @@
   }
 
   function pickN(arr, n){
-    const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+    const a=[...arr]; for(let i=a.length-1;i>0;i++){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
     return a.slice(0,n);
   }
 
@@ -465,15 +460,20 @@
       arr.forEach((c,i)=>{ seats[s].hand[c.id]={...c, order:i}; });
     }
 
-    // キャラクターカード：
-    //  - 必ずどこか1卓に "member (5).png"（=隊長席、UIで明示しない）
-    //  - その他は jpg の 1..4 からランダム
-    const jpgs = ["member (1).jpg","member (2).jpg","member (3).jpg","member (4).jpg"];
-    const mustIdx = Math.floor(Math.random()*seatCount)+1;
-    seats[mustIdx].avatarName = "member (5).png";
+    // ===== 隊長（非表示だが内部的に1席だけ）＋キャラクター割当 =====
+    const leaderSeat = Math.floor(Math.random()*seatCount)+1; // 1-based
+    const poolJPG = ["member (1).jpg","member (2).jpg","member (3).jpg","member (4).jpg"];
+    let poolIdx = 0;
+    const noDupPool = pickN(poolJPG, Math.min(poolJPG.length, Math.max(0, seatCount-1)));
+
     for(let s=1;s<=seatCount;s++){
-      if(!seats[s].avatarName){
-        seats[s].avatarName = jpgs[Math.floor(Math.random()*jpgs.length)];
+      if(s===leaderSeat){
+        seats[s].avatarName = "member (5).jpg"; // 隊長卓
+      }else{
+        // 可能な限り重複なし。超過分は循環利用（仕様優先で破綻回避）
+        const pick = noDupPool[poolIdx % noDupPool.length] || poolJPG[Math.floor(Math.random()*poolJPG.length)];
+        poolIdx++;
+        seats[s].avatarName = pick;
       }
       seats[s].avatarFace = true; // 表（誰でもクリックで裏返し可）
     }
@@ -496,7 +496,8 @@
       missionTextLines,
       items,
       effects:{ eqRemain:0, neqRemain:0, x1Remain:0, swap:null },
-      diIndex
+      diIndex,
+      leaderSeat
     });
   }
 
@@ -578,7 +579,7 @@
     await update(ref(db,`rooms/${code}`),{
       phase:"lobby", mission:null, seatCount:0, seats:{},
       players: nextPlayers, spectators: nextSpectators,
-      missionTextLines:[], items:{}, effects:{}, diIndex:0
+      missionTextLines:[], items:{}, effects:{}, diIndex:0, leaderSeat:null
     });
     resetConfirm.classList.add("hidden");
   });
@@ -603,7 +604,7 @@
     if(!nums.length && !showDi){ itemsPanel.classList.add("hidden"); return; }
     itemsPanel.classList.remove("hidden");
 
-    // アイテムカード（60x80）
+    // アイテムカード（50x80）
     nums.forEach(num=>{
       const it = items[num];
       const el = div("div","itemImg");
@@ -630,6 +631,7 @@
         const remove = ()=>box.remove();
         document.addEventListener("click",(e)=>{ if(!box.contains(e.target) && e.target!==diImg) remove(); }, { once:true });
 
+        // 指示：進める→ index-1, 戻す→ index+1
         $("#diPrev").onclick = ()=>{ update(ref(db,`rooms/${state.roomCode}`),{ diIndex: Math.max(0, idx-1) }); remove(); };
         $("#diNext").onclick = ()=>{ update(ref(db,`rooms/${state.roomCode}`),{ diIndex: Math.min(6, idx+1) }); remove(); };
       };
@@ -645,10 +647,9 @@
       const table = div("div","table");
       const row = div("div","tableRow");
 
-      // ラベル列（番号＋下線＋キャラカード）※キャラは下線の下
+      // ラベル列（着席前：番号＋下線／着席後：名前＋下線）＋キャラ
       const label = div("div","tableLabel");
-      const occ = div("div","occupant", seat.occupantName ? seat.occupantName : "");
-      const num = div("div","num", String(idx));
+      const top = div("div","labelMain", seat.occupantName ? seat.occupantName : String(idx));
       const ul = div("div","underline");
       const av = div("div","avatar");
       av.style.backgroundImage = seat.avatarFace ? `url("${seat.avatarName||""}")` : `url("battery.jpg")`;
@@ -656,12 +657,11 @@
         const path = `rooms/${state.roomCode}/seats/${idx}`;
         update(ref(db,path), { avatarFace: !seat.avatarFace });
       };
-      label.appendChild(occ);
-      label.appendChild(num);
+      label.appendChild(top);
       label.appendChild(ul);
       label.appendChild(av);
 
-      // 手札行（横幅はカード枚数で自動。高さはテーブル側で110に固定）
+      // 手札行（横幅はカード枚数で自動。高さはテーブル側で90に固定）
       const hand = div("div","hand");
       const cards = Object.keys(seat.hand||{}).map(id=>seat.hand[id]).sort((a,b)=>(a.order|0)-(b.order|0));
       table.style.width = `fit-content`;
@@ -690,7 +690,7 @@
             update(ref(db,path),{ revealed: !c.revealed });
           };
         }else{
-          card.style.cursor="default"; // 他人のカードは押せない（観戦者も）
+          card.style.cursor="default"; // 自分のカード以外は押せない（観戦者も）
         }
 
         // レター＆トークン
@@ -816,7 +816,7 @@
       await flagItemUsed(num);
       return;
     }
-    if(num===16){ // 情報トークンの中で“出現1回の数字”からランダム抽出→このカード上に表示
+    if(num===16){ // 情報トークンの“出現1回だけの数字”からランダム抽出→このカード上に表示
       const chosen = pickUniqueInfoTokenNumber(currentRoom);
       await update(ref(db,`${base}/items/${num}`), { used:true, overlay: chosen? String(chosen):"—" });
       return;
@@ -832,10 +832,9 @@
       await Promise.all(Object.keys(updates).map(path=> set(ref(db,path), updates[path])));
       return;
     }
-    if(num===2){ // 手札交換
-      await update(ref(db,`${base}/effects/swap`), { userId: state.userId, step:"pickSelf", self:null, other:null });
-      alert("交換：まず自分のカードを1枚タップ → 次に相手のカードを1枚タップ");
+    if(num===2){ // 手札交換（フロー本体は別途拡張予定／ここでは使用済みにする）
       await flagItemUsed(num);
+      alert("交換：この仕様の詳細UIは後続で実装します。");
       return;
     }
 
