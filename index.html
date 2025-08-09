@@ -136,7 +136,11 @@
     position:absolute;left:8px;right:8px;bottom:2px;height:var(--token-h);
     display:flex;gap:var(--card-gap);align-items:flex-end;overflow-x:auto
   }
-  .alpha{width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0}
+  .alpha{
+    width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1;
+    background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;
+    position:relative;top:-6px;z-index:2
+  }
   .token{margin-top:2px;font-size:11px;border-radius:4px;padding:1px 0}
   .token.equal{background:#ffedd5;color:#000}  /* ＝：薄オレンジ */
   .token.noteq{background:#e0f2fe;color:#000}  /* ≠：水色 */
@@ -203,7 +207,7 @@
          ========================= -->
     <div class="join-box" id="joinBox">
       <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-      <button class="btn" id="btnSpectate">観戦で入室</button>
+      <!-- 観戦ボタンは不要なので削除 -->
       <button class="btn primary" id="btnJoin">参加で入室</button>
       <button class="btn ghost" id="btnRandom">コード作成</button>
       <span class="small">入室後、右下の歯車から席を決められます</span>
@@ -258,11 +262,8 @@
   </div>
 </main>
 
-<!-- 情報トークン用の小タブ -->
-<div id="miniPop" class="mini-pop hidden">
-  <button class="btn small" id="tokenPlace">トークンを置く</button>
-  <button class="btn small ghost" id="tokenCancel">キャンセル</button>
-</div>
+<!-- 情報トークン用の小タブ（数字のみ） -->
+<div id="miniPop" class="mini-pop hidden"></div>
 
 <!-- やり直し確認 -->
 <div id="restartPop" class="restart-pop hidden">
@@ -301,11 +302,10 @@
   </div>
 </div>
 
-<!-- 席選択（タブで選ぶ） -->
+<!-- 席選択（タブで即決定） -->
 <div id="seatPop" class="seat-pop hidden">
   <div class="row"><label>席を選択</label><div id="seatTabs" class="tabs"></div></div>
   <div class="row" style="justify-content:flex-end">
-    <button class="btn small" id="btnSeatOk">OK</button>
     <button class="btn small ghost" id="btnSeatCancel">キャンセル</button>
   </div>
 </div>
@@ -351,7 +351,6 @@ const roomInfo = document.getElementById('roomInfo');
 const joinBox= document.getElementById('joinBox');
 const inputCode = document.getElementById('roomCode');
 const btnJoin = document.getElementById('btnJoin');
-const btnSpect= document.getElementById('btnSpectate');
 const btnRandom=document.getElementById('btnRandom');
 
 const lobby   = document.getElementById('lobby');
@@ -368,11 +367,6 @@ const menuPop = document.getElementById('menuPopup');
 const btnSit  = document.getElementById('btnSit');
 const btnLeave= document.getElementById('btnLeaveSeat');
 const btnRestart=document.getElementById('btnRestart');
-function updateMenuButtons(){
-  const seated = state.seatedTable!=null;
-  H(btnSit, seated);      // 座っている時は「席に座る」を隠す
-  H(btnLeave, !seated);   // 座っていない時は「席を立つ」を隠す
-}
 const restartPop=document.getElementById('restartPop');
 const btnRestartOk=document.getElementById('btnRestartOk');
 const btnRestartCancel=document.getElementById('btnRestartCancel');
@@ -382,8 +376,6 @@ const specsEl  =document.getElementById('spectators');
 const listsBox =document.getElementById('listsBox');
 
 const miniPop = document.getElementById('miniPop');
-const tokenPlace=document.getElementById('tokenPlace');
-const tokenCancel=document.getElementById('tokenCancel');
 
 const startPop=document.getElementById('startPop');
 const selCount=document.getElementById('selCount');
@@ -401,7 +393,6 @@ const missionDetailBody  = document.getElementById('missionDetailBody');
 
 const seatPop = document.getElementById('seatPop');
 const seatTabs= document.getElementById('seatTabs');
-const btnSeatOk=document.getElementById('btnSeatOk');
 const btnSeatCancel=document.getElementById('btnSeatCancel');
 
 /* ひらがな3文字 */
@@ -423,7 +414,6 @@ function cssNum(name){
 /* 入室 */
 btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); }; // ランダム4桁
 btnJoin.onclick   = ()=> enter('player');
-btnSpect.onclick  = ()=> enter('spectator');
 
 async function enter(mode){
   const code=(inputCode.value||"").trim();
@@ -516,7 +506,6 @@ function renderMissionPanels(v){
   H(missionBox, !!v.started); // 開始後は右パネルを隠す
 }
 
-
 /* リスト描画 */
 function renderLists(v){
   playersEl.innerHTML=''; specsEl.innerHTML='';
@@ -602,19 +591,19 @@ function renderTables(v){
     /* 中段：キャラ＋手札 */
     const content=document.createElement('div'); content.className='t-content';
 
-    // キャラ（誰でも裏返せる）
+    // キャラ（自身の席のみ見える／他席は伏せ）
     const char=document.createElement('div'); char.className='char-card';
-const canSeeChars = state.seatedTable!=null;
-if(canSeeChars){
-  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-  char.style.backgroundImage = `url("${face}")`;
-  char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
-} else {
-  char.style.backgroundImage = 'none';
-  char.style.background = '#eee';
-  char.style.pointerEvents='none';
-}
-content.appendChild(char);
+    const canSeeChars = (state.seatedTable === idx); // 最新要望：自席のみ可視
+    if(canSeeChars){
+      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+      char.style.backgroundImage = `url("${face}")`;
+      char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
+    } else {
+      char.style.backgroundImage = 'none';
+      char.style.background = '#eee';
+      char.style.pointerEvents='none';
+    }
+    content.appendChild(char);
 
     // 手札
     const hand=document.createElement('div'); hand.className='hand';
@@ -649,20 +638,28 @@ content.appendChild(char);
 
     /* 下段：アルファベット＋トークン（固定で見切れない） */
     const tokens=document.createElement('div'); tokens.className='t-tokens';
-// スクロール同期（手札とアルファベット行を完全一致）
-hand.addEventListener('scroll', ()=>{ tokens.scrollLeft = hand.scrollLeft; });
+    // 左側のキャラ幅ぶんのスペーサーで位置を合わせる
+    const spacer=document.createElement('div'); spacer.style.width = (CW + 8) + 'px'; spacer.style.flex='0 0 auto'; tokens.appendChild(spacer);
+    // スクロール同期（手札とアルファベット行を完全一致）
+    hand.addEventListener('scroll', ()=>{ tokens.scrollLeft = hand.scrollLeft; });
+
     (t.hand||[]).forEach((c,ci)=>{
       const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
       if(c.token){
         const tk=document.createElement('div');
         tk.className='token ' + (c.token.style||'');
-        tk.textContent = (c.token.type==='num' || c.token.style==='black') ? c.token.value : c.token.type; // 数字 or 記号
+        // 数字トークンはアルファベットの下に追加表示（置換しない）
+        tk.textContent = (c.token.type==='num' || c.token.style==='black') ? c.token.value : c.token.type;
         a.appendChild(tk);
       }
       if(c.ownerId===state.userId){
-        a.onclick=(ev)=>{ openMiniToken(ev.clientX, ev.clientY, async ()=>{
-          await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { token:{type:'num', value:c.num, style:'black'} }); // 黒背景白文字
-        }); };
+        a.onclick=(ev)=>{
+          openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {
+              token:{type:'num', value:c.num, style:'black'}
+            });
+          });
+        };
       }
       tokens.appendChild(a);
     });
@@ -672,12 +669,17 @@ hand.addEventListener('scroll', ()=>{ tokens.scrollLeft = hand.scrollLeft; });
   });
 }
 
-/* 小タブ */
-let tokenCb=null;
-function openMiniToken(x,y, cb){ tokenCb=cb; pos(miniPop,x,y); H(miniPop,false); }
+/* 数字のみの小ポップ */
+function openNumberMini(x,y, label, cb){
+  const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
+  const b1=document.createElement('button'); b1.className='btn small'; b1.textContent=label;
+  b1.onclick=()=>{ if(div.isConnected) div.remove(); cb&&cb(); };
+  div.appendChild(b1);
+  document.body.appendChild(div);
+  setTimeout(()=>{ if(div.isConnected) div.remove(); }, 4000);
+}
 
-tokenPlace.onclick = ()=>{ tokenCb&&tokenCb(); H(miniPop,true); tokenCb=null; };
-tokenCancel.onclick= ()=>{ H(miniPop,true); tokenCb=null; };
+/* 汎用ミニポップ（アイテム/DI用） */
 function openMini(x,y, leftText,leftCb, rightText,rightCb){
   const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
   const b1=document.createElement('button'); b1.className='btn small'; b1.textContent=leftText;
@@ -690,39 +692,38 @@ function openMini(x,y, leftText,leftCb, rightText,rightCb){
 }
 
 /* 歯車 */
+function updateMenuButtons(){
+  const seated = state.seatedTable!=null;
+  H(btnSit, seated);      // 座っている時は「席に座る」を隠す
+  H(btnLeave, !seated);   // 座っていない時は「席を立つ」を隠す
+}
 const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
-document.addEventListener('click',(e)=>{ outsideClose(e, menuPop); if(!miniPop.contains(e.target)) H(miniPop,true); }, true);
+document.addEventListener('click',(e)=>{ outsideClose(e, menuPop); }, true);
 gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.contains('hidden')) updateMenuButtons(); };
 
-/* 席（タブで選ぶ） */
+/* 席（タブ即決定） */
 btnSit.onclick = ()=>{
   if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
   const v=state.watching; if(!v?.started){ alert('ゲーム開始後に席を選べます'); return; }
-  state.seatPick=null;
   seatTabs.innerHTML='';
   (v.tables||[]).forEach((t,i)=>{
     const tab=document.createElement('div'); tab.className='tab';
     tab.textContent = t.playerName ? `${i+1}（使用中）` : `${i+1}`;
     if(t.playerId) tab.classList.add('disabled');
-    tab.onclick=()=> {
+    tab.onclick=async ()=> {
       if(tab.classList.contains('disabled')) return;
-      [...seatTabs.children].forEach(x=>x.classList.remove('active'));
-      tab.classList.add('active'); state.seatPick=i;
+      await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {playerId:state.userId, playerName:state.userName});
+      const hand=(v.tables[i].hand||[]);
+      await Promise.all(hand.map((_,idx)=> update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), {ownerId:state.userId})));
+      state.seatedTable=i;
+      H(seatPop,true);
+      updateMenuButtons();
     };
     seatTabs.appendChild(tab);
   });
   H(seatPop,false);
 };
 btnSeatCancel.onclick=()=> H(seatPop,true);
-btnSeatOk.onclick = async ()=>{
-  if(state.seatPick==null){ alert('席を選択してください'); return; }
-  const idx=state.seatPick, v=state.watching;
-  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:state.userId, playerName:state.userName});
-  const hand=(v.tables[idx].hand||[]);
-  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:state.userId})));
-  state.seatedTable=idx;
-  H(seatPop,true);
-};
 
 btnLeave.onclick = async ()=>{
   if(state.seatedTable==null){ alert('席に座っていません'); return; }
@@ -731,6 +732,7 @@ btnLeave.onclick = async ()=>{
   await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
   await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
   state.seatedTable=null;
+  updateMenuButtons();
 };
 
 /* やり直し */
@@ -773,16 +775,19 @@ async function startGame(playerCount, missionId){
   for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) deck.push({num:n, kind:'normal', open:false, ownerId:null}); }
   shuffle(deck);
 
-  // 表示種別（通常/赤/黄）は今後の拡張ポイント（必要なら kind を切替）
-
   const alpha="abcdefghijklmnopqrstuvwxyz";
   let p=0;
   while(p<deck.length){
     for(let t=0; t<playerCount && p<deck.length; t++){
-      const c=deck[p++], a=alpha[ tables[t].hand.length % alpha.length ];
-      tables[t].hand.push({...c, alpha:a, token:null});
+      const c=deck[p++];
+      tables[t].hand.push({...c, alpha:'', token:null});
     }
   }
+  // ▼ 全プレイヤーの手札を昇順に並べ、a.. のアルファベットを再割当
+  tables.forEach(T=>{
+    T.hand.sort((a,b)=> a.num - b.num);
+    T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; });
+  });
 
   // アイテム（14-18は配らない）
   const all=[1,2,3,4,5,6,7,8,9,10,11,12];
@@ -830,7 +835,7 @@ function missionInfo(id){
   }
 }
 
-/* クリック外しで小ポップ閉じる */
+/* クリック外しで小ポップ閉じる（数字ポップは自動で消える） */
 document.addEventListener('click',(e)=>{
   if(!miniPop.contains(e.target)) H(miniPop,true);
 }, true);
