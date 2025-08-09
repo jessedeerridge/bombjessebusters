@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>4桁ルームチャット</title>
+  <style>
+    :root { --bg:#0b0f14; --card:#121923; --muted:#93a1b1; --text:#e6edf3; --accent:#4aa3ff; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; background: linear-gradient(180deg,#0a0f14,#0b1320 40%,#0e1626); color: var(--text); display: grid; place-items: center; }
+    .wrap { width: min(960px, 100%); padding: 16px; }
+    .card { background: color-mix(in oklab, var(--card) 90%, #000 10%); border: 1px solid #223246; border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.25); overflow: hidden; }
+    header { padding: 16px 18px; border-bottom: 1px solid #1d2a3a; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 16px; margin: 0; letter-spacing: .02em; }
+    .hint { color: var(--muted); font-size: 12px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    input, button { padding: 10px 12px; border-radius: 10px; border: 1px solid #2a3b52; background: #0e1622; color: var(--text); outline: none; }
+    input::placeholder { color: #73879e; }
+    input[name=code] { width: 6.5em; letter-spacing: .2em; text-align: center; font-variant-numeric: tabular-nums; }
+    button { background: linear-gradient(180deg,#2766ff,#1c55d7); border: none; cursor: pointer; }
+    button.secondary { background: #162437; border: 1px solid #2a3b52; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    main { display: grid; grid-template-rows: auto 1fr auto; min-height: 60vh; }
+    #join, #chat { padding: 16px; }
+    #join { display: grid; gap: 14px; }
+    .share { font-size: 12px; color: var(--muted); word-break: break-all; }
+    #chat { display: none; }
+    .msgs { height: 56vh; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: #0c1420; border: 1px solid #1d2a3a; border-radius: 12px; }
+    .m { display: grid; gap: 2px; background: #0f1a2a; border: 1px solid #20314a; border-radius: 12px; padding: 8px 10px; }
+    .me { background: #0f2236; border-color: #254673; }
+    .meta { display: flex; gap: 8px; font-size: 12px; color: var(--muted); }
+    .name { color: #b2c8ff; }
+    .time { margin-left: auto; }
+    .inputRow { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+    textarea { resize: none; min-height: 46px; max-height: 32vh; border-radius: 10px; border: 1px solid #2a3b52; background: #0e1622; color: var(--text); padding: 10px 12px; }
+    footer { padding: 12px 16px; border-top: 1px solid #1d2a3a; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .ok { color: #74d391; }
+    .err { color: #ff7b7b; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .tiny { font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="wrap card">
+    <header>
+      <h1>4桁コード = 名前の部屋でチャット</h1>
+      <div class="hint">同じ <b>名前</b> と <b>4桁コード</b> を入れれば同じ部屋に集合</div>
+    </header>
+
+    <main>
+      <!-- 参加フォーム -->
+      <section id="join">
+        <div class="row">
+          <input id="name" name="name" placeholder="名前 (例: Taro)" autocomplete="off" />
+          <input id="code" name="code" placeholder="4桁 (例: 1234)" maxlength="4" pattern="\\d{4}" />
+          <button id="enter">入室</button>
+          <button id="copy" class="secondary" title="この部屋のURLをコピー">リンク</button>
+        </div>
+        <div class="share tiny">このページURLの末尾に <span class="mono">?room=1234&name=Taro</span> の形でも入室できます。</div>
+      </section>
+
+      <!-- チャット画面 -->
+      <section id="chat">
+        <div class="tiny mono" id="roomLabel"></div>
+        <div class="msgs" id="msgs"></div>
+        <div class="inputRow">
+          <textarea id="text" placeholder="メッセージを入力… (Ctrl+Enterで送信)"></textarea>
+          <button id="send">送信</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>接続: <span id="status" class="err">未接続</span></span>
+      <span class="tiny">Powered by Firebase Realtime Database</span>
+    </footer>
+  </div>
+
+  <!-- ▼▼▼ ここに自分の Firebase 設定を貼り付ける ▼▼▼ -->
+  <script type="module">
+    // 1) https://console.firebase.google.com でプロジェクト作成 → Webアプリ追加
+    // 2) SDK設定スニペット(構成)のオブジェクトを下の firebaseConfig に貼り付けてください
+    // 3) Realtime Database を「テストモード」で作成
+    // 4) ルールは学習用として以下の超簡易版(公開)を推奨。実運用は認証+ルール強化必須！
+    // {
+    //   "rules": {"rooms": {".read": true, ".write": true}}
+    // }
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getDatabase, ref, push, onChildAdded, serverTimestamp, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    // === ここを差し替え ===
+    const firebaseConfig = {
+      apiKey: "PASTE_YOURS",
+      authDomain: "PASTE_YOURS.firebaseapp.com",
+      databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
+      projectId: "PASTE_YOURS",
+      storageBucket: "PASTE_YOURS.appspot.com",
+      messagingSenderId: "PASTE_YOURS",
+      appId: "PASTE_YOURS"
+    };
+
+    //--- UI 要素 ---
+    const qs = (s) => document.querySelector(s);
+    const nameEl = qs('#name');
+    const codeEl = qs('#code');
+    const enterBtn = qs('#enter');
+    const copyBtn  = qs('#copy');
+    const chatSec = qs('#chat');
+    const joinSec = qs('#join');
+    const msgsEl = qs('#msgs');
+    const textEl = qs('#text');
+    const sendBtn = qs('#send');
+    const statusEl = qs('#status');
+    const roomLabel = qs('#roomLabel');
+
+    // Firebase init
+    let app, db;
+    try {
+      app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+      statusEl.textContent = '準備OK';
+      statusEl.className = 'ok';
+    } catch (e) {
+      statusEl.textContent = '設定未完了';
+      statusEl.className = 'err';
+      console.error(e);
+    }
+
+    // クエリ引数 → 自動入室
+    const params = new URLSearchParams(location.search);
+    if (params.get('name')) nameEl.value = params.get('name');
+    if (params.get('room')) codeEl.value = params.get('room');
+    if (nameEl.value && /^\d{4}$/.test(codeEl.value)) {
+      joinRoom(nameEl.value, codeEl.value);
+    }
+
+    // クリック操作
+    enterBtn.addEventListener('click', () => tryEnter());
+    copyBtn.addEventListener('click', () => copyLink());
+    sendBtn.addEventListener('click', () => send());
+    textEl.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') send();
+    });
+    codeEl.addEventListener('input', () => { codeEl.value = codeEl.value.replace(/\D/g,'').slice(0,4); });
+
+    function tryEnter(){
+      const name = nameEl.value.trim();
+      const code = codeEl.value.trim();
+      if (!name) return alert('名前を入力してください');
+      if (!/^\d{4}$/.test(code)) return alert('4桁の数字コードを入力してください');
+      joinRoom(name, code);
+    }
+
+    let roomRef, unsub; let meName = '';
+    function joinRoom(name, code){
+      if (!db) return alert('Firebase 設定がまだです');
+      meName = name;
+      roomRef = ref(db, `rooms/${code}/messages`);
+
+      // 直近100件のみ
+      const q = query(roomRef, limitToLast(100));
+      onChildAdded(q, (snap) => {
+        const m = snap.val();
+        addMessage(m);
+      });
+
+      joinSec.style.display = 'none';
+      chatSec.style.display = 'block';
+      roomLabel.textContent = `部屋: ${code} / 名前: ${name}`;
+      history.replaceState({}, '', `?room=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`);
+      textEl.focus();
+
+      // 入室通知(システムメッセージ)
+      push(roomRef, { name: 'system', text: `${name} が入室しました`, ts: Date.now() });
+    }
+
+    function addMessage(m){
+      const wrap = document.createElement('div');
+      wrap.className = 'm' + (m.name === meName ? ' me' : '');
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const name = document.createElement('div'); name.className = 'name'; name.textContent = m.name;
+      const time = document.createElement('div'); time.className = 'time'; time.textContent = tsToTime(m.ts);
+      const text = document.createElement('div'); text.textContent = m.text;
+      meta.append(name, time);
+      wrap.append(meta, text);
+      msgsEl.append(wrap);
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+
+    function tsToTime(t){
+      if (!t) return '';
+      try {
+        const d = new Date(typeof t === 'number' ? t : t.seconds*1000);
+        const y = d.getFullYear();
+        const M = String(d.getMonth()+1).padStart(2,'0');
+        const D = String(d.getDate()).padStart(2,'0');
+        const h = String(d.getHours()).padStart(2,'0');
+        const m = String(d.getMinutes()).padStart(2,'0');
+        return `${M}/${D} ${h}:${m}`;
+      } catch { return ''; }
+    }
+
+    async function send(){
+      const text = textEl.value.trim();
+      if (!text) return;
+      if (!roomRef) return alert('まず入室してください');
+      sendBtn.disabled = true;
+      try{
+        await push(roomRef, { name: meName, text, ts: Date.now() });
+        textEl.value = '';
+        textEl.focus();
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    async function copyLink(){
+      const name = nameEl.value.trim() || 'Taro';
+      const code = /^\d{4}$/.test(codeEl.value) ? codeEl.value : '1234';
+      const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`;
+      await navigator.clipboard.writeText(url).catch(()=>{});
+      copyBtn.textContent = 'コピー済み';
+      setTimeout(()=> copyBtn.textContent = 'リンク', 1200);
+    }
+  </script>
+</body>
+</html>
