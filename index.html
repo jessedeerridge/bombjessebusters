@@ -6,12 +6,12 @@
 <title>BOMB　BUSTERS</title>
 <style>
   :root{
-    /* 手札カード（仕様どおり固定） */
+    /* 手札カード（仕様固定） */
     --card-w:24px;
     --card-h:50px;
     --card-gap:3px;
 
-    /* キャラクターカード */
+    /* キャラカード（仕様固定） */
     --char-w:40px;
     --char-h:60px;
 
@@ -23,8 +23,13 @@
     --di-w:70px;
     --di-h:70px;
 
-    /* テーブル高さ固定 */
+    /* テーブルの高さは固定 */
     --table-h:90px;
+
+    /* テーブル内部のレイアウト高さ配分 */
+    --header-h:12px;   /* 上部の細い見出し */
+    --token-h:14px;    /* 下部トークンバー */
+    --content-h: calc(var(--table-h) - var(--header-h) - var(--token-h) - 6px);
 
     /* 数字フォント */
     --font-card:16px;
@@ -53,7 +58,7 @@
   /* 右下の歯車 */
   .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer}
   .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08)}
-  .menu .btn{width:200px;text-align:left}
+  .menu .btn{width:220px;text-align:left}
 
   /* アイテム行（待機中は非表示） */
   .items-bar{display:flex;align-items:center;gap:8px;margin-top:10px}
@@ -69,23 +74,38 @@
   }
 
   /* テーブル群（縦並び） */
-  .tables{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+  .tables{display:flex;flex-direction:column;gap:10px;margin-top:10px;overflow-x:auto}
   .table{
-    border:1px dashed #ddd;border-radius:10px;padding:8px;position:relative;
-    height:var(--table-h);display:flex;flex-direction:column;gap:6px;overflow:hidden
+    position:relative;
+    border:1px dashed #ddd;border-radius:10px;
+    padding:0 8px; /* 内側左右だけ */
+    height:var(--table-h);
+    display:block;
+    background:#fff;
+    overflow:hidden; /* 下部固定バーのはみ出し防止 */
+    width:max-content; /* 中身幅にフィット */
   }
-  .header{display:flex;align-items:center;gap:8px;font-size:12px}
+  /* 上部（アンダーライン付きの数字 or 名前） */
+  .t-header{
+    height:var(--header-h);display:flex;align-items:center;gap:8px;
+    font-size:12px;margin-top:4px
+  }
   .title{text-decoration:underline;padding-right:6px}
 
-  /* キャラカード（名前/数字の下） */
+  /* 中段：キャラ(左)＋手札(右) を横並びで配置し高さを確保 */
+  .t-content{
+    position:absolute;left:8px;right:8px;
+    top:calc(var(--header-h) + 6px);
+    bottom:calc(var(--token-h) + 4px);
+    display:flex;gap:8px;align-items:flex-start;
+    min-height:var(--content-h);
+  }
   .char-card{
     width:var(--char-w);height:var(--char-h);
     background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
-    cursor:pointer;user-select:none
+    cursor:pointer;user-select:none;flex:0 0 auto;
   }
-
-  /* 手札（中央） */
-  .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;padding-bottom:2px}
+  .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;flex:0 0 auto}
   .card{
     width:var(--card-w);height:var(--card-h);border-radius:6px;border:1px solid #ddd;position:relative;
     background:#bbb;flex:0 0 auto;display:flex;align-items:flex-start;justify-content:center;cursor:pointer;user-select:none
@@ -101,16 +121,19 @@
     background-size:cover;background-position:center
   }
 
-  /* アルファベット列 */
-  .alpha-row{display:flex;gap:var(--card-gap);margin-top:4px}
-  .alpha{width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none}
+  /* 下段：アルファベット＋トークンをテーブル下部に固定 */
+  .t-tokens{
+    position:absolute;left:8px;right:8px;bottom:2px;height:var(--token-h);
+    display:flex;gap:var(--card-gap);align-items:flex-end
+  }
+  .alpha{width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1}
   .token{margin-top:2px;font-size:11px;border-radius:4px;padding:1px 0}
-  .token.equal{background:#ffedd5;color:#000}  /* ＝ */
-  .token.noteq{background:#e0f2fe;color:#000}  /* ≠ */
-  .token.x1{background:#fce7f3;color:#000}     /* x1 */
-  .token.black{background:#000;color:#fff}     /* 黒地白字 */
+  .token.equal{background:#ffedd5;color:#000}  /* ＝：薄オレンジ */
+  .token.noteq{background:#e0f2fe;color:#000}  /* ≠：水色 */
+  .token.x1{background:#fce7f3;color:#000}     /* x1：ピンク */
+  .token.black{background:#000;color:#fff}     /* 黒地白字（No.16用など） */
 
-  /* 小タブ */
+  /* 小ポップ */
   .mini-pop{
     position:fixed;z-index:50;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
     display:flex;gap:6px
@@ -126,31 +149,30 @@
   .mission h3{margin:0 0 8px 0;font-size:14px}
   .bold{font-weight:700}
 
-  /* やり直し確認 */
-  .restart-pop{
-    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-    background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
-    padding:14px;z-index:60;display:flex;flex-direction:column;gap:10px;min-width:260px
-  }
-  .restart-actions{display:flex;gap:8px;align-items:center}
-  .restart-actions .btn:first-child{font-size:11px;padding:4px 8px}
-  .restart-actions .btn.big{flex:1}
-
-  /* 開始ポップ（人数＋ミッション同時選択） */
-  .start-pop{
+  /* 確認/開始ポップ */
+  .restart-pop,.start-pop,.seat-pop{
     position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
     background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
     padding:14px;z-index:60;display:flex;flex-direction:column;gap:10px;min-width:280px
   }
-  .start-pop .row{display:flex;gap:8px;align-items:center}
-  .start-pop label{width:84px;font-size:13px}
+  .start-pop .row,.seat-pop .row{display:flex;gap:8px;align-items:center}
+  .start-pop label,.seat-pop label{width:84px;font-size:13px}
   .start-pop select{flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;background:#fff}
+  .restart-actions{display:flex;gap:8px;align-items:center}
+  .restart-actions .btn:first-child{font-size:11px;padding:4px 8px}
+  .restart-actions .btn.big{flex:1}
+
+  /* 席タブ */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{padding:6px 10px;border:1px solid #ddd;border-radius:999px;cursor:pointer;user-select:none}
+  .tab.active{background:#111;color:#fff;border-color:#111}
+  .tab.disabled{opacity:.35;pointer-events:none}
 </style>
 </head>
 <body>
 <header>
   <h1>BOMB　BUSTERS</h1>
-  <div class="small" id="roomInfo"></div> <!-- ← ルームコード常時表示 -->
+  <div class="small" id="roomInfo"></div> <!-- ルームコードを常時表示 -->
 </header>
 
 <main>
@@ -205,7 +227,7 @@
   </div>
 </main>
 
-<!-- トークン小タブ -->
+<!-- 情報トークン用の小タブ -->
 <div id="miniPop" class="mini-pop hidden">
   <button class="btn small" id="tokenPlace">トークンを置く</button>
   <button class="btn small ghost" id="tokenCancel">キャンセル</button>
@@ -248,6 +270,15 @@
   </div>
 </div>
 
+<!-- 席選択（タブで選ぶ） -->
+<div id="seatPop" class="seat-pop hidden">
+  <div class="row"><label>席を選択</label><div id="seatTabs" class="tabs"></div></div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn small" id="btnSeatOk">OK</button>
+    <button class="btn small ghost" id="btnSeatCancel">キャンセル</button>
+  </div>
+</div>
+
 <script type="module">
 /* ===== Firebase v9 ===== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
@@ -272,7 +303,8 @@ const db  = getDatabase(app);
 /* ===== 状態 ===== */
 const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:hiragana3(),
-  isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null
+  isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null,
+  seatPick:null
 };
 
 /* ===== 要素 ===== */
@@ -315,6 +347,11 @@ const btnStartCancel=document.getElementById('btnStartCancel');
 
 const missionTitle=document.getElementById('missionTitle');
 const missionText =document.getElementById('missionText');
+
+const seatPop = document.getElementById('seatPop');
+const seatTabs= document.getElementById('seatTabs');
+const btnSeatOk=document.getElementById('btnSeatOk');
+const btnSeatCancel=document.getElementById('btnSeatCancel');
 
 /* ひらがな3文字 */
 function hiragana3(){
@@ -396,9 +433,7 @@ function listenRoom(code){
       if(p===0 && s===0){ remove(ref(db, `rooms/${code}`)); return; }
     }
 
-    // 右の参加/観戦リスト（開始後は非表示）
     H(listsBox, !!v?.started);
-
     renderLists(v);
     renderItemsAndDi(v);
     renderTables(v);
@@ -408,7 +443,7 @@ function listenRoom(code){
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
 
-    updateHeaderInfo(); // ← ゲーム開始後も上部にコード表示
+    updateHeaderInfo(); // 常時表示
   });
 }
 
@@ -449,7 +484,7 @@ function renderItemsAndDi(v){
       openMini(ev.clientX, ev.clientY,
         '使用する', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
-          // TODO: ＝ / ≠ / x1 などの効果をここに
+          // ＝／≠／x1などの効果は別途実装ポイント
         },
         'キャンセル', ()=>{}
       );
@@ -474,35 +509,37 @@ function renderItemsAndDi(v){
   };
 }
 
-/* テーブル描画（幅＝手札枚数で都度算出／高さ90固定） */
+/* テーブル描画（横：キャラ→手札／下：固定トークンバー） */
 function renderTables(v){
   tablesEl.innerHTML='';
   if(!v) return;
 
-  const W = cssNum('--card-w'), G = cssNum('--card-gap');
+  const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table';
 
-    /* 横幅を手札枚数から動的算出（カード幅×枚数＋隙間）＋左右余白 */
+    /* 横幅 = キャラ幅 + 手札幅 + 余白 */
     const n = (t.hand||[]).length;
-    const inner = n>0 ? (n*W + (n-1)*G) : 0;
-    box.style.width = (inner + 16) + 'px';
+    const handInner = n>0 ? (n*W + (n-1)*G) : 0;
+    const totalW = CW + 8 + handInner + 16; // char + gap + hand + 内側左右
+    box.style.width = Math.max(totalW, CW + 16) + 'px';
 
-    // 左のアンダーライン…着席済みなら「名前」、未着なら「番号」
-    const header=document.createElement('div'); header.className='header';
+    /* 上のタイトル（着席で名前に置き換え） */
+    const header=document.createElement('div'); header.className='t-header';
     const title=document.createElement('div');  title.className='title';
     title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
     header.appendChild(title); box.appendChild(header);
 
-    // キャラカード（誰でも裏返せる）
+    /* 中段：キャラ＋手札 */
+    const content=document.createElement('div'); content.className='t-content';
+
+    // キャラ（誰でも裏返せる）
     const char=document.createElement('div'); char.className='char-card';
     const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
     char.style.backgroundImage = `url("${face}")`;
-    char.onclick=async ()=>{
-      await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped});
-    };
-    box.appendChild(char);
+    char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
+    content.appendChild(char);
 
     // 手札
     const hand=document.createElement('div'); hand.className='hand';
@@ -534,16 +571,18 @@ function renderTables(v){
 
       hand.appendChild(card);
     });
-    box.appendChild(hand);
+    content.appendChild(hand);
+    box.appendChild(content);
 
-    // アルファベット列
-    const arow=document.createElement('div'); arow.className='alpha-row';
+    /* 下段：アルファベット＋トークン（固定で見切れない） */
+    const tokens=document.createElement('div'); tokens.className='t-tokens';
     (t.hand||[]).forEach((c,ci)=>{
       const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
       if(c.token){
         const tk=document.createElement('div');
         tk.className='token ' + (c.token.style||'');
-        tk.textContent = c.token.type==='num' || c.token.style==='black' ? c.token.value : c.token.type;
+        // 数字トークンなら値、＝/≠/x1なら記号
+        tk.textContent = (c.token.type==='num' || c.token.style==='black') ? c.token.value : c.token.type;
         a.appendChild(tk);
       }
       if(c.ownerId===state.userId){
@@ -555,9 +594,9 @@ function renderTables(v){
           });
         };
       }
-      arow.appendChild(a);
+      tokens.appendChild(a);
     });
-    box.appendChild(arow);
+    box.appendChild(tokens);
 
     tablesEl.appendChild(box);
   });
@@ -586,20 +625,36 @@ const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
 document.addEventListener('click',(e)=>{ outsideClose(e, menuPop); if(!miniPop.contains(e.target)) H(miniPop,true); }, true);
 gear.onclick=()=> menuPop.classList.toggle('hidden');
 
-/* 席 */
-btnSit.onclick = async ()=>{
+/* 席（タブで選ぶ） */
+btnSit.onclick = ()=>{
   if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
   const v=state.watching; if(!v?.started){ alert('ゲーム開始後に席を選べます'); return; }
-  const empties=(v.tables||[]).map((t,i)=> t.playerId?null:i).filter(i=>i!==null);
-  if(!empties.length){ alert('空席がありません'); return; }
-  const s=prompt(`空席番号を入力：${empties.map(i=>i+1).join(', ')}`); if(!s) return;
-  const pick=(parseInt(s,10)||0)-1; if(!empties.includes(pick)){ alert('その席は選べません'); return; }
-
-  await update(ref(db, `rooms/${state.roomCode}/tables/${pick}`), {playerId:state.userId, playerName:state.userName});
-  const hand=(state.watching.tables[pick].hand||[]);
-  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${pick}/hand/${i}`), {ownerId:state.userId})));
-  state.seatedTable=pick;
+  state.seatPick=null;
+  seatTabs.innerHTML='';
+  (v.tables||[]).forEach((t,i)=>{
+    const tab=document.createElement('div'); tab.className='tab';
+    tab.textContent = t.playerName ? `${i+1}（使用中）` : `${i+1}`;
+    if(t.playerId) tab.classList.add('disabled');
+    tab.onclick=()=> {
+      if(tab.classList.contains('disabled')) return;
+      [...seatTabs.children].forEach(x=>x.classList.remove('active'));
+      tab.classList.add('active'); state.seatPick=i;
+    };
+    seatTabs.appendChild(tab);
+  });
+  H(seatPop,false);
 };
+btnSeatCancel.onclick=()=> H(seatPop,true);
+btnSeatOk.onclick = async ()=>{
+  if(state.seatPick==null){ alert('席を選択してください'); return; }
+  const idx=state.seatPick, v=state.watching;
+  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:state.userId, playerName:state.userName});
+  const hand=(v.tables[idx].hand||[]);
+  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:state.userId})));
+  state.seatedTable=idx;
+  H(seatPop,true);
+};
+
 btnLeave.onclick = async ()=>{
   if(state.seatedTable==null){ alert('席に座っていません'); return; }
   const idx=state.seatedTable;
@@ -614,7 +669,7 @@ btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可');
 restartPop.querySelectorAll('.btn')[0].onclick = async ()=>{
   H(restartPop,true);
   const v=state.watching; if(!v) return;
-  await startGame(v.tableCount, v.mission?.id || 1); // 同じ人数＆ミッションで再配布
+  await startGame(v.tableCount, v.mission?.id || 1); // 同じ設定で再配布
 };
 restartPop.querySelectorAll('.btn')[1].onclick = ()=> H(restartPop,true);
 
@@ -628,12 +683,12 @@ btnStartOk.onclick = async ()=>{
   await startGame(count, missionId);
 };
 
-/* ゲーム開始（ミッションの保存込み） */
+/* ゲーム開始（ミッション保存） */
 async function startGame(playerCount, missionId){
   if(!state.isHost) return;
   const code=state.roomCode;
 
-  // 1テーブルに必ず隊長（member 5）／他は1..4を重複なしで
+  // 隊長テーブル（member 5）を1つランダムに
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
   const tables=[];
@@ -642,12 +697,15 @@ async function startGame(playerCount, missionId){
     tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] });
   }
 
-  // デッキ（1..12 ×4）／配布：均等でなくても余りなく順配り
+  // デッキ（1..12 ×4）を配る（余りなく順配り）
   const deck=[];
   for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) deck.push({num:n, kind:'normal', open:false, ownerId:null}); }
   shuffle(deck);
-  const alpha="abcdefghijklmnopqrstuvwxyz";
 
+  // 表示種別（通常/赤/黄）を適当に混在させたいならここで kind を付与する（必要に応じて）
+  // 今回は全て normal のまま。ミッションで赤/黄を入れる処理は今後の拡張ポイント。
+
+  const alpha="abcdefghijklmnopqrstuvwxyz";
   let p=0;
   while(p<deck.length){
     for(let t=0; t<playerCount && p<deck.length; t++){
@@ -656,12 +714,12 @@ async function startGame(playerCount, missionId){
     }
   }
 
-  // アイテム（待機中は非表示）…ここでは14〜18は配らない
+  // アイテム（14-18は配らない）
   const all=[1,2,3,4,5,6,7,8,9,10,11,12];
   shuffle(all);
   const items = all.slice(0, Math.min(playerCount, all.length)).map(no=>({id:crypto.randomUUID(),no,used:false}));
 
-  // ミッション情報（保存＆右パネル表示用）
+  // ミッション情報
   const missionMeta = missionInfo(missionId);
 
   await set(ref(db, `rooms/${code}`), {
@@ -674,6 +732,9 @@ async function startGame(playerCount, missionId){
     captainTable: captainIndex,
     mission: missionMeta
   });
+
+  // ゲームUI解禁
+  H(gear,false);
 }
 
 function missionInfo(id){
