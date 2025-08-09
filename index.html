@@ -31,8 +31,7 @@
 
     /* テーブル内部のレイアウト高さ配分 */
     --header-h:12px;   /* 上部の細い見出し */
-    --token-h:14px;    /* 下部トークンバー */
-    --content-h: calc(var(--table-h) - var(--header-h) - var(--token-h) - 6px);
+    --content-h: calc(var(--table-h) - var(--header-h) - 6px);
 
     /* 数字フォント */
     --font-card:16px;
@@ -92,7 +91,7 @@
     height:var(--table-h);
     display:block;
     background:#fff;
-    overflow:hidden; /* 下部固定バーのはみ出し防止 */
+    overflow:hidden; /* はみ出し防止 */
     width:max-content; /* 中身幅にフィット */
   }
   /* 上部（アンダーライン付きの数字 or 名前） */
@@ -102,11 +101,11 @@
   }
   .title{text-decoration:underline;padding-right:6px}
 
-  /* 中段：キャラ(左)＋手札(右) を横並びで配置し高さを確保 */
+  /* 中段：キャラ(左)＋手札(右) */
   .t-content{
     position:absolute;left:8px;right:8px;
     top:calc(var(--header-h) + 6px);
-    bottom:calc(var(--token-h) + 4px);
+    bottom:4px;
     display:flex;gap:8px;align-items:flex-start;
     min-height:var(--content-h);
   }
@@ -115,7 +114,7 @@
     background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
-  .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;flex:0 0 auto}
+  .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;flex:0 0 auto;position:relative}
   .card{
     width:var(--card-w);height:var(--card-h);border-radius:6px;border:1px solid #ddd;position:relative;
     background:#bbb;flex:0 0 auto;display:flex;align-items:flex-start;justify-content:center;cursor:pointer;user-select:none
@@ -131,17 +130,13 @@
     background-size:cover;background-position:center
   }
 
-  /* 下段：アルファベット＋トークンをテーブル下部に固定 */
-  .t-tokens{
-    position:absolute;left:8px;right:8px;bottom:2px;height:var(--token-h);
-    display:flex;gap:var(--card-gap);align-items:flex-end;overflow-x:auto
-  }
+  /* アルファベット＆トークン：カード上に重ねる */
+  .badge-wrap{position:absolute;left:0;right:0;top:-10px;display:flex;flex-direction:column;align-items:center;pointer-events:auto;z-index:2}
   .alpha{
     width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1;
-    background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;
-    position:relative;top:-6px;z-index:2
+    background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0
   }
-  .token{margin-top:2px;font-size:11px;border-radius:4px;padding:1px 0}
+  .token{margin-top:2px;font-size:11px;border-radius:4px;padding:1px 4px}
   .token.equal{background:#ffedd5;color:#000}  /* ＝：薄オレンジ */
   .token.noteq{background:#e0f2fe;color:#000}  /* ≠：水色 */
   .token.x1{background:#fce7f3;color:#000}     /* x1：ピンク */
@@ -207,7 +202,7 @@
          ========================= -->
     <div class="join-box" id="joinBox">
       <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-      <!-- 観戦ボタンは不要なので削除 -->
+      <!-- 観戦ボタンは不要 -->
       <button class="btn primary" id="btnJoin">参加で入室</button>
       <button class="btn ghost" id="btnRandom">コード作成</button>
       <span class="small">入室後、右下の歯車から席を決められます</span>
@@ -430,11 +425,10 @@ async function enter(mode){
     state.isHost = snap.val()?.hostId === state.userId;
   }
 
-  const path = mode==='player' ? `players/${state.userId}` : `spectators/${state.userId}`;
+  const path = `players/${state.userId}`; // 観戦機能は廃止
   await set(ref(db, `rooms/${code}/${path}`), {name:state.userName, at:Date.now()});
 
   onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
-  onDisconnect(ref(db, `rooms/${code}/spectators/${state.userId}`)).remove();
 
   listenRoom(code);
 
@@ -566,7 +560,7 @@ function renderItemsAndDi(v){
   };
 }
 
-/* テーブル描画（横：キャラ→手札／下：固定トークンバー） */
+/* テーブル描画（横：キャラ→手札） */
 function renderTables(v){
   tablesEl.innerHTML='';
   if(!v) return;
@@ -591,18 +585,11 @@ function renderTables(v){
     /* 中段：キャラ＋手札 */
     const content=document.createElement('div'); content.className='t-content';
 
-    // キャラ（自身の席のみ見える／他席は伏せ）
+    // キャラ（誰でも見える＆誰でも裏返せる）
     const char=document.createElement('div'); char.className='char-card';
-    const canSeeChars = (state.seatedTable === idx); // 最新要望：自席のみ可視
-    if(canSeeChars){
-      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-      char.style.backgroundImage = `url("${face}")`;
-      char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
-    } else {
-      char.style.backgroundImage = 'none';
-      char.style.background = '#eee';
-      char.style.pointerEvents='none';
-    }
+    const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+    char.style.backgroundImage = `url("${face}")`;
+    char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
     content.appendChild(char);
 
     // 手札
@@ -631,39 +618,28 @@ function renderTables(v){
       if(card.classList.contains('back')) bot.style.display='none';
       card.appendChild(bot);
 
+      // ▼ アルファベット＆トークン（カードの上に重ねる）
+      const wrap=document.createElement('div'); wrap.className='badge-wrap';
+      const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
+      if(isMine){
+        a.onclick=(ev)=>{
+          openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { token:{type:'num', value:c.num, style:'black'} });
+          });
+        };
+      }
+      wrap.appendChild(a);
+      if(c.token){
+        const tk=document.createElement('div'); tk.className='token ' + (c.token.style||'');
+        tk.textContent = (c.token.type==='num' || c.token.style==='black') ? c.token.value : c.token.type;
+        wrap.appendChild(tk);
+      }
+      card.appendChild(wrap);
+
       hand.appendChild(card);
     });
     content.appendChild(hand);
     box.appendChild(content);
-
-    /* 下段：アルファベット＋トークン（固定で見切れない） */
-    const tokens=document.createElement('div'); tokens.className='t-tokens';
-    // 左側のキャラ幅ぶんのスペーサーで位置を合わせる
-    const spacer=document.createElement('div'); spacer.style.width = (CW + 8) + 'px'; spacer.style.flex='0 0 auto'; tokens.appendChild(spacer);
-    // スクロール同期（手札とアルファベット行を完全一致）
-    hand.addEventListener('scroll', ()=>{ tokens.scrollLeft = hand.scrollLeft; });
-
-    (t.hand||[]).forEach((c,ci)=>{
-      const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
-      if(c.token){
-        const tk=document.createElement('div');
-        tk.className='token ' + (c.token.style||'');
-        // 数字トークンはアルファベットの下に追加表示（置換しない）
-        tk.textContent = (c.token.type==='num' || c.token.style==='black') ? c.token.value : c.token.type;
-        a.appendChild(tk);
-      }
-      if(c.ownerId===state.userId){
-        a.onclick=(ev)=>{
-          openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
-            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {
-              token:{type:'num', value:c.num, style:'black'}
-            });
-          });
-        };
-      }
-      tokens.appendChild(a);
-    });
-    box.appendChild(tokens);
 
     tablesEl.appendChild(box);
   });
