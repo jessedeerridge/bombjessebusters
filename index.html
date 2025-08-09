@@ -7,12 +7,11 @@
 <style>
   :root{
     --gap:10px;
-    --cardW:24px;   /* 指定どおり */
-    --cardH:60px;   /* 指定どおり */
-    --cardGap:3px;  /* 指定どおり */
-    --letterH:16px; /* a/b/...の高さ（小さめ） */
-    --labelW:28px;  /* テーブル左ラベルの幅 */
-    --tiny:11px;
+    --cardW:24px;   /* 幅 指定どおり */
+    --cardH:50px;   /* 高さ 指定どおり */
+    --cardGap:3px;  /* カード間 指定どおり */
+    --letterH:16px; /* a/b/... 小さめ */
+    --labelW:28px;  /* 左ラベル幅（数字＋下線） */
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#fff;color:#111}
@@ -35,14 +34,14 @@
   /* ====== テーブル（席） ====== */
   .table{border:1px solid #eee;border-radius:12px;padding:8px;margin-bottom:10px}
   .tableRow{display:grid;grid-template-columns: var(--labelW) 1fr; gap:8px; align-items:stretch}
-  /* 左の数字ラベル：数字だけ＋数字の下に下線（border-topで表現） */
+  /* 左の数字だけ＋その下に下線 */
   .tableLabel{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px}
   .tableLabel .num{font-size:12px;font-weight:700;line-height:1}
   .tableLabel .underline{width:100%;border-top:2px solid #111;margin-top:2px}
-  /* テーブル左上の着席者名（小さく） */
+  /* 左上に着席者名（小さく） */
   .occupant{font-size:11px;color:#444;margin-bottom:4px}
 
-  /* 手札：横一列15枚想定（nowrap）／必要に応じて横スクロール */
+  /* 手札：横一列15枚想定（nowrap）、必要なら横スクロール */
   .handWrap{overflow-x:auto;padding-bottom:6px}
   .hand{display:flex;gap:var(--cardGap);flex-wrap:nowrap}
 
@@ -52,16 +51,16 @@
   .letterCell>button{width:100%;height:100%;border:none;background:transparent;font-size:10px;cursor:pointer}
   .token{font-size:10px;font-weight:700}
 
-  /* 「トークンを置く」小ボタン */
+  /* 「トークンを置く」ボタン（小） */
   .placeBtn{position:absolute;transform:translateY(-6px);font-size:11px;padding:4px 6px;border-radius:8px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);z-index:20}
 
   /* ====== カード本体 ====== */
   .card{width:var(--cardW);height:var(--cardH);border-radius:6px;border:1px solid #000;overflow:hidden;user-select:none;cursor:pointer;position:relative}
-  .cardInner{display:grid;grid-template-rows:14px 1fr;height:100%}
+  .cardInner{display:grid;grid-template-rows:12px 1fr;height:100%}
   .numTop{display:grid;place-items:center;font-weight:700;font-size:10px}
   .lowerArea{width:100%;height:100%}
 
-  /* 裏：常に codeback.png（他人・観戦者から見える未公開） */
+  /* 裏：codeback.png（他席や観戦者の未公開） */
   .isBack{
     background:
       url("codeback.png") center/cover no-repeat,
@@ -70,32 +69,38 @@
   }
   .isBack .numTop{visibility:hidden}
 
-  /* 表：黒地＋白字（自分の未公開／公開いずれもこの表現） */
-  .isFace{background:#000;color:#fff;border-color:#000}
-  .isFace .lowerArea{background:url("codenumber.png") center bottom/contain no-repeat}
+  /* 表（公開前の自分の手札）＝薄い灰色地＋白字 */
+  .isFacePrivate{background:#bbb;color:#fff;border-color:#bbb}
+  .isFacePrivate .lowerArea{background:url("codenumber.png") center bottom/contain no-repeat}
 
-  /* 公開状態は輪郭を強調 */
+  /* 表（全体公開）＝黒地＋白字 */
+  .isFacePublic{background:#000;color:#fff;border-color:#000}
+  .isFacePublic .lowerArea{background:url("codenumber.png") center bottom/contain no-repeat}
   .isRevealed{outline:2px solid #0a7}
 
-  /* ====== 右下の設定メニュー ====== */
+  /* 右下の設定メニュー */
   .floating{position:fixed;right:12px;bottom:12px;display:flex;gap:8px}
   .menu{position:relative}
   .menuPopup{position:absolute;right:0;bottom:44px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:8px;display:none;min-width:160px}
   .menu.open .menuPopup{display:block}
   .menuPopup button{width:100%;text-align:left}
 
-  /* ====== モーダル ====== */
+  /* モーダル */
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50}
   .sheet{background:#fff;border-radius:16px;max-width:520px;width:calc(100% - 32px);padding:16px;border:1px solid #eee}
   .choices{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px}
   .choice{padding:10px;border:1px solid #ddd;border-radius:10px;text-align:center;cursor:pointer}
   .rowSmall{display:flex;gap:8px;align-items:center;margin-top:8px}
 
-  /* やり直し確認（小さな「やり直す」＋大きなキャンセル） */
+  /* やり直し確認：小さい「やり直す」＋大きい「キャンセル」 */
   .confirmRow{display:flex;gap:10px;align-items:center;margin-top:12px}
   .btnTiny{font-size:11px;padding:6px 10px}
   .btnLarge{font-size:16px;padding:12px 16px}
 
+  /* ミッション詳細 */
+  .missionPanel .title{font-weight:800;margin-bottom:6px}
+  .missionPanel .line{font-size:12px;color:#222}
+  .missionPanel{margin-top:10px}
   @media (max-width:900px){.container{flex-direction:column}.side{width:auto}}
 </style>
 </head>
@@ -145,6 +150,12 @@
     <div id="tablesPanel" class="panel" style="margin-top:12px;">
       <div id="tablesArea"></div>
     </div>
+
+    <!-- Mission details (画面下部) -->
+    <div id="missionPanel" class="panel missionPanel hidden">
+      <div class="title">ミッション詳細</div>
+      <div id="missionLines"></div>
+    </div>
   </div>
 
   <!-- Side: lists (hidden after start) -->
@@ -169,7 +180,7 @@
       <div style="font-weight:800;">ミッションを選択（1〜10）</div>
       <div class="choices" id="missionChoices"></div>
       <div class="muted" style="margin-top:8px;">
-        1：1.5のコードが1枚混じる（合計25枚）。/ 2：各自の手札から1枚を右端固定（他は昇順）。
+        1：1.5/2.5/3.5/4.5のうち1枚が混入（合計25）。 / 2：各席1枚を右端固定（他は昇順）。 / 3：候補3種を提示し、その中の1枚のみ混入（合計25）。
       </div>
     </div>
   </div>
@@ -218,7 +229,7 @@
     serverTimestamp, onDisconnect, remove, runTransaction
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-  /* ==== Firebase config ==== */
+  /* ==== Firebase config（そのまま使用） ==== */
   const firebaseConfig = {
     apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
     authDomain: "chat-68c4c.firebaseapp.com",
@@ -226,7 +237,7 @@
     projectId: "chat-68c4c",
     storageBucket: "chat-68c4c.appspot.com",
     messagingSenderId: "172284325975",
-    appId: "1:172284325:web:6f9bdd77e822c0ea39dd92"
+    appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
   };
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
@@ -240,11 +251,12 @@
   const roomCodeLabel=$("#roomCodeLabel"), nameLabel=$("#nameLabel"), roleLabel=$("#roleLabel");
   const playersList=$("#playersList"), spectatorsList=$("#spectatorsList"), sidePanel=$("#sidePanel");
   const tablesArea=$("#tablesArea");
-  const controls=$("#controls"), menu=$("#menu"), menuPopup=$("#menuPopup"), settingsBtn=$("#settingsBtn");
+  const controls=$("#controls"), menu=$("#menu"), settingsBtn=$("#settingsBtn");
   const chooseSeatBtn=$("#chooseSeatBtn"), leaveSeatMenuBtn=$("#leaveSeatMenuBtn"), resetBtn=$("#resetBtn");
   const startModal=$("#startModal"), seatCountInput=$("#seatCountInput"), seatNext=$("#seatNext"), missionStep=$("#missionStep"), missionChoices=$("#missionChoices");
   const seatSelectModal=$("#seatSelectModal"), seatList=$("#seatList"), leaveSeatBtn=$("#leaveSeatBtn");
   const resetConfirm=$("#resetConfirm"), confirmResetBtn=$("#confirmResetBtn"), cancelResetBtn=$("#cancelResetBtn");
+  const missionPanel=$("#missionPanel"), missionLines=$("#missionLines");
 
   // State
   let state = {
@@ -263,7 +275,7 @@
     const A=["赤","青","黄","緑","桃","黒","白","金","銀","茶"],B=["ねこ","いぬ","うさぎ","たぬき","きつね","くま","とり","さかな","ドラゴン","ペンギン"],n=Math.floor(Math.random()*900)+100;
     return A[Math.floor(Math.random()*A.length)]+B[Math.floor(Math.random()*B.length)]+n;
   };
-  const cardVal = txt => parseFloat(txt); // 1.5 もOK
+  const cardVal = txt => parseFloat(txt); // 1.5 等OK
   const indexToLetter = i => String.fromCharCode(97 + i); // 0:a, 11:l, 12:m
 
   // ensure room
@@ -272,7 +284,7 @@
     const s = await get(r);
     if(!s.exists()){
       await set(r,{ createdAt:serverTimestamp(), hostId:null, phase:"lobby", mission:null, seatCount:0,
-        players:{}, spectators:{}, wants:{}, seats:{} });
+        players:{}, spectators:{}, wants:{}, seats:{}, missionTextLines:[] });
     }
     return r;
   }
@@ -306,7 +318,7 @@
     await set(meRef,{ name:state.name, joinedAt:serverTimestamp() });
     onDisconnect(meRef).remove();
 
-    // 参加希望（やり直し時に復帰）
+    // 参加希望（やり直し時の復帰）
     await set(ref(db, `rooms/${state.roomCode}/wants/${state.userId}`), { wantsPlayer: role==="player", name: state.name });
     onDisconnect(ref(db, `rooms/${state.roomCode}/wants/${state.userId}`)).remove();
 
@@ -325,8 +337,9 @@
       sidePanel.classList.toggle("hidden", state.phase!=="lobby");
       controls.classList.toggle("hidden", state.phase!=="playing");
       resetBtn.classList.toggle("hidden", !state.isHost);
+      chooseSeatBtn.disabled = (state.role!=="player");
 
-      // 席関連のメニュー表示
+      // 自席検出＆席メニュー更新
       const seats = v.seats||{};
       state.mySeat = null;
       Object.keys(seats).forEach(k=>{ if(seats[k].occupantUser===state.userId) state.mySeat=String(k); });
@@ -335,6 +348,7 @@
       renderList(playersList, v.players||{});
       renderList(spectatorsList, v.spectators||{});
       renderTables(v);
+      renderMissionDetails(v);
     });
 
     onValue(ref(db,`rooms/${code}/players`),(s)=>renderList(playersList,s.val()||{}));
@@ -367,19 +381,40 @@
     missionStep.classList.remove("hidden");
   });
 
+  function pickN(arr, n){
+    const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+    return a.slice(0,n);
+  }
+
   async function startGame(seatCount, mission){
     startModal.classList.add("hidden");
     const code=state.roomCode;
 
-    // デッキ：1..12×2=24（M1なら+1.5）
+    // デッキ：1..12×2=24
     let deck=[]; let cid=0;
     for(let v=1;v<=12;v++){ deck.push({id:`c${cid++}`,text:String(v)}); deck.push({id:`c${cid++}`,text:String(v)}); }
-    if(mission===1){ deck.push({id:`c${cid++}`,text:"1.5", special:true}); }
+
+    const halves = ["1.5","2.5","3.5","4.5"];
+    let missionTextLines = [];
+
+    if(mission===1){
+      // 1,2,3,4.5 のうち1枚だけ混入 → x
+      const x = halves[Math.floor(Math.random()*halves.length)];
+      deck.push({ id:`c${cid++}`, text:x, special:true });
+      missionTextLines = ["#1 爆弾", `${x}が1枚だけ入っている。`];
+    }
+    if(mission===3){
+      // 候補 x,y,z（重複なし）を提示し、その中の1つだけ混入
+      const picks = pickN(halves,3);
+      const use = picks[Math.floor(Math.random()*picks.length)];
+      deck.push({ id:`c${cid++}`, text:use, special:true });
+      missionTextLines = ["#3 さらい爆弾", `${picks.join(",")}のうち1枚だけ入っている。`];
+    }
 
     // シャッフル
     for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
 
-    // 席を作成し、ラウンドロビンで余りなく配布（均等でなくてOK）
+    // 席を作成し、ラウンドロビンで余りなく配布（均等でなくOK）
     const seats={};
     for(let s=1;s<=seatCount;s++){ seats[s]={ hand:{}, tokens:{}, occupantUser:null, occupantName:null }; }
     let k=0, sidx=1;
@@ -389,15 +424,14 @@
     }
 
     // 並び順（規定：昇順）。M2は各席でランダム1枚を右端固定
-    const val = (t)=>parseFloat(t);
     for(let s=1;s<=seatCount;s++){
       let arr = Object.keys(seats[s].hand).map(id=>({id, ...seats[s].hand[id]}));
       if(mission===2 && arr.length){
         const pick = arr[Math.floor(Math.random()*arr.length)];
-        const rest = arr.filter(x=>x.id!==pick.id).sort((a,b)=>val(a.text)-val(b.text));
+        const rest = arr.filter(x=>x.id!==pick.id).sort((a,b)=>cardVal(a.text)-cardVal(b.text));
         arr = [...rest, {...pick, pinRight:true}];
       }else{
-        arr.sort((a,b)=>val(a.text)-val(b.text));
+        arr.sort((a,b)=>cardVal(a.text)-cardVal(b.text));
       }
       arr.forEach((c,i)=>{ seats[s].hand[c.id]={...c, order:i}; });
     }
@@ -406,16 +440,15 @@
       phase:"playing",
       mission,
       seatCount,
-      seats
+      seats,
+      missionTextLines
     });
   }
 
   /* ======= 設定メニュー：座席選択／席を立つ／やり直し ======= */
   settingsBtn.addEventListener("click", ()=>menu.classList.toggle("open"));
-  chooseSeatBtn.addEventListener("click", openSeatSelector);
-  leaveSeatMenuBtn.addEventListener("click", leaveSeat);
 
-  function openSeatSelector(){
+  const seatSelectModalOpen = ()=>{
     const code=state.roomCode;
     seatList.innerHTML="";
     onValue(ref(db,`rooms/${code}/seats`),(snap)=>{
@@ -426,17 +459,20 @@
         const occName = seats[idx].occupantName;
         const btn = document.createElement("button");
         btn.textContent = `テーブル${idx}：` + (occUser ? `${occName} が着席中` : "空席");
-        // ホスト以外は占有席に座れない（ホストも上書きしない実装）
         const occupied = !!occUser && occUser!==state.userId;
-        btn.disabled = occupied;
+        btn.disabled = occupied || (state.role!=="player"); // 観戦者は座れない
         btn.style.padding="8px"; btn.style.border="1px solid #ddd"; btn.style.borderRadius="10px"; btn.style.background="#fff"; btn.style.textAlign="left";
         btn.onclick=()=>claimSeat(idx);
         seatList.appendChild(btn);
       });
     }, { onlyOnce:true });
     seatSelectModal.classList.remove("hidden");
+  };
+
+  document.getElementById("chooseSeatBtn").addEventListener("click", ()=>{
+    seatSelectModalOpen();
     menu.classList.remove("open");
-  }
+  });
 
   async function claimSeat(idx){
     const code=state.roomCode;
@@ -448,7 +484,6 @@
     }
     await update(ref(db,`rooms/${code}/seats/${idx}`),{ occupantName: state.name });
     state.mySeat = String(idx);
-    // 離脱時に席だけ空ける（カードは残る）
     onDisconnect(ref(db,`rooms/${code}/seats/${idx}/occupantUser`)).remove();
     onDisconnect(ref(db,`rooms/${code}/seats/${idx}/occupantName`)).remove();
     seatSelectModal.classList.add("hidden");
@@ -460,12 +495,13 @@
     await update(ref(db,`rooms/${code}/seats/${state.mySeat}`),{ occupantUser: null, occupantName: null });
     state.mySeat=null;
   }
+  document.getElementById("leaveSeatMenuBtn").addEventListener("click", ()=>{ leaveSeat(); });
   leaveSeatBtn.addEventListener("click", ()=>{ leaveSeat(); seatSelectModal.classList.add("hidden"); });
 
   // やり直し（ホストのみ）
   resetBtn.addEventListener("click", ()=>{
     if(!state.isHost) return;
-    resetConfirm.classList.remove("hidden");
+    document.getElementById("resetConfirm").classList.remove("hidden");
     menu.classList.remove("open");
   });
   cancelResetBtn.addEventListener("click", ()=>resetConfirm.classList.add("hidden"));
@@ -493,7 +529,8 @@
       seatCount:0,
       seats:{},
       players: nextPlayers,
-      spectators: nextSpectators
+      spectators: nextSpectators,
+      missionTextLines:[]
     });
     resetConfirm.classList.add("hidden");
   });
@@ -501,7 +538,7 @@
   /* ======= レンダリング ======= */
   function canOperateOnSeat(seatIdx){
     // 「自分のカードしか押せない」= 自分が着席しているテーブルのみ
-    return state.mySeat && String(seatIdx)===String(state.mySeat);
+    return state.role==="player" && state.mySeat && String(seatIdx)===String(state.mySeat);
   }
 
   function renderTables(roomVal){
@@ -518,13 +555,14 @@
 
       const table = div("div","table");
       const row = div("div","tableRow");
-      // 左のラベル（数字だけ＋下線）
+
+      // 左ラベル（数字だけ＋下線）
       const label = div("div","tableLabel");
       label.appendChild(div("div","num", String(idx)));
-      const ul = div("div","underline",""); label.appendChild(ul);
+      label.appendChild(div("div","underline",""));
       row.appendChild(label);
 
-      // 右側コンテンツ
+      // 右側：着席者名（左上小さく）＋手札
       const content = div("div","");
       const occ = div("div","occupant", seat.occupantName ? `👤 ${seat.occupantName}` : "");
       content.appendChild(occ);
@@ -548,14 +586,14 @@
         const revealed = !!c.revealed;
 
         // 見え方：
-        // - 公開：全員に表（黒）
-        // - 自分の席の未公開：自分だけ表（黒）
-        // - それ以外（他席 or 観戦者）：裏
+        // - 公開：全員に黒表
+        // - 自分の席の未公開：自分だけ灰表
+        // - 観戦者 or 他席の未公開：裏
         if(revealed){
-          card.classList.add("isFace","isRevealed");
+          card.classList.add("isFacePublic","isRevealed");
           top.textContent = c.text;
-        }else if(isMineSeat && state.role==="player"){
-          card.classList.add("isFace");
+        }else if(isMineSeat){
+          card.classList.add("isFacePrivate");
           top.textContent = c.text;
         }else{
           card.classList.add("isBack");
@@ -565,17 +603,17 @@
         inner.appendChild(lower);
         card.appendChild(inner);
 
-        // クリック可否：自分の席のカードのみ
-        if(isMineSeat && state.role==="player"){
+        // クリック可否：自席のみ
+        if(isMineSeat){
           card.title = revealed ? "クリックで裏に戻す" : "クリックで公開";
           card.onclick = ()=>toggleReveal(idx,c.id);
         }else{
           card.style.cursor="default";
         }
 
-        // 文字ラベル（a,b,c... 1枚につき1文字）
+        // 文字ラベル（a,b,c...）
         const letter = indexToLetter(i);
-        const letterCell = makeLetterCell(idx,c,letter,(isMineSeat && state.role==="player"));
+        const letterCell = makeLetterCell(idx,c,letter,isMineSeat);
 
         wrap.appendChild(card);
         wrap.appendChild(letterCell);
@@ -590,7 +628,6 @@
     });
   }
 
-  /* ======= 公開/非公開トグル（自席のみ） ======= */
   async function toggleReveal(seatIdx, cardId){
     if(!canOperateOnSeat(seatIdx)) return;
     const code=state.roomCode;
@@ -598,7 +635,6 @@
     await runTransaction(ref(db,path),(prev)=>!prev);
   }
 
-  /* ======= トークン ======= */
   function makeLetterCell(seatIdx, card, letter, canPlace){
     const cell=div("div","letterCell");
     const tokenRef = ref(db, `rooms/${state.roomCode}/seats/${seatIdx}/tokens/${card.id}`);
@@ -641,10 +677,21 @@
     setTimeout(()=>document.addEventListener("click",closer,true),0);
   }
 
+  function renderMissionDetails(roomVal){
+    const lines = roomVal.missionTextLines || [];
+    missionLines.innerHTML="";
+    if(lines.length){
+      lines.forEach(t=>{ const p=div("div","line",t); missionLines.appendChild(p); });
+      missionPanel.classList.remove("hidden");
+    }else{
+      missionPanel.classList.add("hidden");
+    }
+  }
+
   /* ======= 退室 ======= */
   leaveBtn.addEventListener("click", async ()=>{
     const code=state.roomCode; if(!code) return;
-    // 席から外す（カードは残す）
+    // 席から外す（カードは残る）
     if(state.mySeat){
       await update(ref(db,`rooms/${code}/seats/${state.mySeat}`),{ occupantUser:null, occupantName:null });
     }
@@ -653,6 +700,9 @@
     await remove(ref(db,`rooms/${code}/wants/${state.userId}`));
     location.href = location.origin + location.pathname;
   });
+
+  // util
+  function div(tag,cls,text){ const el=document.createElement(tag); if(cls) el.className=cls; if(text!=null) el.textContent=text; return el; }
 
   // boot
   (function boot(){
