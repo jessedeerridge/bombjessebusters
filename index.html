@@ -3,94 +3,113 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>4桁ルームチャット</title>
+  <title>BOMB BUSTERS</title>
   <style>
-    :root { --bg:#0b0f14; --card:#121923; --muted:#93a1b1; --text:#e6edf3; --accent:#4aa3ff; }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; background: linear-gradient(180deg,#0a0f14,#0b1320 40%,#0e1626); color: var(--text); display: grid; place-items: center; }
-    .wrap { width: min(960px, 100%); padding: 16px; }
-    .card { background: color-mix(in oklab, var(--card) 90%, #000 10%); border: 1px solid #223246; border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.25); overflow: hidden; }
-    header { padding: 16px 18px; border-bottom: 1px solid #1d2a3a; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
-    header h1 { font-size: 16px; margin: 0; letter-spacing: .02em; }
-    .hint { color: var(--muted); font-size: 12px; }
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    input, button { padding: 10px 12px; border-radius: 10px; border: 1px solid #2a3b52; background: #0e1622; color: var(--text); outline: none; }
-    input::placeholder { color: #73879e; }
-    input[name=code] { width: 6.5em; letter-spacing: .2em; text-align: center; font-variant-numeric: tabular-nums; }
-    button { background: linear-gradient(180deg,#2766ff,#1c55d7); border: none; cursor: pointer; }
-    button.secondary { background: #162437; border: 1px solid #2a3b52; }
-    button:disabled { opacity: .6; cursor: not-allowed; }
-    main { display: grid; grid-template-rows: auto 1fr auto; min-height: 60vh; }
-    #join, #chat { padding: 16px; }
-    #join { display: grid; gap: 14px; }
-    .share { font-size: 12px; color: var(--muted); word-break: break-all; }
-    #chat { display: none; }
-    .msgs { height: 56vh; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: #0c1420; border: 1px solid #1d2a3a; border-radius: 12px; }
-    .m { display: grid; gap: 2px; background: #0f1a2a; border: 1px solid #20314a; border-radius: 12px; padding: 8px 10px; }
-    .me { background: #0f2236; border-color: #254673; }
-    .meta { display: flex; gap: 8px; font-size: 12px; color: var(--muted); }
-    .name { color: #b2c8ff; }
-    .time { margin-left: auto; }
-    .inputRow { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
-    textarea { resize: none; min-height: 46px; max-height: 32vh; border-radius: 10px; border: 1px solid #2a3b52; background: #0e1622; color: var(--text); padding: 10px 12px; }
-    footer { padding: 12px 16px; border-top: 1px solid #1d2a3a; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
-    .ok { color: #74d391; }
-    .err { color: #ff7b7b; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .tiny { font-size: 11px; }
+    :root { --bg:#0a0f16; --panel:#111a26; --line:#223448; --muted:#8aa0b6; --text:#e6eef7; --accent:#5ab0ff; --danger:#ff6b6b; }
+    * { box-sizing: border-box }
+    html,body { height:100%; margin:0 }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; background: radial-gradient(1000px 600px at 10% 0%, #0c1624 0%, #090d14 60%); color: var(--text); }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    .card { background: var(--panel); border:1px solid var(--line); border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); overflow:hidden; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line) }
+    header h1 { font-size:16px; margin:0; letter-spacing:.12em }
+    header .badge { background:#162338; border:1px solid #27415e; padding:6px 10px; border-radius:999px; font-size:12px; }
+
+    .layout { display:grid; grid-template-columns: 280px 1fr 280px; gap:12px; padding:12px; }
+    .panel { background:#0e1724; border:1px solid var(--line); border-radius:12px; padding:12px; }
+
+    /* Join */
+    #join { display:grid; gap:10px }
+    #join .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    input, select, button, textarea { background:#0b1320; border:1px solid #25374d; color:var(--text); border-radius:10px; padding:10px 12px; outline:none }
+    input::placeholder { color:#7890a6 }
+    button { cursor:pointer; background: linear-gradient(180deg,#2b76ff,#215ed1); border:none }
+    button.secondary { background:#132239; border:1px solid #27415e }
+    button:disabled { opacity:.6; cursor:not-allowed }
+
+    /* Lists */
+    .list h3 { margin:4px 0 8px; font-size:13px; color:var(--muted); font-weight:600 }
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid #2a415d; border-radius:999px; margin:4px 4px 0 0; font-size:12px; background:#0c1a2d }
+    .me { outline:2px solid var(--accent); }
+    .host { border-color:#ffb23f; }
+
+    /* Table */
+    #table { display:grid; gap:12px }
+    .seat { background:#0b1524; border:1px solid #22344a; border-radius:12px; padding:10px }
+    .seat .meta { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12px; color:var(--muted) }
+
+    .cards { display:flex; flex-wrap:wrap; gap:8px }
+    .cardv { width:44px; height:60px; display:grid; place-items:center; border-radius:8px; border:1px solid #2b4162; user-select:none }
+    .mine.face { background:#0f2340; border-color:#345a96 }
+    .back { background:#0d1b31; position:relative }
+    .back:after { content:""; position:absolute; inset:8px; border:2px dashed #335279; border-radius:6px; opacity:.9 }
+    .number { font-weight:700; font-variant-numeric:tabular-nums; }
+    .clickable { cursor:pointer }
+
+    .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    .hint { font-size:12px; color:var(--muted) }
+    .ok { color:#74d391 }
+    .err { color:var(--danger) }
   </style>
 </head>
 <body>
   <div class="wrap card">
     <header>
-      <h1>4桁コード = 名前の部屋でチャット</h1>
-      <div class="hint">同じ <b>名前</b> と <b>4桁コード</b> を入れれば同じ部屋に集合</div>
+      <h1>BOMB BUSTERS</h1>
+      <div><span class="badge">v0.1 prototype</span></div>
     </header>
 
-    <main>
-      <!-- 参加フォーム -->
-      <section id="join">
-        <div class="row">
-          <input id="name" name="name" placeholder="名前 (例: Taro)" autocomplete="off" />
-          <input id="code" name="code" placeholder="4桁 (例: 1234)" maxlength="4" pattern="\\d{4}" />
-          <button id="enter">入室</button>
-          <button id="copy" class="secondary" title="この部屋のURLをコピー">リンク</button>
+    <div class="layout">
+      <!-- Left: Join & Controls -->
+      <section class="panel" id="left">
+        <div id="join">
+          <div class="row">
+            <input id="name" placeholder="名前" autocomplete="off" />
+            <input id="room" placeholder="ルーム 4桁" maxlength="4" />
+          </div>
+          <div class="row">
+            <select id="role">
+              <option value="player">参加</option>
+              <option value="spectator">観戦</option>
+            </select>
+            <button id="enter">入室</button>
+            <button id="copy" class="secondary">リンク</button>
+          </div>
+          <div class="hint">同じ <b>名前</b> と <b>4桁コード</b> で同じ部屋へ。URL共有でも入室OK。</div>
         </div>
-        <div class="share tiny">このページURLの末尾に <span class="mono">?room=1234&name=Taro</span> の形でも入室できます。</div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+        <div class="controls">
+          <button id="start" disabled>ゲーム開始</button>
+          <span id="status" class="hint"></span>
+        </div>
       </section>
 
-      <!-- チャット画面 -->
-      <section id="chat">
-        <div class="tiny mono" id="roomLabel"></div>
-        <div class="msgs" id="msgs"></div>
-        <div class="inputRow">
-          <textarea id="text" placeholder="メッセージを入力… (Ctrl+Enterで送信)"></textarea>
-          <button id="send">送信</button>
-        </div>
+      <!-- Center: Table -->
+      <section class="panel" id="center">
+        <div id="table" class="table"></div>
       </section>
-    </main>
 
-    <footer>
-      <span>接続: <span id="status" class="err">未接続</span></span>
-      <span class="tiny">Powered by Firebase Realtime Database</span>
-    </footer>
+      <!-- Right: Lists -->
+      <aside class="panel list" id="right">
+        <h3>参加者</h3>
+        <div id="players"></div>
+        <h3 style="margin-top:12px">観戦</h3>
+        <div id="spectators"></div>
+      </aside>
+    </div>
   </div>
 
-  <!-- ▼▼▼ ここに自分の Firebase 設定を貼り付ける ▼▼▼ -->
+  <!-- Firebase -->
   <script type="module">
-    // 1) https://console.firebase.google.com でプロジェクト作成 → Webアプリ追加
-    // 2) SDK設定スニペット(構成)のオブジェクトを下の firebaseConfig に貼り付けてください
-    // 3) Realtime Database を「テストモード」で作成
-    // 4) ルールは学習用として以下の超簡易版(公開)を推奨。実運用は認証+ルール強化必須！
-    // {
-    //   "rules": {"rooms": {".read": true, ".write": true}}
-    // }
+    // ===== 使い方 =====
+    // 1) Firebase コンソールの Web アプリ構成を下の firebaseConfig に貼ってください
+    // 2) Realtime Database を作成（テストモード可）。databaseURL を構成に含める
+    // 3) ルール（学習用）: {"rules":{"rooms":{".read":true,".write":true}}}
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, push, onChildAdded, serverTimestamp, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { getDatabase, ref, set, get, update, onValue, onChildAdded, push, serverTimestamp, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-    // === ここを差し替え ===
+    // === ここをあなたの構成に置き換え ===
     const firebaseConfig = {
       apiKey: "PASTE_YOURS",
       authDomain: "PASTE_YOURS.firebaseapp.com",
@@ -101,128 +120,182 @@
       appId: "PASTE_YOURS"
     };
 
-    //--- UI 要素 ---
-    const qs = (s) => document.querySelector(s);
+    // ==== UI refs ====
+    const qs = s => document.querySelector(s);
     const nameEl = qs('#name');
-    const codeEl = qs('#code');
+    const roomEl = qs('#room');
+    const roleEl = qs('#role');
     const enterBtn = qs('#enter');
-    const copyBtn  = qs('#copy');
-    const chatSec = qs('#chat');
-    const joinSec = qs('#join');
-    const msgsEl = qs('#msgs');
-    const textEl = qs('#text');
-    const sendBtn = qs('#send');
+    const copyBtn = qs('#copy');
+    const startBtn = qs('#start');
     const statusEl = qs('#status');
-    const roomLabel = qs('#roomLabel');
+    const playersEl = qs('#players');
+    const spectatorsEl = qs('#spectators');
+    const tableEl = qs('#table');
 
-    // Firebase init
-    let app, db;
-    try {
-      app = initializeApp(firebaseConfig);
-      db = getDatabase(app);
-      statusEl.textContent = '準備OK';
-      statusEl.className = 'ok';
-    } catch (e) {
-      statusEl.textContent = '設定未完了';
-      statusEl.className = 'err';
-      console.error(e);
-    }
+    // init
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-    // クエリ引数 → 自動入室
-    const params = new URLSearchParams(location.search);
-    if (params.get('name')) nameEl.value = params.get('name');
-    if (params.get('room')) codeEl.value = params.get('room');
-    if (nameEl.value && /^\d{4}$/.test(codeEl.value)) {
-      joinRoom(nameEl.value, codeEl.value);
-    }
+    // URL params auto-join
+    const p = new URLSearchParams(location.search);
+    if (p.get('name')) nameEl.value = p.get('name');
+    if (p.get('room')) roomEl.value = p.get('room');
 
-    // クリック操作
-    enterBtn.addEventListener('click', () => tryEnter());
-    copyBtn.addEventListener('click', () => copyLink());
-    sendBtn.addEventListener('click', () => send());
-    textEl.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') send();
-    });
-    codeEl.addEventListener('input', () => { codeEl.value = codeEl.value.replace(/\D/g,'').slice(0,4); });
+    roomEl.addEventListener('input',()=>{ roomEl.value = roomEl.value.replace(/\D/g,'').slice(0,4); });
+    enterBtn.addEventListener('click', joinRoom);
+    copyBtn.addEventListener('click', copyLink);
 
-    function tryEnter(){
+    let me = { name:"", room:"", role:"player" };
+    let host = null; // who owns start button
+
+    async function joinRoom(){
       const name = nameEl.value.trim();
-      const code = codeEl.value.trim();
-      if (!name) return alert('名前を入力してください');
-      if (!/^\d{4}$/.test(code)) return alert('4桁の数字コードを入力してください');
-      joinRoom(name, code);
-    }
+      const room = roomEl.value.trim();
+      const role = roleEl.value;
+      if (!name) return alert('名前');
+      if (!/^\d{4}$/.test(room)) return alert('ルームコードは4桁数字');
 
-    let roomRef, unsub; let meName = '';
-    function joinRoom(name, code){
-      if (!db) return alert('Firebase 設定がまだです');
-      meName = name;
-      roomRef = ref(db, `rooms/${code}/messages`);
+      me = { name, room, role };
+      history.replaceState({},'',`?room=${encodeURIComponent(room)}&name=${encodeURIComponent(name)}`);
 
-      // 直近100件のみ
-      const q = query(roomRef, limitToLast(100));
-      onChildAdded(q, (snap) => {
-        const m = snap.val();
-        addMessage(m);
+      const roomRoot = ref(db, `rooms/${room}`);
+      const playersRef = ref(db, `rooms/${room}/players/${name}`);
+
+      // set host if none
+      const snap = await get(ref(db, `rooms/${room}/host`));
+      if (!snap.exists()) {
+        await set(ref(db, `rooms/${room}/host`), name);
+      }
+
+      // presence
+      await update(playersRef, { name, role, online: true, joinedAt: Date.now() });
+      onDisconnect(playersRef).remove();
+
+      // listen host
+      onValue(ref(db, `rooms/${room}/host`), s=>{ host = s.val(); updateControls(); });
+
+      // listen lists
+      onValue(ref(db, `rooms/${room}/players`), (s)=>{
+        const all = s.val()||{}; renderLists(all); renderTable(all);
       });
 
-      joinSec.style.display = 'none';
-      chatSec.style.display = 'block';
-      roomLabel.textContent = `部屋: ${code} / 名前: ${name}`;
-      history.replaceState({}, '', `?room=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`);
-      textEl.focus();
+      // listen game
+      onValue(ref(db, `rooms/${room}/game`), (s)=>{
+        const game = s.val(); renderGame(game);
+      });
 
-      // 入室通知(システムメッセージ)
-      push(roomRef, { name: 'system', text: `${name} が入室しました`, ts: Date.now() });
+      statusEl.textContent = `入室しました: ${room}`;
+      updateControls();
     }
 
-    function addMessage(m){
-      const wrap = document.createElement('div');
-      wrap.className = 'm' + (m.name === meName ? ' me' : '');
-      const meta = document.createElement('div'); meta.className = 'meta';
-      const name = document.createElement('div'); name.className = 'name'; name.textContent = m.name;
-      const time = document.createElement('div'); time.className = 'time'; time.textContent = tsToTime(m.ts);
-      const text = document.createElement('div'); text.textContent = m.text;
-      meta.append(name, time);
-      wrap.append(meta, text);
-      msgsEl.append(wrap);
-      msgsEl.scrollTop = msgsEl.scrollHeight;
+    function updateControls(){
+      const amHost = host === me.name;
+      startBtn.disabled = !amHost;
+      startBtn.title = amHost ? '開始できます' : 'ホストのみ開始可';
     }
 
-    function tsToTime(t){
-      if (!t) return '';
-      try {
-        const d = new Date(typeof t === 'number' ? t : t.seconds*1000);
-        const y = d.getFullYear();
-        const M = String(d.getMonth()+1).padStart(2,'0');
-        const D = String(d.getDate()).padStart(2,'0');
-        const h = String(d.getHours()).padStart(2,'0');
-        const m = String(d.getMinutes()).padStart(2,'0');
-        return `${M}/${D} ${h}:${m}`;
-      } catch { return ''; }
+    function renderLists(all){
+      const arr = Object.values(all);
+      const ps = arr.filter(x=>x.role==='player');
+      const sp = arr.filter(x=>x.role==='spectator');
+      playersEl.innerHTML = '';
+      spectatorsEl.innerHTML = '';
+      for(const x of ps){ playersEl.append(pill(x)); }
+      for(const x of sp){ spectatorsEl.append(pill(x)); }
     }
 
-    async function send(){
-      const text = textEl.value.trim();
-      if (!text) return;
-      if (!roomRef) return alert('まず入室してください');
-      sendBtn.disabled = true;
-      try{
-        await push(roomRef, { name: meName, text, ts: Date.now() });
-        textEl.value = '';
-        textEl.focus();
-      } finally {
-        sendBtn.disabled = false;
+    function pill(x){
+      const el = document.createElement('span');
+      el.className = 'pill' + (x.name===me.name?' me':'') + (x.name===host?' host':'');
+      el.textContent = x.name + (x.name===host?' (Host)':'');
+      return el;
+    }
+
+    function renderTable(all){
+      const entries = Object.values(all).filter(x=>x.role==='player');
+      // sort by joinedAt
+      entries.sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0));
+      tableEl.innerHTML='';
+      for (const p of entries){
+        const seat = document.createElement('div'); seat.className='seat';
+        const meta = document.createElement('div'); meta.className='meta';
+        meta.textContent = p.name + (p.name===host?' (Host)':'');
+        seat.append(meta);
+        const cards = document.createElement('div'); cards.className='cards'; cards.dataset.owner=p.name; seat.append(cards);
+        tableEl.append(seat);
       }
     }
 
+    // ====== Game logic ======
+    startBtn.addEventListener('click', startGame);
+
+    async function startGame(){
+      if (host!==me.name) return;
+      const room = me.room;
+      // load players
+      const s = await get(ref(db, `rooms/${room}/players`));
+      const all = s.val()||{}; const players = Object.values(all).filter(x=>x.role==='player');
+      if (players.length<2) { alert('2人以上で開始'); return; }
+
+      // build deck 1..12 x2
+      const deck = [];
+      for(let v=1; v<=12; v++) { deck.push({v, uid:`${v}-a`}); deck.push({v, uid:`${v}-b`}); }
+      // shuffle
+      for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
+      // deal round-robin
+      const hands = {}; const names = players.map(p=>p.name);
+      for (const n of names) hands[n] = [];
+      let idx=0; for (const c of deck){ hands[names[idx%names.length]].push({ id:c.uid, value:c.v, revealed:false }); idx++; }
+
+      // write
+      await set(ref(db, `rooms/${room}/game`), {
+        started:true,
+        createdAt: Date.now(),
+        hands
+      });
+    }
+
+    function renderGame(game){
+      if (!game) return;
+      // place cards into seats
+      for (const [owner, list] of Object.entries(game.hands||{})){
+        const seatCards = tableEl.querySelector(`.cards[data-owner="${owner}"]`);
+        if (!seatCards) continue;
+        seatCards.innerHTML='';
+        const mine = owner===me.name;
+        const arr = mine ? [...list].sort((a,b)=>a.value-b.value) : list;
+        arr.forEach((c, i)=>{
+          const d = document.createElement('div');
+          if (mine || c.revealed){
+            d.className = 'cardv mine face';
+            const n = document.createElement('div'); n.className='number'; n.textContent = c.value; d.append(n);
+          } else {
+            d.className = 'cardv back clickable';
+            d.title = `${owner} のカードを公開`;
+            d.addEventListener('click', ()=>reveal(owner, i));
+          }
+          seatCards.append(d);
+        });
+      }
+    }
+
+    async function reveal(owner, index){
+      // クリックされた側の配列 index のカードを revealed=true
+      const r = ref(db, `rooms/${me.room}/game/hands/${owner}/${index}/revealed`);
+      const s = await get(ref(db, `rooms/${me.room}/game/hands/${owner}`));
+      if (!s.exists()) return;
+      // guard: 既に公開なら何もしない
+      const list = s.val(); if (list[index]?.revealed) return;
+      await set(r, true);
+    }
+
     async function copyLink(){
-      const name = nameEl.value.trim() || 'Taro';
-      const code = /^\d{4}$/.test(codeEl.value) ? codeEl.value : '1234';
-      const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`;
+      const name = nameEl.value.trim()||'Player';
+      const room = /^\d{4}$/.test(roomEl.value)? roomEl.value : '1234';
+      const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(room)}&name=${encodeURIComponent(name)}`;
       await navigator.clipboard.writeText(url).catch(()=>{});
-      copyBtn.textContent = 'コピー済み';
-      setTimeout(()=> copyBtn.textContent = 'リンク', 1200);
+      copyBtn.textContent='コピー済み'; setTimeout(()=>copyBtn.textContent='リンク',1200);
     }
   </script>
 </body>
