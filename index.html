@@ -15,18 +15,17 @@
     --char-w:40px;
     --char-h:60px;
 
-    /* アイテムカード */
+    /* アイテムカード（指定サイズ） */
     --item-w:50px;
-    --item-h:80px;
+    --item-h:65px;
 
     /* DI */
     --di-w:70px;
     --di-h:70px;
 
-    /* テーブルの高さを少し詰める */
-    --table-h:82px;          /* ← 90 → 82 */
-    /* テーブル内部のレイアウト高さ配分 */
-    --header-h:10px;         /* ← 12 → 10（見出し高さを詰める） */
+    /* テーブルをさらにコンパクトに */
+    --table-h:80px;
+    --header-h:8px;
     --content-h: calc(var(--table-h) - var(--header-h) - 6px);
 
     /* 数字フォント */
@@ -61,7 +60,7 @@
   .menu .btn{width:220px;text-align:left}
 
   /* ゲームレイアウト */
-  .items-bar{display:flex;align-items:center;gap:8px;margin-top:2px} /* ← 上に詰める */
+  .items-bar{display:flex;align-items:center;gap:8px;margin-top:0}
   .items{display:flex;gap:6px;align-items:center;overflow-x:auto}
   .item{
     width:var(--item-w);height:var(--item-h);border:1px solid #ddd;border-radius:8px;background:#fff;
@@ -75,38 +74,30 @@
 
   /* テーブル群（縦並び） */
   .tables{
-    display:flex;flex-direction:column;gap:8px;margin-top:8px;
+    display:flex;flex-direction:column;gap:8px;margin-top:6px;
     overflow:visible;
     position:relative;
   }
   .table{
-    position:relative;
-    border:1px dashed #ddd;border-radius:10px;
-    padding:0 8px;
-    height:var(--table-h);
-    display:block;
-    background:#fff;
-    overflow:visible;
-    width:max-content;
-    z-index:0;
+    position:relative;border:1px dashed #ddd;border-radius:10px;
+    padding:0 8px;height:var(--table-h);display:block;background:#fff;
+    overflow:visible;width:max-content;z-index:0;
   }
   .table.elevated{ z-index:9999; }
 
-  /* 見出しをさらに上に詰める */
+  /* タイトルをさらに上へ */
   .t-header{
-    height:var(--header-h);
-    display:flex;align-items:center;gap:6px;
-    font-size:12px;margin-top:0;   /* ← 4px → 0 */
+    height:var(--header-h);display:flex;align-items:center;gap:6px;
+    font-size:12px;margin-top:0;
   }
   .title{text-decoration:underline;padding-right:4px}
 
   /* 中段：キャラ(左)＋手札(右) */
   .t-content{
     position:absolute;left:8px;right:8px;
-    top:calc(var(--header-h) + 4px);  /* ← 6px から詰める */
+    top:calc(var(--header-h) + 2px);
     bottom:4px;
-    display:flex;gap:8px;align-items:flex-start;
-    min-height:var(--content-h);
+    display:flex;gap:8px;align-items:flex-start;min-height:var(--content-h);
     overflow:visible;
   }
 
@@ -116,9 +107,7 @@
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
   .char-card.blank{
-    background:#f3f4f6;
-    border:1px dashed #d1d5db;
-    cursor:default;
+    background:#f3f4f6;border:1px dashed #d1d5db;cursor:default;
   }
 
   .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow:visible;flex:0 0 auto;position:relative}
@@ -139,12 +128,11 @@
     background-size:cover;background-position:center
   }
 
-  /* アルファベット＆トークン（枠外OK/最前面寄り） */
+  /* アルファベット＆トークン */
   .badge-fixed{
     position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);
     display:flex;flex-direction:column;align-items:center;
-    z-index:10000;
-    pointer-events:auto;
+    z-index:10000;pointer-events:auto;
   }
   .alpha{
     width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none;line-height:1;
@@ -171,12 +159,10 @@
   .mission{border:1px solid #eee;border-radius:10px;padding:10px}
   .mission h3{margin:0 0 8px 0;font-size:14px}
 
-  /* ミッション詳細（画面下部） */
   .mission-footer{margin-top:12px;border-top:1px solid #eee;padding-top:8px}
   .mission-footer .line{font-size:13px;line-height:1.5}
   .mission-footer .line + .line{margin-top:4px}
 
-  /* 確認/開始ポップ */
   .restart-pop,.start-pop,.seat-pop{
     position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
     background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
@@ -189,7 +175,6 @@
   .restart-actions .btn:first-child{font-size:11px;padding:4px 8px}
   .restart-actions .btn.big{flex:1}
 
-  /* 席タブ */
   .tabs{display:flex;gap:6px;flex-wrap:wrap}
   .tab{padding:6px 10px;border:1px solid #ddd;border-radius:999px;cursor:pointer;user-select:none}
   .tab.active{background:#111;color:#fff;border-color:#111}
@@ -219,12 +204,12 @@
 
     <!-- ゲーム設定／レイアウト -->
     <div id="lobby" class="hidden">
-      <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:6px">
+      <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:4px">
         <button class="btn primary" id="btnStart" title="ホストのみ">爆弾を解除！</button>
         <span class="small" id="startHint">（ホストのみ押せます）</span>
       </div>
 
-      <!-- アイテム行 -->
+      <!-- アイテム行（上部に横並び） -->
       <div class="items-bar hidden" id="itemsBar">
         <div class="items" id="items"></div>
         <div class="di" id="di"></div>
@@ -510,12 +495,12 @@ function renderLists(v){
   });
 }
 
-/* アイテム & DI */
+/* ========= アイテム & DI ========= */
 function renderItemsAndDi(v){
   if(!v || !v.started){ H(itemsBar,true); return; }
   H(itemsBar,false);
 
-  // アイテム
+  // アイテム（横並び／トップ）
   itemsEl.innerHTML='';
   (v.items||[]).forEach((it, idx)=>{
     const div=document.createElement('div');
@@ -530,7 +515,7 @@ function renderItemsAndDi(v){
       }else{
         openOneMini(ev.clientX, ev.clientY, '使用する', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
-          // 効果は別途実装ポイント
+          // ※各アイテム固有効果は今後ここに分岐実装
         });
       }
     };
@@ -541,7 +526,6 @@ function renderItemsAndDi(v){
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
-    // DIは従来の2択ポップを維持（必要ならこちらもワンボタン化可）
     openMini(ev.clientX, ev.clientY,
       '進める', async ()=>{
         const now=state.watching?.di?.value ?? val; const next=clamp(now-1,0,6);
@@ -555,14 +539,14 @@ function renderItemsAndDi(v){
   };
 }
 
-/* テーブル描画 */
+/* ========= テーブル描画 ========= */
 function renderTables(v){
   tablesEl.innerHTML='';
   if(!v) return;
 
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
 
-  /* だれか1人でも着席していたら、全員のキャラカードを表示する */
+  // だれか1人でも着席していたら、全員のキャラカードを表示する
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
 
   (v.tables||[]).forEach((t, idx)=>{
@@ -587,7 +571,7 @@ function renderTables(v){
 
     const content=document.createElement('div'); content.className='t-content';
 
-    // キャラクター
+    // キャラ
     const char=document.createElement('div'); char.className='char-card';
     if(!seatedAny){
       char.classList.add('blank');
@@ -638,15 +622,14 @@ function renderTables(v){
           const cardPath  = `${tablePath}/hand/${ci}`;
 
           if(c.token){
-            openMini(ev.clientX, ev.clientY,
-              '消す', async ()=>{
-                await update(ref(db, cardPath), { token:null });
-                const afterHas = (t.hand||[]).some(cc => cc !== c && !!cc.token);
-                box.classList.toggle('elevated', afterHas);
-              },
-              'キャンセル', ()=>{}
-            );
+            // ▼ キャンセル無しで「消す」だけ表示
+            openOneMini(ev.clientX, ev.clientY, '消す', async ()=>{
+              await update(ref(db, cardPath), { token:null });
+              const afterHas = (t.hand||[]).some(cc => cc !== c && !!cc.token);
+              box.classList.toggle('elevated', afterHas);
+            });
           }else{
+            // 数字トークンを付ける（黒地白字）
             openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
               await update(ref(db, cardPath), { token:{type:'num', value:c.num, style:'black'} });
               box.classList.add('elevated');
@@ -676,7 +659,8 @@ function renderTables(v){
   });
 }
 
-/* ワンボタンの小ポップ（キャンセル無し） */
+/* ========= ポップ ========= */
+/* ワンボタン（キャンセル無し） */
 function openOneMini(x,y, label, cb){
   const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
   div.addEventListener('click', e=>e.stopPropagation());
@@ -685,13 +669,9 @@ function openOneMini(x,y, label, cb){
   div.appendChild(b);
   document.body.appendChild(div);
 }
-
 /* 数字のみの小ポップ（ワンボタン） */
-function openNumberMini(x,y, label, cb){
-  openOneMini(x,y,label,cb);
-}
-
-/* 2択ミニポップ（DIやトークン削除用） */
+function openNumberMini(x,y, label, cb){ openOneMini(x,y,label,cb); }
+/* 2択（DIなど用） */
 function openMini(x,y, leftText,leftCb, rightText,rightCb){
   const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
   div.addEventListener('click', e=>e.stopPropagation());
@@ -715,12 +695,10 @@ function closeAllMini(e){
     if(!pop.contains(e.target)) pop.remove();
   });
 }
-
 document.addEventListener('click',(e)=>{ closeAllMini(e); outsideClose(e, menuPop); }, true);
-
 gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.contains('hidden')) updateMenuButtons(); };
 
-/* 席（タブ即決定） */
+/* ========= 席（タブ即決定） ========= */
 btnSit.onclick = ()=>{
   if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
   const v=state.watching; if(!v?.started){ alert('ゲーム開始後に席を選べます'); return; }
@@ -754,7 +732,7 @@ btnLeave.onclick = async ()=>{
   updateMenuButtons();
 };
 
-/* やり直し */
+/* ========= ゲーム開始 ========= */
 btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可'); return; } H(restartPop,false); };
 btnRestartOk.onclick = async ()=>{
   H(restartPop,true);
@@ -763,7 +741,6 @@ btnRestartOk.onclick = async ()=>{
 };
 btnRestartCancel.onclick = ()=> H(restartPop,true);
 
-/* 開始：人数＋ミッションを同時に選択 */
 btnStart.onclick = ()=>{ if(!state.isHost) return; H(startPop,false); };
 btnStartCancel.onclick = ()=> H(startPop,true);
 btnStartOk.onclick = async ()=>{
@@ -773,11 +750,17 @@ btnStartOk.onclick = async ()=>{
   await startGame(count, missionId);
 };
 
-/* ゲーム開始ロジック */
+/* ========= デッキ／ミッション ========= */
+function itemDeckNumbers(missionId){
+  // ミッションID ≤ 42 の間は 1..13、以降は 1..18
+  const max = missionId<=42 ? 13 : 18;
+  return Array.from({length:max},(_,i)=> i+1);
+}
 async function startGame(playerCount, missionId){
   if(!state.isHost) return;
   const code=state.roomCode;
 
+  // 隊長テーブル（member 5）を1つランダムに
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
   const tables=[];
@@ -786,6 +769,7 @@ async function startGame(playerCount, missionId){
     tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] });
   }
 
+  // コードデッキ（1..12 ×4）
   const deck=[];
   for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) deck.push({num:n, kind:'normal', open:false, ownerId:null}); }
   shuffle(deck);
@@ -803,9 +787,12 @@ async function startGame(playerCount, missionId){
     T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; });
   });
 
-  const all=[1,2,3,4,5,6,7,8,9,10,11,12];
-  shuffle(all);
-  const items = all.slice(0, Math.min(playerCount, all.length)).map(no=>({id:crypto.randomUUID(),no,used:false}));
+  // アイテム：ミッション指定が無ければ人数ぶん／ミッション42までは14-18を除外
+  const pool = itemDeckNumbers(missionId);
+  shuffle(pool);
+  const itemCount = playerCount; // ※必要なら mission に応じて上書きできる
+  const items = pool.slice(0, Math.min(itemCount, pool.length))
+                    .map(no=>({id:crypto.randomUUID(),no,used:false}));
 
   const missionMeta = missionInfo(missionId);
 
@@ -823,7 +810,7 @@ async function startGame(playerCount, missionId){
   H(gear,false);
 }
 
-/* ミッション表示用メタ */
+/* 表示用ミッションメタ（必要に応じて拡張） */
 function missionInfo(id){
   switch(id){
     case 1: {
