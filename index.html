@@ -6,19 +6,31 @@
 <title>BOMB　BUSTERS</title>
 <style>
   :root{
-    --card-w:24px;      /* 手札カード */
+    /* 手札カード（仕様どおり固定） */
+    --card-w:24px;
     --card-h:50px;
     --card-gap:3px;
-    --char-w:40px;      /* キャラクターカード */
+
+    /* キャラクターカード */
+    --char-w:40px;
     --char-h:60px;
-    --item-w:50px;      /* アイテムカード */
+
+    /* アイテムカード */
+    --item-w:50px;
     --item-h:80px;
-    --di-w:70px;        /* DI画像 */
+
+    /* DI */
+    --di-w:70px;
     --di-h:70px;
-    --table-h:90px;     /* テーブル高さ固定 */
-    --font-card:16px;   /* 数字フォントサイズ */
-    --font-weight:bold; /* 数字フォント太さ */
+
+    /* テーブル高さ固定 */
+    --table-h:90px;
+
+    /* 数字フォント */
+    --font-card:16px;
+    --font-weight:bold;
   }
+
   *,*::before,*::after{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fff;color:#111}
   header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eee}
@@ -43,7 +55,7 @@
   .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08)}
   .menu .btn{width:200px;text-align:left}
 
-  /* アイテム行（画面上部に1列だけ） */
+  /* アイテム行（待機中は非表示） */
   .items-bar{display:flex;align-items:center;gap:8px;margin-top:10px}
   .items{display:flex;gap:6px;align-items:center;overflow-x:auto}
   .item{
@@ -63,9 +75,9 @@
     height:var(--table-h);display:flex;flex-direction:column;gap:6px;overflow:hidden
   }
   .header{display:flex;align-items:center;gap:8px;font-size:12px}
-  .title{ text-decoration:underline; padding-right:6px } /* 左にアンダーライン＋数字or名前 */
+  .title{text-decoration:underline;padding-right:6px}
 
-  /* キャラカードは左上の数字/名前の「下」に表示 */
+  /* キャラカード（名前/数字の下） */
   .char-card{
     width:var(--char-w);height:var(--char-h);
     background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
@@ -76,11 +88,10 @@
   .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;padding-bottom:2px}
   .card{
     width:var(--card-w);height:var(--card-h);border-radius:6px;border:1px solid #ddd;position:relative;
-    background:#bbb; /* 自分の未公開（薄灰） */
-    flex:0 0 auto;display:flex;align-items:flex-start;justify-content:center;cursor:pointer;user-select:none
+    background:#bbb;flex:0 0 auto;display:flex;align-items:flex-start;justify-content:center;cursor:pointer;user-select:none
   }
-  .card.back{background:#fff url('./codeback.png') center/cover no-repeat;border-color:#ccc} /* 裏面 */
-  .card.open{background:#000} /* 公開時は黒地 */
+  .card.back{background:#fff url('./codeback.png') center/cover no-repeat;border-color:#ccc}
+  .card.open{background:#000}
   .num{
     position:absolute;top:2px;left:0;right:0;text-align:center;
     font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)
@@ -90,16 +101,16 @@
     background-size:cover;background-position:center
   }
 
-  /* アルファベット列（外側の下） */
+  /* アルファベット列 */
   .alpha-row{display:flex;gap:var(--card-gap);margin-top:4px}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none}
   .token{margin-top:2px;font-size:11px;border-radius:4px;padding:1px 0}
-  .token.equal{background:#ffedd5;color:#000}   /* ＝ */
-  .token.noteq{background:#e0f2fe;color:#000}   /* ≠ */
-  .token.x1{background:#fce7f3;color:#000}      /* x1 */
-  .token.black{background:#000;color:#fff}      /* 黒地白字（No.16用など） */
+  .token.equal{background:#ffedd5;color:#000}  /* ＝ */
+  .token.noteq{background:#e0f2fe;color:#000}  /* ≠ */
+  .token.x1{background:#fce7f3;color:#000}     /* x1 */
+  .token.black{background:#000;color:#fff}     /* 黒地白字 */
 
-  /* ミニポップ（トークンやDIの小タブ） */
+  /* 小タブ */
   .mini-pop{
     position:fixed;z-index:50;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
     display:flex;gap:6px
@@ -115,21 +126,31 @@
   .mission h3{margin:0 0 8px 0;font-size:14px}
   .bold{font-weight:700}
 
-  /* やり直し確認（小/大ボタン） */
+  /* やり直し確認 */
   .restart-pop{
     position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
     background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
     padding:14px;z-index:60;display:flex;flex-direction:column;gap:10px;min-width:260px
   }
   .restart-actions{display:flex;gap:8px;align-items:center}
-  .restart-actions .btn:first-child{font-size:11px;padding:4px 8px} /* すごく小さい「やり直す」 */
-  .restart-actions .btn.big{flex:1} /* 大きいキャンセル */
+  .restart-actions .btn:first-child{font-size:11px;padding:4px 8px}
+  .restart-actions .btn.big{flex:1}
+
+  /* 開始ポップ（人数＋ミッション同時選択） */
+  .start-pop{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
+    padding:14px;z-index:60;display:flex;flex-direction:column;gap:10px;min-width:280px
+  }
+  .start-pop .row{display:flex;gap:8px;align-items:center}
+  .start-pop label{width:84px;font-size:13px}
+  .start-pop select{flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;background:#fff}
 </style>
 </head>
 <body>
 <header>
   <h1>BOMB　BUSTERS</h1>
-  <div class="small" id="meName"></div>
+  <div class="small" id="roomInfo"></div> <!-- ← ルームコード常時表示 -->
 </header>
 
 <main>
@@ -172,24 +193,19 @@
   <div class="col side">
     <div class="panel">
       <div class="list" id="listsBox">
-        <h3>参加者</h3>
-        <div id="players"></div>
-        <h3 style="margin-top:10px">観戦者</h3>
-        <div id="spectators"></div>
+        <h3>参加者</h3><div id="players"></div>
+        <h3 style="margin-top:10px">観戦者</h3><div id="spectators"></div>
       </div>
       <div class="mission" id="missionBox">
         <h3>ミッション</h3>
-        <div class="bold">#1　爆弾</div>
-        <div>x が1つ</div>
-        <div class="bold" style="margin-top:6px">#3　さらい爆弾</div>
-        <div>x – y – z のうち1つ</div>
-        <div class="small" style="margin-top:8px">（詳細は画面下部へ。ファイル名は表示しません）</div>
+        <div id="missionTitle" class="bold">（未選択）</div>
+        <div id="missionText" class="small">開始時に人数と一緒に選びます</div>
       </div>
     </div>
   </div>
 </main>
 
-<!-- ミニポップ（トークン） -->
+<!-- トークン小タブ -->
 <div id="miniPop" class="mini-pop hidden">
   <button class="btn small" id="tokenPlace">トークンを置く</button>
   <button class="btn small ghost" id="tokenCancel">キャンセル</button>
@@ -204,15 +220,43 @@
   </div>
 </div>
 
+<!-- 開始ポップ（人数＋ミッション） -->
+<div id="startPop" class="start-pop hidden">
+  <div class="row"><label>人数</label>
+    <select id="selCount">
+      <option>2</option><option>3</option><option selected>4</option>
+      <option>5</option><option>6</option>
+    </select>
+  </div>
+  <div class="row"><label>ミッション</label>
+    <select id="selMission">
+      <option value="1">#1 爆弾</option>
+      <option value="2">#2（予備）</option>
+      <option value="3">#3 さらい爆弾</option>
+      <option value="4">#4</option>
+      <option value="5">#5</option>
+      <option value="6">#6</option>
+      <option value="7">#7</option>
+      <option value="8">#8</option>
+      <option value="9">#9</option>
+      <option value="10">#10</option>
+    </select>
+  </div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn small" id="btnStartOk">OK</button>
+    <button class="btn small ghost" id="btnStartCancel">キャンセル</button>
+  </div>
+</div>
+
 <script type="module">
-/* ===== Firebase v9 (modular) ===== */
+/* ===== Firebase v9 ===== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import {
   getDatabase, ref, get, set, update, remove,
   onValue, onDisconnect
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-/* === 提供された設定をそのまま使用 === */
+/* 設定 */
 const firebaseConfig = {
   apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
   authDomain: "chat-68c4c.firebaseapp.com",
@@ -225,14 +269,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
 
-/* ====== 状態 ====== */
+/* ===== 状態 ===== */
 const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:hiragana3(),
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null
 };
 
-/* ====== 要素 ====== */
-const meName = document.getElementById('meName');
+/* ===== 要素 ===== */
+const roomInfo = document.getElementById('roomInfo');
 const joinBox= document.getElementById('joinBox');
 const inputCode = document.getElementById('roomCode');
 const btnJoin = document.getElementById('btnJoin');
@@ -263,21 +307,32 @@ const miniPop = document.getElementById('miniPop');
 const tokenPlace=document.getElementById('tokenPlace');
 const tokenCancel=document.getElementById('tokenCancel');
 
-meName.textContent = `あなた：${state.userName}`;
+const startPop=document.getElementById('startPop');
+const selCount=document.getElementById('selCount');
+const selMission=document.getElementById('selMission');
+const btnStartOk=document.getElementById('btnStartOk');
+const btnStartCancel=document.getElementById('btnStartCancel');
 
-/* ====== ひらがな3文字 ====== */
+const missionTitle=document.getElementById('missionTitle');
+const missionText =document.getElementById('missionText');
+
+/* ひらがな3文字 */
 function hiragana3(){
   const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"];
   return Array.from({length:3},()=>h[Math.random()*h.length|0]).join('');
 }
 
-/* ====== ユーティリティ ====== */
+/* util */
 const H = (el,b)=> el.classList.toggle('hidden', !!b);
 function pos(el,x,y){el.style.left=x+'px';el.style.top=y+'px';}
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+function cssNum(name){
+  const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return parseFloat(v.replace('px',''))||0;
+}
 
-/* ====== 入室 ====== */
+/* 入室 */
 btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e6|0).padStart(6,'0'); };
 btnJoin.onclick   = ()=> enter('player');
 btnSpect.onclick  = ()=> enter('spectator');
@@ -291,30 +346,31 @@ async function enter(mode){
   const snap=await get(roomRef);
 
   if(!snap.exists()){
-    // 新規作成 → 入った人がホスト
     state.isHost=true;
     await set(roomRef, baseRoom(state.userId));
   }else{
     state.isHost = snap.val()?.hostId === state.userId;
   }
 
-  // 参加 or 観戦リストに追加
   const path = mode==='player' ? `players/${state.userId}` : `spectators/${state.userId}`;
   await set(ref(db, `rooms/${code}/${path}`), {name:state.userName, at:Date.now()});
 
-  // 切断時に自動退出 → 残0ならルーム自動削除
   onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
   onDisconnect(ref(db, `rooms/${code}/spectators/${state.userId}`)).remove();
 
-  // リスナ開始
   listenRoom(code);
 
   H(joinBox,true);
   H(lobby,false);
   H(gear,false);
+  updateHeaderInfo();
 }
 
-/* ====== ルーム初期構造 ====== */
+function updateHeaderInfo(){
+  roomInfo.textContent = state.roomCode ? `コード：${state.roomCode}　/　あなた：${state.userName}` : '';
+}
+
+/* ルーム初期構造 */
 function baseRoom(hostId){
   return {
     createdAt: Date.now(),
@@ -323,11 +379,12 @@ function baseRoom(hostId){
     items:[],
     di:{value:0,max:6},
     captainTable:null,
+    mission:null,
     players:{}, spectators:{}
   };
 }
 
-/* ====== 監視 ====== */
+/* 監視 */
 function listenRoom(code){
   onValue(ref(db, `rooms/${code}`),(snap)=>{
     const v=snap.val();
@@ -345,14 +402,27 @@ function listenRoom(code){
     renderLists(v);
     renderItemsAndDi(v);
     renderTables(v);
+    renderMission(v);
 
     state.gameStarted=!!v?.started;
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
+
+    updateHeaderInfo(); // ← ゲーム開始後も上部にコード表示
   });
 }
 
-/* ====== 参加/観戦リスト描画 ====== */
+function renderMission(v){
+  if(!v?.mission){
+    missionTitle.textContent='（未選択）';
+    missionText.textContent='開始時に人数と一緒に選びます';
+    return;
+  }
+  missionTitle.textContent = `#${v.mission.id} ${v.mission.name||''}`.trim();
+  missionText.textContent  = v.mission.desc || '';
+}
+
+/* リスト描画 */
 function renderLists(v){
   playersEl.innerHTML=''; specsEl.innerHTML='';
   if(!v) return;
@@ -364,7 +434,7 @@ function renderLists(v){
   });
 }
 
-/* ====== アイテム & DI（待機中は非表示） ====== */
+/* アイテム & DI */
 function renderItemsAndDi(v){
   if(!v || !v.started){ H(itemsBar,true); return; }
   H(itemsBar,false);
@@ -376,11 +446,10 @@ function renderItemsAndDi(v){
     div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item (${it.no}).jpg")`;
     div.onclick=(ev)=>{
-      // タップ → 「使用する/キャンセル」
       openMini(ev.clientX, ev.clientY,
         '使用する', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
-          // 効果フックはここに（＝/≠/x1等の発火）
+          // TODO: ＝ / ≠ / x1 などの効果をここに
         },
         'キャンセル', ()=>{}
       );
@@ -405,12 +474,20 @@ function renderItemsAndDi(v){
   };
 }
 
-/* ====== テーブル描画 ====== */
+/* テーブル描画（幅＝手札枚数で都度算出／高さ90固定） */
 function renderTables(v){
   tablesEl.innerHTML='';
   if(!v) return;
+
+  const W = cssNum('--card-w'), G = cssNum('--card-gap');
+
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table';
+
+    /* 横幅を手札枚数から動的算出（カード幅×枚数＋隙間）＋左右余白 */
+    const n = (t.hand||[]).length;
+    const inner = n>0 ? (n*W + (n-1)*G) : 0;
+    box.style.width = (inner + 16) + 'px';
 
     // 左のアンダーライン…着席済みなら「名前」、未着なら「番号」
     const header=document.createElement('div'); header.className='header';
@@ -422,7 +499,6 @@ function renderTables(v){
     const char=document.createElement('div'); char.className='char-card';
     const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
     char.style.backgroundImage = `url("${face}")`;
-    char.title='キャラクターカード';
     char.onclick=async ()=>{
       await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped});
     };
@@ -434,10 +510,9 @@ function renderTables(v){
       const card=document.createElement('div'); card.className='card';
       const isMine = c.ownerId === state.userId;
 
-      if(!isMine && !c.open) card.classList.add('back');   // 他人の未公開は裏
-      if(c.open) card.classList.add('open');               // 公開は黒地
+      if(!isMine && !c.open) card.classList.add('back');
+      if(c.open) card.classList.add('open');
 
-      // クリック（自分のカードだけトグル）
       if(isMine){
         card.onclick=async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open});
@@ -449,7 +524,6 @@ function renderTables(v){
       num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
       card.appendChild(num);
 
-      // 下詰め画像（通常/赤/黄）…表示のみ。ファイル名はUIに出さない
       const bot=document.createElement('div'); bot.className='img-bottom';
       let img='codenumber.png';
       if(c.kind==='red') img='redcode.png';
@@ -462,18 +536,16 @@ function renderTables(v){
     });
     box.appendChild(hand);
 
-    // アルファベット列（外側の下）
+    // アルファベット列
     const arow=document.createElement('div'); arow.className='alpha-row';
     (t.hand||[]).forEach((c,ci)=>{
       const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
-      // 既存トークン描画
       if(c.token){
         const tk=document.createElement('div');
         tk.className='token ' + (c.token.style||'');
         tk.textContent = c.token.type==='num' || c.token.style==='black' ? c.token.value : c.token.type;
         a.appendChild(tk);
       }
-      // 自分のカードのアルファベットだけ反応 → ミニタブ「トークンを置く」
       if(c.ownerId===state.userId){
         a.onclick=(ev)=>{
           openMiniToken(ev.clientX, ev.clientY, async ()=>{
@@ -491,14 +563,13 @@ function renderTables(v){
   });
 }
 
-/* ====== ミニポップ ====== */
+/* 小タブ */
 let tokenCb=null;
 function openMiniToken(x,y, cb){
   tokenCb=cb; pos(miniPop,x,y); H(miniPop,false);
 }
 tokenPlace.onclick = ()=>{ tokenCb&&tokenCb(); H(miniPop,true); tokenCb=null; };
 tokenCancel.onclick= ()=>{ H(miniPop,true); tokenCb=null; };
-
 function openMini(x,y, leftText,leftCb, rightText,rightCb){
   const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
   const b1=document.createElement('button'); b1.className='btn small'; b1.textContent=leftText;
@@ -510,13 +581,12 @@ function openMini(x,y, leftText,leftCb, rightText,rightCb){
   setTimeout(()=>{ if(div.isConnected) div.remove(); }, 6000);
 }
 
-/* ====== 歯車メニュー ====== */
+/* 歯車 */
+const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
+document.addEventListener('click',(e)=>{ outsideClose(e, menuPop); if(!miniPop.contains(e.target)) H(miniPop,true); }, true);
 gear.onclick=()=> menuPop.classList.toggle('hidden');
-document.addEventListener('click',(e)=>{
-  if(!gear.contains(e.target) && !menuPop.contains(e.target)) H(menuPop,true);
-}, true);
 
-/* ====== 席に座る/立つ ====== */
+/* 席 */
 btnSit.onclick = async ()=>{
   if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
   const v=state.watching; if(!v?.started){ alert('ゲーム開始後に席を選べます'); return; }
@@ -525,98 +595,98 @@ btnSit.onclick = async ()=>{
   const s=prompt(`空席番号を入力：${empties.map(i=>i+1).join(', ')}`); if(!s) return;
   const pick=(parseInt(s,10)||0)-1; if(!empties.includes(pick)){ alert('その席は選べません'); return; }
 
-  // 着席 → playerName設定 & 手札オーナー付与
   await update(ref(db, `rooms/${state.roomCode}/tables/${pick}`), {playerId:state.userId, playerName:state.userName});
-  const hand=v.tables[pick].hand||[];
+  const hand=(state.watching.tables[pick].hand||[]);
   await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${pick}/hand/${i}`), {ownerId:state.userId})));
   state.seatedTable=pick;
 };
-
 btnLeave.onclick = async ()=>{
-  const v=state.watching; if(state.seatedTable==null){ alert('席に座っていません'); return; }
+  if(state.seatedTable==null){ alert('席に座っていません'); return; }
   const idx=state.seatedTable;
+  const hand=(state.watching.tables[idx].hand||[]);
   await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
-  const hand=v.tables[idx].hand||[];
   await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
   state.seatedTable=null;
 };
 
-/* ====== やり直し ====== */
-btnRestart.onclick = ()=>{
-  if(!state.isHost){ alert('ホストのみ操作可'); return; }
-  H(restartPop,false);
-};
+/* やり直し */
+btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可'); return; } H(restartPop,false); };
 restartPop.querySelectorAll('.btn')[0].onclick = async ()=>{
   H(restartPop,true);
   const v=state.watching; if(!v) return;
-  await startGame(v.tableCount); // 同数で再配布
+  await startGame(v.tableCount, v.mission?.id || 1); // 同じ人数＆ミッションで再配布
 };
 restartPop.querySelectorAll('.btn')[1].onclick = ()=> H(restartPop,true);
 
-/* ====== ゲーム開始 ====== */
-btnStart.onclick = async ()=>{
-  if(!state.isHost) return;
-  const pc = clamp(parseInt(prompt('プレイ人数（2〜6目安）','4')||'4',10),1,6);
-  await startGame(pc);
+/* 開始：人数＋ミッションを同時に選択 */
+btnStart.onclick = ()=>{ if(!state.isHost) return; H(startPop,false); };
+btnStartCancel.onclick = ()=> H(startPop,true);
+btnStartOk.onclick = async ()=>{
+  const count = clamp(parseInt(selCount.value,10),1,6);
+  const missionId = parseInt(selMission.value,10);
+  H(startPop,true);
+  await startGame(count, missionId);
 };
 
-async function startGame(playerCount){
+/* ゲーム開始（ミッションの保存込み） */
+async function startGame(playerCount, missionId){
   if(!state.isHost) return;
   const code=state.roomCode;
 
-  // テーブル生成（縦並び／高さ固定）
+  // 1テーブルに必ず隊長（member 5）／他は1..4を重複なしで
   const captainIndex = Math.floor(Math.random()*playerCount);
-  const faces=[1,2,3,4];
-  shuffle(faces);
+  const faces=[1,2,3,4]; shuffle(faces);
   const tables=[];
   for(let i=0;i<playerCount;i++){
-    const face = (i===captainIndex) ? 'member (5).jpg' : `member (${faces[(i%4)]}).jpg`;
-    tables.push({
-      titleNumber:i+1,
-      playerId:null, playerName:null,
-      character:{face, flipped:false},
-      hand:[]
-    });
+    const face = (i===captainIndex) ? 'member (5).jpg' : `member (${faces[i%4]}).jpg`;
+    tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] });
   }
 
-  // デッキ（1..12 ×4）をシャッフルし、均等でなくても余りなく順番配り
+  // デッキ（1..12 ×4）／配布：均等でなくても余りなく順配り
   const deck=[];
   for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) deck.push({num:n, kind:'normal', open:false, ownerId:null}); }
   shuffle(deck);
-
   const alpha="abcdefghijklmnopqrstuvwxyz";
+
   let p=0;
   while(p<deck.length){
     for(let t=0; t<playerCount && p<deck.length; t++){
-      const c=deck[p++];
-      const a = alpha[ tables[t].hand.length % alpha.length ];
+      const c=deck[p++], a=alpha[ tables[t].hand.length % alpha.length ];
       tables[t].hand.push({...c, alpha:a, token:null});
     }
   }
 
-  // アイテム（待機中は非表示）…人数ぶん配布。ミッション42までは14〜18を除外 → ここでは除外。
-  const all=[1,2,3,4,5,6,7,8,9,10,11,12/*,13,14,15,16,17,18*/];
+  // アイテム（待機中は非表示）…ここでは14〜18は配らない
+  const all=[1,2,3,4,5,6,7,8,9,10,11,12];
   shuffle(all);
   const items = all.slice(0, Math.min(playerCount, all.length)).map(no=>({id:crypto.randomUUID(),no,used:false}));
 
-  // 反映
+  // ミッション情報（保存＆右パネル表示用）
+  const missionMeta = missionInfo(missionId);
+
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
     started:true,
     tableCount:playerCount,
     tables, items,
-    di:{value:playerCount, max:6}, // 開始時は「di＋プレイ人数」
-    captainTable: captainIndex
+    di:{value:playerCount, max:6},
+    captainTable: captainIndex,
+    mission: missionMeta
   });
-
-  // UI
-  H(gear,false);
 }
 
-/* ====== クリック外しでミニポップ閉じる ====== */
+function missionInfo(id){
+  switch(id){
+    case 1: return {id:1, name:'爆弾', desc:'x が1つ'};
+    case 3: return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ'};
+    default: return {id, name:`#${id}`, desc:''};
+  }
+}
+
+/* クリック外しで小ポップ閉じる */
 document.addEventListener('click',(e)=>{
-  if(!miniPop.contains(e.target)){ H(miniPop,true); }
+  if(!miniPop.contains(e.target)) H(miniPop,true);
 }, true);
 </script>
 </body>
