@@ -144,10 +144,16 @@
   .token.x1{background:#fce7f3;color:#000}
   .token.black{background:#000;color:#fff}
 
-  /* ポップは絶対最前面 */
+  /* ===== ポップ専用 最上位レイヤー ===== */
+  .pop-layer{
+    position:fixed;inset:0;z-index:2147483647;pointer-events:none;
+  }
+  /* ポップ（常に最前面） */
   .mini-pop{
-    position:fixed;z-index:999999;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
-    display:flex;gap:6px
+    position:fixed; /* ビューポート基準 */
+    z-index:2147483647;
+    background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
+    display:flex;gap:6px;pointer-events:auto;
   }
 
   /* 右パネル */
@@ -251,6 +257,9 @@
 
 <!-- 旧miniPop互換ダミー -->
 <div id="miniPop" class="mini-pop hidden"></div>
+
+<!-- ポップ専用レイヤー（最前面） -->
+<div id="popLayer" class="pop-layer"></div>
 
 <!-- やり直し確認 -->
 <div id="restartPop" class="restart-pop hidden">
@@ -373,6 +382,9 @@ const missionDetailBody  = document.getElementById('missionDetailBody');
 const seatPop = document.getElementById('seatPop');
 const seatTabs= document.getElementById('seatTabs');
 const btnSeatCancel=document.getElementById('btnSeatCancel');
+
+/* ポップ専用レイヤー */
+const popLayer = document.getElementById('popLayer');
 
 /* ひらがな3文字 */
 function hiragana3(){
@@ -511,16 +523,15 @@ function renderItemsAndDi(v){
     div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item (${it.no}).jpg")`;
     div.onclick=(ev)=>{
-      // 使用済み→「表にする」だけ、未使用→「使用する」だけ
+      // 使用済み→「表にする」だけ、未使用→「使用する」だけ（キャンセル無し）
       if(it.used){
         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
-          // 使用回数ロールバック（安全のため適用しない。必要ならここで減算）
         });
       }else{
         openOneMini(ev.clientX, ev.clientY, '使用する', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
-          // ====== アイテム効果の使用回数カウント ======
+          // 使用回数カウント（アイテム1,12,14）
           const path=`rooms/${state.roomCode}/meta/itemUses`;
           const uses = state.watching?.meta?.itemUses || {i1:0,i12:0,i14:0};
           if(it.no===1)   await update(ref(db, path), {i1:(uses.i1||0)+1});
@@ -536,16 +547,16 @@ function renderItemsAndDi(v){
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
-    openMini(ev.clientX, ev.clientY,
-      '進める', async ()=>{
+    openMenu(ev.clientX, ev.clientY, [
+      {label:'進める', action: async ()=>{
         const now=state.watching?.di?.value ?? val; const next=clamp(now-1,0,6);
         await update(ref(db, `rooms/${state.roomCode}/di`), {value:next});
-      },
-      '戻す', async ()=>{
+      }},
+      {label:'戻す', action: async ()=>{
         const now=state.watching?.di?.value ?? val; const next=clamp(now+1,0,6);
         await update(ref(db, `rooms/${state.roomCode}/di`), {value:next});
-      }
-    );
+      }},
+    ]);
   };
 }
 
@@ -595,7 +606,7 @@ function renderTables(v){
     if(!seatedAny){
       char.classList.add('blank');
     } else {
-      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg')}`;
       char.style.backgroundImage = `url("${face}")`;
       char.onclick=async ()=>{
         await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped});
@@ -644,36 +655,39 @@ function renderTables(v){
           const canNoteq = (counts.noteq < caps.noteq);
           const canX1    = (counts.x1 < caps.x1);
 
-          // 既にトークンがある場合：タイプ別に「消す」or 数字再指定
           if(c.token){
+            // 既にトークンがある：値の再指定 or 消す
             const entries = [];
-            // 再指定（数字はそのカードの数）
+            // 数字再指定
             if(c.token.type==='equal' || c.token.type==='noteq' || c.token.type==='x1' || c.token.style==='black'){
               entries.push({label:String(c.num), action: async ()=>{
-                // 既に同タイプなら値だけ更新、タイプ違いならカウント調整無し（値のみ）
-                await update(ref(db, cardPath), { token:{...(c.token.style==='black'?{type:'num',style:'black'}:{type:c.token.type}), value:c.num, style:(c.token.style|| (c.token.type==='equal'?'equal':c.token.type==='noteq'?'noteq':c.token.type==='x1'?'x1':'black'))} });
+                await update(ref(db, cardPath), {
+                  token: (c.token.style==='black')
+                    ? {type:'num', value:c.num, style:'black'}
+                    : {type:c.token.type, value:c.num, style:c.token.style}
+                });
               }});
             }
-            // 消す（グローバルカウントも減算）
+            // 消す（グローバル減算）
             entries.push({label:'消す', action: async ()=>{
-              const t = c.token;
+              const tkn = c.token;
               await update(ref(db, cardPath), { token:null });
-              if(t?.type==='equal') await incToken('equal', -1);
-              if(t?.type==='noteq') await incToken('noteq', -1);
-              if(t?.type==='x1')    await incToken('x1', -1);
+              if(tkn?.type==='equal') await incToken('equal', -1);
+              if(tkn?.type==='noteq') await incToken('noteq', -1);
+              if(tkn?.type==='x1')    await incToken('x1', -1);
               const afterHas = (t.hand||[]).some(cc => cc !== c && !!cc.token);
               box.classList.toggle('elevated', afterHas);
             }});
             openMenu(ev.clientX, ev.clientY, entries);
           }else{
-            // 何も付いていない場合：選択肢を動的に
+            // 未設定：可用なものだけ出す
             const entries = [];
-            // 常に「数字トークン」（黒）を許可
+            // 常に数字（黒）
             entries.push({label:String(c.num), action: async ()=>{
               await update(ref(db, cardPath), { token:{type:'num', value:c.num, style:'black'} });
               box.classList.add('elevated');
             }});
-            // アイテム1（=）
+            // ＝（アイテム1）
             if(canEqual){
               entries.push({label:'＝', action: async ()=>{
                 await update(ref(db, cardPath), { token:{type:'equal', value:c.num, style:'equal'} });
@@ -681,7 +695,7 @@ function renderTables(v){
                 box.classList.add('elevated');
               }});
             }
-            // アイテム12（≠）
+            // ≠（アイテム12）
             if(canNoteq){
               entries.push({label:'≠', action: async ()=>{
                 await update(ref(db, cardPath), { token:{type:'noteq', value:c.num, style:'noteq'} });
@@ -689,7 +703,7 @@ function renderTables(v){
                 box.classList.add('elevated');
               }});
             }
-            // アイテム14（x1）
+            // x1（アイテム14）
             if(canX1){
               entries.push({label:'x1', action: async ()=>{
                 await update(ref(db, cardPath), { token:{type:'x1', value:c.num, style:'x1'} });
@@ -725,7 +739,7 @@ function renderTables(v){
     tablesEl.appendChild(box);
   });
 
-  // トークンカウントの加減算
+  // トークン総数の加減算
   async function incToken(kind, delta){
     const path = `rooms/${state.roomCode}/meta/tokenCounts`;
     const now = (state.watching?.meta?.tokenCounts||{})[kind]||0;
@@ -741,9 +755,9 @@ function openOneMini(x,y, label, cb){
   const b=document.createElement('button'); b.className='btn small'; b.textContent=label;
   b.onclick=()=>{ if(div.isConnected) div.remove(); cb&&cb(); };
   div.appendChild(b);
-  document.body.appendChild(div);
+  popLayer.appendChild(div);
 }
-/* 可変メニュー */
+/* 可変メニュー（ボタン並べ） */
 function openMenu(x,y, entries){
   const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
   div.addEventListener('click', e=>e.stopPropagation());
@@ -752,7 +766,7 @@ function openMenu(x,y, entries){
     b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); };
     div.appendChild(b);
   });
-  document.body.appendChild(div);
+  popLayer.appendChild(div);
 }
 /* 2択（DIなど用） */
 function openMini(x,y, leftText,leftCb, rightText,rightCb){
@@ -832,6 +846,7 @@ function itemDeckNumbers(missionId){
   const max = missionId<=42 ? 13 : 18;
   return Array.from({length:max},(_,i)=> i+1);
 }
+
 async function startGame(playerCount, missionId){
   if(!state.isHost) return;
   const code=state.roomCode;
