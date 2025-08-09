@@ -1,882 +1,623 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>BOMB BUSTERS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BOMB　BUSTERS</title>
 <style>
   :root{
-    --gap:10px;
-
-    /* 数字カード（手札） */
-    --cardW:24px;
-    --cardH:50px;
-    --cardGap:3px;
-
-    /* キャラクターカード */
-    --avatarW:40px;
-    --avatarH:60px;
-
-    /* ラベル列（席ラベル＋下線＋キャラカード）幅 */
-    --labelW:72px;
+    --card-w:24px;      /* 手札カード */
+    --card-h:50px;
+    --card-gap:3px;
+    --char-w:40px;      /* キャラクターカード */
+    --char-h:60px;
+    --item-w:50px;      /* アイテムカード */
+    --item-h:80px;
+    --di-w:70px;        /* DI画像 */
+    --di-h:70px;
+    --table-h:90px;     /* テーブル高さ固定 */
+    --font-card:16px;   /* 数字フォントサイズ */
+    --font-weight:bold; /* 数字フォント太さ */
   }
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#fff;color:#111}
-  header{padding:16px;border-bottom:1px solid #eee;text-align:center;font-weight:800;letter-spacing:.04em}
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fff;color:#111}
+  header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eee}
+  h1{margin:0;font-size:18px}
+  .small{font-size:12px;opacity:.75}
 
-  .container{display:flex;gap:var(--gap);padding:12px}
-  .main{flex:1;min-width:0}
-  .panel{border:1px solid #eee;border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);background:#fff}
-  .side{width:280px}
-  .hidden{display:none !important}
-  input[type="text"], input[type="number"]{width:100%;padding:12px;border:1px solid #ddd;border-radius:12px}
-  button{padding:10px 14px;border:1px solid #ddd;background:#fff;border-radius:12px;cursor:pointer}
-  button.primary{background:#111;color:#fff;border-color:#111}
-  button:disabled{opacity:.55;cursor:not-allowed}
-  .row{display:flex;gap:10px;align-items:center}
-  .row>*{flex:1}
-  .muted{color:#666;font-size:12px}
-  .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #eee;padding:6px 10px;border-radius:999px;font-size:13px;background:#fafafa}
-  .list{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto}
+  main{padding:10px 12px;display:flex;gap:12px}
+  .col{flex:1;min-width:0}
+  .side{width:38%;max-width:420px}
 
-  /* ====== テーブル（席） ====== */
-  .tablesArea{display:flex;flex-direction:column;gap:10px} /* 縦並び */
-  .table{border:1px solid #eee;border-radius:12px;padding:8px;display:inline-block;max-width:100%;overflow-x:auto;overflow-y:hidden;height:90px} /* ← 高さ固定 */
-  .tableRow{display:grid;grid-template-columns: var(--labelW) auto; gap:8px; align-items:stretch; width:fit-content}
-  .tableLabel{display:flex;flex-direction:column;align-items:center;gap:4px;width:var(--labelW)}
-  .labelMain{font-size:12px;font-weight:700;line-height:1;text-align:center;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-  .underline{width:100%;border-top:2px solid #111;margin-top:4px}
-  .avatar{width:var(--avatarW);height:var(--avatarH);border:1px solid #ccc;border-radius:6px;cursor:pointer;background:#fff center/cover no-repeat}
+  .join-box{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .join-box input{padding:8px;border:1px solid #ddd;border-radius:6px}
+  .btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#f8f8f8;cursor:pointer}
+  .btn.primary{background:#111;color:#fff;border-color:#111}
+  .btn.small{padding:6px 10px;font-size:12px}
+  .btn.big{padding:12px 14px;font-size:16px}
+  .btn.ghost{background:transparent}
+  .hidden{display:none!important}
 
-  /* 手札（横一列, 15枚並ぶ幅感） */
-  .hand{display:flex;gap:var(--cardGap);flex-wrap:nowrap}
+  /* 右下の歯車 */
+  .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer}
+  .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08)}
+  .menu .btn{width:200px;text-align:left}
 
-  /* 1枚（カード＋下の文字） */
-  .cardWrap{display:flex;flex-direction:column;align-items:center;position:relative}
-  .letterCell{width:var(--cardW);border:1px solid #eee;border-radius:4px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px;margin-top:2px}
-  .letterLabel{font-size:10px;line-height:1;cursor:pointer;user-select:none}
-  .token{font-size:10px;font-weight:700}
-  .eqMark{font-size:10px;font-weight:700;padding:2px 4px;border-radius:6px;background:#ffd9b3;border:1px solid #e2a56a;color:#000;cursor:pointer}
-  .neqMark{font-size:10px;font-weight:700;padding:2px 4px;border-radius:6px;background:#cfefff;border:1px solid #74b6e3;color:#000;cursor:pointer}
-  .x1Mark{font-size:10px;font-weight:700;padding:2px 4px;border-radius:6px;background:#ffc1d6;border:1px solid #e08aae;color:#000;cursor:pointer}
+  /* アイテム行（画面上部に1列だけ） */
+  .items-bar{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .items{display:flex;gap:6px;align-items:center;overflow-x:auto}
+  .item{
+    width:var(--item-w);height:var(--item-h);border:1px solid #ddd;border-radius:8px;background:#fff;
+    background-size:cover;background-position:center;position:relative;cursor:pointer;flex:0 0 auto
+  }
+  .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
+  .di{
+    margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;border:1px solid #ddd;background:#fff;
+    background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
+  }
 
-  /* 小タブ（レタークリック時） */
-  .floatTab{position:absolute;font-size:11px;padding:6px 8px;border-radius:10px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.12);z-index:40}
+  /* テーブル群（縦並び） */
+  .tables{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+  .table{
+    border:1px dashed #ddd;border-radius:10px;padding:8px;position:relative;
+    height:var(--table-h);display:flex;flex-direction:column;gap:6px;overflow:hidden
+  }
+  .header{display:flex;align-items:center;gap:8px;font-size:12px}
+  .title{ text-decoration:underline; padding-right:6px } /* 左にアンダーライン＋数字or名前 */
 
-  /* ====== 数字カード ====== */
-  .card{width:var(--cardW);height:var(--cardH);border-radius:6px;border:1px solid #000;overflow:hidden;user-select:none;position:relative}
-  .cardInner{display:grid;grid-template-rows:16px 1fr;height:100%}
-  .numTop{display:grid;place-items:center;font-weight:bold;font-size:16px} /* 指定: 16px / bold */
-  .lowerArea{width:100%;height:100%;background-position:center bottom;background-repeat:no-repeat;background-size:contain}
-  .isBack{background:url("codeback.png") center/cover no-repeat;border-color:#ccc}
-  .isBack .numTop{visibility:hidden}
-  .isFacePrivate{background:#bbb;color:#fff;border-color:#bbb}
-  .isFacePublic{background:#000;color:#fff;border-color:#000;outline:2px solid #0a7}
+  /* キャラカードは左上の数字/名前の「下」に表示 */
+  .char-card{
+    width:var(--char-w);height:var(--char-h);
+    background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
+    cursor:pointer;user-select:none
+  }
 
-  /* ====== アイテム行 ====== */
-  .itemsPanel{display:flex;flex-direction:column;gap:6px}
-  .itemsRowWrap{display:flex;gap:10px;align-items:center}
-  .itemsRow{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;flex:1}
-  .itemImg{width:50px;height:80px;border:1px solid #ddd;border-radius:8px;background:#fff center/cover no-repeat;cursor:pointer;user-select:none;position:relative}
-  .itemUsed{background:#fff url("itemback.jpg") center/cover no-repeat !important;cursor:default}
-  .itemOverlay{position:absolute;inset:auto 4px 4px 4px;min-height:18px;border-radius:6px;background:#000;color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+  /* 手札（中央） */
+  .hand{display:flex;align-items:flex-start;gap:var(--card-gap);overflow-x:auto;padding-bottom:2px}
+  .card{
+    width:var(--card-w);height:var(--card-h);border-radius:6px;border:1px solid #ddd;position:relative;
+    background:#bbb; /* 自分の未公開（薄灰） */
+    flex:0 0 auto;display:flex;align-items:flex-start;justify-content:center;cursor:pointer;user-select:none
+  }
+  .card.back{background:#fff url('./codeback.png') center/cover no-repeat;border-color:#ccc} /* 裏面 */
+  .card.open{background:#000} /* 公開時は黒地 */
+  .num{
+    position:absolute;top:2px;left:0;right:0;text-align:center;
+    font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)
+  }
+  .img-bottom{
+    position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;
+    background-size:cover;background-position:center
+  }
 
-  .diBox{display:flex;align-items:center;gap:6px;margin-left:auto}
-  .diImg{width:70px;height:70px;border:1px solid #eee;border-radius:8px;cursor:pointer;background:#fff;object-fit:cover}
+  /* アルファベット列（外側の下） */
+  .alpha-row{display:flex;gap:var(--card-gap);margin-top:4px}
+  .alpha{width:var(--card-w);text-align:center;font-size:11px;cursor:pointer;user-select:none}
+  .token{margin-top:2px;font-size:11px;border-radius:4px;padding:1px 0}
+  .token.equal{background:#ffedd5;color:#000}   /* ＝ */
+  .token.noteq{background:#e0f2fe;color:#000}   /* ≠ */
+  .token.x1{background:#fce7f3;color:#000}      /* x1 */
+  .token.black{background:#000;color:#fff}      /* 黒地白字（No.16用など） */
 
-  @media (max-width:900px){.container{flex-direction:column}.side{width:auto}}
+  /* ミニポップ（トークンやDIの小タブ） */
+  .mini-pop{
+    position:fixed;z-index:50;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
+    display:flex;gap:6px
+  }
+
+  /* 右パネル */
+  .panel{display:flex;flex-direction:column;gap:10px}
+  .list{border:1px solid #eee;border-radius:10px;padding:8px}
+  .list h3{margin:0 0 6px 0;font-size:13px}
+  .name{padding:4px 6px;border-radius:6px}
+  .muted{opacity:.6}
+  .mission{border:1px solid #eee;border-radius:10px;padding:10px}
+  .mission h3{margin:0 0 8px 0;font-size:14px}
+  .bold{font-weight:700}
+
+  /* やり直し確認（小/大ボタン） */
+  .restart-pop{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
+    padding:14px;z-index:60;display:flex;flex-direction:column;gap:10px;min-width:260px
+  }
+  .restart-actions{display:flex;gap:8px;align-items:center}
+  .restart-actions .btn:first-child{font-size:11px;padding:4px 8px} /* すごく小さい「やり直す」 */
+  .restart-actions .btn.big{flex:1} /* 大きいキャンセル */
 </style>
 </head>
 <body>
-<header>BOMB BUSTERS</header>
+<header>
+  <h1>BOMB　BUSTERS</h1>
+  <div class="small" id="meName"></div>
+</header>
 
-<!-- Join -->
-<section id="joinView" class="container">
-  <div class="main panel" style="max-width:560px;margin:0 auto;">
-    <div class="row">
-      <input id="roomCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="ルームコード（例: 1234）">
-      <button id="joinBtn" class="primary">入室</button>
+<main>
+  <div class="col">
+    <!-- 入室UI -->
+    <div class="join-box" id="joinBox">
+      <input id="roomCode" placeholder="ルームコード" maxlength="12" />
+      <button class="btn" id="btnSpectate">観戦で入室</button>
+      <button class="btn primary" id="btnJoin">参加で入室</button>
+      <button class="btn ghost" id="btnRandom">コード作成</button>
+      <span class="small">入室後、右下の歯車から席を決められます</span>
     </div>
-    <div class="muted" style="margin-top:8px;">入室後に「参加」か「観戦」を選べます。名前は自動付与（ひらがな3文字）。</div>
-  </div>
-</section>
 
-<!-- Role select -->
-<section id="roleView" class="container hidden">
-  <div class="main panel" style="max-width:560px;margin:0 auto;">
-    <div class="row" style="justify-content:center">
-      <button id="asPlayer" class="primary">参加</button>
-      <button id="asSpectator">観戦</button>
-    </div>
-    <div id="whoami" class="muted" style="margin-top:8px;"></div>
-  </div>
-</section>
-
-<!-- Lobby/Game -->
-<section id="gameView" class="container hidden">
-  <div class="main">
-
-    <div id="lobbyPanel" class="panel">
-      <div class="row" style="justify-content:space-between;">
-        <div>
-          <div class="muted">ルームコード</div>
-          <div class="section-title" style="font-weight:800">#<span id="roomCodeLabel"></span></div>
-          <div class="muted">あなた: <span id="nameLabel"></span>（<span id="roleLabel"></span>）</div>
-        </div>
-        <div class="row" style="flex:none;gap:8px">
-          <button id="startBtn" class="primary hidden">爆弾を解除！</button>
-          <button id="leaveBtn">退室</button>
-        </div>
+    <!-- ロビー/ゲーム -->
+    <div id="lobby" class="hidden">
+      <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button class="btn primary" id="btnStart" title="ホストのみ">爆弾を解除！</button>
+        <span class="small" id="startHint">（ホストのみ押せます）</span>
       </div>
-    </div>
 
-    <!-- Items -->
-    <div id="itemsPanel" class="panel itemsPanel hidden">
-      <div class="itemsRowWrap">
-        <div id="itemsRow" class="itemsRow"></div>
-        <div class="diBox">
-          <img id="diImg" class="diImg" alt="">
-        </div>
+      <!-- アイテム行（待機中は非表示） -->
+      <div class="items-bar hidden" id="itemsBar">
+        <div class="items" id="items"></div>
+        <div class="di" id="di"></div>
       </div>
-    </div>
 
-    <!-- Tables（縦並び） -->
-    <div id="tablesPanel" class="panel" style="margin-top:12px;">
-      <div id="tablesArea" class="tablesArea"></div>
-    </div>
+      <!-- テーブル（縦並び） -->
+      <div class="tables" id="tables"></div>
 
-    <!-- Mission details（タイトルは出さない） -->
-    <div id="missionPanel" class="panel hidden">
-      <div id="missionLines"></div>
-    </div>
-  </div>
-
-  <!-- Side: lists（開始後は消える） -->
-  <aside id="sidePanel" class="side panel">
-    <div class="section-title">参加者</div>
-    <div id="playersList" class="list"></div>
-    <div class="section-title" style="margin-top:12px;">観戦者</div>
-    <div id="spectatorsList" class="list"></div>
-    <div class="muted" style="margin-top:12px;">※ ゲーム開始後、この枠は非表示になります。</div>
-  </aside>
-</section>
-
-<!-- Start Wizard -->
-<div id="startModal" class="modal hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50">
-  <div class="sheet" style="background:#fff;border-radius:16px;max-width:520px;width:calc(100% - 32px);padding:16px;border:1px solid #eee">
-    <div style="font-weight:800;">プレイ人数を選択</div>
-    <div class="row" style="gap:8px;align-items:center;margin-top:8px">
-      <input id="seatCountInput" type="number" min="2" max="12" value="4" />
-      <button id="seatNext" class="primary" style="flex:none">次へ</button>
-    </div>
-    <div id="missionStep" class="hidden" style="margin-top:12px;">
-      <div style="font-weight:800;">ミッションを選択（1〜10）</div>
-      <div id="missionChoices" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px"></div>
-      <div class="muted" style="margin-top:8px;">
-        1：1.5/2.5/3.5/4.5のうち1枚混入。 / 2：各席ランダム1枚を右端固定（他は昇順）。 / 3：候補3種提示→1枚混入。
+      <!-- 設定FAB -->
+      <button class="fab hidden" id="gear" title="設定">⚙</button>
+      <div class="menu hidden" id="menuPopup">
+        <button class="btn" id="btnSit">席に座る</button>
+        <button class="btn" id="btnLeaveSeat">席を立つ</button>
+        <button class="btn" id="btnRestart">やり直す</button>
       </div>
     </div>
   </div>
+
+  <div class="col side">
+    <div class="panel">
+      <div class="list" id="listsBox">
+        <h3>参加者</h3>
+        <div id="players"></div>
+        <h3 style="margin-top:10px">観戦者</h3>
+        <div id="spectators"></div>
+      </div>
+      <div class="mission" id="missionBox">
+        <h3>ミッション</h3>
+        <div class="bold">#1　爆弾</div>
+        <div>x が1つ</div>
+        <div class="bold" style="margin-top:6px">#3　さらい爆弾</div>
+        <div>x – y – z のうち1つ</div>
+        <div class="small" style="margin-top:8px">（詳細は画面下部へ。ファイル名は表示しません）</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ミニポップ（トークン） -->
+<div id="miniPop" class="mini-pop hidden">
+  <button class="btn small" id="tokenPlace">トークンを置く</button>
+  <button class="btn small ghost" id="tokenCancel">キャンセル</button>
 </div>
 
-<!-- Seat selector -->
-<div id="seatSelectModal" class="modal hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50">
-  <div class="sheet" style="background:#fff;border-radius:16px;max-width:520px;width:calc(100% - 32px);padding:16px;border:1px solid #eee">
-    <div style="font-weight:800;">座るテーブルを選択</div>
-    <div id="seatList" class="list" style="margin-top:8px;"></div>
-    <div class="row" style="gap:8px;align-items:center;margin-top:8px">
-      <button id="leaveSeatBtn">席を立つ</button>
-      <div class="muted">※ 退出すると席は空きます（カードは残る）。</div>
-    </div>
+<!-- やり直し確認 -->
+<div id="restartPop" class="restart-pop hidden">
+  <div style="font-size:14px">やり直しますか？</div>
+  <div class="restart-actions">
+    <button class="btn">やり直す</button>
+    <button class="btn big">キャンセル</button>
   </div>
 </div>
 
-<!-- Reset confirm（やり直す） -->
-<div id="resetConfirm" class="modal hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50">
-  <div class="sheet" style="background:#fff;border-radius:16px;max-width:520px;width:calc(100% - 32px);padding:16px;border:1px solid #eee">
-    <div style="font-weight:800;">やり直しますか？</div>
-    <div style="display:flex;gap:10px;align-items:center;margin-top:12px">
-      <button id="confirmResetBtn" style="font-size:11px;padding:6px 10px">やり直す</button>
-      <button id="cancelResetBtn" style="font-size:16px;padding:12px 16px">キャンセル</button>
-    </div>
-  </div>
-</div>
-
-<!-- 右下設定メニュー -->
-<div id="controls" class="hidden" style="position:fixed;right:12px;bottom:12px;display:flex;gap:8px;z-index:60">
-  <div id="menu" style="position:relative">
-    <button id="settingsBtn">⚙ 設定</button>
-    <div id="menuPopup" style="position:absolute;right:0;bottom:44px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:8px;display:none;min-width:180px">
-      <button id="chooseSeatBtn">席に座る</button>
-      <button id="leaveSeatMenuBtn" class="hidden">席を立つ</button>
-      <button id="resetBtn" class="hidden">やり直す</button>
-    </div>
-  </div>
-</div>
-
-<!-- Firebase + App -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-  import {
-    getDatabase, ref, get, set, update, onValue, push,
-    serverTimestamp, onDisconnect, remove, runTransaction
-  } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+/* ===== Firebase v9 (modular) ===== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import {
+  getDatabase, ref, get, set, update, remove,
+  onValue, onDisconnect
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-  /* ==== Firebase config ==== */
-  const firebaseConfig = {
-    apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
-    authDomain: "chat-68c4c.firebaseapp.com",
-    databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
-    projectId: "chat-68c4c",
-    storageBucket: "chat-68c4c.appspot.com",
-    messagingSenderId: "172284325975",
-    appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
+/* === 提供された設定をそのまま使用 === */
+const firebaseConfig = {
+  apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
+  authDomain: "chat-68c4c.firebaseapp.com",
+  databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
+  projectId: "chat-68c4c",
+  storageBucket: "chat-68c4c.appspot.com",
+  messagingSenderId: "172284325975",
+  appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+/* ====== 状態 ====== */
+const state = {
+  roomCode:null, userId:crypto.randomUUID(), userName:hiragana3(),
+  isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null
+};
+
+/* ====== 要素 ====== */
+const meName = document.getElementById('meName');
+const joinBox= document.getElementById('joinBox');
+const inputCode = document.getElementById('roomCode');
+const btnJoin = document.getElementById('btnJoin');
+const btnSpect= document.getElementById('btnSpectate');
+const btnRandom=document.getElementById('btnRandom');
+
+const lobby   = document.getElementById('lobby');
+const btnStart= document.getElementById('btnStart');
+const startHint=document.getElementById('startHint');
+
+const itemsBar= document.getElementById('itemsBar');
+const itemsEl = document.getElementById('items');
+const diEl    = document.getElementById('di');
+
+const tablesEl= document.getElementById('tables');
+const gear    = document.getElementById('gear');
+const menuPop = document.getElementById('menuPopup');
+const btnSit  = document.getElementById('btnSit');
+const btnLeave= document.getElementById('btnLeaveSeat');
+const btnRestart=document.getElementById('btnRestart');
+const restartPop=document.getElementById('restartPop');
+
+const playersEl=document.getElementById('players');
+const specsEl  =document.getElementById('spectators');
+const listsBox =document.getElementById('listsBox');
+
+const miniPop = document.getElementById('miniPop');
+const tokenPlace=document.getElementById('tokenPlace');
+const tokenCancel=document.getElementById('tokenCancel');
+
+meName.textContent = `あなた：${state.userName}`;
+
+/* ====== ひらがな3文字 ====== */
+function hiragana3(){
+  const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"];
+  return Array.from({length:3},()=>h[Math.random()*h.length|0]).join('');
+}
+
+/* ====== ユーティリティ ====== */
+const H = (el,b)=> el.classList.toggle('hidden', !!b);
+function pos(el,x,y){el.style.left=x+'px';el.style.top=y+'px';}
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+
+/* ====== 入室 ====== */
+btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e6|0).padStart(6,'0'); };
+btnJoin.onclick   = ()=> enter('player');
+btnSpect.onclick  = ()=> enter('spectator');
+
+async function enter(mode){
+  const code=(inputCode.value||"").trim();
+  if(!code){ alert('コードを入力してください'); return; }
+  state.roomCode = code; state.mode=mode;
+
+  const roomRef = ref(db, `rooms/${code}`);
+  const snap=await get(roomRef);
+
+  if(!snap.exists()){
+    // 新規作成 → 入った人がホスト
+    state.isHost=true;
+    await set(roomRef, baseRoom(state.userId));
+  }else{
+    state.isHost = snap.val()?.hostId === state.userId;
+  }
+
+  // 参加 or 観戦リストに追加
+  const path = mode==='player' ? `players/${state.userId}` : `spectators/${state.userId}`;
+  await set(ref(db, `rooms/${code}/${path}`), {name:state.userName, at:Date.now()});
+
+  // 切断時に自動退出 → 残0ならルーム自動削除
+  onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
+  onDisconnect(ref(db, `rooms/${code}/spectators/${state.userId}`)).remove();
+
+  // リスナ開始
+  listenRoom(code);
+
+  H(joinBox,true);
+  H(lobby,false);
+  H(gear,false);
+}
+
+/* ====== ルーム初期構造 ====== */
+function baseRoom(hostId){
+  return {
+    createdAt: Date.now(),
+    hostId, started:false,
+    tableCount:0, tables:[],
+    items:[],
+    di:{value:0,max:6},
+    captainTable:null,
+    players:{}, spectators:{}
   };
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+}
 
-  // DOM
-  const $ = s=>document.querySelector(s);
-  const joinView=$("#joinView"), roleView=$("#roleView"), gameView=$("#gameView");
-  const roomCodeInput=$("#roomCodeInput"), joinBtn=$("#joinBtn");
-  const asPlayerBtn=$("#asPlayer"), asSpectatorBtn=$("#asSpectator"), whoami=$("#whoami");
-  const startBtn=$("#startBtn"), leaveBtn=$("#leaveBtn");
-  const roomCodeLabel=$("#roomCodeLabel"), nameLabel=$("#nameLabel"), roleLabel=$("#roleLabel");
-  const playersList=$("#playersList"), spectatorsList=$("#spectatorsList"), sidePanel=$("#sidePanel");
-  const itemsPanel=$("#itemsPanel"), itemsRow=$("#itemsRow"), diImg=$("#diImg");
-  const tablesArea=$("#tablesArea");
-  const controls=$("#controls"), menu=$("#menu"), settingsBtn=$("#settingsBtn"), menuPopup=$("#menuPopup");
-  const chooseSeatBtn=$("#chooseSeatBtn"), leaveSeatMenuBtn=$("#leaveSeatMenuBtn"), resetBtn=$("#resetBtn");
-  const startModal=$("#startModal"), seatCountInput=$("#seatCountInput"), seatNext=$("#seatNext"), missionStep=$("#missionStep"), missionChoices=$("#missionChoices");
-  const seatSelectModal=$("#seatSelectModal"), seatList=$("#seatList"), leaveSeatBtn=$("#leaveSeatBtn");
-  const resetConfirm=$("#resetConfirm"), confirmResetBtn=$("#confirmResetBtn"), cancelResetBtn=$("#cancelResetBtn");
-  const missionPanel=$("#missionPanel"), missionLines=$("#missionLines");
+/* ====== 監視 ====== */
+function listenRoom(code){
+  onValue(ref(db, `rooms/${code}`),(snap)=>{
+    const v=snap.val();
+    state.watching=v;
 
-  // State
-  let state = {
-    roomCode:null, userId:null, name:null, role:null, isHost:false,
-    phase:"lobby", mission:null, seatCount:0, mySeat:null
-  };
-  let currentRoom = null;
+    // 全員退出なら自動削除
+    if(v){
+      const p=Object.keys(v.players||{}).length, s=Object.keys(v.spectators||{}).length;
+      if(p===0 && s===0){ remove(ref(db, `rooms/${code}`)); return; }
+    }
 
-  // helpers
-  const cleanCode = s => (s||"").replace(/\D/g,"").slice(0,6);
-  const setView = v=>{
-    joinView.classList.toggle("hidden", v!=="join");
-    roleView.classList.toggle("hidden", v!=="role");
-    gameView.classList.toggle("hidden", v!=="game");
-  };
+    // 右の参加/観戦リスト（開始後は非表示）
+    H(listsBox, !!v?.started);
 
-  // ひらがな3文字ランダム名
-  const HIRA = Array.from("あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわん");
-  const randName = ()=> Array.from({length:3},()=>HIRA[Math.floor(Math.random()*HIRA.length)]).join("");
+    renderLists(v);
+    renderItemsAndDi(v);
+    renderTables(v);
 
-  const parseNum = t => parseFloat(String(t).replace(",","."));
-  const indexToLetter = i => String.fromCharCode(97 + i);
-  const codeArtFor = (txt)=>{
-    const t = String(txt).replace(",",".");
-    if(t.endsWith(".5")) return "redcode.png";     // 赤コード
-    if(t.endsWith(".1")) return "yellowcode.png";  // 黄コード
-    return "codenumber.png";                       // 通常
-  };
+    state.gameStarted=!!v?.started;
+    H(btnStart, !(state.isHost && !state.gameStarted));
+    H(startHint, !(state.isHost && !state.gameStarted));
+  });
+}
 
-  // アイテム画像（UIでは名前を出さない。内部参照のみ）
-  const ITEM_IMG = {
-    1:"item (13).jpg",
-    2:"item (12).jpg",
-    3:"item (1).jpg",
-    4:"item (3).jpg",
-    5:"item (6).jpg",
-    6:"item (17).jpg",
-    7:"item (16).jpg",
-    8:"item (5).jpg",
-    9:"item (7).jpg",
-    10:"item (10).jpg",
-    11:"item (8).jpg",
-    12:"item (13).jpg",
-    13:"item (4).jpg",
-    14:"item (9).jpg",
-    15:"item (14).jpg",
-    16:"item (15).jpg",
-    17:"item (2).jpg",
-    18:"item (11).jpg" /* 18はミッション42以降のみ候補にしたい場合に使用 */
-  };
+/* ====== 参加/観戦リスト描画 ====== */
+function renderLists(v){
+  playersEl.innerHTML=''; specsEl.innerHTML='';
+  if(!v) return;
+  Object.values(v.players||{}).forEach(u=>{
+    const d=document.createElement('div'); d.className='name'; d.textContent=u.name||'(?)'; playersEl.appendChild(d);
+  });
+  Object.values(v.spectators||{}).forEach(u=>{
+    const d=document.createElement('div'); d.className='name muted'; d.textContent=u.name||'(?)'; specsEl.appendChild(d);
+  });
+}
 
-  /* ===== Join flow ===== */
-  $("#joinBtn").addEventListener("click", async ()=>{
-    const code=cleanCode(roomCodeInput.value);
-    if(!code) return alert("ルームコードを数字で入力してください。");
-    state.roomCode=code; state.userId=state.userId || push(ref(db,"clients")).key; state.name=state.name||randName();
-    whoami.textContent=`暫定名: ${state.name}`;
-    setView("role");
-    const url=new URL(location.href); url.searchParams.set("room",code); history.replaceState(null,"",url.toString());
+/* ====== アイテム & DI（待機中は非表示） ====== */
+function renderItemsAndDi(v){
+  if(!v || !v.started){ H(itemsBar,true); return; }
+  H(itemsBar,false);
+
+  // アイテム
+  itemsEl.innerHTML='';
+  (v.items||[]).forEach((it, idx)=>{
+    const div=document.createElement('div');
+    div.className='item' + (it.used?' used':'');
+    if(!it.used) div.style.backgroundImage = `url("./item (${it.no}).jpg")`;
+    div.onclick=(ev)=>{
+      // タップ → 「使用する/キャンセル」
+      openMini(ev.clientX, ev.clientY,
+        '使用する', async ()=>{
+          await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
+          // 効果フックはここに（＝/≠/x1等の発火）
+        },
+        'キャンセル', ()=>{}
+      );
+    };
+    itemsEl.appendChild(div);
   });
 
-  $("#asPlayer").addEventListener("click", ()=>enterAs("player"));
-  $("#asSpectator").addEventListener("click", ()=>enterAs("spectator"));
-
-  async function enterAs(role){
-    state.role=role;
-    roomCodeLabel.textContent=state.roomCode; nameLabel.textContent=state.name; roleLabel.textContent=(role==="player"?"参加者":"観戦者");
-    const roomRef=await ensureRoom(state.roomCode);
-    const snap=await get(roomRef); const v=snap.val()||{};
-    if(role==="player" && !v.hostId) await update(roomRef,{ hostId:state.userId });
-
-    const actual = (v.phase==="playing") ? "spectator" : role; // 途中参加は観戦
-    state.role=actual; roleLabel.textContent=(actual==="player"?"参加者":"観戦者");
-
-    const basePath = actual==="player" ? `rooms/${state.roomCode}/players/${state.userId}` : `rooms/${state.roomCode}/spectators/${state.userId}`;
-    const meRef = ref(db, basePath);
-    await set(meRef,{ name:state.name, joinedAt:serverTimestamp() });
-    onDisconnect(meRef).remove();
-
-    // 「やり直し」時の希望役職
-    await set(ref(db, `rooms/${state.roomCode}/wants/${state.userId}`), { wantsPlayer: role==="player", name: state.name });
-    onDisconnect(ref(db, `rooms/${state.roomCode}/wants/${state.userId}`)).remove();
-
-    setupRealtime(state.roomCode);
-    setView("game");
-  }
-
-  async function ensureRoom(code){
-    const r = ref(db, `rooms/${code}`);
-    const s = await get(r);
-    if(!s.exists()){
-      await set(r,{
-        createdAt:serverTimestamp(), hostId:null, phase:"lobby", mission:null, seatCount:0,
-        players:{}, spectators:{}, wants:{}, seats:{}, missionTextLines:[], items:{}, effects:{}, diIndex:0, leaderSeat:null
-      });
-    }
-    return r;
-  }
-
-  function setupRealtime(code){
-    const roomRef = ref(db, `rooms/${code}`);
-    onValue(roomRef,(snap)=>{
-      const v=snap.val()||{};
-      currentRoom = v;
-      state.phase=v.phase||"lobby"; state.mission=v.mission||null; state.isHost=(v.hostId===state.userId);
-      state.seatCount=v.seatCount||0;
-
-      startBtn.classList.toggle("hidden", !(state.isHost && state.phase==="lobby" && state.role==="player"));
-      sidePanel.classList.toggle("hidden", state.phase!=="lobby");
-      controls.classList.toggle("hidden", state.phase!=="playing");
-      resetBtn.classList.toggle("hidden", !state.isHost);
-      chooseSeatBtn.disabled = (state.role!=="player");
-
-      // 自席検出
-      const seats = v.seats||{};
-      state.mySeat = null;
-      Object.keys(seats).forEach(k=>{ if(seats[k].occupantUser===state.userId) state.mySeat=String(k); });
-      leaveSeatMenuBtn.classList.toggle("hidden", !state.mySeat);
-
-      renderList(playersList, v.players||{});
-      renderList(spectatorsList, v.spectators||{});
-      renderItems(v);
-      renderTables(v);
-      renderMissionDetails(v);
-    });
-
-    onValue(ref(db,`rooms/${code}/players`),(s)=>renderList(playersList,s.val()||{}));
-    onValue(ref(db,`rooms/${code}/spectators`),(s)=>renderList(s.val()||{}));
-  }
-
-  function renderList(container,map){
-    container.innerHTML="";
-    const ids=Object.keys(map);
-    if(!ids.length){ container.appendChild(div("div","muted","（なし）")); return; }
-    ids.forEach(id=>{
-      const d=div("div","pill"); d.textContent=map[id].name||"???"; container.appendChild(d);
-    });
-  }
-  function div(tag,cls,text){ const el=document.createElement(tag); if(cls) el.className=cls; if(text!=null) el.textContent=text; return el; }
-
-  /* ===== Start（人数→ミッション→配布） ===== */
-  seatNext.addEventListener("click", openMissionPicker);
-  startBtn.addEventListener("click", openMissionPicker);
-  function openMissionPicker(){
-    if(startBtn.classList.contains("hidden") && this!==seatNext) return;
-    missionChoices.innerHTML="";
-    for(let i=1;i<=10;i++){
-      const b=div("button","",String(i));
-      Object.assign(b.style,{padding:"10px",border:"1px solid #ddd",borderRadius:"10px",background:"#fff"});
-      b.onclick=()=>startGame(Math.max(2, Math.min(12, parseInt(seatCountInput.value,10)||4)), i);
-      missionChoices.appendChild(b);
-    }
-    missionStep.classList.remove("hidden");
-    startModal.classList.remove("hidden");
-  }
-
-  function pickN(arr, n){
-    const a=[...arr]; for(let i=a.length-1;i>0;i++){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
-    return a.slice(0,n);
-  }
-
-  async function startGame(seatCount, mission){
-    startModal.classList.add("hidden");
-    const code=state.roomCode;
-
-    // デッキ：1..12 × 4 = 48
-    let deck=[]; let cid=0;
-    for(let v=1;v<=12;v++){ for(let r=0;r<4;r++) deck.push({id:`c${cid++}`,text:String(v)}); }
-
-    const halves = ["1.5","2.5","3.5","4.5"];
-    let missionTextLines = [];
-
-    if(mission===1){
-      const x = halves[Math.floor(Math.random()*halves.length)];
-      deck.push({ id:`c${cid++}`, text:x, special:true });
-      missionTextLines = ["<b>#1 爆弾</b>", `${x}が1つ`];
-    }
-    if(mission===3){
-      const picks = pickN(halves,3);
-      const use = picks[Math.floor(Math.random()*(picks.length))];
-      deck.push({ id:`c${cid++}`, text:use, special:true });
-      missionTextLines = ["<b>#3 さらい爆弾</b>", `${picks[0]} – ${picks[1]} - ${picks[2]}のうち1つ`];
-    }
-
-    // シャッフル
-    for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
-
-    // 席作成（縦に積む）＋配布（ラウンドロビン）
-    const seats={};
-    for(let s=1;s<=seatCount;s++){ seats[s]={ hand:{}, tokens:{}, occupantUser:null, occupantName:null, avatarName:null, avatarFace:true }; }
-    let k=0, sidx=1;
-    while(k<deck.length){
-      const c=deck[k++]; seats[sidx].hand[c.id]={...c, revealed:false};
-      sidx++; if(sidx>seatCount) sidx=1;
-    }
-
-    // 並び順（昇順）／M2：ランダム1枚を右端固定
-    for(let s=1;s<=seatCount;s++){
-      let arr = Object.keys(seats[s].hand).map(id=>({id, ...seats[s].hand[id]}));
-      if(mission===2 && arr.length){
-        const pick = arr[Math.floor(Math.random()*arr.length)];
-        const rest = arr.filter(x=>x.id!==pick.id).sort((a,b)=>parseNum(a.text)-parseNum(b.text));
-        arr = [...rest, {...pick, pinRight:true}];
-      }else{
-        arr.sort((a,b)=>parseNum(a.text)-parseNum(b.text));
+  // DI
+  const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
+  diEl.style.backgroundImage = `url("./di${val}.png")`;
+  diEl.onclick=(ev)=>{
+    openMini(ev.clientX, ev.clientY,
+      '進める', async ()=>{
+        const now=state.watching?.di?.value ?? val; const next=clamp(now-1,0,6);
+        await update(ref(db, `rooms/${state.roomCode}/di`), {value:next});
+      },
+      '戻す', async ()=>{
+        const now=state.watching?.di?.value ?? val; const next=clamp(now+1,0,6);
+        await update(ref(db, `rooms/${state.roomCode}/di`), {value:next});
       }
-      arr.forEach((c,i)=>{ seats[s].hand[c.id]={...c, order:i}; });
-    }
+    );
+  };
+}
 
-    // ===== 隊長（非表示だが内部的に1席だけ）＋キャラクター割当 =====
-    const leaderSeat = Math.floor(Math.random()*seatCount)+1; // 1-based
-    const poolJPG = ["member (1).jpg","member (2).jpg","member (3).jpg","member (4).jpg"];
-    let poolIdx = 0;
-    const noDupPool = pickN(poolJPG, Math.min(poolJPG.length, Math.max(0, seatCount-1)));
+/* ====== テーブル描画 ====== */
+function renderTables(v){
+  tablesEl.innerHTML='';
+  if(!v) return;
+  (v.tables||[]).forEach((t, idx)=>{
+    const box=document.createElement('div'); box.className='table';
 
-    for(let s=1;s<=seatCount;s++){
-      if(s===leaderSeat){
-        seats[s].avatarName = "member (5).jpg"; // 隊長卓
-      }else{
-        // 可能な限り重複なし。超過分は循環利用（仕様優先で破綻回避）
-        const pick = noDupPool[poolIdx % noDupPool.length] || poolJPG[Math.floor(Math.random()*poolJPG.length)];
-        poolIdx++;
-        seats[s].avatarName = pick;
+    // 左のアンダーライン…着席済みなら「名前」、未着なら「番号」
+    const header=document.createElement('div'); header.className='header';
+    const title=document.createElement('div');  title.className='title';
+    title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
+    header.appendChild(title); box.appendChild(header);
+
+    // キャラカード（誰でも裏返せる）
+    const char=document.createElement('div'); char.className='char-card';
+    const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+    char.style.backgroundImage = `url("${face}")`;
+    char.title='キャラクターカード';
+    char.onclick=async ()=>{
+      await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped});
+    };
+    box.appendChild(char);
+
+    // 手札
+    const hand=document.createElement('div'); hand.className='hand';
+    (t.hand||[]).forEach((c,ci)=>{
+      const card=document.createElement('div'); card.className='card';
+      const isMine = c.ownerId === state.userId;
+
+      if(!isMine && !c.open) card.classList.add('back');   // 他人の未公開は裏
+      if(c.open) card.classList.add('open');               // 公開は黒地
+
+      // クリック（自分のカードだけトグル）
+      if(isMine){
+        card.onclick=async ()=>{
+          await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open});
+        };
       }
-      seats[s].avatarFace = true; // 表（誰でもクリックで裏返し可）
-    }
 
-    // アイテム：人数ぶん（ミッション42までは 14〜18 除外）
-    const pool = (mission<=42)
-      ? [1,2,3,4,5,6,7,8,9,10,11,12,13]
-      : [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
-    const itemNums = pickN(pool, Math.min(seatCount, pool.length));
-    const items = {}; itemNums.forEach(n=>{ items[n]={ used:false, overlay:null }; });
+      const num=document.createElement('div'); num.className='num';
+      num.textContent=String(c.num);
+      num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
+      card.appendChild(num);
 
-    // di 画像：開始時は seatCount（0〜6にクランプ）
-    const diIndex = Math.max(0, Math.min(6, seatCount));
+      // 下詰め画像（通常/赤/黄）…表示のみ。ファイル名はUIに出さない
+      const bot=document.createElement('div'); bot.className='img-bottom';
+      let img='codenumber.png';
+      if(c.kind==='red') img='redcode.png';
+      if(c.kind==='yellow') img='yellowcode.png';
+      bot.style.backgroundImage=`url("./${img}")`;
+      if(card.classList.contains('back')) bot.style.display='none';
+      card.appendChild(bot);
 
-    await update(ref(db,`rooms/${code}`),{
-      phase:"playing",
-      mission,
-      seatCount,
-      seats,
-      missionTextLines,
-      items,
-      effects:{ eqRemain:0, neqRemain:0, x1Remain:0, swap:null },
-      diIndex,
-      leaderSeat
+      hand.appendChild(card);
+    });
+    box.appendChild(hand);
+
+    // アルファベット列（外側の下）
+    const arow=document.createElement('div'); arow.className='alpha-row';
+    (t.hand||[]).forEach((c,ci)=>{
+      const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
+      // 既存トークン描画
+      if(c.token){
+        const tk=document.createElement('div');
+        tk.className='token ' + (c.token.style||'');
+        tk.textContent = c.token.type==='num' || c.token.style==='black' ? c.token.value : c.token.type;
+        a.appendChild(tk);
+      }
+      // 自分のカードのアルファベットだけ反応 → ミニタブ「トークンを置く」
+      if(c.ownerId===state.userId){
+        a.onclick=(ev)=>{
+          openMiniToken(ev.clientX, ev.clientY, async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {
+              token:{type:'num', value:c.num, style:null}
+            });
+          });
+        };
+      }
+      arow.appendChild(a);
+    });
+    box.appendChild(arow);
+
+    tablesEl.appendChild(box);
+  });
+}
+
+/* ====== ミニポップ ====== */
+let tokenCb=null;
+function openMiniToken(x,y, cb){
+  tokenCb=cb; pos(miniPop,x,y); H(miniPop,false);
+}
+tokenPlace.onclick = ()=>{ tokenCb&&tokenCb(); H(miniPop,true); tokenCb=null; };
+tokenCancel.onclick= ()=>{ H(miniPop,true); tokenCb=null; };
+
+function openMini(x,y, leftText,leftCb, rightText,rightCb){
+  const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
+  const b1=document.createElement('button'); b1.className='btn small'; b1.textContent=leftText;
+  const b2=document.createElement('button'); b2.className='btn small ghost'; b2.textContent=rightText;
+  b1.onclick=()=>{ if(div.isConnected) div.remove(); leftCb&&leftCb(); };
+  b2.onclick=()=>{ if(div.isConnected) div.remove(); rightCb&&rightCb(); };
+  div.appendChild(b1); div.appendChild(b2);
+  document.body.appendChild(div);
+  setTimeout(()=>{ if(div.isConnected) div.remove(); }, 6000);
+}
+
+/* ====== 歯車メニュー ====== */
+gear.onclick=()=> menuPop.classList.toggle('hidden');
+document.addEventListener('click',(e)=>{
+  if(!gear.contains(e.target) && !menuPop.contains(e.target)) H(menuPop,true);
+}, true);
+
+/* ====== 席に座る/立つ ====== */
+btnSit.onclick = async ()=>{
+  if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
+  const v=state.watching; if(!v?.started){ alert('ゲーム開始後に席を選べます'); return; }
+  const empties=(v.tables||[]).map((t,i)=> t.playerId?null:i).filter(i=>i!==null);
+  if(!empties.length){ alert('空席がありません'); return; }
+  const s=prompt(`空席番号を入力：${empties.map(i=>i+1).join(', ')}`); if(!s) return;
+  const pick=(parseInt(s,10)||0)-1; if(!empties.includes(pick)){ alert('その席は選べません'); return; }
+
+  // 着席 → playerName設定 & 手札オーナー付与
+  await update(ref(db, `rooms/${state.roomCode}/tables/${pick}`), {playerId:state.userId, playerName:state.userName});
+  const hand=v.tables[pick].hand||[];
+  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${pick}/hand/${i}`), {ownerId:state.userId})));
+  state.seatedTable=pick;
+};
+
+btnLeave.onclick = async ()=>{
+  const v=state.watching; if(state.seatedTable==null){ alert('席に座っていません'); return; }
+  const idx=state.seatedTable;
+  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
+  const hand=v.tables[idx].hand||[];
+  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
+  state.seatedTable=null;
+};
+
+/* ====== やり直し ====== */
+btnRestart.onclick = ()=>{
+  if(!state.isHost){ alert('ホストのみ操作可'); return; }
+  H(restartPop,false);
+};
+restartPop.querySelectorAll('.btn')[0].onclick = async ()=>{
+  H(restartPop,true);
+  const v=state.watching; if(!v) return;
+  await startGame(v.tableCount); // 同数で再配布
+};
+restartPop.querySelectorAll('.btn')[1].onclick = ()=> H(restartPop,true);
+
+/* ====== ゲーム開始 ====== */
+btnStart.onclick = async ()=>{
+  if(!state.isHost) return;
+  const pc = clamp(parseInt(prompt('プレイ人数（2〜6目安）','4')||'4',10),1,6);
+  await startGame(pc);
+};
+
+async function startGame(playerCount){
+  if(!state.isHost) return;
+  const code=state.roomCode;
+
+  // テーブル生成（縦並び／高さ固定）
+  const captainIndex = Math.floor(Math.random()*playerCount);
+  const faces=[1,2,3,4];
+  shuffle(faces);
+  const tables=[];
+  for(let i=0;i<playerCount;i++){
+    const face = (i===captainIndex) ? 'member (5).jpg' : `member (${faces[(i%4)]}).jpg`;
+    tables.push({
+      titleNumber:i+1,
+      playerId:null, playerName:null,
+      character:{face, flipped:false},
+      hand:[]
     });
   }
 
-  /* ===== 設定 ／ 座席選択・離席・やり直す ===== */
-  settingsBtn.addEventListener("click", ()=>menuPopup.style.display = (menuPopup.style.display==="block"?"none":"block"));
-  document.addEventListener("click",(e)=>{ if(!menu.contains(e.target)) menuPopup.style.display="none"; });
+  // デッキ（1..12 ×4）をシャッフルし、均等でなくても余りなく順番配り
+  const deck=[];
+  for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) deck.push({num:n, kind:'normal', open:false, ownerId:null}); }
+  shuffle(deck);
 
-  document.getElementById("chooseSeatBtn").addEventListener("click", ()=>{
-    const code=state.roomCode;
-    seatList.innerHTML="";
-    onValue(ref(db,`rooms/${code}/seats`),(snap)=>{
-      const seats=snap.val()||{};
-      seatList.innerHTML="";
-      Object.keys(seats).forEach(idx=>{
-        const occUser = seats[idx].occupantUser;
-        const occName = seats[idx].occupantName;
-        const btn = document.createElement("button");
-        btn.textContent = `テーブル${idx}：` + (occUser ? `${occName} が着席中` : "空席");
-        const occupied = !!occUser && occUser!==state.userId;
-        btn.disabled = occupied || (state.role!=="player");
-        Object.assign(btn.style,{padding:"8px",border:"1px solid #ddd",borderRadius:"10px",background:"#fff",textAlign:"left"});
-        btn.onclick=()=>claimSeat(idx);
-        seatList.appendChild(btn);
-      });
-    }, { onlyOnce:true });
-    seatSelectModal.classList.remove("hidden");
-    menuPopup.style.display="none";
+  const alpha="abcdefghijklmnopqrstuvwxyz";
+  let p=0;
+  while(p<deck.length){
+    for(let t=0; t<playerCount && p<deck.length; t++){
+      const c=deck[p++];
+      const a = alpha[ tables[t].hand.length % alpha.length ];
+      tables[t].hand.push({...c, alpha:a, token:null});
+    }
+  }
+
+  // アイテム（待機中は非表示）…人数ぶん配布。ミッション42までは14〜18を除外 → ここでは除外。
+  const all=[1,2,3,4,5,6,7,8,9,10,11,12/*,13,14,15,16,17,18*/];
+  shuffle(all);
+  const items = all.slice(0, Math.min(playerCount, all.length)).map(no=>({id:crypto.randomUUID(),no,used:false}));
+
+  // 反映
+  await set(ref(db, `rooms/${code}`), {
+    ...(state.watching||baseRoom(state.userId)),
+    hostId: state.watching?.hostId || state.userId,
+    started:true,
+    tableCount:playerCount,
+    tables, items,
+    di:{value:playerCount, max:6}, // 開始時は「di＋プレイ人数」
+    captainTable: captainIndex
   });
 
-  async function claimSeat(idx){
-    const code=state.roomCode;
-    const seatUserRef = ref(db,`rooms/${code}/seats/${idx}/occupantUser`);
-    const res = await runTransaction(seatUserRef,(cur)=> cur || state.userId);
-    if(!res.committed || res.snapshot.val()!==state.userId){
-      alert("その席には座れません（既に埋まっています）。");
-      return;
-    }
-    await update(ref(db,`rooms/${code}/seats/${idx}`),{ occupantName: state.name, avatarFace:true });
-    state.mySeat = String(idx);
-    onDisconnect(ref(db,`rooms/${code}/seats/${idx}/occupantUser`)).remove();
-    onDisconnect(ref(db,`rooms/${code}/seats/${idx}/occupantName`)).remove();
-    seatSelectModal.classList.add("hidden");
-  }
+  // UI
+  H(gear,false);
+}
 
-  async function leaveSeat(){
-    if(!state.mySeat) return;
-    const code=state.roomCode;
-    await update(ref(db,`rooms/${code}/seats/${state.mySeat}`),{ occupantUser: null, occupantName: null });
-    state.mySeat=null;
-  }
-  document.getElementById("leaveSeatMenuBtn").addEventListener("click", leaveSeat);
-  leaveSeatBtn.addEventListener("click", ()=>{ leaveSeat(); seatSelectModal.classList.add("hidden"); });
-
-  // やり直す（ホストのみ）
-  resetBtn.addEventListener("click", ()=>{
-    if(!state.isHost) return;
-    resetConfirm.classList.remove("hidden");
-    menuPopup.style.display="none";
-  });
-  cancelResetBtn.addEventListener("click", ()=>resetConfirm.classList.add("hidden"));
-  confirmResetBtn.addEventListener("click", async ()=>{
-    if(!state.isHost) return;
-    const code=state.roomCode;
-
-    const [pS, sS, wS] = await Promise.all([
-      get(ref(db,`rooms/${code}/players`)),
-      get(ref(db,`rooms/${code}/spectators`)),
-      get(ref(db,`rooms/${code}/wants`))
-    ]);
-    const curP = pS.val()||{}, curS=sS.val()||{}, wants=wS.val()||{};
-    const present = { ...curP, ...curS };
-
-    const nextPlayers = {}, nextSpectators = {};
-    Object.keys(present).forEach(uid=>{
-      if(wants[uid]?.wantsPlayer){ nextPlayers[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" }; }
-      else{ nextSpectators[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" }; }
-    });
-
-    await update(ref(db,`rooms/${code}`),{
-      phase:"lobby", mission:null, seatCount:0, seats:{},
-      players: nextPlayers, spectators: nextSpectators,
-      missionTextLines:[], items:{}, effects:{}, diIndex:0, leaderSeat:null
-    });
-    resetConfirm.classList.add("hidden");
-  });
-
-  /* ===== レンダリング ===== */
-  function iOwnSeat(seatIdx){ return state.role==="player" && state.mySeat && String(seatIdx)===String(state.mySeat); }
-
-  function renderMissionDetails(roomVal){
-    const lines = roomVal.missionTextLines||[];
-    if(!lines.length){ missionPanel.classList.add("hidden"); missionLines.innerHTML=""; return; }
-    missionPanel.classList.remove("hidden");
-    missionLines.innerHTML = lines.map(s=>`<div>${s}</div>`).join("");
-  }
-
-  function renderItems(roomVal){
-    const items = roomVal.items || {};
-    itemsRow.innerHTML="";
-
-    const nums = Object.keys(items).map(n=>parseInt(n,10)).sort((a,b)=>a-b);
-    const showDi = typeof roomVal.diIndex==="number";
-
-    if(!nums.length && !showDi){ itemsPanel.classList.add("hidden"); return; }
-    itemsPanel.classList.remove("hidden");
-
-    // アイテムカード（50x80）
-    nums.forEach(num=>{
-      const it = items[num];
-      const el = div("div","itemImg");
-      el.style.backgroundImage = `url("${ITEM_IMG[num]}")`;
-      if(it.used) el.classList.add("itemUsed");
-      if(it.overlay){ const ov=div("div","itemOverlay",it.overlay); el.appendChild(ov); }
-      el.onclick = ()=> onClickItem(num);
-      itemsRow.appendChild(el);
-    });
-
-    // di
-    if(showDi){
-      const idx = Math.max(0, Math.min(6, roomVal.diIndex|0));
-      diImg.src = `di${idx}.png`;
-      diImg.onclick = ()=>{
-        const box = document.createElement("div");
-        box.className = "floatTab";
-        box.style.right = "0"; box.style.bottom = "80px";
-        box.innerHTML = `<div style="display:flex;gap:6px">
-          <button id="diPrev">進める</button>
-          <button id="diNext">戻す</button>
-        </div>`;
-        document.body.appendChild(box);
-        const remove = ()=>box.remove();
-        document.addEventListener("click",(e)=>{ if(!box.contains(e.target) && e.target!==diImg) remove(); }, { once:true });
-
-        // 指示：進める→ index-1, 戻す→ index+1
-        $("#diPrev").onclick = ()=>{ update(ref(db,`rooms/${state.roomCode}`),{ diIndex: Math.max(0, idx-1) }); remove(); };
-        $("#diNext").onclick = ()=>{ update(ref(db,`rooms/${state.roomCode}`),{ diIndex: Math.min(6, idx+1) }); remove(); };
-      };
-    }
-  }
-
-  function renderTables(roomVal){
-    const seats = roomVal.seats || {};
-    tablesArea.innerHTML="";
-
-    Object.keys(seats).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(idx=>{
-      const seat = seats[idx];
-      const table = div("div","table");
-      const row = div("div","tableRow");
-
-      // ラベル列（着席前：番号＋下線／着席後：名前＋下線）＋キャラ
-      const label = div("div","tableLabel");
-      const top = div("div","labelMain", seat.occupantName ? seat.occupantName : String(idx));
-      const ul = div("div","underline");
-      const av = div("div","avatar");
-      av.style.backgroundImage = seat.avatarFace ? `url("${seat.avatarName||""}")` : `url("battery.jpg")`;
-      av.onclick = ()=>{ // 誰でも裏返せる
-        const path = `rooms/${state.roomCode}/seats/${idx}`;
-        update(ref(db,path), { avatarFace: !seat.avatarFace });
-      };
-      label.appendChild(top);
-      label.appendChild(ul);
-      label.appendChild(av);
-
-      // 手札行（横幅はカード枚数で自動。高さはテーブル側で90に固定）
-      const hand = div("div","hand");
-      const cards = Object.keys(seat.hand||{}).map(id=>seat.hand[id]).sort((a,b)=>(a.order|0)-(b.order|0));
-      table.style.width = `fit-content`;
-
-      cards.forEach((c, i)=>{
-        const wrap = div("div","cardWrap");
-        const card = div("div","card");
-        const inner = div("div","cardInner");
-        const numTop = div("div","numTop", String(c.text).replace(",","."));
-        const lower = div("div","lowerArea");
-        lower.style.backgroundImage = `url("${codeArtFor(c.text)}")`;
-
-        const mine = iOwnSeat(idx);
-        const showAsBack = (!mine && !c.revealed) || (c.isBack);
-
-        card.classList.toggle("isBack", !!showAsBack);
-        if(!showAsBack){
-          card.classList.toggle("isFacePrivate", mine && !c.revealed);
-          card.classList.toggle("isFacePublic", !mine || c.revealed);
-        }
-        inner.appendChild(numTop); inner.appendChild(lower); card.appendChild(inner);
-        if(mine){
-          card.style.cursor="pointer";
-          card.onclick = ()=>{
-            const path = `rooms/${state.roomCode}/seats/${idx}/hand/${c.id}`;
-            update(ref(db,path),{ revealed: !c.revealed });
-          };
-        }else{
-          card.style.cursor="default"; // 自分のカード以外は押せない（観戦者も）
-        }
-
-        // レター＆トークン
-        const letterCell = div("div","letterCell");
-        const letter = div("div","letterLabel", indexToLetter(i));
-        letter.onclick = (ev)=> openLetterTab(ev.currentTarget, idx, c.id, String(c.text).replace(",","."));
-        letterCell.appendChild(letter);
-
-        // 既存トークン描画
-        const tk = (seat.tokens && seat.tokens[c.id]) || {};
-        if(tk.eq){ const m=div("div","eqMark","="); m.onclick=()=>toggleToken(idx,c.id,"eq",false); letterCell.appendChild(m); }
-        if(tk.neq){ const m=div("div","neqMark","≠"); m.onclick=()=>toggleToken(idx,c.id,"neq",false); letterCell.appendChild(m); }
-        if(tk.x1){ const m=div("div","x1Mark","x1"); m.onclick=()=>toggleToken(idx,c.id,"x1",false); letterCell.appendChild(m); }
-        if(tk.num!=null){ const t=div("div","token",String(tk.num)); t.style.background="#000"; t.style.color="#fff"; t.style.padding="2px 4px"; t.style.borderRadius="6px"; letterCell.appendChild(t); }
-
-        wrap.appendChild(card);
-        wrap.appendChild(letterCell);
-        hand.appendChild(wrap);
-      });
-
-      row.appendChild(label);
-      row.appendChild(hand);
-      table.appendChild(row);
-      tablesArea.appendChild(table);
-    });
-  }
-
-  /* ===== レタークリック：小タブ ===== */
-  function openLetterTab(target, seatIdx, cardId, cardNumText){
-    const mine = iOwnSeat(seatIdx);
-    if(!mine) return; // 自分のカードしか操作不可
-
-    const fx = currentRoom.effects || {};
-    const tab = document.createElement("div");
-    tab.className = "floatTab";
-    const eqAble = (fx.eqRemain|0) > 0;
-    const neqAble = (fx.neqRemain|0) > 0;
-    const x1Able = (fx.x1Remain|0) > 0;
-
-    tab.innerHTML = `
-      <div style="display:flex;gap:6px;flex-wrap:wrap;max-width:220px">
-        <button data-act="num">数字</button>
-        ${eqAble? `<button data-act="eq">=</button>`:""}
-        ${neqAble? `<button data-act="neq">≠</button>`:""}
-        ${x1Able? `<button data-act="x1">x1</button>`:""}
-        <button data-act="clear">消す</button>
-      </div>
-    `;
-    document.body.appendChild(tab);
-    const rect = target.getBoundingClientRect();
-    tab.style.left = Math.max(8, rect.left - 4) + "px";
-    tab.style.top = (rect.top - 44 + window.scrollY) + "px";
-
-    const close = ()=> tab.remove();
-    setTimeout(()=>document.addEventListener("click",(e)=>{ if(!tab.contains(e.target) && e.target!==target) close(); }, { once:true }), 0);
-
-    tab.querySelectorAll("button").forEach(b=>{
-      b.onclick = async ()=>{
-        const act = b.dataset.act;
-        const base = `rooms/${state.roomCode}`;
-        if(act==="num"){
-          await update(ref(db,`${base}/seats/${seatIdx}/tokens/${cardId}`), { num: cardNumText });
-          close(); return;
-        }
-        if(act==="eq" && eqAble){ await toggleToken(seatIdx,cardId,"eq",true); close(); return; }
-        if(act==="neq" && neqAble){ await toggleToken(seatIdx,cardId,"neq",true); close(); return; }
-        if(act==="x1" && x1Able){ await toggleToken(seatIdx,cardId,"x1",true); close(); return; }
-        if(act==="clear"){
-          await update(ref(db,`${base}/seats/${seatIdx}/tokens/${cardId}`), { num:null, eq:false, neq:false, x1:false });
-          close(); return;
-        }
-      };
-    });
-  }
-
-  async function toggleToken(seatIdx, cardId, kind, add){
-    const base = `rooms/${state.roomCode}`;
-    const fx = currentRoom.effects || {};
-    const remainKey = (kind==="eq"?"eqRemain": kind==="neq"?"neqRemain":"x1Remain");
-    const remain = fx[remainKey]|0;
-
-    if(add){
-      if(remain<=0) return;
-      await update(ref(db,`${base}/seats/${seatIdx}/tokens/${cardId}`), { [kind]: true });
-      await update(ref(db,`${base}/effects`), { [remainKey]: remain-1 });
-    }else{
-      const t = (currentRoom.seats?.[seatIdx]?.tokens?.[cardId]) || {};
-      if(!t[kind]) return;
-      await update(ref(db,`${base}/seats/${seatIdx}/tokens/${cardId}`), { [kind]: false });
-      await update(ref(db,`${base}/effects`), { [remainKey]: remain+1 });
-    }
-  }
-
-  /* ===== アイテムクリック ===== */
-  async function onClickItem(num){
-    const it = (currentRoom.items||{})[num];
-    if(!it || it.used) return;
-
-    const base = `rooms/${state.roomCode}`;
-
-    // （指定がない限り）全体公開カードが2枚以上のとき使用可
-    const openCount = countPublicNumbers(currentRoom);
-    const usable = openCount>=2;
-
-    // 2/16/17 は例外的にすぐ実行可
-    if(!usable && ![2,16,17].includes(num)) return;
-
-    if(num===1){ // '=' 2回まで
-      const remain = (currentRoom.effects?.eqRemain|0);
-      await update(ref(db,`${base}/effects`), { eqRemain: Math.max(remain,2) });
-      await flagItemUsed(num);
-      return;
-    }
-    if(num===12){ // '≠' 2回まで
-      const remain = (currentRoom.effects?.neqRemain|0);
-      await update(ref(db,`${base}/effects`), { neqRemain: Math.max(remain,2) });
-      await flagItemUsed(num);
-      return;
-    }
-    if(num===14){ // 'x1' 2回まで
-      const remain = (currentRoom.effects?.x1Remain|0);
-      await update(ref(db,`${base}/effects`), { x1Remain: Math.max(remain,2) });
-      await flagItemUsed(num);
-      return;
-    }
-    if(num===16){ // 情報トークンの“出現1回だけの数字”からランダム抽出→このカード上に表示
-      const chosen = pickUniqueInfoTokenNumber(currentRoom);
-      await update(ref(db,`${base}/items/${num}`), { used:true, overlay: chosen? String(chosen):"—" });
-      return;
-    }
-    if(num===17){ // 使われたアイテムを全て未使用に戻す（このカードは裏向きのまま）
-      const items = currentRoom.items||{};
-      const updates = {};
-      Object.keys(items).forEach(k=>{
-        const nk = parseInt(k,10);
-        if(nk===17) updates[`rooms/${state.roomCode}/items/${k}`] = { used:true, overlay:null };
-        else updates[`rooms/${state.roomCode}/items/${k}`] = { used:false, overlay:null };
-      });
-      await Promise.all(Object.keys(updates).map(path=> set(ref(db,path), updates[path])));
-      return;
-    }
-    if(num===2){ // 手札交換（フロー本体は別途拡張予定／ここでは使用済みにする）
-      await flagItemUsed(num);
-      alert("交換：この仕様の詳細UIは後続で実装します。");
-      return;
-    }
-
-    // その他：使用→裏向きフラグのみ（必要なら後で挙動拡張）
-    await flagItemUsed(num);
-  }
-
-  function countPublicNumbers(room){
-    let n=0;
-    Object.values(room.seats||{}).forEach(seat=>{
-      Object.values(seat.hand||{}).forEach(c=>{ if(c.revealed) n++; });
-    });
-    return n;
-  }
-  function pickUniqueInfoTokenNumber(room){
-    const counts={};
-    Object.values(room.seats||{}).forEach(seat=>{
-      Object.values(seat.tokens||{}).forEach(t=>{
-        if(t && t.num!=null){ counts[t.num]=(counts[t.num]||0)+1; }
-      });
-    });
-    const onlyOnce = Object.keys(counts).filter(k=>counts[k]===1);
-    if(!onlyOnce.length) return null;
-    return onlyOnce[Math.floor(Math.random()*onlyOnce.length)];
-  }
-  async function flagItemUsed(num){
-    await update(ref(db,`rooms/${state.roomCode}/items/${num}`), { used:true });
-  }
-
-  /* ===== 退室 ===== */
-  leaveBtn.addEventListener("click", async ()=>{
-    const code=state.roomCode;
-    if(!code) return location.reload();
-    if(state.role==="player") await remove(ref(db,`rooms/${code}/players/${state.userId}`));
-    else await remove(ref(db,`rooms/${code}/spectators/${state.userId}`));
-    location.href = location.origin + location.pathname;
-  });
-
-  /* 初期表示 */
-  const urlRoom = new URL(location.href).searchParams.get("room");
-  if(urlRoom){ roomCodeInput.value = urlRoom; }
-  setView("join");
+/* ====== クリック外しでミニポップ閉じる ====== */
+document.addEventListener('click',(e)=>{
+  if(!miniPop.contains(e.target)){ H(miniPop,true); }
+}, true);
 </script>
 </body>
 </html>
