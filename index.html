@@ -573,6 +573,9 @@ function renderTables(v){
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table';
+    // ▼ 下段テーブルの前面に情報トークンが出るよう、上のテーブルほどz-indexを高くする
+    box.style.zIndex = String((v.tables||[]).length - idx);
+    box.style.position = 'relative';
 
     /* 横幅 = キャラ幅 + 手札幅 + 余白 */
     const n = (t.hand||[]).length;
@@ -589,11 +592,16 @@ function renderTables(v){
     /* 中段：キャラ＋手札 */
     const content=document.createElement('div'); content.className='t-content';
 
-    // キャラ（誰でも見える）
+    // キャラ（着席するまではブランク表示）
     const char=document.createElement('div'); char.className='char-card';
-    const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+    let face;
+    if(!t.playerId){
+      face = './blank.jpg'; // 事前に用意してください
+    }else{
+      face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+    }
     char.style.backgroundImage = `url("${face}")`;
-    // キャラは誰でも裏返せる仕様のまま（指定があれば制限可）
+    // キャラは誰でも裏返せる仕様（必要なら着席者のみ許可に変更可）
     char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
     content.appendChild(char);
 
@@ -609,7 +617,24 @@ function renderTables(v){
       if(c.open) card.classList.add('open');
 
       if(isMine){
-        card.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open}); };
+        a.onclick=(ev)=>{
+          ev.stopPropagation();
+          if(c.token){
+            // 既に情報トークンがある → 消すポップ
+            openMini(ev.clientX, ev.clientY,
+              '消す', async ()=>{
+                await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { token:null });
+              },
+              'キャンセル', ()=>{}
+            );
+          }else{
+            // まだ無い → 数字トークン付与
+            openNumberMini(ev.clientX, ev.clientY, String(c.num), async ()=>{
+              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { token:{type:'num', value:c.num, style:'black'} });
+            });
+          }
+        };
+      }
       }
 
       const num=document.createElement('div'); num.className='num';
