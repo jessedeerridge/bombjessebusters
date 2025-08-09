@@ -462,7 +462,7 @@
     }
 
     // キャラクターカード：必ず member(5).png をどこかに割当（無い場合に備えjpg名もフォールバック）
-    const memList = ["member (1).jpg","member (2).jpg","member (3).jpg","member (4).jpg","member (5).jpg","member(1).jpg","member(2).jpg","member(3).jpg","member(4).jpg","member(5).jpg"];
+    const memList = ["member (1).jpg","member (2).jpg","member (3).jpg","member (4).jpg","member (5).jpg"];
     const mustIdx = Math.floor(Math.random()*seatCount)+1;
     seats[mustIdx].avatarName = "member(5).png"; // 第一候補
     for(let s=1;s<=seatCount;s++){
@@ -693,10 +693,10 @@
         const sc = document.createElement("div");
         sc.className = "avatar";
         // 画像フォールバック（png/jpg・スペース有無）
-        const faceUrl = `url("member(5).png"), url("member (5).jpg"), url("member(5).jpg")`;
+        const faceUrl = `url("member (5).jpg")`;
         const faceOther = `url("${seat.avatarName}"), url("${seat.avatarName.replace(" (","(")}")`;
-        sc.style.backgroundImage = (seat.avatarName==="member(5).png") ? faceUrl : faceOther;
-        const backUrl = `url("battery.jpg"), url("battery. jpg")`;
+        sc.style.backgroundImage = (seat.avatarName==="member (5).png") ? faceUrl : faceOther;
+        const backUrl = `url("battery.jpg")`;
         if(!seat.avatarFace) sc.style.backgroundImage = backUrl;
         sc.title = "クリックで表裏を切替";
         sc.onclick = ()=>toggleAvatar(idx, !!seat.avatarFace);
