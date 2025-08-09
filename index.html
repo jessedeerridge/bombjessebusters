@@ -7,10 +7,12 @@
 <style>
   :root{
     --gap:10px;
-    --cardW:23px;   /* 指定: 幅23 */
-    --cardH:70px;   /* 指定: 高さ70 */
-    --cardGap:3px;  /* 指定: 間3 */
-    --letterH:18px; /* カード下のa/b/...高さ */
+    --cardW:24px;   /* 指定どおり */
+    --cardH:60px;   /* 指定どおり */
+    --cardGap:3px;  /* 指定どおり */
+    --letterH:16px; /* a/b/...の高さ（小さめ） */
+    --labelW:28px;  /* テーブル左ラベルの幅 */
+    --tiny:11px;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#fff;color:#111}
@@ -30,57 +32,70 @@
   .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #eee;padding:6px 10px;border-radius:999px;font-size:13px;background:#fafafa}
   .list{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto}
 
-  /* テーブル（席） */
+  /* ====== テーブル（席） ====== */
   .table{border:1px solid #eee;border-radius:12px;padding:8px;margin-bottom:10px}
-  .tableHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-  .tableTitle{font-weight:700}
-  .occupant{font-size:11px;color:#444}
+  .tableRow{display:grid;grid-template-columns: var(--labelW) 1fr; gap:8px; align-items:stretch}
+  /* 左の数字ラベル：数字だけ＋数字の下に下線（border-topで表現） */
+  .tableLabel{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px}
+  .tableLabel .num{font-size:12px;font-weight:700;line-height:1}
+  .tableLabel .underline{width:100%;border-top:2px solid #111;margin-top:2px}
+  /* テーブル左上の着席者名（小さく） */
+  .occupant{font-size:11px;color:#444;margin-bottom:4px}
 
-  /* 手札：横一列15枚想定（nowrap）、必要なら横スクロール */
+  /* 手札：横一列15枚想定（nowrap）／必要に応じて横スクロール */
   .handWrap{overflow-x:auto;padding-bottom:6px}
   .hand{display:flex;gap:var(--cardGap);flex-wrap:nowrap}
 
   /* 1枚の表示ブロック（カード＋下の文字） */
   .cardWrap{display:flex;flex-direction:column;align-items:center}
-  .letterCell{width:var(--cardW);height:var(--letterH);border:1px solid #eee;border-radius:4px;display:grid;place-items:center;font-size:11px;line-height:1;margin-top:2px}
-  .letterCell>button{width:100%;height:100%;border:none;background:transparent;font-size:11px;cursor:pointer}
-  .token{font-size:11px;font-weight:700}
+  .letterCell{width:var(--cardW);height:var(--letterH);border:1px solid #eee;border-radius:4px;display:grid;place-items:center;font-size:10px;line-height:1;margin-top:2px}
+  .letterCell>button{width:100%;height:100%;border:none;background:transparent;font-size:10px;cursor:pointer}
+  .token{font-size:10px;font-weight:700}
 
   /* 「トークンを置く」小ボタン */
   .placeBtn{position:absolute;transform:translateY(-6px);font-size:11px;padding:4px 6px;border-radius:8px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);z-index:20}
 
-  /* カード本体 */
-  .card{width:var(--cardW);height:var(--cardH);border-radius:6px;border:1px solid #ccc;overflow:hidden;user-select:none;cursor:pointer;position:relative}
-  .cardInner{display:grid;grid-template-rows:16px 1fr;height:100%}
-  .numTop{display:grid;place-items:center;font-weight:700;font-size:11px}
+  /* ====== カード本体 ====== */
+  .card{width:var(--cardW);height:var(--cardH);border-radius:6px;border:1px solid #000;overflow:hidden;user-select:none;cursor:pointer;position:relative}
+  .cardInner{display:grid;grid-template-rows:14px 1fr;height:100%}
+  .numTop{display:grid;place-items:center;font-weight:700;font-size:10px}
   .lowerArea{width:100%;height:100%}
 
-  /* 表示状態
-     - 自分の未公開：白地で数字（自分だけ見える）
-     - 他人の未公開：裏面 codeback.png
-     - 公開（全体）：黒地＋白字、下詰めに codenumber.png（＝カード表の仕様） */
+  /* 裏：常に codeback.png（他人・観戦者から見える未公開） */
   .isBack{
     background:
       url("codeback.png") center/cover no-repeat,
       repeating-linear-gradient(45deg,#f3f3f3,#f3f3f3 8px,#e5e5e5 8px,#e5e5e5 16px);
+    border-color:#ccc;
   }
-  .isFaceSelf{background:#fff}
-  .isRevealed{background:#000;color:#fff;border-color:#000;outline:2px solid #0a7}
-  .isRevealed .lowerArea{background:url("codenumber.png") center bottom/contain no-repeat}
   .isBack .numTop{visibility:hidden}
 
-  /* 右下の設定メニュー */
+  /* 表：黒地＋白字（自分の未公開／公開いずれもこの表現） */
+  .isFace{background:#000;color:#fff;border-color:#000}
+  .isFace .lowerArea{background:url("codenumber.png") center bottom/contain no-repeat}
+
+  /* 公開状態は輪郭を強調 */
+  .isRevealed{outline:2px solid #0a7}
+
+  /* ====== 右下の設定メニュー ====== */
   .floating{position:fixed;right:12px;bottom:12px;display:flex;gap:8px}
   .menu{position:relative}
-  .menuPopup{position:absolute;right:0;bottom:44px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:8px;display:none}
+  .menuPopup{position:absolute;right:0;bottom:44px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:8px;display:none;min-width:160px}
   .menu.open .menuPopup{display:block}
+  .menuPopup button{width:100%;text-align:left}
 
-  /* モーダル（開始ウィザード／座席選択） */
-  .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
+  /* ====== モーダル ====== */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50}
   .sheet{background:#fff;border-radius:16px;max-width:520px;width:calc(100% - 32px);padding:16px;border:1px solid #eee}
   .choices{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px}
   .choice{padding:10px;border:1px solid #ddd;border-radius:10px;text-align:center;cursor:pointer}
   .rowSmall{display:flex;gap:8px;align-items:center;margin-top:8px}
+
+  /* やり直し確認（小さな「やり直す」＋大きなキャンセル） */
+  .confirmRow{display:flex;gap:10px;align-items:center;margin-top:12px}
+  .btnTiny{font-size:11px;padding:6px 10px}
+  .btnLarge{font-size:16px;padding:12px 16px}
+
   @media (max-width:900px){.container{flex-direction:column}.side{width:auto}}
 </style>
 </head>
@@ -166,8 +181,19 @@
     <div style="font-weight:800;">座るテーブルを選択</div>
     <div id="seatList" class="list" style="margin-top:8px;"></div>
     <div class="rowSmall">
-      <button id="leaveSeatBtn">席を離れる</button>
+      <button id="leaveSeatBtn">席を立つ</button>
       <div class="muted">※ 退出すると席は空きます（カードは残る）。</div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset confirm -->
+<div id="resetConfirm" class="modal hidden">
+  <div class="sheet">
+    <div style="font-weight:800;">やり直しますか？</div>
+    <div class="confirmRow">
+      <button id="confirmResetBtn" class="btnTiny">やり直す</button>
+      <button id="cancelResetBtn" class="btnLarge">キャンセル</button>
     </div>
   </div>
 </div>
@@ -178,6 +204,7 @@
     <button id="settingsBtn">⚙ 設定</button>
     <div class="menuPopup" id="menuPopup">
       <button id="chooseSeatBtn">席に座る</button>
+      <button id="leaveSeatMenuBtn" class="hidden">席を立つ</button>
       <button id="resetBtn" class="hidden">やり直し</button>
     </div>
   </div>
@@ -191,7 +218,7 @@
     serverTimestamp, onDisconnect, remove, runTransaction
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-  /* ==== Firebase config (そのまま利用) ==== */
+  /* ==== Firebase config ==== */
   const firebaseConfig = {
     apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
     authDomain: "chat-68c4c.firebaseapp.com",
@@ -199,7 +226,7 @@
     projectId: "chat-68c4c",
     storageBucket: "chat-68c4c.appspot.com",
     messagingSenderId: "172284325975",
-    appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
+    appId: "1:172284325:web:6f9bdd77e822c0ea39dd92"
   };
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
@@ -214,9 +241,10 @@
   const playersList=$("#playersList"), spectatorsList=$("#spectatorsList"), sidePanel=$("#sidePanel");
   const tablesArea=$("#tablesArea");
   const controls=$("#controls"), menu=$("#menu"), menuPopup=$("#menuPopup"), settingsBtn=$("#settingsBtn");
-  const chooseSeatBtn=$("#chooseSeatBtn"), resetBtn=$("#resetBtn");
+  const chooseSeatBtn=$("#chooseSeatBtn"), leaveSeatMenuBtn=$("#leaveSeatMenuBtn"), resetBtn=$("#resetBtn");
   const startModal=$("#startModal"), seatCountInput=$("#seatCountInput"), seatNext=$("#seatNext"), missionStep=$("#missionStep"), missionChoices=$("#missionChoices");
   const seatSelectModal=$("#seatSelectModal"), seatList=$("#seatList"), leaveSeatBtn=$("#leaveSeatBtn");
+  const resetConfirm=$("#resetConfirm"), confirmResetBtn=$("#confirmResetBtn"), cancelResetBtn=$("#cancelResetBtn");
 
   // State
   let state = {
@@ -298,10 +326,14 @@
       controls.classList.toggle("hidden", state.phase!=="playing");
       resetBtn.classList.toggle("hidden", !state.isHost);
 
+      // 席関連のメニュー表示
+      const seats = v.seats||{};
+      state.mySeat = null;
+      Object.keys(seats).forEach(k=>{ if(seats[k].occupantUser===state.userId) state.mySeat=String(k); });
+      leaveSeatMenuBtn.classList.toggle("hidden", !state.mySeat);
+
       renderList(playersList, v.players||{});
       renderList(spectatorsList, v.spectators||{});
-
-      detectMySeat(v);
       renderTables(v);
     });
 
@@ -349,14 +381,14 @@
 
     // 席を作成し、ラウンドロビンで余りなく配布（均等でなくてOK）
     const seats={};
-    for(let s=1;s<=seatCount;s++){ seats[s]={ hand:{}, tokens:{} }; }
+    for(let s=1;s<=seatCount;s++){ seats[s]={ hand:{}, tokens:{}, occupantUser:null, occupantName:null }; }
     let k=0, sidx=1;
     while(k<deck.length){
       const c=deck[k++]; seats[sidx].hand[c.id]={...c, revealed:false};
       sidx++; if(sidx>seatCount) sidx=1;
     }
 
-    // 並び順（規定は昇順）。M2は各席でランダム1枚を右端固定
+    // 並び順（規定：昇順）。M2は各席でランダム1枚を右端固定
     const val = (t)=>parseFloat(t);
     for(let s=1;s<=seatCount;s++){
       let arr = Object.keys(seats[s].hand).map(id=>({id, ...seats[s].hand[id]}));
@@ -378,9 +410,10 @@
     });
   }
 
-  /* ======= 設定：座席選択／やり直し ======= */
+  /* ======= 設定メニュー：座席選択／席を立つ／やり直し ======= */
   settingsBtn.addEventListener("click", ()=>menu.classList.toggle("open"));
   chooseSeatBtn.addEventListener("click", openSeatSelector);
+  leaveSeatMenuBtn.addEventListener("click", leaveSeat);
 
   function openSeatSelector(){
     const code=state.roomCode;
@@ -393,20 +426,20 @@
         const occName = seats[idx].occupantName;
         const btn = document.createElement("button");
         btn.textContent = `テーブル${idx}：` + (occUser ? `${occName} が着席中` : "空席");
+        // ホスト以外は占有席に座れない（ホストも上書きしない実装）
         const occupied = !!occUser && occUser!==state.userId;
-        // 指示: ホスト以外は占有席に座れない（※ホストも上書きはしない実装。希望あれば上書き版に変更可）
-        btn.disabled = occupied; 
+        btn.disabled = occupied;
         btn.style.padding="8px"; btn.style.border="1px solid #ddd"; btn.style.borderRadius="10px"; btn.style.background="#fff"; btn.style.textAlign="left";
         btn.onclick=()=>claimSeat(idx);
         seatList.appendChild(btn);
       });
     }, { onlyOnce:true });
     seatSelectModal.classList.remove("hidden");
+    menu.classList.remove("open");
   }
 
   async function claimSeat(idx){
     const code=state.roomCode;
-    // 空席なら自分を設定（占有席はボタン無効なのでここには来ない）
     const seatUserRef = ref(db,`rooms/${code}/seats/${idx}/occupantUser`);
     const res = await runTransaction(seatUserRef,(cur)=> cur || state.userId);
     if(!res.committed || res.snapshot.val()!==state.userId){
@@ -415,27 +448,29 @@
     }
     await update(ref(db,`rooms/${code}/seats/${idx}`),{ occupantName: state.name });
     state.mySeat = String(idx);
-
-    // 離脱時に席だけ空ける（手札やトークンは残す）
+    // 離脱時に席だけ空ける（カードは残る）
     onDisconnect(ref(db,`rooms/${code}/seats/${idx}/occupantUser`)).remove();
     onDisconnect(ref(db,`rooms/${code}/seats/${idx}/occupantName`)).remove();
-
     seatSelectModal.classList.add("hidden");
-    menu.classList.remove("open");
   }
 
-  leaveSeatBtn.addEventListener("click", async ()=>{
-    if(!state.mySeat){ seatSelectModal.classList.add("hidden"); return; }
+  async function leaveSeat(){
+    if(!state.mySeat) return;
     const code=state.roomCode;
     await update(ref(db,`rooms/${code}/seats/${state.mySeat}`),{ occupantUser: null, occupantName: null });
     state.mySeat=null;
-    seatSelectModal.classList.add("hidden");
-  });
+  }
+  leaveSeatBtn.addEventListener("click", ()=>{ leaveSeat(); seatSelectModal.classList.add("hidden"); });
 
-  resetBtn.addEventListener("click", async ()=>{
+  // やり直し（ホストのみ）
+  resetBtn.addEventListener("click", ()=>{
     if(!state.isHost) return;
-    const ok = confirm("やり直しますか？ロビーに戻り、参加を押していた人は全員プレイヤーに復帰します。");
-    if(!ok) return;
+    resetConfirm.classList.remove("hidden");
+    menu.classList.remove("open");
+  });
+  cancelResetBtn.addEventListener("click", ()=>resetConfirm.classList.add("hidden"));
+  confirmResetBtn.addEventListener("click", async ()=>{
+    if(!state.isHost) return;
     const code=state.roomCode;
 
     const [pS, sS, wS] = await Promise.all([
@@ -446,14 +481,10 @@
     const curP = pS.val()||{}, curS=sS.val()||{}, wants=wS.val()||{};
     const present = { ...curP, ...curS };
 
-    const nextPlayers = {};
-    const nextSpectators = {};
+    const nextPlayers = {}, nextSpectators = {};
     Object.keys(present).forEach(uid=>{
-      if(wants[uid]?.wantsPlayer){
-        nextPlayers[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" };
-      }else{
-        nextSpectators[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" };
-      }
+      if(wants[uid]?.wantsPlayer){ nextPlayers[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" }; }
+      else{ nextSpectators[uid] = { name: present[uid]?.name || wants[uid]?.name || "???" }; }
     });
 
     await update(ref(db,`rooms/${code}`),{
@@ -464,20 +495,12 @@
       players: nextPlayers,
       spectators: nextSpectators
     });
-    menu.classList.remove("open");
+    resetConfirm.classList.add("hidden");
   });
 
   /* ======= レンダリング ======= */
-  function detectMySeat(roomVal){
-    state.mySeat = null;
-    const seats = roomVal.seats||{};
-    Object.keys(seats).forEach(idx=>{
-      if(seats[idx].occupantUser === state.userId) state.mySeat = String(idx);
-    });
-  }
-
   function canOperateOnSeat(seatIdx){
-    // 「自分のカードしか押せない」= 自分が着席しているテーブルだけ操作可
+    // 「自分のカードしか押せない」= 自分が着席しているテーブルのみ
     return state.mySeat && String(seatIdx)===String(state.mySeat);
   }
 
@@ -492,18 +515,28 @@
 
     seatKeys.forEach(idx=>{
       const seat = seats[idx];
+
       const table = div("div","table");
-      const header = div("div","tableHeader");
-      const title = div("div","tableTitle", `テーブル ${idx}`);
-      const occ = div("div","occupant", seat.occupantName ? `👤 ${seat.occupantName}` : "空席");
-      header.appendChild(title); header.appendChild(occ);
-      table.appendChild(header);
+      const row = div("div","tableRow");
+      // 左のラベル（数字だけ＋下線）
+      const label = div("div","tableLabel");
+      label.appendChild(div("div","num", String(idx)));
+      const ul = div("div","underline",""); label.appendChild(ul);
+      row.appendChild(label);
+
+      // 右側コンテンツ
+      const content = div("div","");
+      const occ = div("div","occupant", seat.occupantName ? `👤 ${seat.occupantName}` : "");
+      content.appendChild(occ);
 
       const handWrap=div("div","handWrap");
       const handEl=div("div","hand");
 
       let arr = Object.keys(seat.hand||{}).map(id=>({id, ...seat.hand[id]}));
       arr.sort((a,b)=>(a.order??0)-(b.order??0));
+
+      const isMineSeat = canOperateOnSeat(idx);
+      const isSpectator = (state.role==="spectator");
 
       arr.forEach((c,i)=>{
         const wrap = div("div","cardWrap");
@@ -513,38 +546,36 @@
         const lower = div("div","lowerArea");
 
         const revealed = !!c.revealed;
-        const isMineSeat = canOperateOnSeat(idx);
 
+        // 見え方：
+        // - 公開：全員に表（黒）
+        // - 自分の席の未公開：自分だけ表（黒）
+        // - それ以外（他席 or 観戦者）：裏
         if(revealed){
-          card.classList.add("isRevealed");
+          card.classList.add("isFace","isRevealed");
+          top.textContent = c.text;
+        }else if(isMineSeat && state.role==="player"){
+          card.classList.add("isFace");
           top.textContent = c.text;
         }else{
-          if(isMineSeat){
-            // 自分だけ表を見られる（白地＋数字）
-            card.classList.add("isFaceSelf");
-            top.textContent = c.text;
-          }else{
-            // 他者には裏
-            card.classList.add("isBack");
-          }
+          card.classList.add("isBack");
         }
 
         inner.appendChild(top);
         inner.appendChild(lower);
         card.appendChild(inner);
 
-        // クリックで公開/非公開トグル（自分の席のカードだけ）
-        if(isMineSeat){
+        // クリック可否：自分の席のカードのみ
+        if(isMineSeat && state.role==="player"){
           card.title = revealed ? "クリックで裏に戻す" : "クリックで公開";
           card.onclick = ()=>toggleReveal(idx,c.id);
         }else{
-          card.title = "";
-          card.style.cursor = "default";
+          card.style.cursor="default";
         }
 
         // 文字ラベル（a,b,c... 1枚につき1文字）
         const letter = indexToLetter(i);
-        const letterCell = makeLetterCell(idx,c,letter,isMineSeat);
+        const letterCell = makeLetterCell(idx,c,letter,(isMineSeat && state.role==="player"));
 
         wrap.appendChild(card);
         wrap.appendChild(letterCell);
@@ -552,7 +583,9 @@
       });
 
       handWrap.appendChild(handEl);
-      table.appendChild(handWrap);
+      content.appendChild(handWrap);
+      row.appendChild(content);
+      table.appendChild(row);
       tablesArea.appendChild(table);
     });
   }
@@ -566,14 +599,14 @@
   }
 
   /* ======= トークン ======= */
-  function makeLetterCell(seatIdx, card, letter, isMineSeat){
+  function makeLetterCell(seatIdx, card, letter, canPlace){
     const cell=div("div","letterCell");
     const tokenRef = ref(db, `rooms/${state.roomCode}/seats/${seatIdx}/tokens/${card.id}`);
     onValue(tokenRef,(s)=>{
       cell.innerHTML="";
       const v=s.val();
       if(v==null){
-        if(isMineSeat){
+        if(canPlace){
           const b=document.createElement("button");
           b.textContent=letter;
           b.onclick=(ev)=>{
