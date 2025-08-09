@@ -1,70 +1,75 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>BOMB BUSTERS</title>
 <style>
-:root {
-  --bg:#ffffff; --panel:#f5f7fa; --line:#d0d7de; --muted:#6c757d; --text:#212529;
-  --accent:#0d6efd; --danger:#dc3545;
+:root{
+  --bg:#fff; --panel:#f6f8fa; --line:#d0d7de; --muted:#6b7280; --text:#111827;
+  --accent:#2563eb; --danger:#ef4444; --gap:6px; --pad:12px;
 }
-* { box-sizing: border-box }
-html,body { height:100%; margin:0; background:var(--bg); color:var(--text); font-family: system-ui, sans-serif; }
-.wrap { max-width: 1200px; margin: 0 auto; padding: 8px; }
-.card { background: var(--panel); border:1px solid var(--line); border-radius: 12px; }
-header { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--line) }
-header h1 { font-size:18px; margin:0; font-weight:bold }
-header .badge { background:#e9ecef; padding:4px 8px; border-radius:999px; font-size:12px; }
+*{box-sizing:border-box} html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif}
+.wrap{max-width:1200px;margin:0 auto;padding:8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:#fff}
+header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.04em}
 
-.layout { display:grid; grid-template-columns: 220px 1fr 220px; gap:8px; padding:8px; }
-@media(max-width:800px){ .layout { grid-template-columns: 1fr; } }
+.layout{display:grid;grid-template-columns:240px 1fr 260px;gap:10px;padding:10px}
+@media(max-width:900px){ .layout{grid-template-columns:1fr} }
+.panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px}
 
-.panel { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px; }
-#join { display:grid; gap:8px }
-#join .row { display:flex; gap:6px; flex-wrap:wrap }
-input, select, button { border:1px solid var(--line); padding:8px; border-radius:8px; font-size:14px; }
-button { background:var(--accent); color:#fff; cursor:pointer; border:none; }
-button.secondary { background:#e9ecef; color:var(--text); }
-button:disabled { opacity:.6; cursor:not-allowed }
+#join{display:grid;gap:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+input,select,button{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px}
+button{background:var(--accent);color:#fff;cursor:pointer;border:none}
+button.secondary{background:#e5e7eb;color:#111827}
+button:disabled{opacity:.55;cursor:not-allowed}
 
-.list h3 { font-size:14px; margin:4px 0; color:var(--muted); }
-.pill { display:inline-flex; align-items:center; gap:4px; padding:4px 8px; border:1px solid var(--line); border-radius:999px; margin:2px; font-size:12px; background:#f8f9fa }
-.me { outline:2px solid var(--accent); }
-.host { border-color:#ffb23f; }
+.list h3{margin:4px 0 6px;font-size:13px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;padding:4px 8px;border:1px solid var(--line);border-radius:999px;margin:2px;background:#f9fafb;font-size:12px}
+.me{outline:2px solid var(--accent)}
+.host{border-color:#f59e0b}
 
-.cards { display:flex; gap:4px; justify-content:center; }
-.cardv { background:#fff; border:1px solid var(--line); border-radius:6px; display:flex; justify-content:center; align-items:center; font-weight:bold; }
-.mine.face { background:#f1f8ff; }
-.back { background:#dee2e6; }
-.clickable { cursor:pointer }
+#table{display:grid;gap:10px}
+.seat{background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:8px}
+.meta{font-size:12px;color:var(--muted);margin-bottom:6px}
 
-@media all {
-  .cards { flex-wrap:nowrap; }
-  .cardv { flex:0 0 auto; }
-}
+.cards{display:flex;gap:var(--gap);justify-content:center}
+.cardv{background:#fff;border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700}
+.cardv img{display:block;width:100%;height:100%;object-fit:cover;border-radius:8px}
+.mine.face{background:#eef5ff;border-color:#bfdbfe}
+.back{background:#e5e7eb}
+.number{font-variant-numeric:tabular-nums}
 
-.controls { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; }
-.hint { font-size:11px; color:var(--muted) }
-.ok { color:green }
-.err { color:var(--danger) }
+.controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+.hint{font-size:12px;color:var(--muted)}
+
+#settingsBtn{position:fixed;right:16px;bottom:16px;padding:10px 12px;border-radius:10px;background:#111827;color:#fff;border:1px solid #0003;display:none}
+#settingsMenu{position:fixed;right:16px;bottom:64px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 28px rgba(0,0,0,.12);padding:8px;display:none}
+#settingsMenu button{width:100%;text-align:left;background:#fff;color:#111827;border:1px solid var(--line);margin:4px 0}
 </style>
 </head>
 <body>
 <div class="wrap card">
   <header>
     <h1>BOMB BUSTERS</h1>
-    <div><span class="badge">v1.0</span></div>
+    <div></div>
   </header>
+
   <div class="layout">
+    <!-- 左：入室＆開始 -->
     <section class="panel" id="left">
       <div id="join">
         <div class="row">
-          <input id="name" placeholder="名前" autocomplete="off"/>
-          <input id="room" placeholder="ルーム4桁" maxlength="4"/>
+          <input id="name" placeholder="名前" autocomplete="off" />
+          <input id="room" placeholder="ルーム4桁" maxlength="4" />
         </div>
         <div class="row">
-          <select id="role"><option value="player">参加</option><option value="spectator">観戦</option></select>
+          <select id="role">
+            <option value="player">参加</option>
+            <option value="spectator">観戦</option>
+          </select>
           <button id="enter">入室</button>
           <button id="copy" class="secondary">リンク</button>
         </div>
@@ -74,167 +79,285 @@ button:disabled { opacity:.6; cursor:not-allowed }
         <span id="status" class="hint"></span>
       </div>
     </section>
-    <section class="panel" id="center"><div id="table"></div></section>
+
+    <!-- 中央：卓 -->
+    <section class="panel" id="center">
+      <div id="table"></div>
+    </section>
+
+    <!-- 右：リスト -->
     <aside class="panel list" id="right">
-      <h3>参加者</h3><div id="players"></div>
-      <h3>観戦</h3><div id="spectators"></div>
+      <h3>参加者</h3>
+      <div id="players"></div>
+      <h3>観戦</h3>
+      <div id="spectators"></div>
     </aside>
   </div>
 </div>
 
+<!-- ホスト用設定 -->
+<button id="settingsBtn">設定</button>
+<div id="settingsMenu">
+  <button id="resetBtn">ゲームリセット</button>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import { getDatabase, ref, set, get, update, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+import { getDatabase, ref, set, get, update, onValue, onDisconnect, remove } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
+/* === Firebase（あなたのプロジェクトで埋め込み済み）=== */
 const firebaseConfig = {
-  apiKey: "PASTE_YOURS",
+  apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
   authDomain: "chat-68c4c.firebaseapp.com",
   databaseURL: "https://chat-68c4c-default-rtdb.firebaseio.com",
   projectId: "chat-68c4c",
   storageBucket: "chat-68c4c.appspot.com",
-  messagingSenderId: "PASTE_YOURS",
-  appId: "PASTE_YOURS"
+  messagingSenderId: "172284325975",
+  appId: "1:172284325975:web:6f9bdd77e822c0ea39dd92"
 };
 const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const db  = getDatabase(app);
 
-const nameEl = document.querySelector('#name');
-const roomEl = document.querySelector('#room');
-const roleEl = document.querySelector('#role');
-const enterBtn = document.querySelector('#enter');
-const startBtn = document.querySelector('#start');
-const statusEl = document.querySelector('#status');
-const joinPanel = document.querySelector('#join');
+/* === 定数 === */
+const CARD_BACK_SRC = "code裏.png"; // リポジトリ直下に置いた想定
 
-let me={name:"",room:"",role:"player"};
-let host=null, gameStarted=false;
+/* === 要素参照 === */
+const qs = s => document.querySelector(s);
+const nameEl = qs('#name'), roomEl = qs('#room'), roleEl = qs('#role');
+const enterBtn = qs('#enter'), startBtn = qs('#start'), statusEl = qs('#status');
+const copyBtn = qs('#copy');
+const joinPanel = qs('#join');
+const playersEl = qs('#players'), spectatorsEl = qs('#spectators'), tableEl = qs('#table');
+const leftPane = qs('#left'), rightPane = qs('#right');
+const settingsBtn = qs('#settingsBtn'), settingsMenu = qs('#settingsMenu'), resetBtn = qs('#resetBtn');
 
-roomEl.addEventListener('input',()=>{ roomEl.value=roomEl.value.replace(/\D/g,'').slice(0,4); });
+/* === 状態 === */
+let me = { name:"", room:"", role:"player" };
+let host = null;
+let game = null;
+
+/* === 入力整形 & 操作 === */
+roomEl.addEventListener('input', ()=>{ roomEl.value = roomEl.value.replace(/\\D/g,'').slice(0,4); });
 enterBtn.addEventListener('click', joinRoom);
 startBtn.addEventListener('click', startGame);
+copyBtn.addEventListener('click', copyLink);
+settingsBtn.addEventListener('click', ()=>{ settingsMenu.style.display = settingsMenu.style.display ? "" : "block"; });
+resetBtn.addEventListener('click', resetGame);
+document.addEventListener('click', (e)=>{ if(!settingsMenu.contains(e.target) && e.target!==settingsBtn){ settingsMenu.style.display=""; }});
 
+/* === 参加 === */
 async function joinRoom(){
   const name = nameEl.value.trim();
   const room = roomEl.value.trim();
-  const role = roleEl.value;
-  if(!name || !/^[0-9]{4}$/.test(room)) return alert('名前と4桁ルーム');
+  let role = roleEl.value;
+  if(!name || !/^\\d{4}$/.test(room)) return alert("名前と4桁ルームコードを入力");
 
-  const hostRef = ref(db,`rooms/${room}/host`);
-  const snap = await get(hostRef);
-  if(!snap.exists()) {
-    await set(hostRef,name);
+  // ホスト設定
+  const hostRef = ref(db, `rooms/${room}/host`);
+  const hostSnap = await get(hostRef);
+  if(!hostSnap.exists()){
+    await set(hostRef, name);
     host = name;
-    startBtn.disabled = false; // 自分がホストなら即有効化
+    startBtn.disabled = false; // 初回入室者 = ホスト → すぐ開始できる
   } else {
-    host = snap.val();
+    host = hostSnap.val();
   }
 
-  me={name,room,role};
-  const playersRef = ref(db,`rooms/${room}/players/${name}`);
-  await update(playersRef,{name,role,online:true,joinedAt:Date.now()});
-  onDisconnect(playersRef).remove();
-  statusEl.textContent=`入室: ${room}`;
-  joinPanel.style.display='none';
+  // 進行中なら強制観戦
+  const startedSnap = await get(ref(db, `rooms/${room}/game/started`));
+  if(startedSnap.exists() && startedSnap.val()===true) role = "spectator";
+
+  me = { name, room, role };
+
+  // 既存の位置を掃除してから登録（重複防止）
+  await remove(ref(db, `rooms/${room}/players/${name}`));
+  await remove(ref(db, `rooms/${room}/spectators/${name}`));
+  const myRefPath = role==="player" ? `players/${name}` : `spectators/${name}`;
+  const myRef = ref(db, `rooms/${room}/${myRefPath}`);
+  await update(myRef, { name, role, online:true, joinedAt: Date.now() });
+  onDisconnect(myRef).remove();
+
+  joinPanel.style.display = 'none';
+  statusEl.textContent = `入室: ${room}`;
+
+  // 監視開始
   listenRoom();
 }
 
+/* === ルーム監視 === */
 function listenRoom(){
-  const roomRef = ref(db,`rooms/${me.room}`);
-  onValue(roomRef, snap=>{
-    if(!snap.exists()) return;
-    const data = snap.val();
-    gameStarted = !!data.started;
-    renderLists(data);
-    renderTable(data);
+  const roomRef = ref(db, `rooms/${me.room}`);
+  onValue(roomRef, (snap)=>{
+    const data = snap.val() || {};
+    host = data.host || host;
+    game = data.game || null;
 
-    const myName = me.name.trim().toLowerCase();
-    const hostName = (data.host||"").trim().toLowerCase();
-    if(myName === hostName){
-      startBtn.disabled = gameStarted;
-    }
-    if(gameStarted){
-      document.querySelector('#left').style.display='none';
-      document.querySelector('#right').style.display='none';
-      if(me.role==='player' && !data.players[me.name]){
-        me.role='spectator';
-      }
+    // リスト描画（未開始時のみ右側表示）
+    renderLists(data.players||{}, data.spectators||{}, data.host||"");
+
+    // ゲーム描画
+    renderGame(game, data.players||{});
+
+    // UI制御
+    const amHost = (me.name.trim().toLowerCase() === (data.host||"").trim().toLowerCase());
+    const started = !!(data.game && data.game.started);
+
+    // 開始ボタン（ホストのみ／開始後は無効）
+    startBtn.disabled = !amHost || started;
+
+    // 開始後は左・右を隠す
+    leftPane.style.display  = started ? 'none' : '';
+    rightPane.style.display = started ? 'none' : '';
+
+    // 設定ボタン（ホスト×開始中）
+    settingsBtn.style.display = (amHost && started) ? 'block' : 'none';
+    settingsMenu.style.display = '';
+
+    // 進行中に入室していたら観戦扱い
+    if (started && me.role === 'player' && !(data.players||{})[me.name]) {
+      me.role = 'spectator';
     }
   });
 }
 
-function renderLists(data){
-  const playersDiv=document.querySelector('#players');
-  const specsDiv=document.querySelector('#spectators');
-  playersDiv.innerHTML=''; specsDiv.innerHTML='';
-  if(data.players){
-    Object.values(data.players).forEach(p=>{
-      const el=document.createElement('div');
-      el.className='pill'+(p.name===me.name?' me':'')+(p.name===data.host?' host':'');
-      el.textContent=p.name;
-      (p.role==='player'?playersDiv:specsDiv).appendChild(el);
-    });
+/* === リスト描画 === */
+function renderLists(players, spectators, hostName){
+  playersEl.innerHTML = ''; spectatorsEl.innerHTML = '';
+  // 参加者
+  Object.values(players).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0)).forEach(p=>{
+    const el = document.createElement('span');
+    el.className = 'pill' + (p.name===me.name?' me':'') + (p.name===hostName?' host':'');
+    el.textContent = p.name;
+    playersEl.appendChild(el);
+  });
+  // 観戦
+  Object.values(spectators).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0)).forEach(p=>{
+    const el = document.createElement('span');
+    el.className = 'pill' + (p.name===me.name?' me':'');
+    el.textContent = p.name;
+    spectatorsEl.appendChild(el);
+  });
+}
+
+/* === ゲーム開始 === */
+async function startGame(){
+  // ガード
+  if(me.name.trim().toLowerCase() !== (host||"").trim().toLowerCase()) return;
+  // プレイヤー取得
+  const psSnap = await get(ref(db, `rooms/${me.room}/players`));
+  const players = Object.values(psSnap.val() || {}).filter(p=>p.role==='player').map(p=>p.name);
+  if(players.length < 2){ alert('参加者が2人以上必要です'); return; }
+
+  // デッキ作成 1..12 ×2
+  const deck = [];
+  for(let v=1; v<=12; v++){ deck.push(v,v); }
+  // シャッフル
+  for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
+  // ラウンドロビン配布
+  const hands = {}; players.forEach(n=>hands[n]=[]);
+  let idx=0; for(const c of deck){ hands[players[idx%players.length]].push({ num:c, open:false }); idx++; }
+
+  // 書き込み
+  await set(ref(db, `rooms/${me.room}/game`), { started:true, hands });
+}
+
+/* === リセット === */
+async function resetGame(){
+  if(me.name.trim().toLowerCase() !== (host||"").trim().toLowerCase()) return;
+  await set(ref(db, `rooms/${me.room}/game`), { started:false });
+}
+
+/* === ゲーム描画 === */
+function renderGame(game, players){
+  tableEl.innerHTML = '';
+  if(!game || !game.started){ return; }
+
+  // プレイヤー順（joinedAtで並べる）
+  const order = Object.values(players).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0)).map(p=>p.name);
+
+  for(const name of order){
+    const seat = document.createElement('div'); seat.className='seat';
+    const meta = document.createElement('div'); meta.className='meta';
+    meta.textContent = name + (name===host ? ' (Host)' : '');
+    seat.appendChild(meta);
+
+    const cardsWrap = document.createElement('div'); cardsWrap.className='cards';
+    seat.appendChild(cardsWrap);
+
+    const list = game.hands?.[name] || [];
+    // 自分のカードは昇順に
+    const arr = (name===me.name) ? [...list].sort((a,b)=>a.num-b.num) : list;
+
+    // 仮に0枚の時でも崩れないよう1を最低値に
+    const n = Math.max(arr.length, 1);
+
+    // 座席幅に合わせてカードサイズを算出（スクロールなしで全カードを収める）
+    // gap を考慮して「(座席幅 - gap*(n-1)) / n」
+    requestAnimationFrame(()=>sizeAndRenderCards(cardsWrap, arr, name));
+    tableEl.appendChild(seat);
   }
 }
 
-function renderTable(data){
-  const table=document.querySelector('#table');
-  table.innerHTML='';
-  if(!data.players) return;
-  const totalCards=24;
-  const cardValues=Array.from({length:12},(_,i)=>i+1).flatMap(v=>[v,v]);
-  Object.values(data.players).forEach(p=>{
-    const seat=document.createElement('div');
-    seat.innerHTML=`<div>${p.name}</div>`;
-    const cardsDiv=document.createElement('div');
-    cardsDiv.className='cards';
-    const myCards=p.name===me.name;
-    const cards = p.cards || [];
-    const cardWidth = `calc((100vw - 32px)/${cards.length||1})`;
-    cardsDiv.style.setProperty('gap','4px');
-    cards.forEach(c=>{
-      const cEl=document.createElement('div');
-      cEl.className='cardv';
-      cEl.style.width=cardWidth;
-      cEl.style.height=`calc(${cardWidth} * 1.4)`;
-      if(myCards || c.open){
-        cEl.textContent=c.num;
-        cEl.classList.add('mine','face');
-      } else {
-        cEl.classList.add('back','clickable');
-        cEl.addEventListener('click',()=>openCard(p.name,c.num));
-      }
-      cardsDiv.appendChild(cEl);
-    });
-    seat.appendChild(cardsDiv);
-    table.appendChild(seat);
+/* 座席幅からカード幅を算出して描画 */
+function sizeAndRenderCards(container, cardList, ownerName){
+  const gapPx = parseFloat(getComputedStyle(container).columnGap || getComputedStyle(container).gap || '6') || 6;
+  const w = container.clientWidth || container.parentElement.clientWidth || window.innerWidth - 2*16;
+  const n = Math.max(cardList.length, 1);
+  const cardW = Math.max(24, Math.floor((w - gapPx*(n-1)) / n)); // 最小24pxにクリップ
+  container.innerHTML = '';
+
+  cardList.forEach((c, idx)=>{
+    const el = document.createElement('div');
+    el.className = 'cardv';
+    el.style.width  = cardW + 'px';
+    el.style.height = Math.round(cardW * 1.36) + 'px';
+
+    const isMine = (ownerName === me.name);
+    if(isMine || c.open){
+      // 表：数字表示（公開 or 自分）
+      el.classList.add('mine','face');
+      const num = document.createElement('div');
+      num.className = 'number';
+      num.textContent = c.num;
+      el.appendChild(num);
+    }else{
+      // 裏：画像（code裏.png）
+      el.classList.add('back','clickable');
+      const img = document.createElement('img');
+      img.src = CARD_BACK_SRC;
+      img.alt = '裏';
+      el.appendChild(img);
+      el.title = `${ownerName} のカードを公開`;
+      el.addEventListener('click', ()=>reveal(ownerName, idx));
+    }
+    container.appendChild(el);
   });
 }
 
-function startGame(){
-  const roomPath=`rooms/${me.room}`;
-  get(ref(db,`${roomPath}/players`)).then(snap=>{
-    if(!snap.exists()) return;
-    const players=Object.keys(snap.val());
-    const deck=Array.from({length:12},(_,i)=>i+1).flatMap(v=>[v,v]).sort(()=>Math.random()-0.5);
-    const per=Math.floor(deck.length/players.length);
-    const updates={started:true};
-    players.forEach((name,i)=>{
-      const cards=deck.slice(i*per,(i+1)*per).map(num=>({num,open:false}));
-      updates[`players/${name}/cards`]=cards;
-    });
-    update(ref(db,roomPath),updates);
-  });
+/* クリックで公開（インデックスで open=true） */
+async function reveal(owner, index){
+  const r = ref(db, `rooms/${me.room}/game/hands/${owner}/${index}/open`);
+  const s = await get(ref(db, `rooms/${me.room}/game/hands/${owner}`));
+  if(!s.exists()) return;
+  const arr = s.val();
+  if(arr[index]?.open) return;
+  await set(r, true);
 }
 
-function openCard(playerName,num){
-  const roomPath=`rooms/${me.room}`;
-  get(ref(db,`${roomPath}/players/${playerName}/cards`)).then(snap=>{
-    if(!snap.exists()) return;
-    const cards=snap.val();
-    const idx=cards.findIndex(c=>c.num===num && !c.open);
-    if(idx>-1){ cards[idx].open=true; update(ref(db,`${roomPath}/players/${playerName}/cards`),cards); }
-  });
+/* リンクコピー */
+async function copyLink(){
+  const name = nameEl.value.trim() || 'Player';
+  const room = /^\\d{4}$/.test(roomEl.value) ? roomEl.value : '1234';
+  const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(room)}&name=${encodeURIComponent(name)}`;
+  try{ await navigator.clipboard.writeText(url); statusEl.textContent='リンクをコピーしました'; }catch(e){}
 }
+
+/* URLクエリで自動入力 */
+(() => {
+  const p = new URLSearchParams(location.search);
+  if(p.get('name')) nameEl.value = p.get('name');
+  if(p.get('room')) roomEl.value = p.get('room');
+})();
 </script>
 </body>
 </html>
