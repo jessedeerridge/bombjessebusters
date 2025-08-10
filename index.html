@@ -215,10 +215,30 @@
   .tab.active{background:#111;color:#fff;border-color:#111}
   .tab.disabled{opacity:.35;pointer-events:none}
 
-  @media (max-width: 860px){
+ @media (max-width: 860px){
     main{flex-direction:column}
     .side{width:100%;max-width:none}
   }
+
+  /* ▼▼ 画面下部ミッションピッカー ▼▼ */
+  .mp{
+    position:fixed; left:0; right:0; bottom:0;
+    background:#fff; border-top:1px solid #eee;
+    box-shadow:0 -10px 24px rgba(0,0,0,.08);
+    z-index:2147483600; padding:8px 10px;
+  }
+  .mp-inner{ max-width:980px; margin:0 auto; }
+  .mp-row{ display:flex; gap:10px; align-items:flex-start; margin:8px 0; }
+  .mp-label{ width:64px; font-size:12px; opacity:.75; line-height:2; }
+  .mp-grid{
+    display:grid;
+    grid-template-columns:repeat(6, minmax(90px, 1fr));
+    gap:6px; align-items:stretch; justify-content:stretch;
+    max-height:30vh; overflow:auto;
+  }
+  .mp-grid .btn{ width:100%; text-align:center; }
+  .mp-actions{ display:flex; justify-content:flex-end; margin-top:6px; }
+  /* ▲▲ 画面下部ミッションピッカー ▲▲ */
 </style>
 </head>
 <body>
@@ -258,7 +278,7 @@
       <div class="menu hidden" id="menuPopup">
         <button class="btn" id="btnSit">席に座る</button>
         <button class="btn" id="btnLeaveSeat">席を立つ</button>
-        <button class="btn" id="btnRestart">やり直す</button>
+        <button class="btn" id="btnPickMission">ミッションを選ぶ</button>
       </div>
     </div>
   </div>
@@ -277,6 +297,24 @@
     </div>
   </div>
 </main>
+
+<!-- ▼▼ 画面下部ミッションピッカー ▼▼ -->
+<div id="missionPicker" class="mp hidden">
+  <div class="mp-inner">
+    <div class="mp-row">
+      <div class="mp-label">人数</div>
+      <div id="mpCounts" class="tabs"></div>
+    </div>
+    <div class="mp-row">
+      <div class="mp-label">ミッション</div>
+      <div id="mpMissions" class="mp-grid"></div>
+    </div>
+    <div class="mp-actions">
+      <button class="btn small ghost" id="btnMpBack">戻る</button>
+    </div>
+  </div>
+</div>
+<!-- ▲▲ 画面下部ミッションピッカー ▲▲ -->
 
 <div id="miniPop" class="mini-pop hidden"></div>
 <div id="popLayer" class="pop-layer"></div>
@@ -365,10 +403,18 @@ const gear    = document.getElementById('gear');
 const menuPop = document.getElementById('menuPopup');
 const btnSit  = document.getElementById('btnSit');
 const btnLeave= document.getElementById('btnLeaveSeat');
-const btnRestart=document.getElementById('btnRestart');
+// ▼ やり直すを廃止し、ミッションピックに変更
+const btnPickMission = document.getElementById('btnPickMission');
+// ▼ 既存のrestartPop系は残すが使用しない（互換維持）
 const restartPop=document.getElementById('restartPop');
 const btnRestartOk=document.getElementById('btnRestartOk');
 const btnRestartCancel=document.getElementById('btnRestartCancel');
+
+// ▼ ミッションピッカー要素
+const mp = document.getElementById('missionPicker');
+const mpCounts = document.getElementById('mpCounts');
+const mpMissions = document.getElementById('mpMissions');
+const btnMpBack = document.getElementById('btnMpBack');
 
 const playersEl=document.getElementById('players');
 const specsEl  =document.getElementById('spectators');
@@ -1133,23 +1179,81 @@ btnSeatCancel.onclick=()=> H(seatPop,true);
 
 btnLeave.onclick = async ()=>{ await leaveSeatNow(); };
 
-/* start/restart */
-btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可'); return; } H(restartPop,false); };
-btnRestartOk.onclick = async ()=>{
-  H(restartPop,true);
-  /* ★ ミッション「やり直す」確定時に自動で席を立つ */
-  await leaveSeatNow();
-  const v=state.watching; if(!v) return;
-  await startGame(v.tableCount || 4, v.mission?.id || 1);
+/* start / mission-pick */
+btnPickMission.onclick = ()=>{
+  if(!state.isHost){ alert('ホストのみ操作可'); return; }
+  openMissionPicker();   // ▼ 新しいピッカー表示
 };
-btnRestartCancel.onclick = ()=> H(restartPop,true);
+// 既存のrestartPopは使わない
+btnRestartOk.onclick = ()=>{};
+btnRestartCancel.onclick = ()=>{ H(restartPop,true); };
+
 btnStart.onclick = ()=>{ if(!state.isHost) return; H(startPop,false); };
 btnStartCancel.onclick = ()=> H(startPop,true);
 btnStartOk.onclick = async ()=>{ const count=clamp(parseInt(selCount.value,10),1,6); const missionId=parseInt(selMission.value,10); H(startPop,true); await startGame(count, missionId); };
 
-async function startGame(playerCount, missionId){
-  if(!state.isHost) return;
-  const code=state.roomCode;
+/* ▼▼ ミッションピッカー実装 ▼▼ */
+let mpSelectedCount = 4;
+
+function openMissionPicker(){
+  // 初期人数は現在のテーブル数 or 4
+  const v = state.watching;
+  mpSelectedCount = clamp(parseInt(v?.tableCount||4,10), 1, 6);
+
+  // 人数タブ生成
+  mpCounts.innerHTML = '';
+  [2,3,4,5,6].forEach(n=>{
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (n===mpSelectedCount?' active':'');
+    tab.textContent = String(n);
+    tab.onclick = ()=>{
+      mpSelectedCount = n;
+      [...mpCounts.children].forEach(c=>c.classList.remove('active'));
+      tab.classList.add('active');
+    };
+    mpCounts.appendChild(tab);
+  });
+
+  // ミッション一覧生成（#1〜#12, #42, #43：セレクトに出ているものを同じ順で並べる）
+  mpMissions.innerHTML = '';
+  const list = [
+    {id:1, label:'#1 爆弾（赤コード）'},
+    {id:2, label:'#2 黄コード'},
+    {id:3, label:'#3 さらい爆弾'},
+    {id:4, label:'#4'},
+    {id:5, label:'#5'},
+    {id:6, label:'#6'},
+    {id:7, label:'#7'},
+    {id:8, label:'#8'},
+    {id:9, label:'#9 aaa'},
+    {id:10, label:'#10 bbb'},
+    {id:11, label:'#11 ccc'},
+    {id:12, label:'#12'},
+    {id:42, label:'#42'},
+    {id:43, label:'#43'},
+  ];
+  list.forEach(m=>{
+    const b = document.createElement('button');
+    b.className = 'btn small';
+    b.textContent = m.label;
+    b.onclick = async ()=>{
+      // 選択 → 席を自動で立つ → テーブルをリセットして開始
+      await leaveSeatNow();
+      closeMissionPicker();
+      await startGame(mpSelectedCount, m.id);
+    };
+    mpMissions.appendChild(b);
+  });
+
+  btnMpBack.onclick = ()=> closeMissionPicker();
+  H(mp, false);
+  // 他のポップは閉じる
+  H(menuPop, true);
+}
+
+function closeMissionPicker(){ H(mp, true); }
+/* ▲▲ ミッションピッカー実装 ▲▲ */
+
 
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
