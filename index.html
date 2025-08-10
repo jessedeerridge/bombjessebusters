@@ -634,20 +634,6 @@ function pickUnusedNumbers(count){
   const used = new Set(NUMCARD_REG.keys());
   const pool = MATERIALS.numbers.filter(x => !used.has(x));
   shuffle(pool);
-
-
-function findNextSeatedPlayerIndex(){
-  const t = state.watching?.tables || [];
-  const i = t.findIndex(T => T.playerId === state.userId);
-  if(i < 0) return -1;
-  for(let k=1; k<=t.length; k++){
-    const idx = (i + k) % t.length;
-    if(t[idx]?.playerId) return idx;
-  }
-  return -1;
-}
-
-  
   return pool.slice(0, count);
 }
 
@@ -1642,26 +1628,13 @@ const shown = 2 - Math.min(2, used);
     cell.appendChild(tok);
     cell.appendChild(xl);
 
-    cell.onclick = (ev)=>{
-      const nextIdx = findNextSeatedPlayerIndex();
-      if(nextIdx < 0){
-        openOneMini(ev.clientX, ev.clientY, '次のプレイヤー不在', ()=>{});
-        return;
-      }
-      const name = state.watching.tables[nextIdx]?.playerName || `#${nextIdx+1}`;
-      openMenu(ev.clientX, ev.clientY, [{
-        label: `${name} に ${n} を渡す`,
-        action: async ()=>{
-          const snap = await get(ref(db,`rooms/${state.roomCode}/tables/${nextIdx}/m22Tokens`));
-          const cur = snap.val() || [];
-          if(!cur.includes(n)){
-            await set(ref(db,`rooms/${state.roomCode}/tables/${nextIdx}/m22Tokens`), cur.concat(n));
-          }
-        }
-      }]);
+    // タップで「隠す」
+    cell.onclick = (ev)=> {
+      openMenu(ev.clientX, ev.clientY, [
+        {label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); }}
+      ]);
     };
 
-    
     div.appendChild(cell);
   }
 
