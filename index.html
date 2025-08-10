@@ -63,7 +63,11 @@
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/70% no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
   .rulecard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
+　.rulecard.horiz { transform: rotate(90deg);  transform-origin: center;　}
 
+  .numstack { position:relative; width:32px; height:48px; border:0; }
+.numstack .numcard { position:absolute; inset:0; }
+  
   .tables{display:flex;flex-direction:column;gap:8px;margin-top:6px;overflow:visible;position:relative;}
   .table{
     position:relative;border:1px dashed #ddd;border-radius:10px;
@@ -175,7 +179,18 @@
   transform:translateX(-50%);
   z-index:2147483000;
 }
-
+  
+.num-under{
+  position:absolute;
+  left:50%;
+  top:calc(100% + 4px);
+  transform:translateX(-50%);
+  width:32px; height:48px;
+  border-radius:6px; border:1px solid #ddd;
+  background:#fff center/cover no-repeat;
+  z-index:2147482000;
+}
+  
 /* 追加：アイテム16使用時はカード本体を上に持ち上げる */
 .i16-lift{
   transform: translateY(-18px);
@@ -255,11 +270,11 @@
       </div>
 
       <button class="fab hidden" id="gear" title="設定">⚙</button>
-      <div class="menu hidden" id="menuPopup">
-        <button class="btn" id="btnSit">席に座る</button>
-        <button class="btn" id="btnLeaveSeat">席を立つ</button>
-        <button class="btn" id="btnRestart">やり直す</button>
-      </div>
+<div class="menu hidden" id="menuPopup">
+  <button class="btn" id="btnSit">席に座る</button>
+  <button class="btn" id="btnLeaveSeat">席を立つ</button>
+  <button class="btn" id="btnChooseMission">ミッションを選ぶ</button>
+</div>
     </div>
   </div>
 
@@ -321,6 +336,16 @@
     <button class="btn small ghost" id="btnSeatCancel">閉じる</button>
   </div>
 </div>
+
+<!-- ▼▼ 追加：ミッション選択ポップ（画面下部） ▼▼ -->
+<div id="missionPicker" class="seat-pop hidden">
+  <div class="row"><label>ミッション</label></div>
+  <div id="missionButtons" class="tabs" style="flex-wrap:wrap"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:6px">
+    <button class="btn small ghost" id="btnMissionBack">戻る</button>
+  </div>
+</div>
+<!-- ▲▲ 追加ここまで ▲▲ -->
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
@@ -393,6 +418,11 @@ const missionDetailBody  = document.getElementById('missionDetailBody');
 const seatPop = document.getElementById('seatPop');
 const seatTabs= document.getElementById('seatTabs');
 const btnSeatCancel=document.getElementById('btnSeatCancel');
+
+const missionPicker = document.getElementById('missionPicker');
+const missionButtons = document.getElementById('missionButtons');
+const btnMissionBack = document.getElementById('btnMissionBack');
+const btnChooseMission = document.getElementById('btnChooseMission');
 
 /* Pop layer */
 const popLayer = document.getElementById('popLayer');
@@ -1101,6 +1131,28 @@ function closeAllMini(e){ document.querySelectorAll('.mini-pop').forEach(pop=>{ 
  document.addEventListener('click',(e)=>{ closeAllMini(e); outsideClose(e, menuPop); }, true);
 gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.contains('hidden')) updateMenuButtons(); };
 
+/* ▼ 追加：ミッション選択 */
+btnChooseMission.onclick = ()=>{
+  // ボタン群生成（#1〜#12, #42, #43）— 必要なら増減OK
+  missionButtons.innerHTML='';
+  const ids = [1,2,3,4,5,6,7,8,9,10,11,12,42,43];
+  ids.forEach(id=>{
+    const b = document.createElement('div');
+    b.className='tab';
+    b.textContent = `#${id}`;
+    b.onclick = async ()=>{
+      H(missionPicker,true);
+      const v = state.watching;
+      const count = v?.tableCount || 4;
+      await startGame(count, id); // 選択したミッションで即開始
+    };
+    missionButtons.appendChild(b);
+  });
+  H(missionPicker,false); // 表示
+  H(menuPop,true);        // メニューは閉じる
+};
+
+btnMissionBack.onclick = ()=> H(missionPicker,true); // 非表示にする
 /* ★ 共通の離席処理 */
 async function leaveSeatNow(){
   if(state.seatedTable==null || !state.watching?.tables) return;
@@ -1155,32 +1207,50 @@ async function startGame(playerCount, missionId){
   const faces=[1,2,3,4]; shuffle(faces);
   const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] }); }
 
-  // ===== デッキ構築 =====
-  let deck=[]; let missionMeta;
-  // ベースデッキ 1..12 x4 = 48（通常コード）
-  const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
-  shuffle(base);
+// ===== デッキ構築 =====
+let deck = []; let missionMeta;
 
-  if(missionId===1){
-    // ★ 赤コード（1.5,2.5,...,11.5）から1枚
-    const x = (Math.random()*11|0) + 1; // 1..11
-    const specialNum = x + 0.5;
-    const special = { id:crypto.randomUUID(), num:specialNum, kind:'red', open:false, ownerId:null };
-    deck = base.concat([special]);
+// ★通常コードは 1..12 を各1枚のみ（同じ数字が同時に存在しない）
+const base = [];
+for (let n = 1; n <= 12; n++) {
+  base.push({ id: crypto.randomUUID(), num: n, kind: 'normal', open: false, ownerId: null });
+}
+shuffle(base);
+
+if (missionId === 1) {
+  // 赤コード（1.5〜11.5）を1枚追加
+  const x = (Math.random() * 11 | 0) + 1; // 1..11
+  const specialNum = x + 0.5;
+  const special = { id: crypto.randomUUID(), num: specialNum, kind: 'red', open: false, ownerId: null };
+  deck = base.concat([special]);
+  shuffle(deck);
+  missionMeta = missionInfo(1, specialNum);
+
+} else if (missionId === 2) {
+  // 黄コード（1.1〜11.1）を1枚追加
+  const x = (Math.random() * 11 | 0) + 1; // 1..11
+  const specialNum = x + 0.1;
+  const special = { id: crypto.randomUUID(), num: specialNum, kind: 'yellow', open: false, ownerId: null };
+  deck = base.concat([special]);
+  shuffle(deck);
+  missionMeta = missionInfo(2, specialNum);
+
+} else {
+  // それ以外のミッション：まず通常デッキを用意
+  missionMeta = missionInfo(missionId);
+  deck = base.slice();
+
+  // ★ missionInfo() が出す adds.red / adds.yellow を実際に混ぜる
+  if (missionMeta?.adds) {
+    (missionMeta.adds.red || []).forEach(n => {
+      deck.push({ id: crypto.randomUUID(), num: n, kind: 'red', open: false, ownerId: null });
+    });
+    (missionMeta.adds.yellow || []).forEach(n => {
+      deck.push({ id: crypto.randomUUID(), num: n, kind: 'yellow', open: false, ownerId: null });
+    });
     shuffle(deck);
-    missionMeta = missionInfo(1, specialNum);
-  }else if(missionId===2){
-    // ★ 黄コード（1.1,2.1,...,11.1）から1枚
-    const x = (Math.random()*11|0) + 1; // 1..11
-    const specialNum = x + 0.1;
-    const special = { id:crypto.randomUUID(), num:specialNum, kind:'yellow', open:false, ownerId:null };
-    deck = base.concat([special]);
-    shuffle(deck);
-    missionMeta = missionInfo(2, specialNum);
-  }else{
-    deck = base; // 通常
-    missionMeta = missionInfo(missionId);
   }
+}
 
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
@@ -1212,11 +1282,11 @@ async function setupMissionOnStart(code){
 
   // #9：右2 + ランダム数値2枚
   if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
-    const lane = buildNumLaneDOM([
-      {kind:'rule', img: imgRule('right2')},
-      {kind:'num',  img: imgNumber(randNum())},
-      {kind:'num',  img: imgNumber(randNum())}
-    ]);
+const lane = buildNumLaneDOM([
+  {kind:'rule', img: imgRule('right2'), horiz:true},
+  {kind:'num',  img: imgNumber(randNum())},
+  {kind:'num',  img: imgNumber(randNum())}
+]);
     mountLaneUnderItemsBar(lane);
   }
 
@@ -1227,13 +1297,21 @@ async function setupMissionOnStart(code){
   }
 
   // #12：パターン2（各アイテム下に同枚数）
-  if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
-    const items = document.querySelectorAll('#items .item');
-    items.forEach(it=>{
-      const lane = buildDeckLaneP2(2); // 枚数は2（必要なら変更）
-      it.after(lane);
-    });
-  }
+if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
+  const items = document.querySelectorAll('#items .item');
+  const deck = MATERIALS.numbers.slice(); shuffle(deck);
+
+  items.forEach(it=>{
+    // 1枚ずつ配布（使い切ったらランダムで補充）
+    const n = deck.length ? deck.pop() : MATERIALS.numbers[(Math.random()*12)|0];
+
+    const under = document.createElement('div');
+    under.className = 'num-under';
+    under.style.backgroundImage = `url('${imgNumber(n)}')`;
+
+    it.appendChild(under); // 親.itemの中央下に固定表示
+  });
+}
 
   function randNum(){ return MATERIALS.numbers[(Math.random()*12)|0]; }
 }
@@ -1243,7 +1321,10 @@ function buildNumLaneDOM(cells){
   const lane = document.createElement('div'); lane.className='numlane';
   cells.forEach(c=>{
     const div = document.createElement('div');
-    if(c.kind==='rule'){ div.className='rulecard'; div.style.backgroundImage=`url('${c.img}')`; }
+if(c.kind==='rule'){ 
+  div.className='rulecard' + (c.horiz ? ' horiz':''); 
+  div.style.backgroundImage=`url('${c.img}')`; 
+}
     if(c.kind==='num'){  div.className='numcard';  div.style.backgroundImage=`url('${c.img}')`; }
     lane.appendChild(div);
   });
@@ -1260,11 +1341,18 @@ function buildDeckLaneP1(){
   const deck = MATERIALS.numbers.slice(); shuffle(deck);
   let rest = deck.length;
 
+  // ▼ 追加：重ね置き用のスタック
+  const stack = document.createElement('div'); stack.className='numstack';
+
   const deckBtn = document.createElement('div');
   deckBtn.className='numdeck';
   deckBtn.title='めくる';
   const restLbl = document.createElement('span'); restLbl.className='numrest'; restLbl.textContent=`残:${rest}`;
-  lane.appendChild(deckBtn); lane.appendChild(restLbl);
+
+  // 並び順：山札ボタン → スタック → 残表示
+  lane.appendChild(deckBtn);
+  lane.appendChild(stack);
+  lane.appendChild(restLbl);
 
   deckBtn.onclick = ()=>{
     if(rest<=0){
@@ -1276,7 +1364,7 @@ function buildDeckLaneP1(){
     }
     const n = deck.pop(); rest--; restLbl.textContent=`残:${rest}`;
     const nc = document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=`url('${imgNumber(n)}')`;
-    lane.appendChild(nc);
+    stack.appendChild(nc);                     // ★ スタックに重ねる
 
     if(rest===0){
       deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
@@ -1323,9 +1411,16 @@ function missionInfo(id, x=null){
     }
 
     case 9: {
+      // 赤1 / 黄2 を抽選して追加・表示
+      const R = shuffle(MATERIALS.redCodes.slice()).slice(0,1);
+      const Y = shuffle(MATERIALS.yellowCodes.slice()).slice(0,2);
       return {
         id:9, name:'#9 aaa', desc:'',
-        display: ['#9 aaa',
+        adds: { red: R, yellow: Y },
+        display: [
+          '#9 aaa',
+          `赤[${R[0]}]`,
+          `黄[${Y[0]}][${Y[1]}]`,
           '最初の左にあるカードを切断しなければ、右にあるカードを切断できない。',
           '手番に切断できるコードがなければ起爆ダイヤルを1進める。'
         ],
@@ -1333,9 +1428,16 @@ function missionInfo(id, x=null){
       };
     }
     case 10: {
+      // 赤1 / 黄4 を抽選して追加・表示
+      const R = shuffle(MATERIALS.redCodes.slice()).slice(0,1);
+      const Y = shuffle(MATERIALS.yellowCodes.slice()).slice(0,4);
       return {
         id:10, name:'#10 bbb', desc:'',
-        display: ['#10 bbb',
+        adds: { red: R, yellow: Y },
+        display: [
+          '#10 bbb',
+          `赤[${R[0]}]`,
+          `黄[${Y[0]}][${Y[1]}][${Y[2]}][${Y[3]}]`,
           '15分以内に解除しなければならない！',
           '時計回りではなく、手番を行いたいプレイヤーが「チョキン！」と言ってから、切断を実行する。',
           '2人になった場合を除いて、連続で手番をプレイできない。'
@@ -1344,23 +1446,35 @@ function missionInfo(id, x=null){
       };
     }
     case 11: {
+      // 赤2 を抽選して追加・表示（数値カードは赤扱い/パターン1）
+      const R = shuffle(MATERIALS.redCodes.slice()).slice(0,2);
       return {
         id:11, name:'#11 ccc', desc:'',
-        display: ['#11 ccc',
+        adds: { red: R, yellow: [] },
+        display: [
+          '#11 ccc',
+          `赤[${R[0]}][${R[1]}]`,
           '数値カードの数字のコードは全て赤コードと見なされる。',
           '手札がこのコードだけになった場合、公開して手番を終えられる。'
         ],
-        flags: { numberAsRed:true, needsNumberLane:true, pattern:'P1' } // パターン1
+        flags: { numberAsRed:true, needsNumberLane:true, pattern:'P1' }
       };
     }
     case 12: {
+      // 赤1 / 黄4 を抽選して追加・表示（各アイテム中央下に数値1枚ずつ配布）
+      const R = shuffle(MATERIALS.redCodes.slice()).slice(0,1);
+      const Y = shuffle(MATERIALS.yellowCodes.slice()).slice(0,4);
       return {
         id:12, name:'#12', desc:'',
-        display: ['#12',
+        adds: { red: R, yellow: Y },
+        display: [
+          '#12',
+          `赤[${R[0]}]`,
+          `黄[${Y[0]}][${Y[1]}][${Y[2]}][${Y[3]}]`,
           'それぞれの装備カードの下に数値カードを置く。',
           'その装備を使うにはその数値カードの数字と、装備カードの数字を2本ずつ解除しなければならない。'
         ],
-        flags: { needsNumberLane:true, pattern:'P2-eachItem' } // パターン2
+        flags: { needsNumberLane:true, pattern:'P2-eachItem' }
       };
     }
 
