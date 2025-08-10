@@ -260,6 +260,8 @@
       <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:4px">
         <button class="btn primary" id="btnStart" title="ホストのみ">爆弾を解除！</button>
         <span class="small" id="startHint">（ホストのみ押せます）</span>
+        <!-- ▼ 追加：開始前後どちらでもミッションピッカーを開く -->
+        <button class="btn small" id="btnOpenPicker">人数・ミッションを選ぶ</button>
       </div>
 
       <div class="items-bar hidden" id="itemsBar">
@@ -393,6 +395,8 @@ const btnRandom=document.getElementById('btnRandom');
 const lobby   = document.getElementById('lobby');
 const btnStart= document.getElementById('btnStart');
 const startHint=document.getElementById('startHint');
+// ▼ 追加：クイックミッションピッカー起動ボタン
+const btnOpenPicker = document.getElementById('btnOpenPicker');
 
 const itemsBar= document.getElementById('itemsBar');
 const itemsEl = document.getElementById('items');
@@ -536,9 +540,12 @@ function listenRoom(code){
     state.gameStarted=!!v?.started;
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
+    // ▼ 追加：ホストなら開始前後いつでもクイックピッカーを使える
+    H(btnOpenPicker, !state.isHost);
     updateHeaderInfo();
   });
 }
+
 
 /* mission panels */
 function renderMissionPanels(v){
@@ -1184,11 +1191,17 @@ btnPickMission.onclick = ()=>{
   if(!state.isHost){ alert('ホストのみ操作可'); return; }
   openMissionPicker();   // ▼ 新しいピッカー表示
 };
+// ▼ 追加：スタート行のクイックボタンからも開ける
+btnOpenPicker.onclick = ()=>{
+  if(!state.isHost){ alert('ホストのみ操作可'); return; }
+  openMissionPicker();
+};
 // 既存のrestartPopは使わない
 btnRestartOk.onclick = ()=>{};
 btnRestartCancel.onclick = ()=>{ H(restartPop,true); };
 
 btnStart.onclick = ()=>{ if(!state.isHost) return; H(startPop,false); };
+
 btnStartCancel.onclick = ()=> H(startPop,true);
 btnStartOk.onclick = async ()=>{ const count=clamp(parseInt(selCount.value,10),1,6); const missionId=parseInt(selMission.value,10); H(startPop,true); await startGame(count, missionId); };
 
