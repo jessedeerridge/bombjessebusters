@@ -200,19 +200,19 @@
 /* ▲▲ ここまで 追加 ▲▲ */
 
 
-/* ★ #22：情報トークン使用数の2×6パネル */
+/* ★ #22：情報トークン表（3×4）— 黒トークン + 右に x0/x1/x2 */
 .info22{
   position:fixed; left:50%; bottom:12px; transform:translateX(-50%);
   background:#fff; border:1px solid #eee; border-radius:10px; box-shadow:0 10px 24px rgba(0,0,0,.12);
-  padding:8px; z-index:2147483601; display:grid; grid-template-columns:repeat(6, 1fr); gap:6px;
+  padding:8px; z-index:2147483601;
+  display:grid; grid-template-columns:repeat(4, auto); gap:8px; /* ← 3行×4列になる */
 }
 .info22 .cell{
-  border:1px dashed #bbb; border-radius:6px; padding:6px 4px; text-align:center; font-size:12px;
-  background:#fff;
+  display:flex; align-items:center; gap:6px;
+  border:1px dashed #bbb; border-radius:6px; padding:6px 8px; background:#fff; font-size:12px;
 }
-.info22 .num{ display:block; font-weight:700; margin-bottom:2px; }
-.info22 .val{ display:block; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
-
+.info22 .cell .token{ width:22px; height:22px; } /* 既存の .token を流用（黒） */
+.info22 .xlabel{ font-family:ui-monospace, SFMono-Regular, Menlo, monospace; opacity:.8; }
 
 
 /* ★ チェック表（テーブル1の真上） */
@@ -1582,7 +1582,7 @@ await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Tokens: ne
   m22PickPanel.classList.remove('hidden');
 }
 
-/* === #22 用：情報トークン使用数を2×6で表示 === */
+/* === #22 用：情報トークン表（3×4）：黒トークン + x0/x1/x2 を横並び表示 === */
 function showInfo22Panel(vNow){
   const exist = document.getElementById('info22');
   if (exist) exist.remove();
@@ -1590,40 +1590,44 @@ function showInfo22Panel(vNow){
   const v = vNow || state.watching;
   if (!v) return;
 
-  // 各数字(1..12)の「情報トークン(type:'num')の使用数」をカウント
-  const cnt = Array.from({length:13}, ()=>0);
-  (v.tables||[]).forEach(T=>{
-    (T.hand||[]).forEach(c=>{
-      (c.tokens||[]).forEach(tk=>{
-        if (tk?.type==='num'){
-          const n = parseInt(tk.value, 10);
-          if (n>=1 && n<=12) cnt[n] += 1;
-        }
-      });
-    });
-  });
-
-  // 表示値：使用0⇒2 / 使用1⇒1 / 使用2以上⇒0
-  const mapVal = (x)=> x===0 ? 2 : (x===1 ? 1 : 0);
-
   const div = document.createElement('div');
   div.id = 'info22';
   div.className = 'info22';
+
   for (let n=1; n<=12; n++){
-    const cell = document.createElement('div'); cell.className='cell';
-    const a = document.createElement('span'); a.className='num'; a.textContent = String(n);
-    const b = document.createElement('span'); b.className='val'; b.textContent = 'x' + mapVal(cnt[n]);
-    cell.appendChild(a); cell.appendChild(b);
+    // 使用数（2以上は 2 で打ち止め）
+    const used = countNumTokenUsage(n, v);
+    const shown = Math.min(2, used); // ← 0,1,2 のいずれかで表示
+
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+
+    // 黒トークン本体（既存の .token.black を再利用）
+    const tok = document.createElement('div');
+    tok.className = 'token black';
+    tok.textContent = String(n);
+
+    // 右側の xラベル
+    const xl = document.createElement('span');
+    xl.className = 'xlabel';
+    xl.textContent = `x${shown}`;
+
+    cell.appendChild(tok);
+    cell.appendChild(xl);
+
     // タップで「隠す」
     cell.onclick = (ev)=> {
       openMenu(ev.clientX, ev.clientY, [
         {label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); }}
       ]);
     };
+
     div.appendChild(cell);
   }
+
   document.body.appendChild(div);
 }
+
 
 
 
