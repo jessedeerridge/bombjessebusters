@@ -477,9 +477,11 @@ const MATERIALS = {
   yellowCodes : [1,2,3,4,5,6,7,8,9,10,11].map(n=> n + 0.1),
   numbers : [1,2,3,4,5,6,7,8,9,10,11,12]
 };
+// ★ 修正：文字列リテラル
 const imgNumber = n => `./s${n}.jpg`;
 const imgBack   = `./numbercardback.jpg`;
 const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
+
 
 /* ===== 数値カード一意管理＆重ね表示ユーティリティ ===== */
 /* 同じ数字のカードが同時に存在しないように管理する */
@@ -497,29 +499,18 @@ function clearMissionOverlays(){
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
-  const makeBase = ()=>{
-    const holder = document.createElement('div');
-    holder.className = 'numcard-holder';
-    const base = document.createElement('div');
-    base.className = 'numcard';
-    base.style.backgroundImage = `url('${imgNumber(n)}')`;
-    holder.appendChild(base);
-    mountParent.appendChild(holder);
-    NUMCARD_REG.set(n, { holder, count:1 });
-  };
-  const entry = NUMCARD_REG.get(n);
-  if(!entry){
-    makeBase();
-  }else{
-    // すでにどこかに表である → その場所に重ねる
-    const { holder, count } = entry;
-    const ov = document.createElement('div');
-    ov.className = 'numcard overlay';
-    ov.style.backgroundImage = `url('${imgNumber(n)}')`;
-    holder.appendChild(ov);
-    entry.count = count + 1;
-    // もし別の親から呼ばれた場合でも、「同じカードは1枚」方針により新規は作らず既存位置に重ねるだけ
+  if (NUMCARD_REG.has(n)) {
+    // ★ 既に場にあるので何もしない（“同じカードは存在しない”）
+    return;
   }
+  const holder = document.createElement('div');
+  holder.className = 'numcard-holder';
+  const base = document.createElement('div');
+  base.className = 'numcard';
+  base.style.backgroundImage = `url('${imgNumber(n)}')`;
+  holder.appendChild(base);
+  mountParent.appendChild(holder);
+  NUMCARD_REG.set(n, holder);
 }
 
 /** 未使用（＝現在テーブル上に存在しない）数字から count 枚選ぶ */
@@ -1542,29 +1533,31 @@ function buildDeckLaneP1(){
   const restLbl = document.createElement('span'); restLbl.className='numrest'; restLbl.textContent=`残:${rest}`;
   lane.appendChild(deckBtn); lane.appendChild(restLbl);
 
-  deckBtn.onclick = ()=>{
-    if(rest<=0){
-      deck.splice(0, deck.length, ...MATERIALS.numbers.slice()); shuffle(deck);
-      rest = deck.length; restLbl.textContent=`残:${rest}`;
-      deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
-      deckBtn.title='めくる';
-      return;
-    }
-    const n = deck.pop(); rest--; restLbl.textContent=`残:${rest}`;
+deckBtn.onclick = ()=>{
+  if(rest<=0){
+    // ★ 修正：補充しない。12枚で打ち止め
+    deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
+    deckBtn.title = '（山札なし）';
+    deckBtn.style.pointerEvents = 'none';
+    deckBtn.style.opacity = '0.5';
+    return;
+  }
 
-    // ★ 同じ数字は新規生成しない。すでに表ならその場所へ重ねる／初めてならこのレーンに作成
-    if(NUMCARD_REG.has(n)){
-      // 既存位置に重ねる（このレーンには何も追加しない）
-      placeNumberCard(n, NUMCARD_REG.get(n).holder.parentElement || lane);
-    }else{
-      placeNumberCard(n, lane);
-    }
+  const n = deck.pop(); rest--; restLbl.textContent=`残:${rest}`;
 
-    if(rest===0){
-      deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
-      deckBtn.title='山札を作る';
-    }
-  };
+  // ★ 既に場にあればスキップ（追加しない）
+  if(!NUMCARD_REG.has(n)){
+    placeNumberCard(n, lane);
+  }
+
+  if(rest===0){
+    deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
+    deckBtn.title = '（山札なし）';
+    deckBtn.style.pointerEvents = 'none';
+    deckBtn.style.opacity = '0.5';
+  }
+};
+
 
   return lane;
 }
