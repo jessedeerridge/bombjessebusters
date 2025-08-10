@@ -453,6 +453,9 @@ const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null
 };
+// ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
+let m13HeaderUpdateScheduled = false;
+let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
 
 
 /* Elements */
@@ -983,26 +986,27 @@ if (v.mission?.flags?.m13_headerRandomInfoToken && Array.isArray(v.meta?.m13_hea
   if (n0 != null) {
     m13HeaderNum = n0;
 
-    // 同テーブル内で同じ数字の情報トークン（type:'num'）が使われたら自動で消す
-    if (v.mission?.flags?.m13_autoHideHeaderToken) {
-      let used = false;
-      (t.hand || []).forEach(c => {
-        (c.tokens || []).forEach(tk => {
-          if (tk?.type === 'num') {
-            const n = parseInt(tk.value, 10);
-            if (Number.isInteger(n) && n === n0) used = true;
-          }
-        });
-      });
-      if (used) {
-        const current = (state.watching?.meta?.m13_header || [])[idx];
-        if (current === n0) {
-          const next = headerNums.slice();
-          next[idx] = null;
-          update(ref(db, `rooms/${state.roomCode}/meta`), { m13_header: next });
-        }
+// 同テーブル内で同じ数字の情報トークン（type:'num'）が使われたら自動で消す
+// ※ レンダー中にDB更新しない：対象indexだけキューへ積む
+if (v.mission?.flags?.m13_autoHideHeaderToken) {
+  let used = false;
+  (t.hand || []).forEach(c => {
+    (c.tokens || []).forEach(tk => {
+      if (tk?.type === 'num') {
+        const n = parseInt(tk.value, 10);
+        if (Number.isInteger(n) && n === n0) used = true;
       }
+    });
+  });
+  if (used) {
+    const current = (state.watching?.meta?.m13_header || [])[idx];
+    if (current === n0) {
+      if (!m13HeaderClearIndices) m13HeaderClearIndices = new Set();
+      m13HeaderClearIndices.add(idx);
     }
+  }
+}
+
   }
 }
 box.appendChild(header);
@@ -1343,6 +1347,32 @@ if(!suppressNumberPop && canNum){
     tablesEl.appendChild(box);
   });
 
+
+  // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行して再レンダー競合を防ぐ）
+  if (!m13HeaderUpdateScheduled && m13HeaderClearIndices && m13HeaderClearIndices.size > 0) {
+    m13HeaderUpdateScheduled = true;
+    const clearSet = new Set(m13HeaderClearIndices); // スナップショット
+    m13HeaderClearIndices = null;
+    setTimeout(async () => {
+      try {
+        const snap = await get(ref(db, `rooms/${state.roomCode}/meta/m13_header`));
+        const header = (snap.val() || []).slice();
+        clearSet.forEach(i => { if (header[i] != null) header[i] = null; });
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m13_header: header });
+      } finally {
+        m13HeaderUpdateScheduled = false;
+      }
+    }, 0);
+  }
+
+  async function incToken(kind, delta){
+    const path = `rooms/${state.roomCode}/meta/tokenCounts`;
+    const nowv = (state.watching?.meta?.tokenCounts||{})[kind]||0;
+    await update(ref(db, path), {[kind]: Math.max(0, nowv + delta)});
+  }
+}
+
+  
   async function incToken(kind, delta){
     const path = `rooms/${state.roomCode}/meta/tokenCounts`;
     const nowv = (state.watching?.meta?.tokenCounts||{})[kind]||0;
