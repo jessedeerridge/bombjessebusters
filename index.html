@@ -23,8 +23,8 @@
     --di-w:70px;
     --di-h:70px;
 
-    /* テーブルをコンパクトに */
-    --table-h:80px;
+    /* テーブルを少し高く（同時視認性UP） */
+    --table-h:96px; /* ← 80px からアップ */
     --header-h:8px;
     --content-h: calc(var(--table-h) - var(--header-h) - 6px);
 
@@ -81,7 +81,7 @@
   .table{
     position:relative;border:1px dashed #ddd;border-radius:10px;
     padding:0 8px;height:var(--table-h);display:block;background:#fff;
-    overflow:auto; /* ← 個別テーブルを縦スクロール可能に */
+    overflow:auto; /* ← 縦スクロール */
     width:max-content;z-index:0;
   }
   .table.elevated{ z-index:9999; }
@@ -111,7 +111,7 @@
     background:#f3f4f6;border:1px dashed #d1d5db;cursor:default;
   }
 
-  /* ← 手札は縦スクロール可（＝や数字で縦長になってもOK） */
+  /* 手札は縦スクロール可 */
   .hand{
     display:flex;align-items:flex-start;gap:var(--card-gap);
     overflow-y:auto;overflow-x:visible;flex:0 0 auto;position:relative;
@@ -191,8 +191,8 @@
   .restart-actions .btn.big{flex:1}
 
   .tabs{display:flex;gap:6px;flex-wrap:wrap}
-  .tab{padding:6px 10px;border:1px solid #ddd;border-radius:999px;cursor:pointer;user-select:none}
   .tab.active{background:#111;color:#fff;border-color:#111}
+  .tab{padding:6px 10px;border:1px solid #ddd;border-radius:999px;cursor:pointer;user-select:none}
   .tab.disabled{opacity:.35;pointer-events:none}
 
   @media (max-width: 860px){
@@ -544,7 +544,6 @@ function renderItemsAndDi(v){
     if(!it.used) div.style.backgroundImage = `url("./${img}")`;
 
     div.onclick=(ev)=>{
-      // 使用済み→「表にする」だけ、未使用→「使用する」だけ（キャンセル無し）
       if(it.used){
         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
@@ -597,11 +596,11 @@ function renderTables(v){
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
 
-  // 上限取得（＝、≠、x1）
+  // ★上限取得（＝ は i12、≠ は i1、x1 は i14）
   const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
   const caps = {
-    equal: uses.i1>=2 ? 4 : (uses.i1>=1 ? 2 : 0),
-    noteq: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0), // ← アイテム12未使用なら0で出ない
+    equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0), // ← 12が「＝」
+    noteq: uses.i1>=2 ? 4 : (uses.i1>=1 ? 2 : 0),   // ← 1が「≠」
     x1:    uses.i14>=2 ? 2 : (uses.i14>=1 ? 1 : 0)
   };
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
@@ -669,7 +668,7 @@ function renderTables(v){
       if(card.classList.contains('back')) bot.style.display='none';
       card.appendChild(bot);
 
-      // ▼（点滅 ＝ スワップ前／固定表示 ＝ スワップ後8秒）
+      // ▼（点滅/一時表示：アイテム2）
       const i2 = v.meta?.i2Flow;
       if(i2?.phase==='blink' && i2.blinkUntil && now()<i2.blinkUntil){
         const match = (i2.selA && i2.selA.cardId===c.id && i2.selA.table===idx)
@@ -696,7 +695,6 @@ function renderTables(v){
           if(i2flow.phase==='pickSelf' && t.playerId===state.userId){
             await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther' });
           }else if(i2flow.phase==='pickOther' && t.playerId!==state.userId){
-            // 確認ポップ
             openMenu(ev.clientX, ev.clientY, [
               {label:'OK（交換する）', action: async ()=>{
                 await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
@@ -717,8 +715,9 @@ function renderTables(v){
             const tablePath = `rooms/${state.roomCode}/tables/${idx}`;
             const cardPath  = `${tablePath}/hand/${ci}`;
 
+            // ★可否判定：counts < caps（＝はi12由来、≠はi1由来）
             const canEqual = (counts.equal < caps.equal);
-            const canNoteq = (counts.noteq < caps.noteq); // ← アイテム12使用前は0で出ない
+            const canNoteq = (counts.noteq < caps.noteq);
             const canX1    = (counts.x1 < caps.x1);
 
             if(c.token){
@@ -744,10 +743,12 @@ function renderTables(v){
               openMenu(ev.clientX, ev.clientY, entries);
             }else{
               const entries = [];
+              // 黒数字
               entries.push({label:String(c.num), action: async ()=>{
                 await update(ref(db, cardPath), { token:{type:'num', value:c.num, style:'black'} });
                 box.classList.add('elevated');
               }});
+              // ＝（アイテム12の使用数で解放）
               if(canEqual){
                 entries.push({label:'＝', action: async ()=>{
                   await update(ref(db, cardPath), { token:{type:'equal', value:c.num, style:'equal'} });
@@ -755,6 +756,7 @@ function renderTables(v){
                   box.classList.add('elevated');
                 }});
               }
+              // ≠（アイテム1の使用数で解放）
               if(canNoteq){
                 entries.push({label:'≠', action: async ()=>{
                   await update(ref(db, cardPath), { token:{type:'noteq', value:c.num, style:'noteq'} });
@@ -762,6 +764,7 @@ function renderTables(v){
                   box.classList.add('elevated');
                 }});
               }
+              // x1（据え置き）
               if(canX1){
                 entries.push({label:'x1', action: async ()=>{
                   await update(ref(db, cardPath), { token:{type:'x1', value:c.num, style:'x1'} });
@@ -810,17 +813,14 @@ function renderTables(v){
 async function maybeRunItem2Swap(v){
   const flow = v?.meta?.i2Flow;
   if(!flow || flow.phase!=='blink' || !flow.blinkUntil) return;
-  if(flow.usingBy!==state.userId) return; // 実行者のみが処理
-  if(now()<flow.blinkUntil) return; // まだ点滅中
+  if(flow.usingBy!==state.userId) return;
+  if(now()<flow.blinkUntil) return;
 
-  // 必要データ
   const A = flow.selA; const B = flow.selB;
   if(!A || !B) return;
 
-  // 現在のテーブル
   const tables = (state.watching?.tables)||[];
 
-  // 手札からカードIDで実体取得
   const pickCard = (tableIdx, cardId)=>{
     const hand = (tables[tableIdx]?.hand)||[];
     const i = hand.findIndex(c=> c.id===cardId);
@@ -830,47 +830,37 @@ async function maybeRunItem2Swap(v){
   const a = pickCard(A.table, A.cardId);
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card) {
-    // 異常系：フロー解除
     await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null });
     return;
   }
 
-  // 交換：手札から取り出し
   a.hand.splice(a.index,1);
   b.hand.splice(b.index,1);
 
-  // 受け取り先へ「昇順で差し込み（同値は一番左）」関数
   const insertSortedLeft = (hand, card)=>{
-    // 受け渡し先では ownerId を受取側に合わせておく（伏せ/表は維持）
-    // alpha は後で再割り当て
     const n = card.num;
     let pos = 0;
     while(pos<hand.length && hand[pos].num < n) pos++;
-    // 同値を左側に寄せる＝同値がある場合はその最初の位置に入れる
     while(pos>0 && hand[pos-1].num===n) pos--;
     hand.splice(pos,0,card);
     return pos;
   };
 
-  // 所有者を移し替え
   const cardToB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: now()+8000};
   const cardToA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: now()+8000};
 
-  const posInB = insertSortedLeft(b.hand, cardToB);
-  const posInA = insertSortedLeft(a.hand, cardToA);
+  insertSortedLeft(b.hand, cardToB);
+  insertSortedLeft(a.hand, cardToA);
 
-  // αを再割り当て
   const realpha = (hand)=>{
     const alpha="abcdefghijklmnopqrstuvwxyz";
     hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
   };
   realpha(a.hand); realpha(b.hand);
 
-  // DB反映（テーブル2つだけ更新）
   await Promise.all([
     set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand),
     set(ref(db, `rooms/${state.roomCode}/tables/${B.table}/hand`), b.hand),
-    // フロー終了
     update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null })
   ]);
 }
@@ -975,7 +965,6 @@ async function startGame(playerCount, missionId){
   if(!state.isHost) return;
   const code=state.roomCode;
 
-  // 隊長テーブル（member 5）を1つランダムに
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
   const tables=[];
@@ -984,7 +973,6 @@ async function startGame(playerCount, missionId){
     tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] });
   }
 
-  // コードデッキ（1..12 ×4）＋ 各カードに id 付与
   const deck=[];
   for(let n=1;n<=12;n++){
     for(let k=0;k<4;k++) deck.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null});
@@ -1004,7 +992,6 @@ async function startGame(playerCount, missionId){
     T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; });
   });
 
-  // アイテム
   const pool = itemDeckNumbers(missionId);
   shuffle(pool);
   const itemCount = playerCount;
