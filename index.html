@@ -49,12 +49,9 @@
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
-  /* item16 の抽出数字 */
-  .reveal-badge{
-    position:absolute;left:50%;transform:translateX(-50%);
-    bottom:-8px;font-size:12px;line-height:1;color:#fff;background:#000;
-    border:1px solid #000;border-radius:6px;padding:2px 6px;pointer-events:none;
-  }
+  /* item16 の旧バッジ（未使用）
+  .reveal-badge{position:absolute;left:50%;transform:translateX(-50%);bottom:-8px;font-size:12px;line-height:1;color:#fff;background:#000;border:1px solid #000;border-radius:6px;padding:2px 6px;pointer-events:none;}
+  */
 
   .di{ margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;border:1px solid #ddd;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto }
@@ -96,6 +93,9 @@
   }
   .card.back{background:#fff url('./codeback.jpg') center/cover no-repeat;border-color:#ccc}
   .card.open{background:#000}
+  /* ★ アイテム2：選択可能カードの青枠 */
+  .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
+
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center}
 
@@ -121,6 +121,10 @@
     display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;max-width:min(90vw,320px)
   }
   .bottom-pop{left:50%;transform:translateX(-50%);bottom:10px;}
+
+  /* ★ 画面下部のグローバル黒枠バッジ（アイテム16表示） */
+  .global-reveal{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:2147483647;}
+  .global-reveal .token{cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.12);}
 
   .panel{display:flex;flex-direction:column;gap:10px}
   .list{border:1px solid #eee;border-radius:10px;padding:8px}
@@ -221,6 +225,8 @@
 
 <div id="miniPop" class="mini-pop hidden"></div>
 <div id="popLayer" class="pop-layer"></div>
+<!-- ★ アイテム16の表示先（画面下部） -->
+<div id="globalReveal" class="global-reveal hidden"></div>
 
 <div id="restartPop" class="restart-pop hidden">
   <div style="font-size:14px">やり直しますか？</div>
@@ -236,7 +242,7 @@
   </div>
   <div class="row"><label>ミッション</label>
     <select id="selMission">
-      <option value="1">#1 爆弾</option><option value="2">#2（予備）</option><option value="3">#3 さらい爆弾</option>
+      <option value="1">#1 爆弾</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
       <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
       <option value="8">#8</option><option value="9">#9</option><option value="10">#10</option>
       <option value="42">#42</option><option value="43">#43</option>
@@ -329,6 +335,8 @@ const btnSeatCancel=document.getElementById('btnSeatCancel');
 
 /* Pop layer */
 const popLayer = document.getElementById('popLayer');
+/* global reveal */
+const globalReveal = document.getElementById('globalReveal');
 
 /* helpers */
 function hiragana3(){ const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"]; return Array.from({length:3},()=>h[Math.random()*h.length|0]).join(''); }
@@ -396,7 +404,7 @@ function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード�
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
     players:{}, spectators:{},
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null } };
+    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null } };
 }
 
 /* watch */
@@ -405,7 +413,7 @@ function listenRoom(code){
     const v=snap.val(); state.watching=v;
     if(v){ const p=Object.keys(v.players||{}).length, s=Object.keys(v.spectators||{}).length; if(p===0 && s===0){ remove(ref(db, `rooms/${code}`)); return; } }
     H(listsBox, !!v?.started);
-    renderLists(v); renderItemsAndDi(v); renderTables(v); renderMissionPanels(v);
+    renderLists(v); renderItemsAndDi(v); renderTables(v); renderMissionPanels(v); renderGlobalReveal(v);
     state.gameStarted=!!v?.started;
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
@@ -443,11 +451,7 @@ function renderItemsAndDi(v){
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
 
-    // item16 抽出数字
-    if(it.extraNum!=null){
-      const b=document.createElement('div'); b.className='reveal-badge'; b.textContent=String(it.extraNum);
-      div.appendChild(b);
-    }
+    // 旧: item16 抽出数字（カード下表示）は廃止
 
     div.onclick=(ev)=>{
       if(it.used){
@@ -484,6 +488,24 @@ function renderItemsAndDi(v){
       {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
     ]);
   };
+}
+
+/* ===== Global badge (item16) ===== */
+function renderGlobalReveal(v){
+  const data = v?.meta?.i16Badge;
+  if(!data || data.num==null){ globalReveal.innerHTML=''; H(globalReveal,true); return; }
+  globalReveal.innerHTML = '';
+  const t = document.createElement('div');
+  t.className = 'token black';
+  t.textContent = String(data.num);
+  t.title = 'クリックで操作';
+  t.onclick = (ev)=>{
+    openMenu(ev.clientX, ev.clientY, [
+      {label:'消す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); }}
+    ]);
+  };
+  globalReveal.appendChild(t);
+  H(globalReveal,false);
 }
 
 /* ===== Tables ===== */
@@ -788,28 +810,26 @@ async function addTwoItemsFromDeck(){
   await set(ref(db, `rooms/${state.roomCode}/items`), next);
 }
 
-/* item16: 1~12 の数値トークンだけを数え、同じ数字が2つ未満のものからランダム表示 */
+/* item16: 既存の数値トークンから、同じ数字が2つ以上になっていないトークンだけを候補にし、1つ選んで画面下に表示 */
 async function handleItem16(itemIdx){
   const v = state.watching; if(!v) return;
   const counts = Object.create(null);
+  const tokens = [];
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       (c.tokens||[]).forEach(tk=>{
         if(tk && tk.type==='num'){
           const n = (tk.value|0);
-          if(n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; }
+          if(n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; tokens.push(tk); }
         }
       });
     });
   });
-  const deck = Array.from({length:12}, (_,i)=> i+1).filter(n => (counts[n]||0) < 2);
-  if(deck.length === 0){
-    await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { extraNum: null });
-    return;
-  }
-  shuffle(deck);
-  const pick = deck[0];
-  await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { extraNum: pick });
+  // 既存トークンのうち、同じ数字が2つ以上になっていないもの（= その数字の総数 < 2）を候補に
+  const candidates = tokens.filter(tk=> (counts[tk.value|0] || 0) < 2);
+  if(candidates.length===0){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); return; }
+  const pick = candidates[Math.random()*candidates.length|0];
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: { num:(pick.value|0), at: Date.now() } });
 }
 
 /* gear etc */
@@ -850,7 +870,6 @@ btnLeave.onclick = async ()=>{
 
 /* start/restart */
 btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可'); return; } H(restartPop,false); };
-// 高速リスタート：unseatAllPlayers を使わず、現在の人数/ミッションで即 startGame
 btnRestartOk.onclick = async ()=>{
   H(restartPop,true);
   const v=state.watching; if(!v) return;
@@ -871,29 +890,32 @@ async function startGame(playerCount, missionId){
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
+  // ベースデッキ 1..12 x4 = 48
+  const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
+  shuffle(base);
+
   if(missionId===1){
-    // 通常カード（1..12 x4=48）から 24枚ランダム
-    const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
-    shuffle(base);
-    const take24 = base.slice(0,24);
-    // x を 1.5,2.5,3.5,4.5 から 1枚
-    const halfList=[1.5,2.5,3.5,4.5];
-    const x = halfList[Math.random()*halfList.length|0];
-    const special = { id:crypto.randomUUID(), num:x, kind:'half', open:false, ownerId:null };
-    deck = take24.concat(special);
+    // 赤コードを1枚だけ追加
+    const x = (Math.random()*12|0) + 1;
+    const special = { id:crypto.randomUUID(), num:x, kind:'red', open:false, ownerId:null };
+    deck = base.concat([special]);
     shuffle(deck);
     missionMeta = missionInfo(1, x);
+  }else if(missionId===2){
+    // 黄コードを1枚だけ追加
+    const x = (Math.random()*12|0) + 1;
+    const special = { id:crypto.randomUUID(), num:x, kind:'yellow', open:false, ownerId:null };
+    deck = base.concat([special]);
+    shuffle(deck);
+    missionMeta = missionInfo(2, x);
   }else{
-    const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
-    shuffle(base);
-    deck = base;
+    deck = base; // 通常
     missionMeta = missionInfo(missionId);
   }
 
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
-  let p=0;
-  while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
+  let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
   tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
 
   // アイテム（人数ぶん）
@@ -905,7 +927,7 @@ async function startGame(playerCount, missionId){
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
     di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null }
+    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
 
   H(gear,false);
@@ -914,10 +936,13 @@ async function startGame(playerCount, missionId){
 function missionInfo(id, x=null){
   switch(id){
     case 1:{
-      const dispX = (x!=null) ? x : [1.5,2.5,3.5,4.5][Math.random()*4|0];
+      const dispX = (x!=null) ? x : (Math.random()*12|0)+1;
       return {id:1, name:'爆弾', desc:'x が1つ', display:[`#1 爆弾`, `${dispX}が1つ`]};
     }
-    case 2:{ return {id:2, name:'（予備）', desc:'手札の1枚をランダムで一番右へ。他は昇順', display:['#2 （予備）']}; }
+    case 2:{
+      const dispX = (x!=null) ? x : (Math.random()*12|0)+1;
+      return {id:2, name:'黄コード', desc:'x が1つ', display:[`#2 黄コード`, `${dispX}が1つ`]};
+    }
     case 3:{ const list=[1.5,2.5,3.5,4.5]; shuffle(list); const pick=list.slice(0,3); return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]}のうち1つ`]}; }
     case 42:{ return {id:42, name:'#42', desc:'特殊なし', display:['#42','特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'特殊なし', display:['#43','特殊なし']}; }
