@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
@@ -41,6 +41,9 @@
   .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08);z-index:11}
   .menu .btn{width:220px;text-align:left}
 
+  /* ★ ホスト左下の工具ボタン */
+  .host-tool{position:fixed;left:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:10}
+
   .items-bar{display:flex;align-items:center;gap:8px;margin-top:0}
   .items{display:flex;gap:6px;align-items:center;overflow-x:auto}
   .item{
@@ -49,9 +52,6 @@
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
-  /* item16 の旧バッジ（未使用）
-  .reveal-badge{position:absolute;left:50%;transform:translateX(-50%);bottom:-8px;font-size:12px;line-height:1;color:#fff;background:#000;border:1px solid #000;border-radius:6px;padding:2px 6px;pointer-events:none;}
-  */
 
   .di{ margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;border:1px solid #ddd;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto }
@@ -227,6 +227,8 @@
 <div id="popLayer" class="pop-layer"></div>
 <!-- ★ アイテム16の表示先（画面下部） -->
 <div id="globalReveal" class="global-reveal hidden"></div>
+<!-- ★ ホスト左下 工具アイコン -->
+<button id="hostTool" class="host-tool hidden" title="ホスト用ツール">🛠</button>
 
 <div id="restartPop" class="restart-pop hidden">
   <div style="font-size:14px">やり直しますか？</div>
@@ -242,7 +244,7 @@
   </div>
   <div class="row"><label>ミッション</label>
     <select id="selMission">
-      <option value="1">#1 爆弾</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
+      <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
       <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
       <option value="8">#8</option><option value="9">#9</option><option value="10">#10</option>
       <option value="42">#42</option><option value="43">#43</option>
@@ -337,6 +339,8 @@ const btnSeatCancel=document.getElementById('btnSeatCancel');
 const popLayer = document.getElementById('popLayer');
 /* global reveal */
 const globalReveal = document.getElementById('globalReveal');
+/* host tool */
+const hostTool = document.getElementById('hostTool');
 
 /* helpers */
 function hiragana3(){ const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"]; return Array.from({length:3},()=>h[Math.random()*h.length|0]).join(''); }
@@ -413,7 +417,7 @@ function listenRoom(code){
     const v=snap.val(); state.watching=v;
     if(v){ const p=Object.keys(v.players||{}).length, s=Object.keys(v.spectators||{}).length; if(p===0 && s===0){ remove(ref(db, `rooms/${code}`)); return; } }
     H(listsBox, !!v?.started);
-    renderLists(v); renderItemsAndDi(v); renderTables(v); renderMissionPanels(v); renderGlobalReveal(v);
+    renderLists(v); renderItemsAndDi(v); renderTables(v); renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
@@ -450,8 +454,6 @@ function renderItemsAndDi(v){
   (v.items||[]).forEach((it, idx)=>{
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
-
-    // 旧: item16 抽出数字（カード下表示）は廃止
 
     div.onclick=(ev)=>{
       if(it.used){
@@ -507,6 +509,23 @@ function renderGlobalReveal(v){
   globalReveal.appendChild(t);
   H(globalReveal,false);
 }
+
+/* ===== Host tool (odd-open normal codes) ===== */
+function renderHostTool(v){
+  if(!state.isHost || !v?.tables){ H(hostTool,true); return; }
+  const openCountByNum = {};
+  (v.tables||[]).forEach(T=>{
+    (T.hand||[]).forEach(c=>{
+      if(c?.kind==='normal' && c.open===true){
+        const n = c.num|0; // 通常コードは整数想定
+        openCountByNum[n] = (openCountByNum[n]||0) + 1;
+      }
+    });
+  });
+  const hasOdd = Object.values(openCountByNum).some(cnt => (cnt % 2)===1);
+  H(hostTool, !hasOdd);
+}
+hostTool.onclick = ()=> alert('全体公開されている通常コードの枚数に奇数が含まれています。');
 
 /* ===== Tables ===== */
 function renderTables(v){
@@ -626,8 +645,8 @@ function renderTables(v){
       const col=document.createElement('div'); col.className='tok-col';
       (c.tokens||[]).forEach(tk=>{
         const el=document.createElement('div'); el.className='token ' + (tk.style||'');
-        el.textContent = tk.type==='equal' ? '＝' : tk.type==='x1' ? 'x1' : tk.type==='num' ? tk.value : '';
         col.appendChild(el);
+        el.textContent = tk.type==='equal' ? '＝' : tk.type==='x1' ? 'x1' : tk.type==='num' ? tk.value : '';
       });
 
       if(!(i2All && i2All.usingBy===state.userId) && !(i18All && i18All.usingBy===state.userId) && isMine){
@@ -798,17 +817,6 @@ function itemDeckNumbers(){
   return Array.from({length:18}, (_,i)=> i+1);
 }
 
-// 全員を席から外す（やり直す時に使用）
-async function unseatAllPlayers(v){
-  const tables = v?.tables || [];
-  for (let i=0;i<tables.length;i++){
-    await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {playerId:null, playerName:null});
-    const hand = tables[i].hand || [];
-    for (let h=0; h<hand.length; h++){ await update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${h}`), {ownerId:null}); }
-  }
-  state.seatedTable = null; updateMenuButtons();
-}
-
 /* item13: 追加で2枚 */
 async function addTwoItemsFromDeck(){
   const v = state.watching; if(!v) return;
@@ -821,31 +829,21 @@ async function addTwoItemsFromDeck(){
   await set(ref(db, `rooms/${state.roomCode}/items`), next);
 }
 
-/* item16: 1~12 の各〈数字〉情報トークンの総数を数え、総数が2未満の数字から1つランダムで画面下部に表示 */
+/* item16: 数字トークンの総使用数を見て、<2の数字から1つ選び画面下に表示（黒/白） */
 async function handleItem16(itemIdx){
   const v = state.watching; if(!v) return;
   const counts = Object.create(null);
+  const tokens = [];
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       (c.tokens||[]).forEach(tk=>{
         if(tk && tk.type==='num'){
           const n = (tk.value|0);
-          if(n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; }
+          if(n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; tokens.push(tk); }
         }
       });
     });
   });
-  const deck = Array.from({length:12}, (_,i)=> i+1).filter(n => (counts[n]||0) < 2);
-  if(deck.length===0){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); return; }
-  shuffle(deck);
-  const pick = deck[0];
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: { num: pick, at: Date.now() } });
-}
-        }
-      });
-    });
-  });
-  // 既存トークンのうち、同じ数字が2つ以上になっていないもの（= その数字の総数 < 2）を候補に
   const candidates = tokens.filter(tk=> (counts[tk.value|0] || 0) < 2);
   if(candidates.length===0){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); return; }
   const pick = candidates[Math.random()*candidates.length|0];
@@ -859,6 +857,15 @@ function closeAllMini(e){ document.querySelectorAll('.mini-pop').forEach(pop=>{ 
  document.addEventListener('click',(e)=>{ closeAllMini(e); outsideClose(e, menuPop); }, true);
 gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.contains('hidden')) updateMenuButtons(); };
 
+/* ★ 共通の離席処理 */
+async function leaveSeatNow(){
+  if(state.seatedTable==null || !state.watching?.tables) return;
+  const idx=state.seatedTable; const hand=(state.watching.tables[idx].hand||[]);
+  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
+  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
+  state.seatedTable=null; updateMenuButtons();
+}
+
 btnSit.onclick = ()=>{
   if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
   const v=state.watching; if(!v?.started){ alert('ゲーム開始後に席を選べます'); return; }
@@ -867,7 +874,7 @@ btnSit.onclick = ()=>{
     const tab=document.createElement('div'); tab.className='tab';
     tab.textContent = t.playerName ? `${i+1}（使用中）` : `${i+1}`;
     if(t.playerId) tab.classList.add('disabled');
-    tab.onclick=async ()=> {
+    tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
       await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {playerId:state.userId, playerName:state.userName});
       const hand=(v.tables[i].hand||[]);
@@ -880,21 +887,15 @@ btnSit.onclick = ()=>{
 };
 btnSeatCancel.onclick=()=> H(seatPop,true);
 
-btnLeave.onclick = async ()=>{
-  if(state.seatedTable==null){ alert('席に座っていません'); return; }
-  const idx=state.seatedTable; const hand=(state.watching.tables[idx].hand||[]);
-  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
-  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
-  state.seatedTable=null; updateMenuButtons();
-};
+btnLeave.onclick = async ()=>{ await leaveSeatNow(); };
 
 /* start/restart */
 btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可'); return; } H(restartPop,false); };
 btnRestartOk.onclick = async ()=>{
   H(restartPop,true);
+  /* ★ ミッション「やり直す」確定時に自動で席を立つ */
+  await leaveSeatNow();
   const v=state.watching; if(!v) return;
-  // やり直す → 自動で席を立つ
-  await unseatAllPlayers(v);
   await startGame(v.tableCount || 4, v.mission?.id || 1);
 };
 btnRestartCancel.onclick = ()=> H(restartPop,true);
@@ -912,28 +913,28 @@ async function startGame(playerCount, missionId){
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
-  // ベースデッキ 1..12 x4 = 48
+  // ベースデッキ 1..12 x4 = 48（通常コード）
   const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
   shuffle(base);
 
   if(missionId===1){
-    // 赤コード（1.5,2.5,...,11.5）を1枚だけ追加
-    const redList = Array.from({length:11}, (_,i)=> (i+1)+0.5);
-    const x = redList[Math.random()*redList.length|0];
-    const special = { id:crypto.randomUUID(), num:x, kind:'red', open:false, ownerId:null };
+    // ★ 赤コード（1.5,2.5,...,11.5）から1枚
+    const x = (Math.random()*11|0) + 1; // 1..11
+    const specialNum = x + 0.5;
+    const special = { id:crypto.randomUUID(), num:specialNum, kind:'red', open:false, ownerId:null };
     deck = base.concat([special]);
     shuffle(deck);
-    missionMeta = missionInfo(1, x);
+    missionMeta = missionInfo(1, specialNum);
   }else if(missionId===2){
-    // 黄コード（1.1,2.1,...,11.1）を1枚だけ追加
-    const yellowList = Array.from({length:11}, (_,i)=> (i+1)+0.1);
-    const x = yellowList[Math.random()*yellowList.length|0];
-    const special = { id:crypto.randomUUID(), num:x, kind:'yellow', open:false, ownerId:null };
+    // ★ 黄コード（1.1,2.1,...,11.1）から1枚
+    const x = (Math.random()*11|0) + 1; // 1..11
+    const specialNum = x + 0.1;
+    const special = { id:crypto.randomUUID(), num:specialNum, kind:'yellow', open:false, ownerId:null };
     deck = base.concat([special]);
     shuffle(deck);
-    missionMeta = missionInfo(2, x);
+    missionMeta = missionInfo(2, specialNum);
   }else{
-    deck = base;
+    deck = base; // 通常
     missionMeta = missionInfo(missionId);
   }
 
@@ -958,18 +959,22 @@ async function startGame(playerCount, missionId){
 }
 
 function missionInfo(id, x=null){
+  // 表示も新定義に合わせる
   switch(id){
-    case 1:{
-      const dispX = (x!=null) ? x : (Array.from({length:11}, (_,i)=> (i+1)+0.5)[Math.random()*11|0]);
-      return {id:1, name:'爆弾', desc:'x が1つ', display:[`#1 爆弾`, `${dispX}が1つ`]};
-    }が1つ`]};
+    case 1:{ // 赤コード
+      const dispX = (x!=null) ? x : ((Math.random()*11|0)+1)+0.5;
+      return {id:1, name:'爆弾（赤）', desc:'赤コードが1つ', display:[`#1 爆弾（赤コード）`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
     }
-    case 2:{
-      const dispX = (x!=null) ? x : (Array.from({length:11}, (_,i)=> (i+1)+0.1)[Math.random()*11|0]);
-      return {id:2, name:'黄コード', desc:'x が1つ', display:[`#2 黄コード`, `${dispX}が1つ`]};
-    }が1つ`]};
+    case 2:{ // 黄コード
+      const dispX = (x!=null) ? x : ((Math.random()*11|0)+1)+0.1;
+      return {id:2, name:'黄コード', desc:'黄コードが1つ', display:[`#2 黄コード`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
     }
-    case 3:{ const list=[1.5,2.5,3.5,4.5]; shuffle(list); const pick=list.slice(0,3); return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]}のうち1つ`]}; }
+    case 3:{
+      // 例：赤系の候補から3つ提示（必要ならここも調整可）
+      const list=[1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5]; shuffle(list);
+      const pick=list.slice(0,3);
+      return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
+    }
     case 42:{ return {id:42, name:'#42', desc:'特殊なし', display:['#42','特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'特殊なし', display:['#43','特殊なし']}; }
     default: return {id, name:`#${id}`, desc:'', display:[`#${id}`]};
