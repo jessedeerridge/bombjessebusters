@@ -167,13 +167,36 @@
   .token.odd  { background:#e75480; color:#000; }    /* 奇数 1/3 */
 .token.yellowX { background:#ffd400; color:#000; }
 
-  .marker,.blink{
-    position:absolute;left:0;right:0;top:-12px;
-    text-align:center;font-size:14px;line-height:1;
-    z-index:12000; pointer-events:none;
-  }
-  .blink{ animation: blink 0.6s linear infinite; }
-  @keyframes blink{ 0%,100%{opacity:0} 50%{opacity:1} }
+.marker,.blink{
+  position:absolute;left:0;right:0;top:-12px;
+  text-align:center;font-size:14px;line-height:1;
+  z-index:12000; pointer-events:none;
+}
+.blink{ animation: blink 0.6s linear infinite; }
+@keyframes blink{ 0%,100%{opacity:0} 50%{opacity:1} }
+
+/* ★ #22：名前の下に置く「選択ボタン ×3」 */
+.pick3{ display:flex; gap:4px; margin-left:8px; }
+.pickbtn{
+  width:22px; height:22px; border:1px dashed #999; border-radius:4px;
+  background:#fff; display:grid; place-items:center; font-size:12px; line-height:1;
+  color:#000; user-select:none; cursor:pointer;
+}
+.pickbtn.readonly{ opacity:.6; cursor:default; }
+
+/* ★ #22：情報トークン使用数の2×6パネル */
+.info22{
+  position:fixed; left:50%; bottom:12px; transform:translateX(-50%);
+  background:#fff; border:1px solid #eee; border-radius:10px; box-shadow:0 10px 24px rgba(0,0,0,.12);
+  padding:8px; z-index:2147483601; display:grid; grid-template-columns:repeat(6, 1fr); gap:6px;
+}
+.info22 .cell{
+  border:1px dashed #bbb; border-radius:6px; padding:6px 4px; text-align:center; font-size:12px;
+  background:#fff;
+}
+.info22 .num{ display:block; font-weight:700; margin-bottom:2px; }
+.info22 .val{ display:block; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+
 
 
 /* ★ チェック表（テーブル1の真上） */
@@ -683,8 +706,13 @@ function buildMixPlan(missionId){
   21: [
     {type:'redChoose', from:3, take:1},
   ],
-      };
-  return plans[missionId] || [];
+  22: [
+    {type:'redPick',    k:1},
+    {type:'yellowPick', k:4},
+  ],
+};
+return plans[missionId] || [];
+
 }
 
 /**
@@ -1024,10 +1052,52 @@ function renderTables(v){
     const totalW = CW + 8 + handInner + 16;
     box.style.width = Math.max(totalW, CW + 16) + 'px';
 
-    const header=document.createElement('div'); header.className='t-header';
-    const title=document.createElement('div');  title.className='title';
-    title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
-    header.appendChild(title); 
+const header=document.createElement('div'); header.className='t-header';
+const title=document.createElement('div');  title.className='title';
+title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
+header.appendChild(title); 
+
+/* ★ #22：名前の下に3つの小ボタン */
+if (v.mission?.flags?.m22_pick3) {
+  const me = (t.playerId === state.userId);
+  const picks = Array.isArray(t.headerPicks) ? t.headerPicks.slice(0,3) : [null,null,null];
+  const wrap = document.createElement('div'); wrap.className = 'pick3';
+
+  // 自分の手札にある整数(1..12)の集合
+  const myInts = new Set((t.hand||[]).filter(c=> Number.isInteger(c.num)).map(c=> c.num|0));
+
+  // 候補 = 1..12 から「自分の手札に無い数字」だけ
+  const candidates = []; for(let nn=1; nn<=12; nn++){ if(!myInts.has(nn)) candidates.push(nn); }
+
+  const openPickMenu = (ev, slotIndex)=>{
+    const entries = [];
+    candidates.forEach(nn=>{
+      // 同じプレイヤーの別スロットで選んだ数字は重複しないよう除外
+      if (picks.includes(nn)) return;
+      entries.push({ label:String(nn), action: async ()=>{
+        const next = picks.slice(); next[slotIndex] = nn;
+        await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { headerPicks: next });
+      }});
+    });
+    entries.push({ label:'消す', action: async ()=>{
+      const next = picks.slice(); next[slotIndex] = null;
+      await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { headerPicks: next });
+    }});
+    openMenu(ev.clientX, ev.clientY, entries);
+  };
+
+  for (let s=0; s<3; s++){
+    const b = document.createElement('div');
+    b.className = 'pickbtn' + (me ? '' : ' readonly');
+    b.textContent = (picks[s]==null ? '' : String(picks[s]));
+    if (me){
+      b.onclick = (ev)=>{ ev.stopPropagation(); openPickMenu(ev, s); };
+    }
+    wrap.appendChild(b);
+  }
+  header.appendChild(wrap);
+}
+
     
 // #13：初期情報トークン（数値）—— 表示はキャラ下、ここでは値と auto-hide だけ扱う
 let m13HeaderNum = null;
@@ -1413,30 +1483,79 @@ if(!suppressNumberPop && canNum){
     tablesEl.appendChild(box);
   });
 
+  /* ★ #22：黄カードが「公開」された種類が2つ以上になった瞬間に表を出す */
+  if (v.mission?.flags?.m22_showTableAfter2Yellows) {
+    const openYellowKinds = new Set();
+    (v.tables||[]).forEach(T=>{
+      (T.hand||[]).forEach(c=>{
+        if(c?.kind==='yellow' && c.open===true){
+          // 同じ黄でも番号(例: 3.1, 7.1)が違えば“種類”は別
+          openYellowKinds.add(String(c.num));
+        }
+      });
+    });
 
-  // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行して再レンダー競合を防ぐ）
+    const alreadyShown = !!v.meta?.m22_infoShown;
+    if (openYellowKinds.size >= 2 && !alreadyShown) {
+      // DBフラグを立てて重複表示を防止
+      update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown: true });
+      showInfo22Panel(v); // 直ちに描画
+    }
+  }
+
+  // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行...）
   if (!m13HeaderUpdateScheduled && m13HeaderClearIndices && m13HeaderClearIndices.size > 0) {
-    m13HeaderUpdateScheduled = true;
-    const clearSet = new Set(m13HeaderClearIndices); // スナップショット
-    m13HeaderClearIndices = null;
-    setTimeout(async () => {
-      try {
-        const snap = await get(ref(db, `rooms/${state.roomCode}/meta/m13_header`));
-        const header = (snap.val() || []).slice();
-        clearSet.forEach(i => { if (header[i] != null) header[i] = null; });
-        await update(ref(db, `rooms/${state.roomCode}/meta`), { m13_header: header });
-      } finally {
-        m13HeaderUpdateScheduled = false;
-      }
-    }, 0);
+    ...
   }
 
   async function incToken(kind, delta){
-    const path = `rooms/${state.roomCode}/meta/tokenCounts`;
-    const nowv = (state.watching?.meta?.tokenCounts||{})[kind]||0;
-    await update(ref(db, path), {[kind]: Math.max(0, nowv + delta)});
+    ...
   }
 }
+
+/* === #22 用：情報トークン使用数を2×6で表示 === */
+function showInfo22Panel(vNow){
+  const exist = document.getElementById('info22');
+  if (exist) exist.remove();
+
+  const v = vNow || state.watching;
+  if (!v) return;
+
+  // 各数字(1..12)の「情報トークン(type:'num')の使用数」をカウント
+  const cnt = Array.from({length:13}, ()=>0);
+  (v.tables||[]).forEach(T=>{
+    (T.hand||[]).forEach(c=>{
+      (c.tokens||[]).forEach(tk=>{
+        if (tk?.type==='num'){
+          const n = parseInt(tk.value, 10);
+          if (n>=1 && n<=12) cnt[n] += 1;
+        }
+      });
+    });
+  });
+
+  // 表示値：使用0⇒2 / 使用1⇒1 / 使用2以上⇒0
+  const mapVal = (x)=> x===0 ? 2 : (x===1 ? 1 : 0);
+
+  const div = document.createElement('div');
+  div.id = 'info22';
+  div.className = 'info22';
+  for (let n=1; n<=12; n++){
+    const cell = document.createElement('div'); cell.className='cell';
+    const a = document.createElement('span'); a.className='num'; a.textContent = String(n);
+    const b = document.createElement('span'); b.className='val'; b.textContent = 'x' + mapVal(cnt[n]);
+    cell.appendChild(a); cell.appendChild(b);
+    // タップで「隠す」
+    cell.onclick = (ev)=> {
+      openMenu(ev.clientX, ev.clientY, [
+        {label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); }}
+      ]);
+    };
+    div.appendChild(cell);
+  }
+  document.body.appendChild(div);
+}
+
 
 
 
@@ -1602,7 +1721,22 @@ function updateMenuButtons(){
   H(btnLeave, !seated);
   // ▼ ホスト以外にはミッション選択ボタンを出さない
   H(btnPickMission, !state.isHost);
+
+  // ★ #22：情報トークン表の再表示ボタンをメニューに生やす（重複生成防止）
+  const v = state.watching;
+  const need = !!v?.mission?.flags?.m22_allowInfoTableFromMenu;
+  const id  = 'btnShowInfo22';
+  const old = document.getElementById(id);
+  if (!need && old){ old.remove(); }
+  if (need && !old){
+    const b = document.createElement('button');
+    b.className = 'btn'; b.id = id; b.textContent = '情報トークン（#22）';
+    b.onclick = ()=> showInfo22Panel();
+    // メニューの先頭に追加（Seat系の上あたり）
+    menuPop.insertBefore(b, menuPop.firstChild || null);
+  }
 }
+
 const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
 function closeAllMini(e){ document.querySelectorAll('.mini-pop').forEach(pop=>{ if(!pop.contains(e.target)) pop.remove(); }); }
  document.addEventListener('click',(e)=>{ closeAllMini(e); outsideClose(e, menuPop); }, true);
@@ -2194,6 +2328,26 @@ function missionInfo(id, opts={}){
         flags:{ useParityToken:true }
       };
     }
+
+    case 22: {
+      return {
+        id:22, name:'#22', desc:'',
+        display:[
+          '#22', ...linesForMix,
+          '各プレイヤーの名前の下に小さい空ボタンが3つある。自分の手札に無い数字のみ選べる（消す可）。',
+          '黄カードが2種類公開された瞬間、1~12の情報トークン使用数を集計し、2×6表で「0/1/2」（規則下記）を表示する。',
+          '表示規則：使用1枚→「1」、使用2枚以上→「0」、使用0枚→「2」。表はタップ→「隠す」で消える。右下の設定から再表示可。',
+          '指示：「手元にない数字の情報トークンを2枚選び、手元に置いておく」。',
+          '指示：「最初の2本の黄コードが解除されたら、全員が未使用の情報トークンから1枚選び、次手番の人に使ってもらう（対象コードが無ければ何もしない）」。'
+        ],
+        flags:{
+          m22_pick3:true,
+          m22_showTableAfter2Yellows:true,
+          m22_allowInfoTableFromMenu:true
+        }
+      };
+    }
+
 
 
       
