@@ -103,11 +103,11 @@
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
   .token{font-size:11px;border-radius:4px;padding:1px 4px;line-height:1}
-  .token.equal{background:#ffedd5;color:#000}
+  /* ▼ ＝ / ≠ の色を入れ替え（＝をグレー、≠を薄オレンジ） */
+  .token.equal{background:#e5e7eb;color:#000}  /* ＝ */
+  .token.noteq{background:#ffedd5;color:#000}  /* ≠ */
   .token.black{background:#000;color:#fff}
   .token.x1{background:#fce7f3;color:#000}
-  /* 追加：≠トークン用（落ち着いたグレー） */
-  .token.noteq{background:#e5e7eb;color:#000}
 
   .marker,.blink{
     position:absolute;left:0;right:0;top:-12px;
@@ -128,11 +128,13 @@
   .global-reveal{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:2147483647;}
   .global-reveal .token{cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.12);}
 
-  /* 追加：アイテム16のサイド表示 */
+  /* ★ 追加：アイテム16のサイド表示 */
   .i16-side{
     position:absolute; left:calc(100% + 6px); top:50%; transform:translateY(-50%);
     z-index:2147483000;
   }
+  /* ★ 追加：i16サイドトークンが出ているとき、右隣のアイテムを数px右にシフト */
+  .item.i16-has-badge + .item{ margin-left:10px; transition:margin-left .15s ease; }
 
   .panel{display:flex;flex-direction:column;gap:10px}
   .list{border:1px solid #eee;border-radius:10px;padding:8px}
@@ -164,8 +166,8 @@
   .restart-actions .btn.big{flex:1}
 
   .tabs{display:flex;gap:6px;flex-wrap:wrap}
-  .tab{padding:6px 10px;border:1px solid #ddd;border-radius:999px;cursor:pointer;user-select:none}
   .tab.active{background:#111;color:#fff;border-color:#111}
+  .tab{padding:6px 10px;border:1px solid #ddd;border-radius:999px;cursor:pointer;user-select:none}
   .tab.disabled{opacity:.35;pointer-events:none}
 
   @media (max-width: 860px){
@@ -463,9 +465,9 @@ function renderItemsAndDi(v){
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
 
-    // ★ 追加：アイテム16の情報トークンをカード右側に表示
-    // meta.i16Badge.num があれば右側に黒トークンを描画
+    // ★ 追加：アイテム16の情報トークンをカード右側に表示（出現時は右隣カードを数px右へ）
     if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
+      div.classList.add('i16-has-badge');
       const side = document.createElement('div');
       side.className = 'i16-side';
       const tok = document.createElement('div');
@@ -474,7 +476,9 @@ function renderItemsAndDi(v){
       tok.title = 'クリックで操作';
       tok.onclick = (ev)=>{
         openMenu(ev.clientX, ev.clientY, [
-          {label:'消す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); }}
+          {label:'消す', action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null });
+          }}
         ]);
       };
       side.appendChild(tok);
@@ -520,7 +524,7 @@ function renderItemsAndDi(v){
 
 /* ===== Global badge (item16) ===== */
 function renderGlobalReveal(v){
-  // 変更：サイド表示に切り替えたため常に非表示
+  // サイド表示に切り替えたため常に非表示
   globalReveal.innerHTML='';
   H(globalReveal,true);
 }
@@ -549,9 +553,7 @@ function renderTables(v){
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
 
-  // ★ 変更：上限の対応
-  //   ＝ の上限はアイテム12の使用回数
-  //   ≠ の上限はアイテム1の使用回数
+  // ＝はアイテム12、≠はアイテム1の回数で上限
   const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
   const caps = { 
     equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0),
@@ -886,7 +888,7 @@ async function doItem18Take(sel){
 
   const dstHand = (tables[myTable]?.hand)||[];
   const n = card.num;
-  let pos = 0; while(pos<dstHand.length && dstHand[pos].num < n) pos++; while(pos>0 && dstHand[pos-1].num===n) pos--; 
+  let pos = 0; while(pos<dstHand.length && dstHand[pos].num < n) pos++; while(pos>0 && dstHand[pos-1].num===n) pos--;
   const mark = now()+10000;
   dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark});
 
@@ -982,7 +984,7 @@ btnSit.onclick = ()=>{
   });
   H(seatPop,false);
 };
-btnSeatCancel.onclick=()=> H(seatPop,true);
+btnSeatCancel.onclick()=> H(seatPop,true);
 
 btnLeave.onclick = async ()=>{ await leaveSeatNow(); };
 
@@ -1058,16 +1060,15 @@ async function startGame(playerCount, missionId){
 function missionInfo(id, x=null){
   // 表示も新定義に合わせる
   switch(id){
-    case 1:{ // 赤コード
+    case 1:{
       const dispX = (x!=null) ? x : ((Math.random()*11|0)+1)+0.5;
       return {id:1, name:'爆弾（赤）', desc:'赤コードが1つ', display:[`#1 爆弾（赤コード）`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
     }
-    case 2:{ // 黄コード
+    case 2:{
       const dispX = (x!=null) ? x : ((Math.random()*11|0)+1)+0.1;
       return {id:2, name:'黄コード', desc:'黄コードが1つ', display:[`#2 黄コード`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
     }
     case 3:{
-      // 例：赤系の候補から3つ提示（必要ならここも調整可）
       const list=[1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5]; shuffle(list);
       const pick=list.slice(0,3);
       return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
