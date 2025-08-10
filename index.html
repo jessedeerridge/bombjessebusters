@@ -805,10 +805,19 @@ if (v) {
 }    H(listsBox, !!v?.started);
     renderLists(v); renderItemsAndDi(v); renderTables(v); renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
+
+    // ▼ ホスト判定を最新化
+    state.isHost = (v?.hostId === state.userId);
+
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
+
+    // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
+    H(btnPickMission, !state.isHost);
+
     // ▼ 追加：ホストなら開始前後いつでもクイックピッカーを使える
     updateHeaderInfo();
+
   });
 }
 
@@ -1587,7 +1596,13 @@ async function handleItem16(itemIdx){
 }
 
 /* gear etc */
-function updateMenuButtons(){ const seated = state.seatedTable!=null; H(btnSit, seated); H(btnLeave, !seated); }
+function updateMenuButtons(){
+  const seated = state.seatedTable!=null;
+  H(btnSit, seated);
+  H(btnLeave, !seated);
+  // ▼ ホスト以外にはミッション選択ボタンを出さない
+  H(btnPickMission, !state.isHost);
+}
 const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
 function closeAllMini(e){ document.querySelectorAll('.mini-pop').forEach(pop=>{ if(!pop.contains(e.target)) pop.remove(); }); }
  document.addEventListener('click',(e)=>{ closeAllMini(e); outsideClose(e, menuPop); }, true);
