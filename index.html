@@ -1610,7 +1610,7 @@ function showInfo22Panel(vNow){
   for (let n=1; n<=12; n++){
     // 使用数（2以上は 2 で打ち止め）
     const used = countNumTokenUsage(n, v);
-    const shown = Math.min(2, used); // ← 0,1,2 のいずれかで表示
+const shown = 2 - Math.min(2, used);
 
     const cell = document.createElement('div');
     cell.className = 'cell';
