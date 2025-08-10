@@ -500,8 +500,8 @@ const db  = getDatabase(app);
 /* State */
 const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
-  isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null
-    m22GaveOnce:false  // ★ #22：自分が渡した一回ガード（即時連打対策）
+  isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
+  m22GaveOnce:false  // ★ #22：自分が渡した一回ガード（即時連打対策）
 };
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
@@ -1624,32 +1624,11 @@ function showInfo22Panel(vNow){
   const exist = document.getElementById('info22');
   if (exist) exist.remove();
 
-  // ▼ #22：次の手番（テーブル番号順、空席はスキップ）のプレイヤーを求める
-  function findNextPlayer(v){
-    const tables = v?.tables || [];
-    const myIdx = tables.findIndex(T => T.playerId === state.userId);
-    const len = Math.max(1, tables.length);
-    // 自分が座っていれば、そこから前方へ「着席者」を探す
-    if (myIdx >= 0) {
-      for (let k=1; k<=len; k++){
-        const ni = (myIdx + k) % len;
-        const T = tables[ni];
-        if (T && T.playerId){
-          const name = T.playerName || String(T.titleNumber || (ni+1));
-          return { index: ni, name };
-        }
-      }
-    }
-    // 誰も座っていない等のフォールバック：単純に次番号
-    const base = (myIdx >= 0 ? myIdx : 0);
-    const ni = (base + 1) % len;
-    const T = tables[ni] || {};
-    const name = T.playerName || String(T.titleNumber || (ni+1));
-    return { index: ni, name };
-  }
-  
   const v = vNow || state.watching;
   if (!v) return;
+
+  // ★ 黄2種公開（＝サーバ側で m22_infoShown を立てた）までは表を生成しない
+  if (v?.meta?.m22_infoShown !== true) return;
  　const givenMap = v.meta?.m22_given || {};
 　 const iGave    = !!givenMap[state.userId];
   const div = document.createElement('div');
@@ -1911,23 +1890,25 @@ function updateMenuButtons(){
   const seated = state.seatedTable!=null;
   H(btnSit, seated);
   H(btnLeave, !seated);
-  // ▼ ホスト以外にはミッション選択ボタンを出さない
   H(btnPickMission, !state.isHost);
 
-  // ★ #22：情報トークン表の再表示ボタンをメニューに生やす（重複生成防止）
+  // ★ #22：黄コード2種公開までは「表」をメニューに出さない
   const v = state.watching;
-  const need = !!v?.mission?.flags?.m22_allowInfoTableFromMenu;
   const id  = 'btnShowInfo22';
   const old = document.getElementById(id);
-  if (!need && old){ old.remove(); }
-  if (need && !old){
+
+  // 条件 = ミッション22でメニュー許可フラグが立っていて、かつ v.meta.m22_infoShown === true（黄2種公開済み）
+  const canReferInfoTable = !!(v?.mission?.flags?.m22_allowInfoTableFromMenu && v?.meta?.m22_infoShown === true);
+
+  if (!canReferInfoTable && old){ old.remove(); }
+  if (canReferInfoTable && !old){
     const b = document.createElement('button');
     b.className = 'btn'; b.id = id; b.textContent = '情報トークン（#22）';
     b.onclick = ()=> showInfo22Panel(state.watching);
-    // メニューの先頭に追加（Seat系の上あたり）
     menuPop.insertBefore(b, menuPop.firstChild || null);
   }
 }
+
 
 const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
 function closeAllMini(e){ document.querySelectorAll('.mini-pop').forEach(pop=>{ if(!pop.contains(e.target)) pop.remove(); }); }
