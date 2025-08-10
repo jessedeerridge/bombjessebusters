@@ -1600,6 +1600,30 @@ function showInfo22Panel(vNow){
   const exist = document.getElementById('info22');
   if (exist) exist.remove();
 
+  // ▼ #22：次の手番（テーブル番号順、空席はスキップ）のプレイヤーを求める
+  function findNextPlayer(v){
+    const tables = v?.tables || [];
+    const myIdx = tables.findIndex(T => T.playerId === state.userId);
+    const len = Math.max(1, tables.length);
+    // 自分が座っていれば、そこから前方へ「着席者」を探す
+    if (myIdx >= 0) {
+      for (let k=1; k<=len; k++){
+        const ni = (myIdx + k) % len;
+        const T = tables[ni];
+        if (T && T.playerId){
+          const name = T.playerName || String(T.titleNumber || (ni+1));
+          return { index: ni, name };
+        }
+      }
+    }
+    // 誰も座っていない等のフォールバック：単純に次番号
+    const base = (myIdx >= 0 ? myIdx : 0);
+    const ni = (base + 1) % len;
+    const T = tables[ni] || {};
+    const name = T.playerName || String(T.titleNumber || (ni+1));
+    return { index: ni, name };
+  }
+  
   const v = vNow || state.watching;
   if (!v) return;
 
@@ -1620,6 +1644,25 @@ const shown = 2 - Math.min(2, used);
     tok.className = 'token black';
     tok.textContent = String(n);
 
+    // ▼ トークンをクリック → 「次の手番のプレイヤーに n を渡す」
+    tok.onclick = (ev)=>{
+      ev.stopPropagation(); // セルの「隠す」クリックにバブリングさせない
+      const { index: nextIdx, name: nextName } = findNextPlayer(v);
+      openMenu(ev.clientX, ev.clientY, [
+        { label: `${nextName} に ${n} を渡す`, action: async ()=>{
+            // 受け取り先テーブルに m22Tokens を追加（最大2つ表示仕様に合わせるため render 側で slice(0,2) 済）
+            const tRef = ref(db, `rooms/${state.roomCode}/tables/${nextIdx}`);
+            const snap = await get(tRef);
+            const cur  = snap.val() || {};
+            const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
+            arr.push(n);
+            await update(tRef, { m22Tokens: arr });
+            // 「渡した以降は、表を押すと“隠す”」を有効化
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_afterGiven: true });
+          } }
+      ]);
+    };
+    
     // 右側の xラベル
     const xl = document.createElement('span');
     xl.className = 'xlabel';
@@ -1638,6 +1681,15 @@ const shown = 2 - Math.min(2, used);
     div.appendChild(cell);
   }
 
+  // ▼ 「渡した以降」は、表全体のクリックで「隠す」を出す
+  if ((v.meta && v.meta.m22_afterGiven) === true) {
+    div.addEventListener('click', (ev)=>{
+      openMenu(ev.clientX, ev.clientY, [
+        {label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); }}
+      ]);
+    });
+  }
+  
   document.body.appendChild(div);
 }
 
