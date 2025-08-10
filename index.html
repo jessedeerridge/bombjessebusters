@@ -1267,22 +1267,65 @@ async function doItem18Take(sel){
   ]);
 }
 
-/* ===== Item helpers ===== */
-function itemDeckNumbers(){
-  return Array.from({length:18}, (_,i)=> i+1);
+/* ==== アイテムデッキ制御（ミッション別） ==== */
+
+/* このミッションで黄コードを使うか？ */
+function missionUsesYellow(missionId){
+  const plan = buildMixPlan(missionId) || [];
+  // yellowPick / yellowChoose を含むか、#2（黄コード）なら true
+  return missionId===2 || plan.some(p => p.type==='yellowPick' || p.type==='yellowChoose');
 }
+
+/* ミッションごとのアイテム除外リスト（必要に応じて追記） */
+const ITEM_EXCLUSIONS = {
+  // 例）12: [3, 7],   // ミッション12ではアイテム3と7を除外
+};
+
+
+    
+/* ===== Item helpers ===== */
+/* missionId と “黄コードを使うか”で山札を決定し、除外も適用 */
+function itemDeckNumbers(missionId){
+  // 43以降は 1..18 を使用
+  if(missionId >= 43){
+    return Array.from({length:18}, (_,i)=> i+1);
+  }
+
+  // 〜42は 1..13（黄コードあり） / 1..12（黄コードなし）
+  const useYellow = missionUsesYellow(missionId);
+  const maxNo = useYellow ? 13 : 12;
+  let pool = Array.from({length:maxNo}, (_,i)=> i+1);
+
+  // 除外適用
+  const ex = ITEM_EXCLUSIONS[missionId] || [];
+  if(ex.length){
+    const exSet = new Set(ex);
+    pool = pool.filter(n => !exSet.has(n));
+  }
+  return pool;
+}
+
 
 /* item13: 追加で2枚 */
 async function addTwoItemsFromDeck(){
   const v = state.watching; if(!v) return;
-  const pool = itemDeckNumbers();
+  const missionId = v?.mission?.id || 0;
+
+  // ミッション規則に従ったプール
+  const pool = itemDeckNumbers(missionId);
+
+  // 既存と重複しないものから追加
   const existingNos = new Set((v.items||[]).map(i=>i.no));
   const candidates = pool.filter(n=> !existingNos.has(n));
   shuffle(candidates);
+
   const pick = candidates.slice(0,2).map(no=>({id:crypto.randomUUID(), no, used:false}));
+  if(pick.length===0) return;
+
   const next = (v.items||[]).concat(pick);
   await set(ref(db, `rooms/${state.roomCode}/items`), next);
 }
+
 
 /* item16: 数字(1..12)の使用数を集計し、<2の数字から1つ選びメタに保存（表示はアイテム16右側で行う） */
 async function handleItem16(itemIdx){
@@ -1484,9 +1527,10 @@ async function startGame(playerCount, missionId){
   let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
   tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
 
-  // アイテム（人数ぶん）
-  const pool = itemDeckNumbers(); shuffle(pool);
+  // アイテム（人数ぶん） — ミッション規則に合わせて山札を作る
+  const pool = itemDeckNumbers(missionId); shuffle(pool);
   const items = pool.slice(0, Math.min(playerCount, pool.length)).map(no=>({id:crypto.randomUUID(),no,used:false}));
+
 
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
