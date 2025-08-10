@@ -114,6 +114,12 @@ const missionIds<!DOCTYPE html>
     width:var(--char-w);height:var(--char-h);background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
+  /* ★ #13：キャラと下部トークンを縦積みするためのラッパー */
+  .char-col{
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    width:var(--char-w); flex:0 0 auto;
+  }
+  
   .char-card.blank{background:#f3f4f6;border:1px dashed #d1d5db;cursor:default;}
 
   .hand{
@@ -969,18 +975,13 @@ function renderTables(v){
     title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
     header.appendChild(title); 
     
-    // #13：名前の右にランダム数字トークン
+// #13：初期情報トークン（数値）—— 表示はキャラ下、ここでは値と auto-hide だけ扱う
+let m13HeaderNum = null;
 if (v.mission?.flags?.m13_headerRandomInfoToken && Array.isArray(v.meta?.m13_header)) {
   const headerNums = v.meta.m13_header;
-  const idxHeaderNum = headerNums[idx];
-
-  if (idxHeaderNum != null) {
-    // 見た目用の小バッジ
-    const badge = document.createElement('div');
-    badge.className = 'token black';
-    badge.style.marginLeft = '6px';
-    badge.textContent = String(idxHeaderNum);
-    header.appendChild(badge);
+  const n0 = headerNums[idx];
+  if (n0 != null) {
+    m13HeaderNum = n0;
 
     // 同テーブル内で同じ数字の情報トークン（type:'num'）が使われたら自動で消す
     if (v.mission?.flags?.m13_autoHideHeaderToken) {
@@ -989,15 +990,13 @@ if (v.mission?.flags?.m13_headerRandomInfoToken && Array.isArray(v.meta?.m13_hea
         (c.tokens || []).forEach(tk => {
           if (tk?.type === 'num') {
             const n = parseInt(tk.value, 10);
-            if (Number.isInteger(n) && n === idxHeaderNum) used = true;
+            if (Number.isInteger(n) && n === n0) used = true;
           }
         });
       });
-
       if (used) {
-        // まだ同じ値のままなら null でクリア（多重更新の抑制）
         const current = (state.watching?.meta?.m13_header || [])[idx];
-        if (current === idxHeaderNum) {
+        if (current === n0) {
           const next = headerNums.slice();
           next[idx] = null;
           update(ref(db, `rooms/${state.roomCode}/meta`), { m13_header: next });
@@ -1006,18 +1005,38 @@ if (v.mission?.flags?.m13_headerRandomInfoToken && Array.isArray(v.meta?.m13_hea
     }
   }
 }
-    box.appendChild(header);
+box.appendChild(header);
+
 
     const content=document.createElement('div'); content.className='t-content';
 
-    const char=document.createElement('div'); char.className='char-card';
-    if(!seatedAny){ char.classList.add('blank'); }
-    else{
-      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-      char.style.backgroundImage = `url("${face}")`;
-      char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
-    }
-    content.appendChild(char);
+// ★ キャラ＋下部トークン（#13）用ラッパー
+const charCol = document.createElement('div'); 
+charCol.className = 'char-col';
+
+const char=document.createElement('div'); 
+char.className='char-card';
+if(!seatedAny){ 
+  char.classList.add('blank'); 
+}else{
+  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+  char.style.backgroundImage = `url("${face}")`;
+  char.onclick=async ()=>{ 
+    await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
+  };
+}
+charCol.appendChild(char);
+
+// ★ #13：初期情報トークンはキャラの「下」に小さく表示（meta.m13_header をそのまま使う）
+if (m13HeaderNum != null) {
+  const tok = document.createElement('div');
+  tok.className = 'token black';
+  tok.textContent = String(m13HeaderNum);
+  charCol.appendChild(tok);
+}
+
+content.appendChild(charCol);
+
 
     const hand=document.createElement('div'); hand.className='hand';
     (t.hand||[]).forEach((c,ci)=>{
