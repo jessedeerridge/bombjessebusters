@@ -1158,15 +1158,30 @@ content.appendChild(charCol);
       const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
 
       const col=document.createElement('div'); col.className='tok-col';
-      (c.tokens||[]).forEach(tk=>{
-        const el=document.createElement('div'); el.className='token ' + (tk.style||'');
-        col.appendChild(el);
-        el.textContent =
-          tk.type==='equal' ? '＝' :
-          tk.type==='noteq' ? '≠' :
-          tk.type==='x1'    ? 'x1' :
-          tk.type==='num'   ? tk.value : '';
-      });
+ (c.tokens||[]).forEach(tk=>{
+  const el = document.createElement('div');
+  el.className = 'token ' + (tk.style || '');
+  col.appendChild(el);
+
+  const tokenText = (t)=>{
+    switch(t.type){
+      case 'equal':  return '＝';   // = トークン
+      case 'noteq':  return '≠';   // ≠ トークン
+      case 'x1':     return 'x1';  // x1
+      case 'x2':     return 'x2';  // x2（ミッション専用）
+      case 'x3':     return 'x3';  // x3（ミッション専用）
+      case 'yellow': return '▧';   // 黄コードトークン（▧）
+      case 'even':   return '2/4'; // 偶数
+      case 'odd':    return '1/3'; // 奇数
+      case 'xmark':  return '✕';   // ミッション#20の黄色✕用
+      case 'num':    return String(t.value); // 数字
+      default:       return String(t.value ?? '');
+    }
+  };
+
+  el.textContent = tokenText(tk);
+});
+
 
       if(!(i2All && i2All.usingBy===state.userId) && !(i18All && i18All.usingBy===state.userId) && isMine){
         a.onclick=(ev)=>{
