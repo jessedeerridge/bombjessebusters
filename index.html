@@ -106,6 +106,8 @@
   .token.equal{background:#ffedd5;color:#000}
   .token.black{background:#000;color:#fff}
   .token.x1{background:#fce7f3;color:#000}
+  /* 追加：≠トークン用（落ち着いたグレー） */
+  .token.noteq{background:#e5e7eb;color:#000}
 
   .marker,.blink{
     position:absolute;left:0;right:0;top:-12px;
@@ -125,6 +127,12 @@
   /* ★ 画面下部のグローバル黒枠バッジ（アイテム16表示） */
   .global-reveal{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:2147483647;}
   .global-reveal .token{cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.12);}
+
+  /* 追加：アイテム16のサイド表示 */
+  .i16-side{
+    position:absolute; left:calc(100% + 6px); top:50%; transform:translateY(-50%);
+    z-index:2147483000;
+  }
 
   .panel{display:flex;flex-direction:column;gap:10px}
   .list{border:1px solid #eee;border-radius:10px;padding:8px}
@@ -455,6 +463,24 @@ function renderItemsAndDi(v){
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
 
+    // ★ 追加：アイテム16の情報トークンをカード右側に表示
+    // meta.i16Badge.num があれば右側に黒トークンを描画
+    if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
+      const side = document.createElement('div');
+      side.className = 'i16-side';
+      const tok = document.createElement('div');
+      tok.className = 'token black';
+      tok.textContent = String(v.meta.i16Badge.num);
+      tok.title = 'クリックで操作';
+      tok.onclick = (ev)=>{
+        openMenu(ev.clientX, ev.clientY, [
+          {label:'消す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); }}
+        ]);
+      };
+      side.appendChild(tok);
+      div.appendChild(side);
+    }
+
     div.onclick=(ev)=>{
       if(it.used){
         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
@@ -494,20 +520,9 @@ function renderItemsAndDi(v){
 
 /* ===== Global badge (item16) ===== */
 function renderGlobalReveal(v){
-  const data = v?.meta?.i16Badge;
-  if(!data || data.num==null){ globalReveal.innerHTML=''; H(globalReveal,true); return; }
-  globalReveal.innerHTML = '';
-  const t = document.createElement('div');
-  t.className = 'token black';
-  t.textContent = String(data.num);
-  t.title = 'クリックで操作';
-  t.onclick = (ev)=>{
-    openMenu(ev.clientX, ev.clientY, [
-      {label:'消す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); }}
-    ]);
-  };
-  globalReveal.appendChild(t);
-  H(globalReveal,false);
+  // 変更：サイド表示に切り替えたため常に非表示
+  globalReveal.innerHTML='';
+  H(globalReveal,true);
 }
 
 /* ===== Host tool (odd-open normal codes) ===== */
@@ -534,10 +549,13 @@ function renderTables(v){
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
 
-  // ★★ アイテム1に合わせて「＝」上限を i1 使用回数で管理（1回=2個、2回=4個）
+  // ★ 変更：上限の対応
+  //   ＝ の上限はアイテム12の使用回数
+  //   ≠ の上限はアイテム1の使用回数
   const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
   const caps = { 
-    equal: uses.i1>=2 ? 4 : (uses.i1>=1 ? 2 : 0),
+    equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0),
+    noteq: uses.i1>=2  ? 4 : (uses.i1>=1  ? 2 : 0),
     x1:    uses.i14>=2 ? 2 : (uses.i14>=1 ? 1 : 0)
   };
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
@@ -650,7 +668,11 @@ function renderTables(v){
       (c.tokens||[]).forEach(tk=>{
         const el=document.createElement('div'); el.className='token ' + (tk.style||'');
         col.appendChild(el);
-        el.textContent = tk.type==='equal' ? '＝' : tk.type==='x1' ? 'x1' : tk.type==='num' ? tk.value : '';
+        el.textContent =
+          tk.type==='equal' ? '＝' :
+          tk.type==='noteq' ? '≠' :
+          tk.type==='x1'    ? 'x1' :
+          tk.type==='num'   ? tk.value : '';
       });
 
       if(!(i2All && i2All.usingBy===state.userId) && !(i18All && i18All.usingBy===state.userId) && isMine){
@@ -661,6 +683,7 @@ function renderTables(v){
           const has = (type)=> tokens.some(tk=>tk.type===type);
 
           const canEqual = !has('equal') && (counts.equal < caps.equal);
+          const canNoteq = !has('noteq') && (counts.noteq < caps.noteq);
           const canNum   = !has('num');
           const canX1    = !has('x1') && (counts.x1 < caps.x1);
 
@@ -674,7 +697,7 @@ function renderTables(v){
             }});
           }
 
-          // ★★ アイテム1の仕様：「＝」をもう一度押すとメニュー（消す／数字）
+          // ＝（アイテム12管理）
           if (has('equal')) {
             entries.push({
               label:'＝',
@@ -686,16 +709,14 @@ function renderTables(v){
                       await incToken('equal', -1);
                       const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
                       box.classList.toggle('elevated', afterHas);
-                    }
-                  },
+                    }},
                   { label:String(c.num), action: async ()=>{
                       if(!has('num')){
                         const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
                         await update(ref(db, cardPath), { tokens: next });
                         box.classList.add('elevated');
                       }
-                    }
-                  }
+                    }}
                 ]);
               }
             });
@@ -706,6 +727,41 @@ function renderTables(v){
               await incToken('equal', +1);
               box.classList.add('elevated');
             }});
+          }
+
+          // ≠（アイテム1管理）
+          if (has('noteq')) {
+            entries.push({
+              label:'≠',
+              action: async ()=>{
+                openMenu(ev.clientX, ev.clientY, [
+                  { label:'消す', action: async ()=>{
+                      const next = tokens.filter(tk=> tk.type!=='noteq');
+                      await update(ref(db, cardPath), { tokens: next });
+                      await incToken('noteq', -1);
+                      const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
+                      box.classList.toggle('elevated', afterHas);
+                    }},
+                  { label:String(c.num), action: async ()=>{
+                      if(!has('num')){
+                        const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
+                        await update(ref(db, cardPath), { tokens: next });
+                        box.classList.add('elevated');
+                      }
+                    }}
+                ]);
+              }
+            });
+          } else if (canNoteq){
+            entries.push({
+              label:'≠',
+              action: async ()=>{
+                const updated=[...(tokens), {type:'noteq', value:c.num, style:'noteq'}];
+                await update(ref(db, cardPath), { tokens: updated });
+                await incToken('noteq', +1);
+                box.classList.add('elevated');
+              }
+            });
           }
 
           if(canX1){
@@ -739,11 +795,12 @@ function renderTables(v){
 
           if(tokens.length>0){
             tokens.forEach((tk,ti)=>{
-              const label = tk.type==='equal' ? '＝を消す' : tk.type==='x1' ? 'x1を消す' : '数字を消す';
+              const label = tk.type==='equal' ? '＝を消す' : tk.type==='noteq' ? '≠を消す' : tk.type==='x1' ? 'x1を消す' : '数字を消す';
               entries.push({label, action: async ()=>{
                 const next = tokens.slice(); const removed = next.splice(ti,1)[0];
                 await update(ref(db, cardPath), { tokens: next });
                 if(removed?.type==='equal') await incToken('equal', -1);
+                if(removed?.type==='noteq') await incToken('noteq', -1);
                 if(removed?.type==='x1')    await incToken('x1', -1);
                 const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
                 box.classList.toggle('elevated', afterHas);
@@ -860,12 +917,11 @@ async function addTwoItemsFromDeck(){
   await set(ref(db, `rooms/${state.roomCode}/items`), next);
 }
 
-/* item16: 数字(1..12)の使用数を集計し、<2の数字から1つ選んで下部に表示（黒/白） */
+/* item16: 数字(1..12)の使用数を集計し、<2の数字から1つ選びメタに保存（表示はアイテム16右側で行う） */
 async function handleItem16(itemIdx){
   const v = state.watching; if(!v) return;
 
-  // 1..12 の各数字の使用数を集計（数字トークン type:'num' を対象）
-  const counts = Array.from({length:13}, ()=>0); // 1..12 を使用
+  const counts = Array.from({length:13}, ()=>0); // 1..12
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       (c.tokens||[]).forEach(tk=>{
@@ -877,7 +933,6 @@ async function handleItem16(itemIdx){
     });
   });
 
-  // 使用数が2未満の数字のみ候補に
   const candidates = [];
   for(let n=1; n<=12; n++){
     if((counts[n]||0) < 2) candidates.push(n);
@@ -888,7 +943,6 @@ async function handleItem16(itemIdx){
     return;
   }
 
-  // ランダムに1つ選んで下部に表示（黒背景・白文字は renderGlobalReveal で実現）
   const pick = candidates[Math.floor(Math.random()*candidates.length)];
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: { num: pick, at: Date.now() } });
 }
