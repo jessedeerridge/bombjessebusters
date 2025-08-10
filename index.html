@@ -501,6 +501,7 @@ const db  = getDatabase(app);
 const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null
+    m22GaveOnce:false  // ★ #22：自分が渡した一回ガード（即時連打対策）
 };
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
@@ -1670,30 +1671,51 @@ const shown = 2 - Math.min(2, used);
 
     // ▼ トークンをクリック → 「次の手番のプレイヤーに n を渡す」or「隠す」
     tok.onclick = (ev)=>{
-      ev.stopPropagation(); // セルの「隠す」クリックにバブリングさせない
-      if (iGave) {
+      ev.stopPropagation();
+
+      // ★ 二重ガード：即時の連打防止（クライアント）＋持続フラグ（DB）
+      if (state.m22GaveOnce || iGave) {
         openMenu(ev.clientX, ev.clientY, [
           { label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); } }
         ]);
         return;
       }
+
       const { index: nextIdx, name: nextName } = findNextPlayer(v);
       openMenu(ev.clientX, ev.clientY, [
         { label: `${nextName} に ${n} を渡す`, action: async ()=>{
-            const tRef = ref(db, `rooms/${state.roomCode}/tables/${nextIdx}`);
-            const snap = await get(tRef);
-           const cur  = snap.val() || {};
-            const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
-            arr.push(n);
-            await update(tRef, { m22Tokens: arr });
-            // 「渡した以降は、表を押すと“隠す”」を有効化
-           await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_afterGiven: true });
-            // 自分は渡し済みにする（人ごと）
-            const gRef = ref(db, `rooms/${state.roomCode}/meta/m22_given`);
-            await update(gRef, { [state.userId]: true });
-         } }
+            try{
+              // クライアント即時ガードを先に立てる（連打遮断）
+              state.m22GaveOnce = true;
+
+              // 最新の givenMap を確認（多端末/競合の簡易対策）
+              const gPath = `rooms/${state.roomCode}/meta/m22_given`;
+              const gSnap = await get(ref(db, gPath));
+              const gMap  = gSnap.val() || {};
+              if (gMap[state.userId]) return; // 既に渡し済みなら中止
+
+              // 受け取り先テーブルへ push
+              const tRef = ref(db, `rooms/${state.roomCode}/tables/${nextIdx}`);
+              const snap = await get(tRef);
+              const cur  = snap.val() || {};
+              const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
+              arr.push(n);
+              await update(tRef, { m22Tokens: arr });
+
+              // 全体の「渡した以降は隠すメニューのみ」フラグ
+              await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_afterGiven: true });
+
+              // 自分は渡し済みにする（DB保持）
+              await update(ref(db, gPath), { [state.userId]: true });
+            }catch(e){
+              // 失敗時はクライアントガードを戻す
+              state.m22GaveOnce = false;
+              console.error(e);
+            }
+          } }
       ]);
     };
+
     
     // 右側の xラベル
     const xl = document.createElement('span');
@@ -2017,6 +2039,8 @@ async function startGame(playerCount, missionId){
   clearMissionOverlays();
   // 念のため、画面下部バッジも消す
   if(globalReveal){ globalReveal.innerHTML=''; H(globalReveal,true); }
+ // ★ #22：渡し済みガードのリセット
+  state.m22GaveOnce = false;
 
   const code = state.roomCode;
 
