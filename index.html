@@ -73,10 +73,27 @@
   .numcard.overlay:nth-child(4){ left:6px; top:6px; opacity:0.8; }
 
   /* ★ ミッション12：アイテム中央下に固定配置するピン */
-  .num-pin {
-    position:absolute; left:50%; bottom:4px; transform:translateX(-50%);
-    width:32px; height:48px; display:block; pointer-events:none;
+  /* ★ ミッション12：アイテムの“外側の真下”に並べる帯 */
+  .num-under{
+    display:grid;
+    grid-auto-flow:column;
+    grid-auto-columns:var(--item-w); /* アイテム幅に合わせて1列=1アイテム */
+    gap:6px;               /* .items の gap と合わせる */
+    margin-top:4px;        /* アイテム列のすぐ下に表示 */
+    align-items:start;
+    justify-content:start;
+    width:max-content;     /* はみ出し対策：内容幅に合わせる */
   }
+  .num-under .slot{
+    width:var(--item-w);
+    display:grid;
+    place-items:center;    /* 中央配置 */
+  }
+  .num-under .numcard-holder{
+    position:relative;
+    width:32px; height:48px;
+  }
+  
   .tables{display:flex;flex-direction:column;gap:8px;margin-top:6px;overflow:visible;position:relative;}
   .table{
     position:relative;border:1px dashed #ddd;border-radius:10px;
@@ -489,13 +506,12 @@ const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
 
 /* === 前のゲームの表示物を全て掃除する === */
 function clearMissionOverlays(){
-  // ミッション用の横レーン（アイテム下に並べた数値カード帯など）
   document.querySelectorAll('.numlane').forEach(n => n.remove());
-  // ミッション12で各アイテムに付けた固定ピン（アイテムを作り直す前の孤児も含めて全削除）
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
-  // 数値カードの一意管理レジスタをリセット（重ね表示の記録を破棄）
+  document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
   NUMCARD_REG.clear();
 }
+
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
@@ -521,29 +537,40 @@ function pickUnusedNumbers(count){
   return pool.slice(0, count);
 }
 
-/* === ミッション12用：各アイテム中央下に一枚ずつ === */
+/* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ === */
 function distributeNumbersToItemsCentered(eachCount=1){
-  const items = document.querySelectorAll('#items .item');
-  // 同時重複を避け、未使用数字から配る
-  const need = items.length * eachCount;
+  const itemsBar = document.getElementById('itemsBar');
+  const items    = document.querySelectorAll('#items .item');
+  if(!itemsBar || items.length===0) return;
+
+  // 既存を掃除（ミッションやり直し時の二重生成防止）
+  const old = document.querySelector('.num-under');
+  if(old) old.remove();
+
+  // レーンを作成してアイテム列の直下に挿入
+  const under = document.createElement('div');
+  under.className = 'num-under';
+  itemsBar.insertAdjacentElement('afterend', under);
+
+  // 未使用数字から必要枚数ぶん抽選
+  const need  = items.length * eachCount;
   const picks = pickUnusedNumbers(need);
 
+  // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
   let p = 0;
-  items.forEach(it=>{
-    // ピン（固定位置）を用意
-    let pin = it.querySelector(':scope > .num-pin');
-    if(!pin){
-      pin = document.createElement('div');
-      pin.className = 'num-pin';
-      it.appendChild(pin);
-    }
-    // このアイテムに一枚配布
-    for(let k=0;k<eachCount;k++){
+  items.forEach(()=> {
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    under.appendChild(slot);
+
+    for(let k=0; k<eachCount; k++){
       const n = picks[p++]; if(n==null) break;
-      placeNumberCard(n, pin);
+      // placeNumberCard は holder を作って mountParent に追加する
+      placeNumberCard(n, slot);
     }
   });
 }
+
 
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
 function pickK(arr, k){
