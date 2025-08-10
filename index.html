@@ -1078,46 +1078,7 @@ const title=document.createElement('div');  title.className='title';
 title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
 header.appendChild(title); 
 
-/* ★ #22：名前の下に3つの小ボタン */
-if (v.mission?.flags?.m22_pick3) {
-  const me = (t.playerId === state.userId);
-  const picks = Array.isArray(t.headerPicks) ? t.headerPicks.slice(0,3) : [null,null,null];
-  const wrap = document.createElement('div'); wrap.className = 'pick3';
 
-  // 自分の手札にある整数(1..12)の集合
-  const myInts = new Set((t.hand||[]).filter(c=> Number.isInteger(c.num)).map(c=> c.num|0));
-
-  // 候補 = 1..12 から「自分の手札に無い数字」だけ
-  const candidates = []; for(let nn=1; nn<=12; nn++){ if(!myInts.has(nn)) candidates.push(nn); }
-
-  const openPickMenu = (ev, slotIndex)=>{
-    const entries = [];
-    candidates.forEach(nn=>{
-      // 同じプレイヤーの別スロットで選んだ数字は重複しないよう除外
-      if (picks.includes(nn)) return;
-      entries.push({ label:String(nn), action: async ()=>{
-        const next = picks.slice(); next[slotIndex] = nn;
-        await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { headerPicks: next });
-      }});
-    });
-    entries.push({ label:'消す', action: async ()=>{
-      const next = picks.slice(); next[slotIndex] = null;
-      await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { headerPicks: next });
-    }});
-    openMenu(ev.clientX, ev.clientY, entries);
-  };
-
-  for (let s=0; s<3; s++){
-    const b = document.createElement('div');
-    b.className = 'pickbtn' + (me ? '' : ' readonly');
-    b.textContent = (picks[s]==null ? '' : String(picks[s]));
-    if (me){
-      b.onclick = (ev)=>{ ev.stopPropagation(); openPickMenu(ev, s); };
-    }
-    wrap.appendChild(b);
-  }
-  header.appendChild(wrap);
-}
 
     
 // #13：初期情報トークン（数値）—— 表示はキャラ下、ここでは値と auto-hide だけ扱う
