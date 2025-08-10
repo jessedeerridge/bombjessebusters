@@ -279,12 +279,15 @@
 
 <main>
   <div class="col">
-    <div class="join-box" id="joinBox">
-      <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-      <button class="btn primary" id="btnJoin">参加で入室</button>
-      <button class="btn ghost" id="btnRandom">コード作成</button>
-      <span class="small">入室後、右下の歯車から席を決められます</span>
-    </div>
+<div class="join-box" id="joinBox">
+  <!-- ★追加：名前（4文字以内）※未入力でも入室可 -->
+  <input id="userName" placeholder="名前（4文字以内）" maxlength="4" />
+  <input id="roomCode" placeholder="ルームコード" maxlength="12" />
+  <button class="btn primary" id="btnJoin">参加で入室</button>
+  <button class="btn ghost" id="btnRandom">コード作成</button>
+  <span class="small">入室後、右下の歯車から席を決められます</span>
+</div>
+
 
     <div id="lobby" class="hidden">
       <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:4px">
@@ -409,14 +412,17 @@ const db  = getDatabase(app);
 
 /* State */
 const state = {
-  roomCode:null, userId:crypto.randomUUID(), userName:hiragana3(),
+  roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null
 };
+
 
 /* Elements */
 const roomInfo = document.getElementById('roomInfo');
 const joinBox= document.getElementById('joinBox');
+const inputName = document.getElementById('userName'); // ★追加
 const inputCode = document.getElementById('roomCode');
+
 const btnJoin = document.getElementById('btnJoin');
 const btnRandom=document.getElementById('btnRandom');
 
@@ -480,7 +486,10 @@ const globalReveal = document.getElementById('globalReveal');
 const hostTool = document.getElementById('hostTool');
 
 /* helpers */
-function hiragana3(){ const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"]; return Array.from({length:3},()=>h[Math.random()*h.length|0]).join(''); }
+function hiragana(len=4){
+  const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"];
+  return Array.from({length:len},()=>h[Math.random()*h.length|0]).join('');
+}
 const H=(el,b)=> el.classList.toggle('hidden', !!b);
 function pos(el,x,y){el.style.left=x+'px';el.style.top=y+'px';}
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
@@ -671,7 +680,13 @@ function openBottomMenu(entries){
 
 /* enter */
 btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); };
-btnJoin.onclick   = ()=> enter('player');
+btnJoin.onclick   = ()=>{
+  const nm = (inputName?.value || '').trim();
+  // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
+  state.userName = nm ? nm.slice(0,4) : hiragana(4);
+  enter('player');
+};
+
 
 async function enter(mode){
   const code=(inputCode.value||"").trim();
