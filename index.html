@@ -1613,7 +1613,7 @@ function renderM22PickPanel(v){
       if (pickedSet.has(nn)) return;        // 既に選択済み
       if (picked.length >= 2) return;       // 上限
       const next = picked.concat(nn);
-      await update(ref(db, rooms/${state.userCode}/tables/${myIdx}), { m22Tokens: next });
+await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Tokens: next });
     };
     m22PickPanel.appendChild(d);
   });
