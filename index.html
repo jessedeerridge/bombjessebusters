@@ -252,7 +252,7 @@
 <!-- ★ アイテム16の表示先（画面下部） -->
 <div id="globalReveal" class="global-reveal hidden"></div>
 <!-- ★ ホスト左下 工具アイコン -->
-<button id="hostTool" class="host-tool hidden" title="ホスト用ツール">🛠</button>
+<button id="hostTool" class="host-tool hidden" title="工具">🛠</button>
 
 <div id="restartPop" class="restart-pop hidden">
   <div style="font-size:14px">やり直しますか？</div>
@@ -550,12 +550,12 @@ function renderGlobalReveal(v){
 
 /* ===== Host tool (odd-open normal codes) ===== */
 function renderHostTool(v){
-  if(!state.isHost || !v?.tables){ H(hostTool,true); return; }
+  if(!v?.tables){ H(hostTool,true); return; }
   const openCountByNum = {};
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       if(c?.kind==='normal' && c.open===true){
-        const n = c.num|0; // 通常コードは整数想定
+        const n = c.num|0;
         openCountByNum[n] = (openCountByNum[n]||0) + 1;
       }
     });
