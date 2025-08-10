@@ -1484,22 +1484,20 @@ if(!suppressNumberPop && canNum){
     tablesEl.appendChild(box);
   });
 
-  /* ★ #22：黄カードが「公開」された種類が2つ以上になった瞬間に表を出す */
+  /* ★ #22：黄カードが「公開」された枚数が2枚以上になった瞬間に表を出す（種類ではなく枚数） */
   if (v.mission?.flags?.m22_showTableAfter2Yellows) {
-    const openYellowKinds = new Set();
+    let openYellowCount = 0;
     (v.tables||[]).forEach(T=>{
       (T.hand||[]).forEach(c=>{
         if(c?.kind==='yellow' && c.open===true){
-          // 同じ黄でも番号(例: 3.1, 7.1)が違えば“種類”は別
-          openYellowKinds.add(String(c.num));
+          openYellowCount += 1;
         }
       });
     });
 
     const alreadyShown = !!v.meta?.m22_infoShown;
-    if (openYellowKinds.size >= 2 && !alreadyShown) {
-      // DBフラグを立てて重複表示を防止
-      update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown: true });
+    if (openYellowCount >= 2 && !alreadyShown) {
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown: true });
       showInfo22Panel(v); // 直ちに描画
     }
   }
@@ -1660,14 +1658,30 @@ const shown = 2 - Math.min(2, used);
         return;
       }
 
-      const { index: nextIdx, name: nextName } = findNextPlayer(v);
+      // ▼▼ ここで“次の手番”候補を自前で決める（席についている自分の次の着席者）
+      const tables = (v.tables||[]);
+      const myIdx  = tables.findIndex(T => T.playerId === state.userId);
+      let nextIdx  = -1;
+      if (myIdx >= 0 && tables.length > 0){
+        for (let off=1; off<=tables.length; off++){
+          const i = (myIdx + off) % tables.length;
+          if (tables[i]?.playerId){
+            nextIdx = i;
+            break;
+          }
+        }
+      }
+      if (nextIdx < 0){
+        // フォールバック：最初の着席者
+        nextIdx = (tables.findIndex(T => T.playerId) + tables.length) % Math.max(1, tables.length);
+      }
+      const nextName = tables[nextIdx]?.playerName || `#${(nextIdx|0)+1}`;
+
       openMenu(ev.clientX, ev.clientY, [
         { label: `${nextName} に ${n} を渡す`, action: async ()=>{
             try{
-              // クライアント即時ガードを先に立てる（連打遮断）
               state.m22GaveOnce = true;
 
-              // 最新の givenMap を確認（多端末/競合の簡易対策）
               const gPath = `rooms/${state.roomCode}/meta/m22_given`;
               const gSnap = await get(ref(db, gPath));
               const gMap  = gSnap.val() || {};
@@ -1681,19 +1695,19 @@ const shown = 2 - Math.min(2, used);
               arr.push(n);
               await update(tRef, { m22Tokens: arr });
 
-              // 全体の「渡した以降は隠すメニューのみ」フラグ
+              // 「渡した以降は隠すメニューのみ」フラグ
               await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_afterGiven: true });
 
               // 自分は渡し済みにする（DB保持）
               await update(ref(db, gPath), { [state.userId]: true });
             }catch(e){
-              // 失敗時はクライアントガードを戻す
               state.m22GaveOnce = false;
               console.error(e);
             }
           } }
       ]);
     };
+
 
     
     // 右側の xラベル
