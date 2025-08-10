@@ -184,6 +184,22 @@
 }
 .pickbtn.readonly{ opacity:.6; cursor:default; }
 
+/* ▼▼ ここから 追加 ▼▼ */
+.m22-panel{
+  display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+  margin-top:6px;
+}
+.m22-panel .cap{ font-size:12px; opacity:.75; margin-right:6px; }
+.m22-panel .token{ cursor:pointer; }
+.m22-panel .token.disabled{ opacity:.35; cursor:default; }
+
+.m22-under{
+  display:flex; gap:2px; margin-top:2px;
+}
+.m22-under .token{ width:20px; height:20px; }
+/* ▲▲ ここまで 追加 ▲▲ */
+
+
 /* ★ #22：情報トークン使用数の2×6パネル */
 .info22{
   position:fixed; left:50%; bottom:12px; transform:translateX(-50%);
@@ -372,6 +388,10 @@
       <div id="missionFooter" class="mission-footer hidden">
         <div id="missionDetailTitle" class="bold line"></div>
         <div id="missionDetailBody"></div>
+                <div id="m22PickPanel" class="m22-panel hidden">
+          <span class="cap">未所持の数字から最大2つ選択：</span>
+          <!-- トークンはJSで差し込み -->
+        </div>
       </div>
 
       <button class="fab hidden" id="gear" title="設定">⚙</button>
@@ -543,6 +563,7 @@ const missionBox  =document.getElementById('missionBox');
 const missionFooter = document.getElementById('missionFooter');
 const missionDetailTitle = document.getElementById('missionDetailTitle');
 const missionDetailBody  = document.getElementById('missionDetailBody');
+const m22PickPanel = document.getElementById('m22PickPanel');
 
 const seatPop = document.getElementById('seatPop');
 const seatTabs= document.getElementById('seatTabs');
@@ -1159,7 +1180,23 @@ if (m13HeaderNum != null) {
   tok.textContent = String(m13HeaderNum);
   charCol.appendChild(tok);
 }
-
+if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
+  const row = document.createElement('div');
+  row.className = 'm22-under';
+  t.m22Tokens.slice(0,2).forEach(nn=>{
+    const d = document.createElement('div');
+    d.className = 'token black';
+    d.textContent = String(nn);
+    d.title = 'クリックで消す';
+    d.onclick = async (ev)=>{
+      ev.stopPropagation();
+      const next = (t.m22Tokens || []).filter(x => x !== nn);
+      await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { m22Tokens: next });
+    };
+    row.appendChild(d);
+  });
+  charCol.appendChild(row);
+}
 content.appendChild(charCol);
 
 
@@ -1502,7 +1539,12 @@ if(!suppressNumberPop && canNum){
       showInfo22Panel(v); // 直ちに描画
     }
   }
+  renderM22PickPanel(v);
 
+  /* ▼▼ 追加：#22 表を既に表示済みなら、毎回再レンダリングして最新化 ▼▼ */
+  if (v.meta?.m22_infoShown) {
+    showInfo22Panel(v);
+  }
   // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行...）
 // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行）
 if (!m13HeaderUpdateScheduled && m13HeaderClearIndices && m13HeaderClearIndices.size > 0) {
@@ -1539,6 +1581,44 @@ async function incToken(kind, delta){
   }
 }
 
+}
+function renderM22PickPanel(v){
+  if (!v?.mission?.id || v.mission.id !== 22) {
+    if (m22PickPanel) m22PickPanel.classList.add('hidden');
+    return;
+  }
+  // 自分が席に座っていなければ隠す
+  const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+  if (myIdx < 0) { if (m22PickPanel) m22PickPanel.classList.add('hidden'); return; }
+
+  const myTable = v.tables[myIdx] || {};
+  const myHandInts = new Set((myTable.hand||[])
+    .filter(c => Number.isInteger(c.num))
+    .map(c => c.num|0));
+
+  // 候補 = 1..12 から手札に無い数字
+  const candidates = [];
+  for (let n=1; n<=12; n++) if (!myHandInts.has(n)) candidates.push(n);
+
+  const picked = Array.isArray(myTable.m22Tokens) ? myTable.m22Tokens.slice(0,2) : [];
+  const pickedSet = new Set(picked);
+
+  // 描画
+  m22PickPanel.innerHTML = '<span class="cap">未所持の数字から最大2つ選択：</span>';
+  candidates.forEach(nn=>{
+    const d = document.createElement('div');
+    d.className = 'token black' + (pickedSet.has(nn) ? ' disabled' : '');
+    d.textContent = String(nn);
+    d.onclick = async ()=>{
+      if (pickedSet.has(nn)) return;        // 既に選択済み
+      if (picked.length >= 2) return;       // 上限
+      const next = picked.concat(nn);
+      await update(ref(db, rooms/${state.userCode}/tables/${myIdx}), { m22Tokens: next });
+    };
+    m22PickPanel.appendChild(d);
+  });
+
+  m22PickPanel.classList.remove('hidden');
 }
 
 /* === #22 用：情報トークン使用数を2×6で表示 === */
@@ -1759,7 +1839,7 @@ function updateMenuButtons(){
   if (need && !old){
     const b = document.createElement('button');
     b.className = 'btn'; b.id = id; b.textContent = '情報トークン（#22）';
-    b.onclick = ()=> showInfo22Panel();
+    b.onclick = ()=> showInfo22Panel(state.watching);
     // メニューの先頭に追加（Seat系の上あたり）
     menuPop.insertBefore(b, menuPop.firstChild || null);
   }
