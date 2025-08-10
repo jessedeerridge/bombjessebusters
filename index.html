@@ -83,7 +83,9 @@
 
   .hand{
     display:flex;align-items:flex-start;gap:var(--card-gap);
-    overflow-y:auto;overflow-x:visible;flex:0 0 auto;position:relative;
+    /* ▼ をカード上側に出すため、縦方向は可視にする */
+    overflow-y:visible; overflow-x:visible;
+    flex:0 0 auto;position:relative;
     max-height:calc(var(--content-h) - 2px + var(--content-extra));
     padding-bottom:2px;
   }
@@ -107,7 +109,11 @@
   .token.black{background:#000;color:#fff}
   .token.x1{background:#fce7f3;color:#000}
 
-  .marker,.blink{position:absolute;left:0;right:0;top:-12px;text-align:center;font-size:14px;line-height:1;}
+  .marker,.blink{
+    position:absolute;left:0;right:0;top:-12px;
+    text-align:center;font-size:14px;line-height:1;
+    z-index:12000; pointer-events:none;
+  }
   .blink{ animation: blink 0.6s linear infinite; }
   @keyframes blink{ 0%,100%{opacity:0} 50%{opacity:1} }
 
@@ -419,7 +425,7 @@ function renderItemsAndDi(v){
   itemsEl.innerHTML='';
   (v.items||[]).forEach((it, idx)=>{
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
-    if(!it.used) div.style.backgroundImage = `url("./item${it.no}.png")`;
+    if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
 
     // item16 抽出数字の表示
     if(it.extraNum!=null){
@@ -577,7 +583,7 @@ function renderTables(v){
         col.appendChild(el);
       });
 
-      // 情報トークンメニュー（基本は「数字」「＝」のみ。item14中は「x1」も）
+      // 情報トークンメニュー（基本は数値ラベル/＝、item14中は x1 も）
       if(!isI2Actor && isMine){
         a.onclick=(ev)=>{
           ev.stopPropagation();
@@ -592,7 +598,7 @@ function renderTables(v){
           const entries = [];
 
           if(canNum){
-            entries.push({label:'数字', action: async ()=>{
+            entries.push({label:String(c.num), action: async ()=>{
               const updated=[...(tokens), {type:'num', value:c.num, style:'black'}];
               await update(ref(db, cardPath), { tokens: updated });
               box.classList.add('elevated');
@@ -615,7 +621,7 @@ function renderTables(v){
               box.classList.add('elevated');
             }});
           }
-          // 既に x1 があるカード → 「x1」を押した時の分岐（消す or 数字）
+          // 既に x1 があるカード → サブメニュー（消す / 数字）
           if(has('x1')){
             entries.push({label:'x1', action: async ()=>{
               openMenu(ev.clientX, ev.clientY, [
@@ -626,7 +632,7 @@ function renderTables(v){
                   const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
                   box.classList.toggle('elevated', afterHas);
                 }},
-                {label:'数字', action: async ()=>{
+                {label:String(c.num), action: async ()=>{
                   if(!has('num')){
                     const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
                     await update(ref(db, cardPath), { tokens: next });
@@ -637,7 +643,7 @@ function renderTables(v){
             }});
           }
 
-          // 既存トークン個別削除も入れておく
+          // 既存トークン個別削除
           if(tokens.length>0){
             tokens.forEach((tk,ti)=>{
               const label = tk.type==='equal' ? '＝を消す' : tk.type==='x1' ? 'x1を消す' : '数字を消す';
