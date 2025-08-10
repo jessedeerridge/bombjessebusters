@@ -52,6 +52,8 @@
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
+  /* ★ アイテム16サイドトークンによる右隣の微移動 */
+  .item.shifted{ margin-left:10px; }
 
   .di{ margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;border:1px solid #ddd;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto }
@@ -103,11 +105,12 @@
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
   .token{font-size:11px;border-radius:4px;padding:1px 4px;line-height:1}
-  /* ▼ 配色入れ替え（＝ と ≠） */
-  .token.equal{background:#e5e7eb;color:#000}
+  /* ▼▼ 変更1：＝ と ≠ の色を入れ替え ▼▼ */
+  .token.equal{background:#e5e7eb;color:#000}   /* 以前の≠色（グレー）を＝へ */
   .token.black{background:#000;color:#fff}
   .token.x1{background:#fce7f3;color:#000}
-  .token.noteq{background:#ffedd5;color:#000}
+  .token.noteq{background:#ffedd5;color:#000}   /* 以前の＝色（薄オレンジ）を≠へ */
+  /* ▲▲ 変更1ここまで ▲▲ */
 
   .marker,.blink{
     position:absolute;left:0;right:0;top:-12px;
@@ -126,16 +129,13 @@
 
   /* ★ 画面下部のグローバル黒枠バッジ（アイテム16表示） */
   .global-reveal{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:2147483647;}
-  .global-reveal .token{cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.12);} 
+  .global-reveal .token{cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.12);}
 
   /* 追加：アイテム16のサイド表示 */
   .i16-side{
     position:absolute; left:calc(100% + 6px); top:50%; transform:translateY(-50%);
     z-index:2147483000;
   }
-
-  /* ★ 追加：右側アイテムを数px右へ（トークン表示中のみ付与） */
-  .item.shifted{ transform: translateX(6px); transition: transform .15s ease; }
 
   .panel{display:flex;flex-direction:column;gap:10px}
   .list{border:1px solid #eee;border-radius:10px;padding:8px}
@@ -402,13 +402,13 @@ async function enter(mode){
   if(!code){ alert('コードを入力してください'); return; }
   state.roomCode = code; state.mode=mode;
 
-  const roomRef = ref(db, rooms/${code});
+  const roomRef = ref(db, `rooms/${code}`);
   const snap=await get(roomRef);
   if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
   else{ state.isHost = snap.val()?.hostId === state.userId; }
 
-  await set(ref(db, rooms/${code}/players/${state.userId}), {name:state.userName, at:Date.now()});
-  onDisconnect(ref(db, rooms/${code}/players/${state.userId})).remove();
+  await set(ref(db, `rooms/${code}/players/${state.userId}`), {name:state.userName, at:Date.now()});
+  onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
   listenRoom(code);
 
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
@@ -424,9 +424,9 @@ function baseRoom(hostId){
 
 /* watch */
 function listenRoom(code){
-  onValue(ref(db, rooms/${code}),(snap)=>{
+  onValue(ref(db, `rooms/${code}`),(snap)=>{
     const v=snap.val(); state.watching=v;
-    if(v){ const p=Object.keys(v.players||{}).length, s=Object.keys(v.spectators||{}).length; if(p===0 && s===0){ remove(ref(db, rooms/${code})); return; } }
+    if(v){ const p=Object.keys(v.players||{}).length, s=Object.keys(v.spectators||{}).length; if(p===0 && s===0){ remove(ref(db, `rooms/${code}`)); return; } }
     H(listsBox, !!v?.started);
     renderLists(v); renderItemsAndDi(v); renderTables(v); renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
@@ -462,13 +462,14 @@ function renderItemsAndDi(v){
   H(itemsBar,false);
 
   itemsEl.innerHTML='';
-  const _itemNodes = [];              // 追加：描画ノード保持
-  let _i16IndexWithBadge = -1;        // 追加：アイテム16サイドトークンの位置
+  const itemNodes = []; // ★ ノード参照を保持
+
   (v.items||[]).forEach((it, idx)=>{
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
 
     // ★ 追加：アイテム16の情報トークンをカード右側に表示
+    // meta.i16Badge.num があれば右側に黒トークンを描画
     if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
       const side = document.createElement('div');
       side.className = 'i16-side';
@@ -483,7 +484,6 @@ function renderItemsAndDi(v){
       };
       side.appendChild(tok);
       div.appendChild(side);
-      _i16IndexWithBadge = idx; // 追加：起点を記録
     }
 
     div.onclick=(ev)=>{
@@ -510,16 +510,21 @@ function renderItemsAndDi(v){
         });
       }
     };
+
     itemsEl.appendChild(div);
-    _itemNodes.push(div); // 追加：ノード保存
+    itemNodes.push(div);
   });
 
-  // 追加：サイドトークンが出ている16より右側のアイテムを少し右へ
-  if (_i16IndexWithBadge >= 0){
-    for(let i=_i16IndexWithBadge+1; i<_itemNodes.length; i++){
-      _itemNodes[i].classList.add('shifted');
+  /* ▼▼ 変更2：アイテム16サイドトークン表示時、右隣のカードを数px右にずらす ▼▼ */
+  const hasI16 = (v.items||[]).findIndex(it=> it.no===16);
+  const badge = v?.meta?.i16Badge;
+  if(hasI16>=0 && badge && badge.num!=null){
+    const rightIdx = hasI16 + 1;
+    if(itemNodes[rightIdx]){
+      itemNodes[rightIdx].classList.add('shifted');
     }
   }
+  /* ▲▲ 変更2ここまで ▲▲ */
 
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
@@ -533,7 +538,7 @@ function renderItemsAndDi(v){
 
 /* ===== Global badge (item16) ===== */
 function renderGlobalReveal(v){
-  // サイド表示に切り替えたため常に非表示
+  // 変更：サイド表示に切り替えたため常に非表示
   globalReveal.innerHTML='';
   H(globalReveal,true);
 }
@@ -562,7 +567,9 @@ function renderTables(v){
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
 
-  // ★ 上限の対応
+  // ★ 変更：上限の対応
+  //   ＝ の上限はアイテム12の使用回数
+  //   ≠ の上限はアイテム1の使用回数
   const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
   const caps = { 
     equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0),
@@ -993,7 +1000,7 @@ btnSit.onclick = ()=>{
   });
   H(seatPop,false);
 };
-btnSeatCancel.onclick()=> H(seatPop,true);
+btnSeatCancel.onclick=()=> H(seatPop,true);
 
 btnLeave.onclick = async ()=>{ await leaveSeatNow(); };
 
@@ -1078,6 +1085,7 @@ function missionInfo(id, x=null){
       return {id:2, name:'黄コード', desc:'黄コードが1つ', display:[`#2 黄コード`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
     }
     case 3:{
+      // 例：赤系の候補から3つ提示（必要ならここも調整可）
       const list=[1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5]; shuffle(list);
       const pick=list.slice(0,3);
       return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
