@@ -23,10 +23,11 @@
     --di-w:70px;
     --di-h:70px;
 
-    /* テーブルを少し高く（同時視認性UP） */
-    --table-h:96px; /* ← 80px からアップ */
+    /* テーブルの枠は維持、実内容を少し縦に広げる */
+    --table-h:96px;             /* 枠の高さは据え置き */
     --header-h:8px;
     --content-h: calc(var(--table-h) - var(--header-h) - 6px);
+    --content-extra: 16px;      /* ← 実内容の“余剰高さ” */
 
     /* 数字フォント */
     --font-card:16px;
@@ -97,7 +98,7 @@
   .t-content{
     position:absolute;left:8px;right:8px;
     top:calc(var(--header-h) + 2px);
-    bottom:4px;
+    bottom:calc(4px - var(--content-extra)); /* 実領域を少し拡張 */
     display:flex;gap:8px;align-items:flex-start;min-height:var(--content-h);
     overflow:visible;
   }
@@ -115,7 +116,7 @@
   .hand{
     display:flex;align-items:flex-start;gap:var(--card-gap);
     overflow-y:auto;overflow-x:visible;flex:0 0 auto;position:relative;
-    max-height:calc(var(--content-h) - 2px);
+    max-height:calc(var(--content-h) - 2px + var(--content-extra));
     padding-bottom:2px;
   }
 
@@ -412,6 +413,44 @@ function cssNum(name){
 }
 const now=()=>Date.now();
 
+/* ===== ポップが画面外に出ないように調整 ===== */
+function placeInsideViewport(div, x, y){
+  // 仮配置
+  pos(div, x, y);
+  popLayer.appendChild(div);
+  const pad = 8;
+  const r = div.getBoundingClientRect();
+  let nx = x, ny = y;
+
+  if (r.right > innerWidth - pad) nx = Math.max(pad, innerWidth - r.width - pad);
+  if (r.left  < pad)              nx = pad;
+  if (r.bottom> innerHeight - pad)ny = Math.max(pad, innerHeight - r.height - pad);
+  if (r.top   < pad)              ny = pad;
+
+  pos(div, nx, ny);
+}
+function openOneMini(x,y, label, cb){
+  const div=document.createElement('div'); div.className='mini-pop';
+  div.addEventListener('click', e=>e.stopPropagation());
+  const b=document.createElement('button'); b.className='btn small'; b.textContent=label;
+  b.onclick=()=>{ if(div.isConnected) div.remove(); cb&&cb(); };
+  div.appendChild(b);
+  placeInsideViewport(div, x, y);
+}
+function openMenu(x,y, entries){
+  const div=document.createElement('div'); div.className='mini-pop';
+  div.addEventListener('click', e=>e.stopPropagation());
+  entries.forEach(ent=>{
+    const b=document.createElement('button'); b.className='btn small'; b.textContent=ent.label;
+    b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); };
+    div.appendChild(b);
+  });
+  placeInsideViewport(div, x, y);
+}
+function openMini(x,y, leftText,leftCb, rightText,rightCb){
+  openMenu(x,y,[{label:leftText,action:leftCb},{label:rightText,action:rightCb}]);
+}
+
 /* 入室 */
 btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); };
 btnJoin.onclick   = ()=> enter('player');
@@ -462,7 +501,7 @@ function baseRoom(hostId){
     meta:{
       itemUses:{i1:0,i2:0,i12:0,i14:0},
       tokenCounts:{equal:0,noteq:0,x1:0},
-      i2Flow:null /* {usingBy,phase,selA,selB,blinkUntil} */
+      i2Flow:null /* {usingBy,phase,selA,selB} */
     }
   };
 }
@@ -484,9 +523,6 @@ function listenRoom(code){
     renderItemsAndDi(v);
     renderTables(v);
     renderMissionPanels(v);
-
-    // アイテム2：blink→swap→after marks
-    maybeRunItem2Swap(v);
 
     state.gameStarted=!!v?.started;
     H(btnStart, !(state.isHost && !state.gameStarted));
@@ -538,9 +574,9 @@ function renderItemsAndDi(v){
 
     // 画像名マッピング
     let img = `item (${it.no}).jpg`;
-    if(it.no===1) img='item1.jpg';
+    if(it.no===1) img='item1.jpg';     // 1 = 「≠」解放
     if(it.no===2) img='item2.jpg';
-    if(it.no===12) img='item12.jpg';
+    if(it.no===12) img='item12.jpg';   // 12 = 「＝」解放
     if(!it.used) div.style.backgroundImage = `url("./${img}")`;
 
     div.onclick=(ev)=>{
@@ -559,10 +595,10 @@ function renderItemsAndDi(v){
           if(it.no===12)  await update(ref(db, path), {i12:(uses.i12||0)+1});
           if(it.no===14)  await update(ref(db, path), {i14:(uses.i14||0)+1});
 
-          // アイテム2：使用開始（選択フロー）
+          // アイテム2：使用開始（選択フロー Step1）
           if(it.no===2){
             await update(ref(db, `rooms/${state.roomCode}/meta`), {
-              i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null, blinkUntil:null}
+              i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null}
             });
           }
         });
@@ -577,11 +613,11 @@ function renderItemsAndDi(v){
   diEl.onclick=(ev)=>{
     openMenu(ev.clientX, ev.clientY, [
       {label:'進める', action: async ()=>{
-        const now=state.watching?.di?.value ?? val; const next=clamp(now-1,0,6);
+        const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6);
         await update(ref(db, `rooms/${state.roomCode}/di`), {value:next});
       }},
       {label:'戻す', action: async ()=>{
-        const now=state.watching?.di?.value ?? val; const next=clamp(now+1,0,6);
+        const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6);
         await update(ref(db, `rooms/${state.roomCode}/di`), {value:next});
       }},
     ]);
@@ -599,8 +635,8 @@ function renderTables(v){
   // ★上限取得（＝ は i12、≠ は i1、x1 は i14）
   const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
   const caps = {
-    equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0), // ← 12が「＝」
-    noteq: uses.i1>=2 ? 4 : (uses.i1>=1 ? 2 : 0),   // ← 1が「≠」
+    equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0), // 12 が「＝」
+    noteq: uses.i1>=2  ? 4 : (uses.i1>=1  ? 2 : 0), // 1  が「≠」
     x1:    uses.i14>=2 ? 2 : (uses.i14>=1 ? 1 : 0)
   };
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
@@ -651,8 +687,14 @@ function renderTables(v){
       if(!isMine && !c.open) card.classList.add('back');
       if(c.open) card.classList.add('open');
 
+      // アイテム2選択中は自分カードの公開切替をブロック
       if(isMine){
-        card.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open}); };
+        card.onclick=async ()=>{ 
+          const i2 = state.watching?.meta?.i2Flow;
+          const isI2Actor = i2 && i2.usingBy===state.userId && (i2.phase==='pickSelf' || i2.phase==='pickOther');
+          if (isI2Actor) return; // 公開しない
+          await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open}); 
+        };
       }
 
       const num=document.createElement('div'); num.className='num';
@@ -668,12 +710,13 @@ function renderTables(v){
       if(card.classList.contains('back')) bot.style.display='none';
       card.appendChild(bot);
 
-      // ▼（点滅/一時表示：アイテム2）
-      const i2 = v.meta?.i2Flow;
-      if(i2?.phase==='blink' && i2.blinkUntil && now()<i2.blinkUntil){
-        const match = (i2.selA && i2.selA.cardId===c.id && i2.selA.table===idx)
-                   || (i2.selB && i2.selB.cardId===c.id && i2.selB.table===idx);
-        if(match){ const m=document.createElement('div'); m.className='blink'; m.textContent='▼'; wrap.appendChild(m); }
+      /* ▼（選択中／8秒マーク） */
+      const i2flow = v.meta?.i2Flow;
+      if (i2flow?.selA && i2flow.selA.cardId===c.id && i2flow.selA.table===idx){
+        const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m);
+      }
+      if (i2flow?.selB && i2flow.selB.cardId===c.id && i2flow.selB.table===idx){
+        const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m);
       }
       if(c.markUntil && now()<c.markUntil){
         const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m);
@@ -683,26 +726,36 @@ function renderTables(v){
       const badge=document.createElement('div'); badge.className='badge-fixed';
       const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
 
-      // アイテム2フローの選択操作
-      const i2flow=v.meta?.i2Flow;
-      const isI2Actor = i2flow && i2flow.usingBy===state.userId;
-      if(isI2Actor && (i2flow.phase==='pickSelf' || i2flow.phase==='pickOther')){
-        a.style.outline='2px dashed #38bdf8';
-        a.style.outlineOffset='1px';
-        a.title = (i2flow.phase==='pickSelf'?'自分のカードを一枚選んでください':'他プレイヤーのカードを一枚選んでください');
+      // アイテム2フローの選択操作（Step1〜5）
+      const i2flowAll=v.meta?.i2Flow;
+      const isI2Actor = i2flowAll && i2flowAll.usingBy===state.userId;
+
+      if(isI2Actor && (i2flowAll.phase==='pickSelf' || i2flowAll.phase==='pickOther')){
+        const pickSelfPhase = i2flowAll.phase==='pickSelf';
+        const isSelfTable = t.playerId===state.userId;
+        const shouldOutline = (pickSelfPhase && isSelfTable) || (!pickSelfPhase && !isSelfTable);
+
+        if (shouldOutline){
+          a.style.outline='2px dashed #38bdf8';
+          a.style.outlineOffset='1px';
+          a.title = pickSelfPhase ? '自分のカードを一枚選んでください' : '相手のカードを一枚選んでください';
+        }
+
         a.onclick = async (ev)=>{
           ev.stopPropagation();
-          if(i2flow.phase==='pickSelf' && t.playerId===state.userId){
+          if(pickSelfPhase && isSelfTable){
+            // Step2: 自分選択 → selA 設定（▼は全員に見える）
             await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther' });
-          }else if(i2flow.phase==='pickOther' && t.playerId!==state.userId){
+          }else if(!pickSelfPhase && !isSelfTable){
+            // Step5: 交換 or やり直す（即スワップ）
             openMenu(ev.clientX, ev.clientY, [
-              {label:'OK（交換する）', action: async ()=>{
-                await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
-                  selB:{table:idx, cardId:c.id}, phase:'blink', blinkUntil: now()+3000
-                });
+              {label:'交換する', action: async ()=>{
+                const i2 = state.watching?.meta?.i2Flow;
+                if(!i2?.selA) return;
+                await doItem2Swap(i2.selA, {table:idx, cardId:c.id});
               }},
               {label:'やり直す', action: async ()=>{
-                await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:null, selB:null, phase:'pickSelf', blinkUntil:null });
+                await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:null, selB:null, phase:'pickSelf' });
               }},
             ]);
           }
@@ -715,10 +768,9 @@ function renderTables(v){
             const tablePath = `rooms/${state.roomCode}/tables/${idx}`;
             const cardPath  = `${tablePath}/hand/${ci}`;
 
-            // ★可否判定：counts < caps（＝はi12由来、≠はi1由来）
-            const canEqual = (counts.equal < caps.equal);
-            const canNoteq = (counts.noteq < caps.noteq);
-            const canX1    = (counts.x1 < caps.x1);
+            const canEqual = (counts.equal < caps.equal);   // ＝（アイテム12の使用数で解放）
+            const canNoteq = (counts.noteq < caps.noteq);   // ≠（アイテム1 の使用数で解放）
+            const canX1    = (counts.x1    < caps.x1);
 
             if(c.token){
               const entries = [];
@@ -748,7 +800,7 @@ function renderTables(v){
                 await update(ref(db, cardPath), { token:{type:'num', value:c.num, style:'black'} });
                 box.classList.add('elevated');
               }});
-              // ＝（アイテム12の使用数で解放）
+              // ＝
               if(canEqual){
                 entries.push({label:'＝', action: async ()=>{
                   await update(ref(db, cardPath), { token:{type:'equal', value:c.num, style:'equal'} });
@@ -756,7 +808,7 @@ function renderTables(v){
                   box.classList.add('elevated');
                 }});
               }
-              // ≠（アイテム1の使用数で解放）
+              // ≠
               if(canNoteq){
                 entries.push({label:'≠', action: async ()=>{
                   await update(ref(db, cardPath), { token:{type:'noteq', value:c.num, style:'noteq'} });
@@ -764,7 +816,7 @@ function renderTables(v){
                   box.classList.add('elevated');
                 }});
               }
-              // x1（据え置き）
+              // x1
               if(canX1){
                 entries.push({label:'x1', action: async ()=>{
                   await update(ref(db, cardPath), { token:{type:'x1', value:c.num, style:'x1'} });
@@ -809,55 +861,51 @@ function renderTables(v){
   }
 }
 
-/* ========= アイテム2：blinkが終わったら交換実行（使用者のみ） ========= */
-async function maybeRunItem2Swap(v){
-  const flow = v?.meta?.i2Flow;
-  if(!flow || flow.phase!=='blink' || !flow.blinkUntil) return;
-  if(flow.usingBy!==state.userId) return;
-  if(now()<flow.blinkUntil) return;
-
-  const A = flow.selA; const B = flow.selB;
+/* ========= アイテム2：即時スワップ（昇順・同値左、8秒▼表示） ========= */
+async function doItem2Swap(A, B){
   if(!A || !B) return;
-
-  const tables = (state.watching?.tables)||[];
+  // 最新テーブル取得（競合を避ける）
+  const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
+  const tables = snap.val() || [];
 
   const pickCard = (tableIdx, cardId)=>{
     const hand = (tables[tableIdx]?.hand)||[];
     const i = hand.findIndex(c=> c.id===cardId);
     return {hand, index:i, card: i>=0 ? hand[i] : null};
-  };
+    };
 
   const a = pickCard(A.table, A.cardId);
   const b = pickCard(B.table, B.cardId);
-  if(!a.card || !b.card) {
+  if(!a.card || !b.card){
     await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null });
     return;
   }
 
+  // 取り出し
   a.hand.splice(a.index,1);
   b.hand.splice(b.index,1);
 
+  // 挿入（昇順、同値は最も左）
   const insertSortedLeft = (hand, card)=>{
-    const n = card.num;
-    let pos = 0;
+    const n = card.num; let pos = 0;
     while(pos<hand.length && hand[pos].num < n) pos++;
     while(pos>0 && hand[pos-1].num===n) pos--;
     hand.splice(pos,0,card);
-    return pos;
   };
 
-  const cardToB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: now()+8000};
-  const cardToA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: now()+8000};
+  // 所有者変更＆8秒マーカー
+  const mark = now()+8000;
+  const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark};
+  const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark};
 
-  insertSortedLeft(b.hand, cardToB);
-  insertSortedLeft(a.hand, cardToA);
+  insertSortedLeft(b.hand, toB);
+  insertSortedLeft(a.hand, toA);
 
-  const realpha = (hand)=>{
-    const alpha="abcdefghijklmnopqrstuvwxyz";
-    hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
-  };
+  // α再割り当て（O(n)）
+  const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(a.hand); realpha(b.hand);
 
+  // DB反映（2テーブルのみ）
   await Promise.all([
     set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand),
     set(ref(db, `rooms/${state.roomCode}/tables/${B.table}/hand`), b.hand),
@@ -865,30 +913,7 @@ async function maybeRunItem2Swap(v){
   ]);
 }
 
-/* ========= ポップ ========= */
-function openOneMini(x,y, label, cb){
-  const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
-  div.addEventListener('click', e=>e.stopPropagation());
-  const b=document.createElement('button'); b.className='btn small'; b.textContent=label;
-  b.onclick=()=>{ if(div.isConnected) div.remove(); cb&&cb(); };
-  div.appendChild(b);
-  popLayer.appendChild(div);
-}
-function openMenu(x,y, entries){
-  const div=document.createElement('div'); div.className='mini-pop'; pos(div,x,y);
-  div.addEventListener('click', e=>e.stopPropagation());
-  entries.forEach(ent=>{
-    const b=document.createElement('button'); b.className='btn small'; b.textContent=ent.label;
-    b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); };
-    div.appendChild(b);
-  });
-  popLayer.appendChild(div);
-}
-function openMini(x,y, leftText,leftCb, rightText,rightCb){
-  openMenu(x,y,[{label:leftText,action:leftCb},{label:rightText,action:rightCb}]);
-}
-
-/* 歯車 */
+/* ========= 歯車 ========= */
 function updateMenuButtons(){
   const seated = state.seatedTable!=null;
   H(btnSit, seated);
@@ -938,11 +963,27 @@ btnLeave.onclick = async ()=>{
 };
 
 /* ========= ゲーム開始 ========= */
+/* 「やり直す」で全員自動離席 */
+async function unseatAllPlayers(v){
+  const tables = v?.tables || [];
+  for (let i=0;i<tables.length;i++){
+    const t = tables[i];
+    await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {playerId:null, playerName:null});
+    const hand = t.hand || [];
+    for (let h=0; h<hand.length; h++){
+      await update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${h}`), {ownerId:null});
+    }
+  }
+  state.seatedTable = null;
+  updateMenuButtons();
+}
+
 btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可'); return; } H(restartPop,false); };
 btnRestartOk.onclick = async ()=>{
   H(restartPop,true);
   const v=state.watching; if(!v) return;
-  await startGame(v.tableCount, v.mission?.id || 1);
+  await unseatAllPlayers(v);                               // 先に離席
+  await startGame(v.tableCount, v.mission?.id || 1);       // そのまま再配布
 };
 btnRestartCancel.onclick = ()=> H(restartPop,true);
 
@@ -965,6 +1006,7 @@ async function startGame(playerCount, missionId){
   if(!state.isHost) return;
   const code=state.roomCode;
 
+  // 隊長テーブル（member 5）を1つランダムに
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
   const tables=[];
@@ -973,6 +1015,7 @@ async function startGame(playerCount, missionId){
     tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] });
   }
 
+  // コードデッキ（1..12 ×4）＋ id 付与
   const deck=[];
   for(let n=1;n<=12;n++){
     for(let k=0;k<4;k++) deck.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null});
@@ -984,7 +1027,7 @@ async function startGame(playerCount, missionId){
   while(p<deck.length){
     for(let t=0; t<playerCount && p<deck.length; t++){
       const c=deck[p++];
-      tables[t].hand.push({...c, alpha:'', token:null});
+      tables[t].hand.push({...c, alpha:'', token:null, markUntil:null});
     }
   }
   tables.forEach(T=>{
@@ -992,6 +1035,7 @@ async function startGame(playerCount, missionId){
     T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; });
   });
 
+  // アイテム
   const pool = itemDeckNumbers(missionId);
   shuffle(pool);
   const itemCount = playerCount;
