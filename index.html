@@ -1504,13 +1504,41 @@ if(!suppressNumberPop && canNum){
   }
 
   // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行...）
-  if (!m13HeaderUpdateScheduled && m13HeaderClearIndices && m13HeaderClearIndices.size > 0) {
-    ...
-  }
+// ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行）
+if (!m13HeaderUpdateScheduled && m13HeaderClearIndices && m13HeaderClearIndices.size > 0) {
+  m13HeaderUpdateScheduled = true;
+  setTimeout(async () => {
+    try {
+      const indices = Array.from(m13HeaderClearIndices);
+      m13HeaderClearIndices = null;
+      m13HeaderUpdateScheduled = false;
 
-  async function incToken(kind, delta){
-    ...
+      // 現在のヘッダー配列を取得して、対象 index を null にする
+      const snap = await get(ref(db, `rooms/${state.roomCode}/meta/m13_header`));
+      const currentHeader = (snap.val() || []).slice();
+      indices.forEach(i => {
+        if (i >= 0 && i < currentHeader.length) currentHeader[i] = null;
+      });
+
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m13_header: currentHeader });
+    } catch (e) {
+      console.error('m13 header clear failed', e);
+    }
+  }, 0);
+}
+
+async function incToken(kind, delta){
+  try {
+    const path = `rooms/${state.roomCode}/meta/tokenCounts`;
+    const snap = await get(ref(db, path));
+    const prev = snap.val() || { equal:0, noteq:0, x1:0 };
+    const next = { ...prev, [kind]: Math.max(0, (prev[kind] || 0) + delta) };
+    await set(ref(db, path), next);
+  } catch (e) {
+    console.error('incToken failed', e);
   }
+}
+
 }
 
 /* === #22 用：情報トークン使用数を2×6で表示 === */
