@@ -483,7 +483,21 @@ const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
 
 /* ===== 数値カード一意管理＆重ね表示ユーティリティ ===== */
 /* 同じ数字のカードが同時に存在しないように管理する */
+/* ===== 数値カード一意管理＆重ね表示ユーティリティ ===== */
+/* 同じ数字のカードが同時に存在しないように管理する */
 const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
+
+/* === 前のゲームの表示物を全て掃除する === */
+function clearMissionOverlays(){
+  // ミッション用の横レーン（山札や固定並べ）
+  document.querySelectorAll('.numlane').forEach(n => n.remove());
+  // ミッション12で各アイテムに付けた固定ピン
+  document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
+  // 数値カードのレジスタを初期化
+  NUMCARD_REG.clear();
+}
+
+// ここから先は別の関数や処理が続く
 
 /* === 前のゲームの表示物を全て掃除する === */
 function clearMissionOverlays(){
@@ -1491,11 +1505,12 @@ async function setupMissionOnStart(code){
 
   // #9：右2 + ランダム数値2枚
   if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
-    const lane = buildNumLaneDOM([
-      {kind:'rule', img: imgRule('right2')},
-      {kind:'num',  img: imgNumber(randNum())},
-      {kind:'num',  img: imgNumber(randNum())}
-    ]);
+const lane = buildNumLaneDOM([
+  {kind:'rule', img: imgRule('right2')},
+  {kind:'num',  num: randNum()},
+  {kind:'num',  num: randNum()}
+]);
+
     mountLaneUnderItemsBar(lane);
   }
 
@@ -1518,13 +1533,20 @@ async function setupMissionOnStart(code){
 function buildNumLaneDOM(cells){
   const lane = document.createElement('div'); lane.className='numlane';
   cells.forEach(c=>{
-    const div = document.createElement('div');
-    if(c.kind==='rule'){ div.className='rulecard'; div.style.backgroundImage=`url('${c.img}')`; }
-    if(c.kind==='num'){  div.className='numcard';  div.style.backgroundImage=`url('${c.img}')`; }
-    lane.appendChild(div);
+    if(c.kind==='rule'){
+      const div = document.createElement('div');
+      div.className='rulecard';
+      div.style.backgroundImage=`url('${c.img}')`;
+      lane.appendChild(div);
+    }
+    if(c.kind==='num'){
+      // ★ 一意管理レジスタ経由で配置
+      placeNumberCard(c.num, lane);
+    }
   });
   return lane;
 }
+
 function mountLaneUnderItemsBar(lane){
   const bar = document.getElementById('itemsBar');
   bar.insertAdjacentElement('afterend', lane);
@@ -1574,16 +1596,14 @@ function buildDeckLaneP2(n=2){
   const lane = document.createElement('div'); lane.className='numlane';
   const deck = MATERIALS.numbers.slice(); shuffle(deck);
   const picks = deck.slice(0, n);
-  picks.forEach(x=>{
-    const nc = document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=`url('${imgNumber(x)}')`;
-    lane.appendChild(nc);
-  });
+  picks.forEach(x=> placeNumberCard(x, lane)); // ★ 一意管理経由
   return lane;
 }
 
+
 /* パターン3：指定カードを固定並べ（必要時） */
 function buildFixedLane(list){
-  return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
+  return buildNumLaneDOM(list.map(n=>({kind:'num', num:n})));
 }
 
 
