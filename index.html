@@ -1583,7 +1583,7 @@ function renderM22PickPanel(v){
   const picked = Array.isArray(myTable.m22Tokens) ? myTable.m22Tokens.slice(0,2) : [];
   const pickedSet = new Set(picked);
 
- // 描画
+
   m22PickPanel.innerHTML = '<span class="cap">未所持の数字から最大2つ選択：</span>';
   candidates.forEach(nn=>{
     const wrap = document.createElement('div');
@@ -1611,6 +1611,18 @@ function renderM22PickPanel(v){
     wrap.appendChild(x);
     m22PickPanel.appendChild(wrap);
   });
+    d.textContent = String(nn);
+    d.onclick = async ()=>{
+      if (pickedSet.has(nn)) return;        // 既に選択済み
+      if (picked.length >= 2) return;       // 上限
+      const next = picked.concat(nn);
+await update(ref(db, rooms/${state.roomCode}/tables/${myIdx}), { m22Tokens: next });
+    };
+    m22PickPanel.appendChild(d);
+  });
+
+  m22PickPanel.classList.remove('hidden');
+}
 
 /* === #22 用：情報トークン使用数を2×6で表示 === */
 function showInfo22Panel(vNow){
