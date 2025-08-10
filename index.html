@@ -52,8 +52,7 @@
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
-  /* ★ アイテム16サイドトークンによる右隣の微移動 */
-  .item.shifted{ margin-left:10px; }
+
 
   .di{ margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;border:1px solid #ddd;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto }
@@ -522,16 +521,6 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
     itemNodes.push(div);
   });
 
-  /* ▼▼ 変更2：アイテム16サイドトークン表示時、右隣のカードを数px右にずらす ▼▼ */
-  const hasI16 = (v.items||[]).findIndex(it=> it.no===16);
-  const badge = v?.meta?.i16Badge;
-  if(hasI16>=0 && badge && badge.num!=null){
-    const rightIdx = hasI16 + 1;
-    if(itemNodes[rightIdx]){
-      itemNodes[rightIdx].classList.add('shifted');
-    }
-  }
-  /* ▲▲ 変更2ここまで ▲▲ */
 
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
