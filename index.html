@@ -122,6 +122,8 @@
     position:fixed;z-index:2147483647;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
     display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;max-width:min(90vw,320px)
   }
+  /* 画面下部固定の確認バー */
+  .bottom-pop{left:50%;transform:translateX(-50%);bottom:10px;}
 
   .panel{display:flex;flex-direction:column;gap:10px}
   .list{border:1px solid #eee;border-radius:10px;padding:8px}
@@ -135,11 +137,16 @@
   .mission-footer .line{font-size:13px;line-height:1.5}
   .mission-footer .line + .line{margin-top:4px}
 
-  .restart-pop,.start-pop,.seat-pop{
-    position:fixed;left:50%;bottom:12px;transform:translateX(-50%);
+  .restart-pop,.start-pop{ /* 中央 */
+    position:fixed;left:50%;top:50%;transform:translate(-50%, -50%);
     background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
-    padding:14px;z-index:220;display:flex;flex-direction:column;gap:10px;min-width:280px;
-    width:calc(100% - 24px);max-width:640px
+    padding:14px;z-index:220;display:flex;flex-direction:column;gap:10px;min-width:280px
+  }
+  /* 席選択は画面下部に表示 */
+  .seat-pop{
+    position:fixed;left:50%;bottom:10px;transform:translateX(-50%);
+    background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
+    padding:10px;z-index:220;display:flex;flex-direction:column;gap:10px;min-width:280px
   }
   .start-pop .row,.seat-pop .row{display:flex;gap:8px;align-items:center}
   .start-pop label,.seat-pop label{width:84px;font-size:13px}
@@ -157,13 +164,6 @@
     main{flex-direction:column}
     .side{width:100%;max-width:none}
   }
-  /* bottom sheet style mini pop */
-  .bottom-pop{ position:fixed; left:50%; bottom:12px; transform:translateX(-50%);
-    z-index:2147483647; background:#fff; border:1px solid #eee; border-radius:12px;
-    padding:8px; box-shadow:0 12px 24px rgba(0,0,0,.12); display:flex; gap:6px; flex-wrap:wrap; max-width:min(90vw,640px) }
-
-  /* item18: blue selectable border */
-  .card.i18-selectable{ outline:2px solid #3b82f6; outline-offset:-1px; }
 </style>
 </head>
 <body>
@@ -243,6 +243,7 @@
       <option value="1">#1 爆弾</option><option value="2">#2（予備）</option><option value="3">#3 さらい爆弾</option>
       <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
       <option value="8">#8</option><option value="9">#9</option><option value="10">#10</option>
+      <option value="42">#42</option><option value="43">#43</option>
     </select>
   </div>
   <div class="row" style="justify-content:flex-end">
@@ -254,7 +255,7 @@
 <div id="seatPop" class="seat-pop hidden">
   <div class="row"><label>席を選択</label><div id="seatTabs" class="tabs"></div></div>
   <div class="row" style="justify-content:flex-end">
-    <button class="btn small ghost" id="btnSeatCancel">キャンセル</button>
+    <button class="btn small ghost" id="btnSeatCancel">閉じる</button>
   </div>
 </div>
 
@@ -366,15 +367,12 @@ function openMenu(x,y, entries){
   entries.forEach(ent=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=ent.label; b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); }; div.appendChild(b); });
   placeInsideViewport(div, x, y);
 }
-
-// bottom menu helper (for item18 confirm)
+/* 画面下部に出す確認バー */
 function openBottomMenu(entries){
-  const div=document.createElement('div'); div.className='bottom-pop';
+  const div=document.createElement('div'); div.className='mini-pop bottom-pop';
   div.addEventListener('click', e=>e.stopPropagation());
   entries.forEach(ent=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=ent.label; b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); }; div.appendChild(b); });
-  document.body.appendChild(div);
-  const closer=(ev)=>{ if(!div.contains(ev.target)) { div.remove(); document.removeEventListener('click', closer, true);} };
-  setTimeout(()=> document.addEventListener('click', closer, true), 0);
+  popLayer.appendChild(div);
 }
 
 /* enter */
@@ -443,9 +441,9 @@ function renderItemsAndDi(v){
   itemsEl.innerHTML='';
   (v.items||[]).forEach((it, idx)=>{
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
-    if(!it.used) div.style.backgroundImage = `url('./item${it.no}.jpg')`;
+    if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
 
-    // item16 抽出数字の表示
+    // item16 抽出数字
     if(it.extraNum!=null){
       const b=document.createElement('div'); b.className='reveal-badge'; b.textContent=String(it.extraNum);
       div.appendChild(b);
@@ -466,16 +464,16 @@ function renderItemsAndDi(v){
           if(it.no===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
           if(it.no===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
 
-          // item2: 交換フロー開始
+          // item2: 交換フロー開始（確認付）
           if(it.no===2){
             await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
           }
-          // item13: 追加で2枚（そのゲームのデッキから）
+          // item13: 追加で2枚
           if(it.no===13){ await addTwoItemsFromDeck(); }
-          // item16: 情報トークンから条件に合う数字を抽出して表示
+          // item16: 情報トークン集計
           if(it.no===16){ await handleItem16(idx); }
-          // item18: 他プレイヤーのカードを1枚取得
-          if(it.no===18){ await startItem18(); }
+          // item18: 他人のカードを取る
+          if(it.no===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
         });
       }
     };
@@ -483,7 +481,7 @@ function renderItemsAndDi(v){
   });
 
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
-  diEl.style.backgroundImage = `url('./di${val}.png')`;
+  diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
     openMenu(ev.clientX, ev.clientY, [
       {label:'進める', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
@@ -502,7 +500,8 @@ function renderTables(v){
   const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
   const caps = { equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0), x1: uses.i14>=2 ? 2 : (uses.i14>=1 ? 1 : 0) };
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
-  const i18 = v.meta?.i18Flow || null;
+  const i2All=v.meta?.i2Flow;
+  const i18All=v.meta?.i18Flow;
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table';
@@ -528,7 +527,7 @@ function renderTables(v){
     if(!seatedAny){ char.classList.add('blank'); }
     else{
       const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-      char.style.backgroundImage = `url('${face}')`;
+      char.style.backgroundImage = `url("${face}")`;
       char.onclick=async ()=>{ await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); };
     }
     content.appendChild(char);
@@ -541,17 +540,20 @@ function renderTables(v){
       if(!isMine && !c.open) card.classList.add('back');
       if(c.open) card.classList.add('open');
 
-      /* ▼：選択中と交換後 */
-      const i2flow = v.meta?.i2Flow;
-      if (i2flow?.selA && i2flow.selA.cardId===c.id && i2flow.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
-      if (i2flow?.selB && i2flow.selB.cardId===c.id && i2flow.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+      /* ▼：選択中/取得後 */
+      if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+      if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+      if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if(c.markUntil && now()<c.markUntil){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
 
-      /* アイテム2：カード本体で選択（公開はしない） */
-      const i2All=v.meta?.i2Flow;
+      /* アイテム2：カード選択（公開はしない） */
       const isI2Actor = i2All && i2All.usingBy===state.userId;
       const canPickSelf  = isI2Actor && i2All?.phase==='pickSelf'  && t.playerId===state.userId;
       const canPickOther = isI2Actor && i2All?.phase==='pickOther' && t.playerId!==state.userId;
+
+      /* アイテム18：他人のみ */
+      const isI18Actor = i18All && i18All.usingBy===state.userId;
+      const canI18Pick = isI18Actor && i18All?.phase==='pickOther' && t.playerId!==state.userId;
 
       if(isI2Actor && (canPickSelf || canPickOther)){
         card.classList.add('i2-selectable');
@@ -560,41 +562,41 @@ function renderTables(v){
           if(canPickSelf){
             await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther' });
           }else if(canPickOther){
-            // selBを保存して▼を見せ、すぐ交換
+            // 2枚目選択 → 確認ポップ
             await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
-            const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
-            if(i2?.selA){ await doItem2Swap(i2.selA, {table:idx, cardId:c.id}); }
+            openBottomMenu([
+              {label:'交換する', action: async ()=>{
+                const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
+                if(i2?.selA && i2?.selB) await doItem2Swap(i2.selA, i2.selB);
+              }},
+              {label:'やり直す', action: async ()=>{
+                await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+              }}
+            ]);
           }
+        };
+      }else if(canI18Pick){
+        // item18 選択可（青枠）
+        card.classList.add('i2-selectable');
+        card.onclick = async (ev)=>{
+          ev.stopPropagation();
+          await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:{table:idx, cardId:c.id} });
+          openBottomMenu([
+            {label:'とる', action: async ()=>{ const i18=(await get(ref(db, `rooms/${state.roomCode}/meta/i18Flow`))).val(); if(i18?.sel) await doItem18Take(i18.sel); }},
+            {label:'やり直す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:null, phase:'pickOther' }); }}
+          ]);
         };
       }else{
         // 通常時の公開トグル（自分だけ）
         card.onclick = async ()=>{
           if(isMine){
-            const i2 = state.watching?.meta?.i2Flow;
-            const blocking = i2 && i2.usingBy===state.userId && (i2.phase==='pickSelf' || i2.phase==='pickOther');
-            if(blocking) return;
+            const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
+            const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
+            if(blockingI2 || blockingI18) return;
             await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open});
           }
         };
       }
-
-      /* item18: 自分以外のカードに青枠を出して選べるように */
-      const isI18Actor = i18 && i18.usingBy===state.userId;
-      const canPickI18Other = isI18Actor && !i18.selTarget && t.playerId && t.playerId!==state.userId;
-      if(canPickI18Other){
-        card.classList.add('i18-selectable');
-        card.onclick = async (ev)=>{
-          ev.stopPropagation();
-          await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { selTarget:{table:idx, cardId:c.id} });
-          openBottomMenu([
-            {label:'とる', action: async ()=>{ const cur=(await get(ref(db, `rooms/${state.roomCode}/meta/i18Flow`))).val(); if(cur?.selTarget){ await doItem18Take(cur.selTarget); } }},
-            {label:'キャンセル', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { selTarget:null }); }}
-          ]);
-        };
-      }
-
-      // item18: 選択中のカードに▼
-      if(i18?.selTarget && i18.selTarget.cardId===c.id && i18.selTarget.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
 
       /* カードの見た目 */
       const num=document.createElement('div'); num.className='num';
@@ -604,7 +606,7 @@ function renderTables(v){
 
       const bot=document.createElement('div'); bot.className='img-bottom';
       let img='codenumber.jpg'; if(c.kind==='red') img='redcode.png'; if(c.kind==='yellow') img='yellowcode.png';
-      bot.style.backgroundImage=`url('./${img}')`; if(card.classList.contains('back')) bot.style.display='none';
+      bot.style.backgroundImage=`url("./${img}")`; if(card.classList.contains('back')) bot.style.display='none';
       card.appendChild(bot);
 
       /* αと情報トークン */
@@ -619,7 +621,7 @@ function renderTables(v){
       });
 
       // 情報トークンメニュー
-      if(!(i2All && (isI2Actor && (canPickSelf || canPickOther))) && !isI18Actor && isMine){
+      if(!(i2All && i2All.usingBy===state.userId) && !(i18All && i18All.usingBy===state.userId) && isMine){
         a.onclick=(ev)=>{
           ev.stopPropagation();
           const cardPath  = `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`;
@@ -631,14 +633,66 @@ function renderTables(v){
           const canX1    = !has('x1') && (counts.x1 < caps.x1);
 
           const entries = [];
-          if(canNum){ entries.push({label:String(c.num), action: async ()=>{ const updated=[...(tokens), {type:'num', value:c.num, style:'black'}]; await update(ref(db, cardPath), { tokens: updated }); box.classList.add('elevated'); }}); }
-          if(canEqual){ entries.push({label:'＝', action: async ()=>{ const updated=[...(tokens), {type:'equal', value:c.num, style:'equal'}]; await update(ref(db, cardPath), { tokens: updated }); await incToken('equal', +1); box.classList.add('elevated'); }}); }
-          if(canX1){ entries.push({label:'x1', action: async ()=>{ const updated=[...(tokens), {type:'x1', value:c.num, style:'x1'}]; await update(ref(db, cardPath), { tokens: updated }); await incToken('x1', +1); box.classList.add('elevated'); }}); }
-          if(has('x1')){ entries.push({label:'x1', action: async ()=>{ openMenu(ev.clientX, ev.clientY, [
-            {label:'消す', action: async ()=>{ const next = tokens.filter(tk=>tk.type!=='x1'); await update(ref(db, cardPath), { tokens: next }); await incToken('x1', -1); const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0); box.classList.toggle('elevated', afterHas); }},
-            {label:String(c.num), action: async ()=>{ if(!has('num')){ const next=[...(tokens), {type:'num', value:c.num, style:'black'}]; await update(ref(db, cardPath), { tokens: next }); box.classList.add('elevated'); }}},
-          ]); }}); }
-          if(tokens.length>0){ tokens.forEach((tk,ti)=>{ const label = tk.type==='equal' ? '＝を消す' : tk.type==='x1' ? 'x1を消す' : '数字を消す'; entries.push({label, action: async ()=>{ const next = tokens.slice(); const removed = next.splice(ti,1)[0]; await update(ref(db, cardPath), { tokens: next }); if(removed?.type==='equal') await incToken('equal', -1); if(removed?.type==='x1') await incToken('x1', -1); const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0); box.classList.toggle('elevated', afterHas); }}); }); }
+
+          if(canNum){
+            entries.push({label:String(c.num), action: async ()=>{
+              const updated=[...(tokens), {type:'num', value:c.num, style:'black'}];
+              await update(ref(db, cardPath), { tokens: updated });
+              box.classList.add('elevated');
+            }});
+          }
+          if(canEqual){
+            entries.push({label:'＝', action: async ()=>{
+              const updated=[...(tokens), {type:'equal', value:c.num, style:'equal'}];
+              await update(ref(db, cardPath), { tokens: updated });
+              await incToken('equal', +1);
+              box.classList.add('elevated');
+            }});
+          }
+          if(canX1){
+            entries.push({label:'x1', action: async ()=>{
+              const updated=[...(tokens), {type:'x1', value:c.num, style:'x1'}];
+              await update(ref(db, cardPath), { tokens: updated });
+              await incToken('x1', +1);
+              box.classList.add('elevated');
+            }});
+          }
+          if(has('x1')){
+            entries.push({label:'x1', action: async ()=>{
+              openMenu(ev.clientX, ev.clientY, [
+                {label:'消す', action: async ()=>{
+                  const next = tokens.filter(tk=>tk.type!=='x1');
+                  await update(ref(db, cardPath), { tokens: next });
+                  await incToken('x1', -1);
+                  const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
+                  box.classList.toggle('elevated', afterHas);
+                }},
+                {label:String(c.num), action: async ()=>{
+                  if(!has('num')){
+                    const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
+                    await update(ref(db, cardPath), { tokens: next });
+                    box.classList.add('elevated');
+                  }
+                }},
+              ]);
+            }});
+          }
+
+          // 既存トークン個別削除
+          if(tokens.length>0){
+            tokens.forEach((tk,ti)=>{
+              const label = tk.type==='equal' ? '＝を消す' : tk.type==='x1' ? 'x1を消す' : '数字を消す';
+              entries.push({label, action: async ()=>{
+                const next = tokens.slice(); const removed = next.splice(ti,1)[0];
+                await update(ref(db, cardPath), { tokens: next });
+                if(removed?.type==='equal') await incToken('equal', -1);
+                if(removed?.type==='x1')    await incToken('x1', -1);
+                const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
+                box.classList.toggle('elevated', afterHas);
+              }});
+            });
+          }
+
           openMenu(ev.clientX, ev.clientY, entries);
         };
       }
@@ -666,7 +720,7 @@ function renderTables(v){
   }
 }
 
-/* ===== Item 2 swap (after selection, 10s ▼) ===== */
+/* ===== Item 2 swap (confirm after pick) ===== */
 async function doItem2Swap(A, B){
   if(!A || !B) return;
   const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
@@ -703,51 +757,46 @@ async function doItem2Swap(A, B){
   ]);
 }
 
-/* ===== Item 18 take (move into my hand, 10s ▼) ===== */
-async function doItem18Take(target){
-  const myTable = state.seatedTable;
-  if(myTable==null){ alert('先に席に座ってください'); await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:null }); return; }
-
+/* ===== Item 18 take ===== */
+async function doItem18Take(sel){
+  const myTable = state.watching?.tables?.findIndex(t=> t.playerId===state.userId);
+  if(myTable==null || myTable<0){ alert('席に座ってから使用してください'); await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
   const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
   const tables = snap.val() || [];
-  const fromHand = (tables[target.table]?.hand)||[];
-  const idx = fromHand.findIndex(c=> c.id===target.cardId);
-  if(idx<0){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:null }); return; }
 
-  const card = fromHand.splice(idx,1)[0];
-  const toHand = (tables[myTable]?.hand)||[];
+  const srcHand = (tables[sel.table]?.hand)||[];
+  const si = srcHand.findIndex(c=> c.id===sel.cardId);
+  if(si<0){ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
+  const card = srcHand.splice(si,1)[0];
 
-  const insertSortedLeft = (hand, card)=>{ const n = card.num; let pos = 0; while(pos<hand.length && hand[pos].num < n) pos++; while(pos>0 && hand[pos-1].num===n) pos--; hand.splice(pos,0,card); };
-
+  const dstHand = (tables[myTable]?.hand)||[];
+  const n = card.num;
+  // 既存nの左端に差し入れ、無ければ昇順位置
+  let pos = 0; while(pos<dstHand.length && dstHand[pos].num < n) pos++; while(pos>0 && dstHand[pos-1].num===n) pos--; 
   const mark = now()+10000;
-  const moved = {...card, ownerId: state.userId, markUntil: mark};
-  insertSortedLeft(toHand, moved);
+  dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark});
 
+  // α更新
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
-  realpha(fromHand); realpha(toHand);
+  realpha(dstHand); realpha(srcHand);
 
   await Promise.all([
-    set(ref(db, `rooms/${state.roomCode}/tables/${target.table}/hand`), fromHand),
-    set(ref(db, `rooms/${state.roomCode}/tables/${myTable}/hand`), toHand),
+    set(ref(db, `rooms/${state.roomCode}/tables/${sel.table}/hand`), srcHand),
+    set(ref(db, `rooms/${state.roomCode}/tables/${myTable}/hand`), dstHand),
     update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:null })
   ]);
 }
 
-/* start item18 flow */
-async function startItem18(){
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{ usingBy:state.userId, selTarget:null } });
-}
-
 /* ===== Item helpers ===== */
-function itemDeckNumbers(/* missionId */){
-  // 今回は 1〜18 固定デッキ
+function itemDeckNumbers(){
+  // 今回は 1〜18 固定デッキ（18 を追加）
   return Array.from({length:18}, (_,i)=> i+1);
 }
 
 /* item13: 追加で2枚 */
 async function addTwoItemsFromDeck(){
   const v = state.watching; if(!v) return;
-  const pool = itemDeckNumbers(v.mission?.id);
+  const pool = itemDeckNumbers();
   const existingNos = new Set((v.items||[]).map(i=>i.no));
   const candidates = pool.filter(n=> !existingNos.has(n));
   shuffle(candidates);
@@ -770,7 +819,6 @@ async function handleItem16(itemIdx){
       });
     });
   });
-  // 2つ以上同じ数字が使われていない → 使用回数が 0 または 1 の数字
   const pool = Object.keys(counts).map(n=>+n).filter(n=> counts[n] < 2);
   if(pool.length===0) return;
   const pick = pool[Math.random()*pool.length|0];
@@ -781,7 +829,7 @@ async function handleItem16(itemIdx){
 function updateMenuButtons(){ const seated = state.seatedTable!=null; H(btnSit, seated); H(btnLeave, !seated); }
 const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
 function closeAllMini(e){ document.querySelectorAll('.mini-pop').forEach(pop=>{ if(!pop.contains(e.target)) pop.remove(); }); }
-document.addEventListener('click',(e)=>{ closeAllMini(e); outsideClose(e, menuPop); }, true);
+ document.addEventListener('click',(e)=>{ closeAllMini(e); outsideClose(e, menuPop); }, true);
 gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.contains('hidden')) updateMenuButtons(); };
 
 btnSit.onclick = ()=>{
@@ -824,7 +872,7 @@ async function unseatAllPlayers(v){
   state.seatedTable = null; updateMenuButtons();
 }
 btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可'); return; } H(restartPop,false); };
-btnRestartOk.onclick = async ()=>{ H(restartPop>true); const v=state.watching; if(!v) return; await unseatAllPlayers(v); await startGame(v.tableCount, v.mission?.id || 1); };
+btnRestartOk.onclick = async ()=>{ H(restartPop,true); const v=state.watching; if(!v) return; await unseatAllPlayers(v); await startGame(v.tableCount, v.mission?.id || 1); };
 btnRestartCancel.onclick = ()=> H(restartPop,true);
 btnStart.onclick = ()=>{ if(!state.isHost) return; H(startPop,false); };
 btnStartCancel.onclick = ()=> H(startPop,true);
@@ -845,8 +893,8 @@ async function startGame(playerCount, missionId){
   while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
   tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
 
-  // アイテム（人数ぶん）— デッキは 1..18
-  const pool = itemDeckNumbers(missionId); shuffle(pool);
+  // アイテム（人数ぶん）— デッキは 1..18（18追加）
+  const pool = itemDeckNumbers(); shuffle(pool);
   const items = pool.slice(0, Math.min(playerCount, pool.length)).map(no=>({id:crypto.randomUUID(),no,used:false}));
 
   const missionMeta = missionInfo(missionId);
@@ -865,15 +913,16 @@ async function startGame(playerCount, missionId){
 function missionInfo(id){
   switch(id){
     case 1:{ const list=[1.5,2.5,3.5,4.5]; const x=list[Math.random()*list.length|0]; return {id:1, name:'爆弾', desc:'x が1つ', display:[`#1 爆弾`, `${x}が1つ`]}; }
-    case 2:{ return {id:2, name:'（予備）', desc:'自分の手札の内1枚がランダムで右端へ。他は昇順', display:[`#2 （予備）`]}; }
+    case 2:{ return {id:2, name:'（予備）', desc:'手札の1枚をランダムで一番右へ。他は昇順', display:[`#2 （予備）` ]}; }
     case 3:{ const list=[1.5,2.5,3.5,4.5]; shuffle(list); const pick=list.slice(0,3); return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]}のうち1つ`]}; }
-    case 42:{ return {id:42, name:'#42', desc:'特殊なし', display:['#42 特殊なし']}; }
-    case 43:{ return {id:43, name:'#43', desc:'特殊なし', display:['#43 特殊なし']}; }
+    case 42:{ return {id:42, name:'#42', desc:'特殊なし', display:['#42','特殊なし']}; }
+    case 43:{ return {id:43, name:'#43', desc:'特殊なし', display:['#43','特殊なし']}; }
     default: return {id, name:`#${id}`, desc:'', display:[`#${id}`]};
   }
 }
 
-document.addEventListener('click',(e)=>{ if(!miniPop.contains(e.target)) H(miniPop,true); }, true);
+// 画面タップで各種ポップは外側タップで消える
+ document.addEventListener('click',(e)=>{ if(!miniPop.contains(e.target)) H(miniPop,true); }, true);
 </script>
 </body>
 </html>
