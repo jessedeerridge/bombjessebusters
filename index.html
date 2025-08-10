@@ -52,8 +52,8 @@
   /* item16 の抽出数字 */
   .reveal-badge{
     position:absolute;left:50%;transform:translateX(-50%);
-    bottom:-10px;font-size:11px;line-height:1;color:#fff;background:#000;
-    border:1px solid #111;border-radius:4px;padding:1px 4px;pointer-events:none;
+    bottom:-8px;font-size:12px;line-height:1;color:#fff;background:#000;
+    border:1px solid #000;border-radius:6px;padding:2px 6px;pointer-events:none;
   }
 
   .di{ margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;border:1px solid #ddd;background:#fff;
@@ -83,7 +83,6 @@
 
   .hand{
     display:flex;align-items:flex-start;gap:var(--card-gap);
-    /* ▼ をカード上側に出すため、縦方向は可視にする */
     overflow-y:visible; overflow-x:visible;
     flex:0 0 auto;position:relative;
     max-height:calc(var(--content-h) - 2px + var(--content-extra));
@@ -97,7 +96,6 @@
   }
   .card.back{background:#fff url('./codeback.jpg') center/cover no-repeat;border-color:#ccc}
   .card.open{background:#000}
-  .card.i2-selectable{outline:2px dashed #38bdf8;outline-offset:-1px;}
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center}
 
@@ -122,7 +120,6 @@
     position:fixed;z-index:2147483647;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
     display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;max-width:min(90vw,320px)
   }
-  /* 画面下部固定の確認バー */
   .bottom-pop{left:50%;transform:translateX(-50%);bottom:10px;}
 
   .panel{display:flex;flex-direction:column;gap:10px}
@@ -137,12 +134,11 @@
   .mission-footer .line{font-size:13px;line-height:1.5}
   .mission-footer .line + .line{margin-top:4px}
 
-  .restart-pop,.start-pop{ /* 中央 */
+  .restart-pop,.start-pop{
     position:fixed;left:50%;top:50%;transform:translate(-50%, -50%);
     background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
     padding:14px;z-index:220;display:flex;flex-direction:column;gap:10px;min-width:280px
   }
-  /* 席選択は画面下部に表示 */
   .seat-pop{
     position:fixed;left:50%;bottom:10px;transform:translateX(-50%);
     background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
@@ -367,7 +363,6 @@ function openMenu(x,y, entries){
   entries.forEach(ent=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=ent.label; b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); }; div.appendChild(b); });
   placeInsideViewport(div, x, y);
 }
-/* 画面下部に出す確認バー */
 function openBottomMenu(entries){
   const div=document.createElement('div'); div.className='mini-pop bottom-pop';
   div.addEventListener('click', e=>e.stopPropagation());
@@ -420,7 +415,12 @@ function listenRoom(code){
 
 /* mission panels */
 function renderMissionPanels(v){
-  if(!v?.mission){ missionTitle.textContent='（未選択）'; missionText.textContent='開始時に人数と一緒に選びます'; missionDetailTitle.textContent=''; missionDetailBody.innerHTML=''; H(missionFooter,true); H(missionBox,false); return; }
+  if(!v?.mission){
+    missionTitle.textContent='（未選択）';
+    missionText.textContent='開始時に人数と一緒に選びます';
+    missionDetailTitle.textContent=''; missionDetailBody.innerHTML='';
+    H(missionFooter,true); H(missionBox,false); return;
+  }
   missionDetailTitle.textContent = v.mission.display?.[0] || '';
   missionDetailBody.innerHTML = (v.mission.display||[]).slice(1).map(line=>`<div class="line">${line}</div>`).join('');
   H(missionFooter, !v.started); H(missionBox, !!v.started);
@@ -464,15 +464,11 @@ function renderItemsAndDi(v){
           if(it.no===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
           if(it.no===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
 
-          // item2: 交換フロー開始（確認付）
           if(it.no===2){
             await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
           }
-          // item13: 追加で2枚
           if(it.no===13){ await addTwoItemsFromDeck(); }
-          // item16: 情報トークン集計
           if(it.no===16){ await handleItem16(idx); }
-          // item18: 他人のカードを取る
           if(it.no===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
         });
       }
@@ -540,18 +536,15 @@ function renderTables(v){
       if(!isMine && !c.open) card.classList.add('back');
       if(c.open) card.classList.add('open');
 
-      /* ▼：選択中/取得後 */
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if(c.markUntil && now()<c.markUntil){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
 
-      /* アイテム2：カード選択（公開はしない） */
       const isI2Actor = i2All && i2All.usingBy===state.userId;
       const canPickSelf  = isI2Actor && i2All?.phase==='pickSelf'  && t.playerId===state.userId;
       const canPickOther = isI2Actor && i2All?.phase==='pickOther' && t.playerId!==state.userId;
 
-      /* アイテム18：他人のみ */
       const isI18Actor = i18All && i18All.usingBy===state.userId;
       const canI18Pick = isI18Actor && i18All?.phase==='pickOther' && t.playerId!==state.userId;
 
@@ -562,7 +555,6 @@ function renderTables(v){
           if(canPickSelf){
             await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther' });
           }else if(canPickOther){
-            // 2枚目選択 → 確認ポップ
             await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
             openBottomMenu([
               {label:'交換する', action: async ()=>{
@@ -576,7 +568,6 @@ function renderTables(v){
           }
         };
       }else if(canI18Pick){
-        // item18 選択可（青枠）
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
@@ -587,7 +578,6 @@ function renderTables(v){
           ]);
         };
       }else{
-        // 通常時の公開トグル（自分だけ）
         card.onclick = async ()=>{
           if(isMine){
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
@@ -598,7 +588,6 @@ function renderTables(v){
         };
       }
 
-      /* カードの見た目 */
       const num=document.createElement('div'); num.className='num';
       num.textContent=String(c.num);
       num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
@@ -609,7 +598,6 @@ function renderTables(v){
       bot.style.backgroundImage=`url("./${img}")`; if(card.classList.contains('back')) bot.style.display='none';
       card.appendChild(bot);
 
-      /* αと情報トークン */
       const badge=document.createElement('div'); badge.className='badge-fixed';
       const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
 
@@ -620,7 +608,6 @@ function renderTables(v){
         col.appendChild(el);
       });
 
-      // 情報トークンメニュー
       if(!(i2All && i2All.usingBy===state.userId) && !(i18All && i18All.usingBy===state.userId) && isMine){
         a.onclick=(ev)=>{
           ev.stopPropagation();
@@ -678,7 +665,6 @@ function renderTables(v){
             }});
           }
 
-          // 既存トークン個別削除
           if(tokens.length>0){
             tokens.forEach((tk,ti)=>{
               const label = tk.type==='equal' ? '＝を消す' : tk.type==='x1' ? 'x1を消す' : '数字を消す';
@@ -720,7 +706,7 @@ function renderTables(v){
   }
 }
 
-/* ===== Item 2 swap (confirm after pick) ===== */
+/* ===== Item 2 swap ===== */
 async function doItem2Swap(A, B){
   if(!A || !B) return;
   const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
@@ -771,12 +757,10 @@ async function doItem18Take(sel){
 
   const dstHand = (tables[myTable]?.hand)||[];
   const n = card.num;
-  // 既存nの左端に差し入れ、無ければ昇順位置
   let pos = 0; while(pos<dstHand.length && dstHand[pos].num < n) pos++; while(pos>0 && dstHand[pos-1].num===n) pos--; 
   const mark = now()+10000;
   dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark});
 
-  // α更新
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(dstHand); realpha(srcHand);
 
@@ -789,7 +773,6 @@ async function doItem18Take(sel){
 
 /* ===== Item helpers ===== */
 function itemDeckNumbers(){
-  // 今回は 1〜18 固定デッキ（18 を追加）
   return Array.from({length:18}, (_,i)=> i+1);
 }
 
@@ -805,34 +788,27 @@ async function addTwoItemsFromDeck(){
   await set(ref(db, `rooms/${state.roomCode}/items`), next);
 }
 
-/* item16: 情報トークンの数字を集計し、2つ以上使われていない数字からランダムに1つ表示 */
+/* item16: 1~12 の数値トークンだけを数え、同じ数字が2つ未満のものからランダム表示 */
 async function handleItem16(itemIdx){
   const v = state.watching; if(!v) return;
-  // 1〜12の初期カウント
-  const counts = Object.fromEntries(Array.from({length:12}, (_,i)=>[i+1,0]));
+  const counts = Object.create(null);
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       (c.tokens||[]).forEach(tk=>{
         if(tk && tk.type==='num'){
-          const n = Number(tk.value);
-          if(Number.isInteger(n) && n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; }
+          const n = (tk.value|0);
+          if(n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; }
         }
       });
     });
   });
-  // 使用回数が2未満（0 or 1）の数字だけを山札に
-  const deck = Object.keys(counts).map(n=>+n).filter(n=> counts[n] < 2);
-  if(deck.length===0) return; // 全て2回以上なら表示なし
+  const deck = Array.from({length:12}, (_,i)=> i+1).filter(n => (counts[n]||0) < 2);
+  if(deck.length === 0){
+    await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { extraNum: null });
+    return;
+  }
   shuffle(deck);
   const pick = deck[0];
-  await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { extraNum: pick });
-}
-      });
-    });
-  });
-  const pool = Object.keys(counts).map(n=>+n).filter(n=> counts[n] < 2);
-  if(pool.length===0) return;
-  const pick = pool[Math.random()*pool.length|0];
   await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { extraNum: pick });
 }
 
@@ -873,17 +849,13 @@ btnLeave.onclick = async ()=>{
 };
 
 /* start/restart */
-async function unseatAllPlayers(v){
-  const tables = v?.tables || [];
-  for (let i=0;i<tables.length;i++){
-    await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {playerId:null, playerName:null});
-    const hand = tables[i].hand || [];
-    for (let h=0; h<hand.length; h++){ await update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${h}`), {ownerId:null}); }
-  }
-  state.seatedTable = null; updateMenuButtons();
-}
 btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可'); return; } H(restartPop,false); };
-btnRestartOk.onclick = async ()=>{ H(restartPop,true); const v=state.watching; if(!v) return; await unseatAllPlayers(v); await startGame(v.tableCount, v.mission?.id || 1); };
+// 高速リスタート：unseatAllPlayers を使わず、現在の人数/ミッションで即 startGame
+btnRestartOk.onclick = async ()=>{
+  H(restartPop,true);
+  const v=state.watching; if(!v) return;
+  await startGame(v.tableCount || 4, v.mission?.id || 1);
+};
 btnRestartCancel.onclick = ()=> H(restartPop,true);
 btnStart.onclick = ()=>{ if(!state.isHost) return; H(startPop,false); };
 btnStartCancel.onclick = ()=> H(startPop,true);
@@ -897,18 +869,36 @@ async function startGame(playerCount, missionId){
   const faces=[1,2,3,4]; shuffle(faces);
   const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] }); }
 
-  const deck=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) deck.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
-  shuffle(deck);
+  // ===== デッキ構築 =====
+  let deck=[]; let missionMeta;
+  if(missionId===1){
+    // 通常カード（1..12 x4=48）から 24枚ランダム
+    const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
+    shuffle(base);
+    const take24 = base.slice(0,24);
+    // x を 1.5,2.5,3.5,4.5 から 1枚
+    const halfList=[1.5,2.5,3.5,4.5];
+    const x = halfList[Math.random()*halfList.length|0];
+    const special = { id:crypto.randomUUID(), num:x, kind:'half', open:false, ownerId:null };
+    deck = take24.concat(special);
+    shuffle(deck);
+    missionMeta = missionInfo(1, x);
+  }else{
+    const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
+    shuffle(base);
+    deck = base;
+    missionMeta = missionInfo(missionId);
+  }
 
-  const alpha="abcdefghijklmnopqrstuvwxyz"; let p=0;
+  // ===== 配布 → 手札昇順 → α付与 =====
+  const alpha="abcdefghijklmnopqrstuvwxyz";
+  let p=0;
   while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
   tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
 
-  // アイテム（人数ぶん）— デッキは 1..18（18追加）
+  // アイテム（人数ぶん）
   const pool = itemDeckNumbers(); shuffle(pool);
   const items = pool.slice(0, Math.min(playerCount, pool.length)).map(no=>({id:crypto.randomUUID(),no,used:false}));
-
-  const missionMeta = missionInfo(missionId);
 
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
@@ -921,10 +911,13 @@ async function startGame(playerCount, missionId){
   H(gear,false);
 }
 
-function missionInfo(id){
+function missionInfo(id, x=null){
   switch(id){
-    case 1:{ const list=[1.5,2.5,3.5,4.5]; const x=list[Math.random()*list.length|0]; return {id:1, name:'爆弾', desc:'x が1つ', display:[`#1 爆弾`, `${x}が1つ`]}; }
-    case 2:{ return {id:2, name:'（予備）', desc:'手札の1枚をランダムで一番右へ。他は昇順', display:[`#2 （予備）` ]}; }
+    case 1:{
+      const dispX = (x!=null) ? x : [1.5,2.5,3.5,4.5][Math.random()*4|0];
+      return {id:1, name:'爆弾', desc:'x が1つ', display:[`#1 爆弾`, `${dispX}が1つ`]};
+    }
+    case 2:{ return {id:2, name:'（予備）', desc:'手札の1枚をランダムで一番右へ。他は昇順', display:['#2 （予備）']}; }
     case 3:{ const list=[1.5,2.5,3.5,4.5]; shuffle(list); const pick=list.slice(0,3); return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]}のうち1つ`]}; }
     case 42:{ return {id:42, name:'#42', desc:'特殊なし', display:['#42','特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'特殊なし', display:['#43','特殊なし']}; }
