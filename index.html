@@ -798,6 +798,17 @@ function itemDeckNumbers(){
   return Array.from({length:18}, (_,i)=> i+1);
 }
 
+// 全員を席から外す（やり直す時に使用）
+async function unseatAllPlayers(v){
+  const tables = v?.tables || [];
+  for (let i=0;i<tables.length;i++){
+    await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {playerId:null, playerName:null});
+    const hand = tables[i].hand || [];
+    for (let h=0; h<hand.length; h++){ await update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${h}`), {ownerId:null}); }
+  }
+  state.seatedTable = null; updateMenuButtons();
+}
+
 /* item13: 追加で2枚 */
 async function addTwoItemsFromDeck(){
   const v = state.watching; if(!v) return;
@@ -810,17 +821,26 @@ async function addTwoItemsFromDeck(){
   await set(ref(db, `rooms/${state.roomCode}/items`), next);
 }
 
-/* item16: 既存の数値トークンから、同じ数字が2つ以上になっていないトークンだけを候補にし、1つ選んで画面下に表示 */
+/* item16: 1~12 の各〈数字〉情報トークンの総数を数え、総数が2未満の数字から1つランダムで画面下部に表示 */
 async function handleItem16(itemIdx){
   const v = state.watching; if(!v) return;
   const counts = Object.create(null);
-  const tokens = [];
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       (c.tokens||[]).forEach(tk=>{
         if(tk && tk.type==='num'){
           const n = (tk.value|0);
-          if(n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; tokens.push(tk); }
+          if(n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; }
+        }
+      });
+    });
+  });
+  const deck = Array.from({length:12}, (_,i)=> i+1).filter(n => (counts[n]||0) < 2);
+  if(deck.length===0){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); return; }
+  shuffle(deck);
+  const pick = deck[0];
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: { num: pick, at: Date.now() } });
+}
         }
       });
     });
@@ -873,6 +893,8 @@ btnRestart.onclick = ()=>{ if(!state.isHost){ alert('ホストのみ操作可');
 btnRestartOk.onclick = async ()=>{
   H(restartPop,true);
   const v=state.watching; if(!v) return;
+  // やり直す → 自動で席を立つ
+  await unseatAllPlayers(v);
   await startGame(v.tableCount || 4, v.mission?.id || 1);
 };
 btnRestartCancel.onclick = ()=> H(restartPop,true);
@@ -895,21 +917,23 @@ async function startGame(playerCount, missionId){
   shuffle(base);
 
   if(missionId===1){
-    // 赤コードを1枚だけ追加
-    const x = (Math.random()*12|0) + 1;
+    // 赤コード（1.5,2.5,...,11.5）を1枚だけ追加
+    const redList = Array.from({length:11}, (_,i)=> (i+1)+0.5);
+    const x = redList[Math.random()*redList.length|0];
     const special = { id:crypto.randomUUID(), num:x, kind:'red', open:false, ownerId:null };
     deck = base.concat([special]);
     shuffle(deck);
     missionMeta = missionInfo(1, x);
   }else if(missionId===2){
-    // 黄コードを1枚だけ追加
-    const x = (Math.random()*12|0) + 1;
+    // 黄コード（1.1,2.1,...,11.1）を1枚だけ追加
+    const yellowList = Array.from({length:11}, (_,i)=> (i+1)+0.1);
+    const x = yellowList[Math.random()*yellowList.length|0];
     const special = { id:crypto.randomUUID(), num:x, kind:'yellow', open:false, ownerId:null };
     deck = base.concat([special]);
     shuffle(deck);
     missionMeta = missionInfo(2, x);
   }else{
-    deck = base; // 通常
+    deck = base;
     missionMeta = missionInfo(missionId);
   }
 
@@ -936,12 +960,14 @@ async function startGame(playerCount, missionId){
 function missionInfo(id, x=null){
   switch(id){
     case 1:{
-      const dispX = (x!=null) ? x : (Math.random()*12|0)+1;
+      const dispX = (x!=null) ? x : (Array.from({length:11}, (_,i)=> (i+1)+0.5)[Math.random()*11|0]);
       return {id:1, name:'爆弾', desc:'x が1つ', display:[`#1 爆弾`, `${dispX}が1つ`]};
+    }が1つ`]};
     }
     case 2:{
-      const dispX = (x!=null) ? x : (Math.random()*12|0)+1;
+      const dispX = (x!=null) ? x : (Array.from({length:11}, (_,i)=> (i+1)+0.1)[Math.random()*11|0]);
       return {id:2, name:'黄コード', desc:'x が1つ', display:[`#2 黄コード`, `${dispX}が1つ`]};
+    }が1つ`]};
     }
     case 3:{ const list=[1.5,2.5,3.5,4.5]; shuffle(list); const pick=list.slice(0,3); return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]}のうち1つ`]}; }
     case 42:{ return {id:42, name:'#42', desc:'特殊なし', display:['#42','特殊なし']}; }
