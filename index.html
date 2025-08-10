@@ -1594,18 +1594,7 @@ function countNumTokenUsage(n, v){
         if (tk?.type === 'num' && parseInt(tk.value, 10) === n) used += 1;
       });
     });
-    // キャラクターカード下の保持トークン（m22Tokens）
-    (T.m22Tokens || []).forEach(nn=>{
-      if (parseInt(nn, 10) === n) used += 1;
-    });
-  });
-  return used;
-    (T.hand || []).forEach(c=>{
-      (c.tokens || []).forEach(tk=>{
-        if (tk?.type === 'num' && parseInt(tk.value, 10) === n) used += 1;
-      });
-    });
-    // キャラクターカードの下の「保持中」トークン（m22Tokens）
+   // キャラクターカード下の保持トークン（m22Tokens）
     (T.m22Tokens || []).forEach(nn=>{
       if (parseInt(nn, 10) === n) used += 1;
     });
@@ -1679,48 +1668,32 @@ const shown = 2 - Math.min(2, used);
     tok.className = 'token black';
     tok.textContent = String(n);
 
-    // ▼ トークンをクリック → 「次の手番のプレイヤーに n を渡す」
+    // ▼ トークンをクリック → 「次の手番のプレイヤーに n を渡す」or「隠す」
     tok.onclick = (ev)=>{
       ev.stopPropagation(); // セルの「隠す」クリックにバブリングさせない
+      if (iGave) {
+        openMenu(ev.clientX, ev.clientY, [
+          { label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); } }
+        ]);
+        return;
+      }
       const { index: nextIdx, name: nextName } = findNextPlayer(v);
       openMenu(ev.clientX, ev.clientY, [
         { label: `${nextName} に ${n} を渡す`, action: async ()=>{
-            // 受け取り先テーブルに m22Tokens を追加（最大2つ表示仕様に合わせるため render 側で slice(0,2) 済）
             const tRef = ref(db, `rooms/${state.roomCode}/tables/${nextIdx}`);
             const snap = await get(tRef);
-            const cur  = snap.val() || {};
+           const cur  = snap.val() || {};
             const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
             arr.push(n);
             await update(tRef, { m22Tokens: arr });
             // 「渡した以降は、表を押すと“隠す”」を有効化
-            await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_afterGiven: true });
-           // 自分は渡し済みにする（人ごと）
-           const gRef = ref(db, `rooms/${state.roomCode}/meta/m22_given`);
-           await update(gRef, { [state.userId]: true });
-          } }
+           await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_afterGiven: true });
+            // 自分は渡し済みにする（人ごと）
+            const gRef = ref(db, `rooms/${state.roomCode}/meta/m22_given`);
+            await update(gRef, { [state.userId]: true });
+         } }
       ]);
-   if(iGave){
-     openMenu(ev.clientX, ev.clientY, [
-       { label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); } }
-     ]);
-     return;
-   }
-   const { index: nextIdx, name: nextName } = findNextPlayer(v);
-   openMenu(ev.clientX, ev.clientY, [
-     { label: `${nextName} に ${n} を渡す`, action: async ()=>{
-         // 受け取り側に m22Tokens 追加
-         const tRef = ref(db, `rooms/${state.roomCode}/tables/${nextIdx}`);
-         const snap = await get(tRef);
-         const cur  = snap.val() || {};
-         const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
-         arr.push(n);
-         await update(tRef, { m22Tokens: arr });
-         // 自分は渡し済みにする
-         const gRef = ref(db, `rooms/${state.roomCode}/meta/m22_given`);
-         await update(gRef, { [state.userId]: true });
-       } }
-   ]);    
-   };
+    };
     
     // 右側の xラベル
     const xl = document.createElement('span');
