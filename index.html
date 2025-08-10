@@ -836,8 +836,17 @@ function renderItemsAndDi(v){
   const itemNodes = []; // ★ ノード参照を保持
 
   (v.items||[]).forEach((it, idx)=>{
+    const flags = v?.mission?.flags || {};
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
-    if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
+    if(!it.used){
+      // #15: 最初は裏向き表示（使用可だが faceUp===false の間は裏面アートを表示）
+      if(flags.itemsFaceDownStart && it.faceUp===false){
+        div.style.backgroundImage = `url("./itemback.jpg")`;
+      }else{
+        div.style.backgroundImage = `url("./item${it.no}.jpg")`;
+      }
+    }
+
 
  // ★ 追加：アイテム16の情報トークンをカードの真下に表示
 if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
@@ -860,29 +869,48 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
 }
 
     div.onclick=(ev)=>{
+      const flags = state.watching?.mission?.flags || {};
       if(it.used){
         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
         });
       }else{
-        openOneMini(ev.clientX, ev.clientY, '使用する', async ()=>{
-          await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
-          const path=`rooms/${state.roomCode}/meta/itemUses`;
-          const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
-          if(it.no===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
-          if(it.no===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
-          if(it.no===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
-          if(it.no===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
+        // 未使用時：#15 の「表にする」を追加し、必要なら併記
+        const entries = [];
 
-          if(it.no===2){
-            await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+        if(flags.itemsFaceDownStart && it.faceUp===false){
+          entries.push({
+            label:'表にする',
+            action: async ()=>{
+              await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), { faceUp:true });
+            }
+          });
+        }
+
+        entries.push({
+          label:'使用する',
+          action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
+            const path=`rooms/${state.roomCode}/meta/itemUses`;
+            const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
+            if(it.no===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
+            if(it.no===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
+            if(it.no===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
+            if(it.no===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
+
+            if(it.no===2){
+              await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+            }
+            if(it.no===13){ await addTwoItemsFromDeck(); }
+            if(it.no===16){ await handleItem16(idx); }
+            if(it.no===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
           }
-          if(it.no===13){ await addTwoItemsFromDeck(); }
-          if(it.no===16){ await handleItem16(idx); }
-          if(it.no===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
         });
+
+        openMenu(ev.clientX, ev.clientY, entries);
       }
     };
+
 
     itemsEl.appendChild(div);
     itemNodes.push(div);
@@ -1696,7 +1724,12 @@ async function startGame(playerCount, missionId){
 
   // アイテム（人数ぶん） — ミッション規則に合わせて山札を作る
   const pool = itemDeckNumbers(missionId); shuffle(pool);
-  const items = pool.slice(0, Math.min(playerCount, pool.length)).map(no=>({id:crypto.randomUUID(),no,used:false}));
+  // #15: 最初は裏向き（faceUp:false）。それ以外は通常どおり表（faceUp:true）
+  const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
+  const items = pool
+    .slice(0, Math.min(playerCount, pool.length))
+    .map(no=>({ id:crypto.randomUUID(), no, used:false, faceUp: faceUpStart }));
+
 
 
   await set(ref(db, `rooms/${code}`), {
