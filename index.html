@@ -103,11 +103,11 @@
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
   .token{font-size:11px;border-radius:4px;padding:1px 4px;line-height:1}
-  /* ▼ ＝ / ≠ の色を入れ替え（＝をグレー、≠を薄オレンジ） */
-  .token.equal{background:#e5e7eb;color:#000}  /* ＝ */
-  .token.noteq{background:#ffedd5;color:#000}  /* ≠ */
+  /* ▼ 配色入れ替え（＝ と ≠） */
+  .token.equal{background:#e5e7eb;color:#000}
   .token.black{background:#000;color:#fff}
   .token.x1{background:#fce7f3;color:#000}
+  .token.noteq{background:#ffedd5;color:#000}
 
   .marker,.blink{
     position:absolute;left:0;right:0;top:-12px;
@@ -126,15 +126,16 @@
 
   /* ★ 画面下部のグローバル黒枠バッジ（アイテム16表示） */
   .global-reveal{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:2147483647;}
-  .global-reveal .token{cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.12);}
+  .global-reveal .token{cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.12);} 
 
-  /* ★ 追加：アイテム16のサイド表示 */
+  /* 追加：アイテム16のサイド表示 */
   .i16-side{
     position:absolute; left:calc(100% + 6px); top:50%; transform:translateY(-50%);
     z-index:2147483000;
   }
-  /* ★ 追加：i16サイドトークンが出ているとき、右隣のアイテムを数px右にシフト */
-  .item.i16-has-badge + .item{ margin-left:10px; transition:margin-left .15s ease; }
+
+  /* ★ 追加：右側アイテムを数px右へ（トークン表示中のみ付与） */
+  .item.shifted{ transform: translateX(6px); transition: transform .15s ease; }
 
   .panel{display:flex;flex-direction:column;gap:10px}
   .list{border:1px solid #eee;border-radius:10px;padding:8px}
@@ -166,8 +167,8 @@
   .restart-actions .btn.big{flex:1}
 
   .tabs{display:flex;gap:6px;flex-wrap:wrap}
-  .tab.active{background:#111;color:#fff;border-color:#111}
   .tab{padding:6px 10px;border:1px solid #ddd;border-radius:999px;cursor:pointer;user-select:none}
+  .tab.active{background:#111;color:#fff;border-color:#111}
   .tab.disabled{opacity:.35;pointer-events:none}
 
   @media (max-width: 860px){
@@ -401,13 +402,13 @@ async function enter(mode){
   if(!code){ alert('コードを入力してください'); return; }
   state.roomCode = code; state.mode=mode;
 
-  const roomRef = ref(db, `rooms/${code}`);
+  const roomRef = ref(db, rooms/${code});
   const snap=await get(roomRef);
   if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
   else{ state.isHost = snap.val()?.hostId === state.userId; }
 
-  await set(ref(db, `rooms/${code}/players/${state.userId}`), {name:state.userName, at:Date.now()});
-  onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
+  await set(ref(db, rooms/${code}/players/${state.userId}), {name:state.userName, at:Date.now()});
+  onDisconnect(ref(db, rooms/${code}/players/${state.userId})).remove();
   listenRoom(code);
 
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
@@ -423,9 +424,9 @@ function baseRoom(hostId){
 
 /* watch */
 function listenRoom(code){
-  onValue(ref(db, `rooms/${code}`),(snap)=>{
+  onValue(ref(db, rooms/${code}),(snap)=>{
     const v=snap.val(); state.watching=v;
-    if(v){ const p=Object.keys(v.players||{}).length, s=Object.keys(v.spectators||{}).length; if(p===0 && s===0){ remove(ref(db, `rooms/${code}`)); return; } }
+    if(v){ const p=Object.keys(v.players||{}).length, s=Object.keys(v.spectators||{}).length; if(p===0 && s===0){ remove(ref(db, rooms/${code})); return; } }
     H(listsBox, !!v?.started);
     renderLists(v); renderItemsAndDi(v); renderTables(v); renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
@@ -461,13 +462,14 @@ function renderItemsAndDi(v){
   H(itemsBar,false);
 
   itemsEl.innerHTML='';
+  const _itemNodes = [];              // 追加：描画ノード保持
+  let _i16IndexWithBadge = -1;        // 追加：アイテム16サイドトークンの位置
   (v.items||[]).forEach((it, idx)=>{
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
 
-    // ★ 追加：アイテム16の情報トークンをカード右側に表示（出現時は右隣カードを数px右へ）
+    // ★ 追加：アイテム16の情報トークンをカード右側に表示
     if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
-      div.classList.add('i16-has-badge');
       const side = document.createElement('div');
       side.className = 'i16-side';
       const tok = document.createElement('div');
@@ -476,13 +478,12 @@ function renderItemsAndDi(v){
       tok.title = 'クリックで操作';
       tok.onclick = (ev)=>{
         openMenu(ev.clientX, ev.clientY, [
-          {label:'消す', action: async ()=>{
-            await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null });
-          }}
+          {label:'消す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); }}
         ]);
       };
       side.appendChild(tok);
       div.appendChild(side);
+      _i16IndexWithBadge = idx; // 追加：起点を記録
     }
 
     div.onclick=(ev)=>{
@@ -510,7 +511,15 @@ function renderItemsAndDi(v){
       }
     };
     itemsEl.appendChild(div);
+    _itemNodes.push(div); // 追加：ノード保存
   });
+
+  // 追加：サイドトークンが出ている16より右側のアイテムを少し右へ
+  if (_i16IndexWithBadge >= 0){
+    for(let i=_i16IndexWithBadge+1; i<_itemNodes.length; i++){
+      _itemNodes[i].classList.add('shifted');
+    }
+  }
 
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
@@ -553,7 +562,7 @@ function renderTables(v){
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
 
-  // ＝はアイテム12、≠はアイテム1の回数で上限
+  // ★ 上限の対応
   const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
   const caps = { 
     equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0),
@@ -888,7 +897,7 @@ async function doItem18Take(sel){
 
   const dstHand = (tables[myTable]?.hand)||[];
   const n = card.num;
-  let pos = 0; while(pos<dstHand.length && dstHand[pos].num < n) pos++; while(pos>0 && dstHand[pos-1].num===n) pos--;
+  let pos = 0; while(pos<dstHand.length && dstHand[pos].num < n) pos++; while(pos>0 && dstHand[pos-1].num===n) pos--; 
   const mark = now()+10000;
   dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark});
 
@@ -1060,11 +1069,11 @@ async function startGame(playerCount, missionId){
 function missionInfo(id, x=null){
   // 表示も新定義に合わせる
   switch(id){
-    case 1:{
+    case 1:{ // 赤コード
       const dispX = (x!=null) ? x : ((Math.random()*11|0)+1)+0.5;
       return {id:1, name:'爆弾（赤）', desc:'赤コードが1つ', display:[`#1 爆弾（赤コード）`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
     }
-    case 2:{
+    case 2:{ // 黄コード
       const dispX = (x!=null) ? x : ((Math.random()*11|0)+1)+0.1;
       return {id:2, name:'黄コード', desc:'黄コードが1つ', display:[`#2 黄コード`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
     }
