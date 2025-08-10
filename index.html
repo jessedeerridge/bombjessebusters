@@ -62,8 +62,21 @@
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/70% no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
-  .rulecard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
 
+  /* ★ 右2/左2/右4/左4 を横向きに（横長） */
+  .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
+
+  /* ★ 数値カードの「重ね」用ホルダー＆オーバーレイ */
+  .numcard-holder { position:relative; width:32px; height:48px; flex:0 0 auto; }
+  .numcard.overlay { position:absolute; left:2px; top:2px; opacity:0.9; }
+  .numcard.overlay:nth-child(3){ left:4px; top:4px; opacity:0.85; }
+  .numcard.overlay:nth-child(4){ left:6px; top:6px; opacity:0.8; }
+
+  /* ★ ミッション12：アイテム中央下に固定配置するピン */
+  .num-pin {
+    position:absolute; left:50%; bottom:4px; transform:translateX(-50%);
+    width:32px; height:48px; display:block; pointer-events:none;
+  }
   .tables{display:flex;flex-direction:column;gap:8px;margin-top:6px;overflow:visible;position:relative;}
   .table{
     position:relative;border:1px dashed #ddd;border-radius:10px;
@@ -467,6 +480,69 @@ const MATERIALS = {
 const imgNumber = n => `./s${n}.jpg`;
 const imgBack   = `./numbercardback.jpg`;
 const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
+
+/* ===== 数値カード一意管理＆重ね表示ユーティリティ ===== */
+/* 同じ数字のカードが同時に存在しないように管理する */
+const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
+
+/** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
+function placeNumberCard(n, mountParent){
+  const makeBase = ()=>{
+    const holder = document.createElement('div');
+    holder.className = 'numcard-holder';
+    const base = document.createElement('div');
+    base.className = 'numcard';
+    base.style.backgroundImage = `url('${imgNumber(n)}')`;
+    holder.appendChild(base);
+    mountParent.appendChild(holder);
+    NUMCARD_REG.set(n, { holder, count:1 });
+  };
+  const entry = NUMCARD_REG.get(n);
+  if(!entry){
+    makeBase();
+  }else{
+    // すでにどこかに表である → その場所に重ねる
+    const { holder, count } = entry;
+    const ov = document.createElement('div');
+    ov.className = 'numcard overlay';
+    ov.style.backgroundImage = `url('${imgNumber(n)}')`;
+    holder.appendChild(ov);
+    entry.count = count + 1;
+    // もし別の親から呼ばれた場合でも、「同じカードは1枚」方針により新規は作らず既存位置に重ねるだけ
+  }
+}
+
+/** 未使用（＝現在テーブル上に存在しない）数字から count 枚選ぶ */
+function pickUnusedNumbers(count){
+  const used = new Set(NUMCARD_REG.keys());
+  const pool = MATERIALS.numbers.filter(x => !used.has(x));
+  shuffle(pool);
+  return pool.slice(0, count);
+}
+
+/* === ミッション12用：各アイテム中央下に一枚ずつ === */
+function distributeNumbersToItemsCentered(eachCount=1){
+  const items = document.querySelectorAll('#items .item');
+  // 同時重複を避け、未使用数字から配る
+  const need = items.length * eachCount;
+  const picks = pickUnusedNumbers(need);
+
+  let p = 0;
+  items.forEach(it=>{
+    // ピン（固定位置）を用意
+    let pin = it.querySelector(':scope > .num-pin');
+    if(!pin){
+      pin = document.createElement('div');
+      pin.className = 'num-pin';
+      it.appendChild(pin);
+    }
+    // このアイテムに一枚配布
+    for(let k=0;k<eachCount;k++){
+      const n = picks[p++]; if(n==null) break;
+      placeNumberCard(n, pin);
+    }
+  });
+}
 
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
 function pickK(arr, k){
@@ -1412,14 +1488,11 @@ async function setupMissionOnStart(code){
     mountLaneUnderItemsBar(lane);
   }
 
-  // #12：パターン2（各アイテム下に同枚数）
+  // #12：各アイテムの中央下に「1枚ずつ」固定配置
   if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
-    const items = document.querySelectorAll('#items .item');
-    items.forEach(it=>{
-      const lane = buildDeckLaneP2(2); // 枚数は2（必要なら変更）
-      it.after(lane);
-    });
+    distributeNumbersToItemsCentered(1); // 一枚ずつ
   }
+
 
   function randNum(){ return MATERIALS.numbers[(Math.random()*12)|0]; }
 }
@@ -1461,14 +1534,21 @@ function buildDeckLaneP1(){
       return;
     }
     const n = deck.pop(); rest--; restLbl.textContent=`残:${rest}`;
-    const nc = document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=`url('${imgNumber(n)}')`;
-    lane.appendChild(nc);
+
+    // ★ 同じ数字は新規生成しない。すでに表ならその場所へ重ねる／初めてならこのレーンに作成
+    if(NUMCARD_REG.has(n)){
+      // 既存位置に重ねる（このレーンには何も追加しない）
+      placeNumberCard(n, NUMCARD_REG.get(n).holder.parentElement || lane);
+    }else{
+      placeNumberCard(n, lane);
+    }
 
     if(rest===0){
       deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
       deckBtn.title='山札を作る';
     }
   };
+
   return lane;
 }
 
