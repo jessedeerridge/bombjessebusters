@@ -1144,7 +1144,8 @@ if (m13HeaderNum != null) {
 if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
   const row = document.createElement('div');
   row.className = 'm22-under';
-  t.m22Tokens.slice(0,2).forEach(nn=>{
+  t.m22Tokens.slice(0,3).forEach(nn=>{
+
     const d = document.createElement('div');
     d.className = 'token black';
     d.textContent = String(nn);
