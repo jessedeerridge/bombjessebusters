@@ -119,6 +119,24 @@
   .blink{ animation: blink 0.6s linear infinite; }
   @keyframes blink{ 0%,100%{opacity:0} 50%{opacity:1} }
 
+
+/* ★ チェック表（テーブル1の真上） */
+.checklist{
+  display:flex; gap:6px; margin:2px 0 2px 0; align-items:center;
+}
+.check-item{
+  position:relative; width:22px; height:22px;
+  border:1px dashed #999; border-radius:4px;
+  background:#fff; display:grid; place-items:center;
+  font-size:12px; user-select:none; color:#000;
+}
+.check-mark{
+  position:absolute; inset:0; margin:auto;
+  width:18px; height:18px; border-radius:50%;
+  background:rgba(34,197,94,.35);
+  pointer-events:none;
+}
+  
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
   .mini-pop{
     position:fixed;z-index:2147483647;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
@@ -569,9 +587,34 @@ hostTool.onclick = ()=> alert('全体公開されている通常コードの枚�
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
 
+  /* ★ 全体公開中の通常コードの「数字別枚数」を集計 */
+  const openCountByNum = {};
+  (v.tables||[]).forEach(T=>{
+    (T.hand||[]).forEach(c=>{
+      if(c?.kind==='normal' && c.open===true){
+        const n = c.num|0; // 1..12
+        openCountByNum[n] = (openCountByNum[n]||0) + 1;
+      }
+    });
+  });
+
+  /* ★ テーブル1の真上にチェック表（1..12）を設置 */
+  if((v.tables||[]).length>0){
+    const cl = document.createElement('div'); cl.className='checklist';
+    for(let n=1; n<=12; n++){
+      const cell = document.createElement('div'); cell.className='check-item';
+      cell.textContent = String(n);
+      if((openCountByNum[n]||0) === 4){ // 同じ数字が4本全体公開
+        const mk = document.createElement('div'); mk.className='check-mark';
+        cell.appendChild(mk);
+      }
+      cl.appendChild(cell);
+    }
+    tablesEl.appendChild(cl); // ← 直後にテーブル1が来るので「真上」になる
+  }
+
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
-
   // ★ 変更：上限の対応
   //   ＝ の上限はアイテム12の使用回数
   //   ≠ の上限はアイテム1の使用回数
