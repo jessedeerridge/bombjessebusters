@@ -137,6 +137,14 @@
     z-index:2147483000;
   }
 
+.i16-below{
+  position:absolute;
+  left:50%;
+  top:calc(100% + 4px);
+  transform:translateX(-50%);
+  z-index:2147483000;
+}
+    
   .panel{display:flex;flex-direction:column;gap:10px}
   .list{border:1px solid #eee;border-radius:10px;padding:8px}
   .list h3{margin:0 0 6px 0;font-size:13px}
@@ -468,23 +476,22 @@ function renderItemsAndDi(v){
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
     if(!it.used) div.style.backgroundImage = `url("./item${it.no}.jpg")`;
 
-    // ★ 追加：アイテム16の情報トークンをカード右側に表示
-    // meta.i16Badge.num があれば右側に黒トークンを描画
-    if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
-      const side = document.createElement('div');
-      side.className = 'i16-side';
-      const tok = document.createElement('div');
-      tok.className = 'token black';
-      tok.textContent = String(v.meta.i16Badge.num);
-      tok.title = 'クリックで操作';
-      tok.onclick = (ev)=>{
-        openMenu(ev.clientX, ev.clientY, [
-          {label:'消す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); }}
-        ]);
-      };
-      side.appendChild(tok);
-      div.appendChild(side);
-    }
+ // ★ 追加：アイテム16の情報トークンをカードの真下に表示
+if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
+  const below = document.createElement('div');
+  below.className = 'i16-below';
+  const tok = document.createElement('div');
+  tok.className = 'token black';
+  tok.textContent = String(v.meta.i16Badge.num);
+  tok.title = 'クリックで操作';
+  tok.onclick = (ev)=>{
+    openMenu(ev.clientX, ev.clientY, [
+      {label:'消す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); }}
+    ]);
+  };
+  below.appendChild(tok);
+  div.appendChild(below);
+}
 
     div.onclick=(ev)=>{
       if(it.used){
