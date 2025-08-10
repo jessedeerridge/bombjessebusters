@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+const missionIds<!DOCTYPE html> 
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
@@ -1566,7 +1566,8 @@ function openMissionPicker(){
 
 // ミッション一覧生成（#付き数字）
 mpMissions.innerHTML = '';
-const missionIds = [1,2,3,4,5,6,7,8,9,10,11,12,42,43];
+// 1〜66 全部
+const missionIds = Array.from({length:66}, (_,i) => i+1);
 missionIds.forEach(id=>{
   const b = document.createElement('button');
   b.className = 'btn small';
