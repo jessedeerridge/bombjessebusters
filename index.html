@@ -1567,16 +1567,39 @@ function renderM22PickPanel(v){
   // 描画
   m22PickPanel.innerHTML = '<span class="cap">未所持の数字から最大2つ選択：</span>';
   candidates.forEach(nn=>{
+    // 1行を [黒トークン] と [x0/x1/x2] の横並びで出すためのラッパー
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.alignItems = 'center';
+    wrap.style.gap = '4px';
+
+    // 黒トークン本体
     const d = document.createElement('div');
     d.className = 'token black' + (pickedSet.has(nn) ? ' disabled' : '');
     d.textContent = String(nn);
+
+    // 使用数→表示値へ変換（2個以上:0 / 1個:1 / 0個:2）
+    const used = countNumTokenUsage(nn, v);
+    const remain = used >= 2 ? 0 : (used === 1 ? 1 : 2);
+
+    // 右側の xラベル
+    const x = document.createElement('span');
+    x.textContent = `x${remain}`;
+    x.style.fontSize = '11px';
+    x.style.opacity = '0.7';
+
+    // クリックで選択（最大2つ）
     d.onclick = async ()=>{
       if (pickedSet.has(nn)) return;        // 既に選択済み
       if (picked.length >= 2) return;       // 上限
       const next = picked.concat(nn);
-await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Tokens: next });
+      await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Tokens: next });
     };
-    m22PickPanel.appendChild(d);
+
+    // 横並びで追加
+    wrap.appendChild(d);
+    wrap.appendChild(x);
+    m22PickPanel.appendChild(wrap);
   });
 
   m22PickPanel.classList.remove('hidden');
