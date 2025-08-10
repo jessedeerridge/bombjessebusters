@@ -485,6 +485,16 @@ const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
 /* 同じ数字のカードが同時に存在しないように管理する */
 const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
 
+/* === 前のゲームの表示物を全て掃除する === */
+function clearMissionOverlays(){
+  // ミッション用の横レーン（アイテム下に並べた数値カード帯など）
+  document.querySelectorAll('.numlane').forEach(n => n.remove());
+  // ミッション12で各アイテムに付けた固定ピン（アイテムを作り直す前の孤児も含めて全削除）
+  document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
+  // 数値カードの一意管理レジスタをリセット（重ね表示の記録を破棄）
+  NUMCARD_REG.clear();
+}
+
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
   const makeBase = ()=>{
@@ -1406,7 +1416,14 @@ function closeMissionPicker(){ H(mp, true); }
 
 async function startGame(playerCount, missionId){
   if(!state.isHost) return;
+
+  // ★ 前のゲーム由来のDOM＆レジスタを完全クリア
+  clearMissionOverlays();
+  // 念のため、画面下部バッジも消す
+  if(globalReveal){ globalReveal.innerHTML=''; H(globalReveal,true); }
+
   const code = state.roomCode;
+
 
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
