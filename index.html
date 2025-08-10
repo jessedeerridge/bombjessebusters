@@ -787,8 +787,16 @@ function baseRoom(hostId){
 function listenRoom(code){
   onValue(ref(db, `rooms/${code}`),(snap)=>{
     const v=snap.val(); state.watching=v;
-    if(v){ const p=Object.keys(v.players||{}).length, s=Object.keys(v.spectators||{}).length; if(p===0 && s===0){ remove(ref(db, `rooms/${code}`)); return; } }
-    H(listsBox, !!v?.started);
+if (v) {
+  const p = Object.keys(v.players || {}).length;
+  const s = Object.keys(v.spectators || {}).length;
+  const empty = (p === 0 && s === 0);
+  const justCreated = (Date.now() - (v.createdAt || 0) < 2000); // 作成から2秒以内は削除しない
+  if (empty && !justCreated) {
+    remove(ref(db, `rooms/${code}`));
+    return;
+  }
+}    H(listsBox, !!v?.started);
     renderLists(v); renderItemsAndDi(v); renderTables(v); renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
     H(btnStart, !(state.isHost && !state.gameStarted));
@@ -1372,13 +1380,7 @@ if(!suppressNumberPop && canNum){
   }
 }
 
-  
-  async function incToken(kind, delta){
-    const path = `rooms/${state.roomCode}/meta/tokenCounts`;
-    const nowv = (state.watching?.meta?.tokenCounts||{})[kind]||0;
-    await update(ref(db, path), {[kind]: Math.max(0, nowv + delta)});
-  }
-}
+
 
 /* ===== Item 2 swap ===== */
 async function doItem2Swap(A, B){
