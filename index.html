@@ -1346,6 +1346,7 @@ if(!suppressNumberPop && canNum){
     entries.push({label:String(c.num), action: async ()=>{
       const updated=[...(tokens), {type:'num', value:c.num, style:'black'}];
       await update(ref(db, cardPath), { tokens: updated });
+      await consumeM22IfMatches(idx, c.num);   // ← 追加
       box.classList.add('elevated');
     }});
   }
@@ -1594,7 +1595,37 @@ function countNumTokenUsage(n, v){
     });
   });
   return used;
+  let used = 0;
+  (vv?.tables || []).forEach(T=>{
+    // カードに置かれた「数字」トークン
+    (T.hand || []).forEach(c=>{
+      (c.tokens || []).forEach(tk=>{
+        if (tk?.type === 'num' && parseInt(tk.value, 10) === n) used += 1;
+      });
+    });
+    // キャラクターカードの下の「保持中」トークン（m22Tokens）
+    (T.m22Tokens || []).forEach(nn=>{
+      if (parseInt(nn, 10) === n) used += 1;
+    });
+  });
+  return used;
 }
+
+  /* ▼ #22：自分のキャラ下の保持トークンを1つ消費する */
+async function consumeM22IfMatches(tableIdx, n){
+  try{
+    const tRef = ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`);
+    const snap = await get(tRef);
+    const cur  = snap.val() || {};
+    const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
+    const i    = arr.indexOf(n);
+    if(i >= 0){
+      arr.splice(i,1);
+      await update(tRef, { m22Tokens: arr });
+    }
+  }catch(e){ console.error('consumeM22IfMatches', e); }
+}
+
 
 /* === #22 用：情報トークン表（3×4）：黒トークン + x0/x1/x2 を横並び表示 === */
 function showInfo22Panel(vNow){
