@@ -52,8 +52,8 @@
   /* item16 の抽出数字 */
   .reveal-badge{
     position:absolute;left:50%;transform:translateX(-50%);
-    bottom:-8px;font-size:12px;line-height:1;color:#fff;background:#000;
-    border:1px solid #000;border-radius:6px;padding:2px 6px;pointer-events:none;
+    bottom:-10px;font-size:11px;line-height:1;color:#fff;background:#000;
+    border:1px solid #111;border-radius:4px;padding:1px 4px;pointer-events:none;
   }
 
   .di{ margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;border:1px solid #ddd;background:#fff;
@@ -808,14 +808,25 @@ async function addTwoItemsFromDeck(){
 /* item16: 情報トークンの数字を集計し、2つ以上使われていない数字からランダムに1つ表示 */
 async function handleItem16(itemIdx){
   const v = state.watching; if(!v) return;
-  const counts = {};
+  // 1〜12の初期カウント
+  const counts = Object.fromEntries(Array.from({length:12}, (_,i)=>[i+1,0]));
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       (c.tokens||[]).forEach(tk=>{
-        if(tk && ('value' in tk)){
-          const n = tk.value;
-          counts[n] = (counts[n]||0) + 1;
+        if(tk && tk.type==='num'){
+          const n = Number(tk.value);
+          if(Number.isInteger(n) && n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; }
         }
+      });
+    });
+  });
+  // 使用回数が2未満（0 or 1）の数字だけを山札に
+  const deck = Object.keys(counts).map(n=>+n).filter(n=> counts[n] < 2);
+  if(deck.length===0) return; // 全て2回以上なら表示なし
+  shuffle(deck);
+  const pick = deck[0];
+  await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { extraNum: pick });
+}
       });
     });
   });
