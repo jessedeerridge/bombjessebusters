@@ -1524,43 +1524,81 @@ function mountLaneUnderItemsBar(lane){
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
   const lane = document.createElement('div'); lane.className='numlane';
+
+  // 1..12 のみ・重複なしの山札
   const deck = MATERIALS.numbers.slice(); shuffle(deck);
   let rest = deck.length;
 
+  // 山札ボタンと残表示
   const deckBtn = document.createElement('div');
   deckBtn.className='numdeck';
   deckBtn.title='めくる';
-  const restLbl = document.createElement('span'); restLbl.className='numrest'; restLbl.textContent=`残:${rest}`;
-  lane.appendChild(deckBtn); lane.appendChild(restLbl);
 
-deckBtn.onclick = ()=>{
-  if(rest<=0){
-    // ★ 修正：補充しない。12枚で打ち止め
-    deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
-    deckBtn.title = '（山札なし）';
-    deckBtn.style.pointerEvents = 'none';
-    deckBtn.style.opacity = '0.5';
-    return;
+  const restLbl = document.createElement('span');
+  restLbl.className='numrest';
+  restLbl.textContent=`残:${rest}`;
+
+  // ★ 山札の右側に「公開札の積み重ね用ホルダー（1か所）」を設置
+  const pile = document.createElement('div');
+  pile.className = 'numcard-holder';
+  pile.style.position = 'relative'; // 念のため
+
+  lane.appendChild(deckBtn);
+  lane.appendChild(restLbl);
+  lane.appendChild(pile);
+
+  // ★ 右側の同一ホルダーに1枚ずつ重ねる
+  function addToPile(n){
+    const already = pile.querySelectorAll('.numcard').length;
+    const node = document.createElement('div');
+    node.className = 'numcard' + (already>0 ? ' overlay' : '');
+    node.style.backgroundImage = `url('${imgNumber(n)}')`;
+
+    if(already>0){
+      // オーバーレイ位置はJSで段差を付ける（右下にずらす）
+      const off = Math.min(6, already * 2); // 2px刻み・最大6px
+      node.style.position = 'absolute';
+      node.style.left = off + 'px';
+      node.style.top  = off + 'px';
+      node.style.opacity = String(Math.max(0.6, 1 - already*0.08)); // 少しだけ透明度
+    }
+    pile.appendChild(node);
   }
 
-  const n = deck.pop(); rest--; restLbl.textContent=`残:${rest}`;
+  deckBtn.onclick = (ev)=>{
+    // ★ 残0：クリックで「山札を作る」を選べる
+    if(rest<=0){
+      openOneMini(ev.clientX, ev.clientY, '山札を作る', async ()=>{
+        // リセット：1..12 を再シャッフル、公開札もクリア
+        deck.splice(0, deck.length, ...MATERIALS.numbers.slice()); shuffle(deck);
+        rest = deck.length;
+        restLbl.textContent = `残:${rest}`;
+        deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
+        deckBtn.style.background = ''; // 念のためリセット
+        deckBtn.title = 'めくる';
+        pile.innerHTML = '';
 
-  // ★ 既に場にあればスキップ（追加しない）
-  if(!NUMCARD_REG.has(n)){
-    placeNumberCard(n, lane);
-  }
+        // ほかの表示で使っている重複防止レジスタもクリア（安全策）
+        NUMCARD_REG.clear();
+      });
+      return;
+    }
 
-  if(rest===0){
-    deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
-    deckBtn.title = '（山札なし）';
-    deckBtn.style.pointerEvents = 'none';
-    deckBtn.style.opacity = '0.5';
-  }
-};
+    // ★ 1枚公開 → 右側の同一ホルダーに積み重ね
+    const n = deck.pop();
+    rest--;
+    restLbl.textContent = `残:${rest}`;
+    addToPile(n);
 
+    if(rest===0){
+      deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
+      deckBtn.title='山札を作る';
+    }
+  };
 
   return lane;
 }
+
 
 /* パターン2：デッキからn枚→並べる（アイテム下） */
 function buildDeckLaneP2(n=2){
