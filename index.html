@@ -519,7 +519,13 @@ function pickUnusedNumbers(count){
   shuffle(pool);
   return pool.slice(0, count);
 }
-
+  
+function clearMissionOverlays(){
+  document.querySelectorAll('.mission-lane').forEach(n=> n.remove());
+  document.querySelectorAll('#items .item .num-pin').forEach(pin=> pin.remove());
+  NUMCARD_REG.clear();
+}
+  
 /* === ミッション12用：各アイテム中央下に一枚ずつ === */
 function distributeNumbersToItemsCentered(eachCount=1){
   const items = document.querySelectorAll('#items .item');
@@ -544,6 +550,8 @@ function distributeNumbersToItemsCentered(eachCount=1){
   });
 }
 
+
+  
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
 function pickK(arr, k){
   const a = arr.slice(); shuffle(a);
@@ -1468,10 +1476,12 @@ async function startGame(playerCount, missionId){
 
 /* ==== ミッション開始時セットアップ ==== */
 async function setupMissionOnStart(code){
+  // ★ 前回のミッションUIを全消去
+  clearMissionOverlays();
+
   const snap = await get(ref(db, `rooms/${code}`));
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
-
   // #9：右2 + ランダム数値2枚
   if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
     const lane = buildNumLaneDOM([
@@ -1499,7 +1509,8 @@ async function setupMissionOnStart(code){
 
 /* ==== 数値カード表示ユーティリティ ==== */
 function buildNumLaneDOM(cells){
-  const lane = document.createElement('div'); lane.className='numlane';
+  const lane = document.createElement('div');
+  lane.className = 'numlane mission-lane';  // ★← 掃除対象マークを付与
   cells.forEach(c=>{
     const div = document.createElement('div');
     if(c.kind==='rule'){ div.className='rulecard'; div.style.backgroundImage=`url('${c.img}')`; }
@@ -1508,6 +1519,7 @@ function buildNumLaneDOM(cells){
   });
   return lane;
 }
+
 function mountLaneUnderItemsBar(lane){
   const bar = document.getElementById('itemsBar');
   bar.insertAdjacentElement('afterend', lane);
@@ -1515,7 +1527,7 @@ function mountLaneUnderItemsBar(lane){
 
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
-  const lane = document.createElement('div'); lane.className='numlane';
+  const lane = document.createElement('div'); lane.className='numlane mission-lane';
   const deck = MATERIALS.numbers.slice(); shuffle(deck);
   let rest = deck.length;
 
@@ -1554,7 +1566,7 @@ function buildDeckLaneP1(){
 
 /* パターン2：デッキからn枚→並べる（アイテム下） */
 function buildDeckLaneP2(n=2){
-  const lane = document.createElement('div'); lane.className='numlane';
+  const lane = document.createElement('div'); lane.className='numlane mission-lane';
   const deck = MATERIALS.numbers.slice(); shuffle(deck);
   const picks = deck.slice(0, n);
   picks.forEach(x=>{
