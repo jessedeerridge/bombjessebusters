@@ -54,8 +54,15 @@
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
 
 
-  .di{ margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;border:1px solid #ddd;background:#fff;
+ .di{ margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;border:1px solid #ddd;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto }
+
+/* ▼ 数値カードの表示帯（アイテム下など） */
+  .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
+  .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
+  .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/70% no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
+  .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+  .rulecard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
 
   .tables{display:flex;flex-direction:column;gap:8px;margin-top:6px;overflow:visible;position:relative;}
   .table{
@@ -105,11 +112,17 @@
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
   .token{font-size:11px;border-radius:4px;padding:1px 4px;line-height:1}
   /* ▼▼ 変更1：＝ と ≠ の色を入れ替え ▼▼ */
-  .token.equal{background:#e5e7eb;color:#000}   /* 以前の≠色（グレー）を＝へ */
+  .token.equal{background:#e5e7eb;color:#000}
   .token.black{background:#000;color:#fff}
   .token.x1{background:#fce7f3;color:#000}
-  .token.noteq{background:#ffedd5;color:#000}   /* 以前の＝色（薄オレンジ）を≠へ */
-  /* ▲▲ 変更1ここまで ▲▲ */
+  .token.noteq{background:#ffedd5;color:#000}
+
+/* ▼ ミッション専用トークン */
+  .token.yellow { background:#000; color:#ffd400; }  /* 黄コード「▧」 */
+  .token.x2 { background:#e5e7eb; color:#000; }      /* x2 */
+  .token.x3 { background:#e5e7eb; color:#000; }      /* x3 */
+  .token.even { background:#cfe8ff; color:#fff; }    /* 偶数 2/4 */
+  .token.odd  { background:#ffd1e6; color:#000; }    /* 奇数 1/3 */
 
   .marker,.blink{
     position:absolute;left:0;right:0;top:-12px;
@@ -285,12 +298,16 @@
     <select id="selCount"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select>
   </div>
   <div class="row"><label>ミッション</label>
-    <select id="selMission">
-      <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
-      <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
-      <option value="8">#8</option><option value="9">#9</option><option value="10">#10</option>
-      <option value="42">#42</option><option value="43">#43</option>
-    </select>
+<select id="selMission">
+  <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
+  <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
+  <option value="8">#8</option>
+  <option value="9">#9 aaa</option>
+  <option value="10">#10 bbb</option>
+  <option value="11">#11 ccc</option>
+  <option value="12">#12</option>
+  <option value="42">#42</option><option value="43">#43</option>
+</select>
   </div>
   <div class="row" style="justify-content:flex-end">
     <button class="btn small" id="btnStartOk">OK</button>
@@ -392,6 +409,16 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function cssNum(name){const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return parseFloat(v.replace('px',''))||0;}
 const now=()=>Date.now();
+
+/* ==== ミッション素材定義 ==== */
+const MATERIALS = {
+  redCodes : [1,2,3,4,5,6,7,8,9,10,11].map(n=> n + 0.5),
+  yellowCodes : [1,2,3,4,5,6,7,8,9,10,11].map(n=> n + 0.1),
+  numbers : [1,2,3,4,5,6,7,8,9,10,11,12]
+};
+const imgNumber = n => `./s${n}.jpg`;
+const imgBack   = `./numbercardback.jpg`;
+const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
 
 /* pop positioning */
 function placeInsideViewport(div, x, y){
@@ -753,15 +780,69 @@ function renderTables(v){
           const canNum   = !has('num');
           const canX1    = !has('x1') && (counts.x1 < caps.x1);
 
-          const entries = [];
+         const entries = [];
 
-          if(canNum){
-            entries.push({label:String(c.num), action: async ()=>{
-              const updated=[...(tokens), {type:'num', value:c.num, style:'black'}];
-              await update(ref(db, cardPath), { tokens: updated });
-              box.classList.add('elevated');
-            }});
-          }
+// ▼ ミッション専用：フラグ取得
+const flags = state.watching?.mission?.flags || {};
+const myHand = (t.hand||[]).filter(cc => cc.ownerId===state.userId);
+const countSame = myHand.filter(cc => cc.num===c.num).length;
+
+// 黄コードトークン（▧）
+if(flags.useYellowToken){
+  entries.push({label:'▧', action: async ()=>{
+    const updated=[...(tokens), {type:'yellow', value:'▧', style:'yellow'}];
+    await update(ref(db, cardPath), { tokens: updated });
+    box.classList.add('elevated');
+  }});
+}
+
+// x1/x2/x3（数字ポップを出さないミッション用）
+if(flags.useXTokens){
+  if(countSame===1) entries.push({label:'x1', action: async ()=>{
+    const updated=[...(tokens), {type:'x1', value:'x1', style:'x1'}];
+    await update(ref(db, cardPath), { tokens: updated });
+    box.classList.add('elevated');
+  }});
+  if(countSame===2) entries.push({label:'x2', action: async ()=>{
+    const updated=[...(tokens), {type:'x2', value:'x2', style:'x2'}];
+    await update(ref(db, cardPath), { tokens: updated });
+    box.classList.add('elevated');
+  }});
+  if(countSame===3) entries.push({label:'x3', action: async ()=>{
+    const updated=[...(tokens), {type:'x3', value:'x3', style:'x3'}];
+    await update(ref(db, cardPath), { tokens: updated });
+    box.classList.add('elevated');
+  }});
+}
+
+// 偶数/奇数（数字ポップを出さないミッション用）
+if(flags.useParityToken){
+  const isEven = (c.num % 2)===0;
+  if(isEven){
+    entries.push({label:'2/4', action: async ()=>{
+      const updated=[...(tokens), {type:'even', value:'2/4', style:'even'}];
+      await update(ref(db, cardPath), { tokens: updated });
+      box.classList.add('elevated');
+    }});
+  }else{
+    entries.push({label:'1/3', action: async ()=>{
+      const updated=[...(tokens), {type:'odd', value:'1/3', style:'odd'}];
+      await update(ref(db, cardPath), { tokens: updated });
+      box.classList.add('elevated');
+    }});
+  }
+}
+
+const suppressNumberPop = !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
+
+// ▼ 既存の数字ポップは、抑制フラグが無い時だけ出す
+if(!suppressNumberPop && canNum){
+  entries.push({label:String(c.num), action: async ()=>{
+    const updated=[...(tokens), {type:'num', value:c.num, style:'black'}];
+    await update(ref(db, cardPath), { tokens: updated });
+    box.classList.add('elevated');
+  }});
+}
 
           // ＝（アイテム12管理）
           if (has('equal')) {
@@ -1118,9 +1199,112 @@ async function startGame(playerCount, missionId){
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
 
+  await setupMissionOnStart(code);   // ★追加
+
   H(gear,false);
 }
 
+/* ==== ミッション開始時セットアップ ==== */
+async function setupMissionOnStart(code){
+  const snap = await get(ref(db, `rooms/${code}`));
+  const v = snap.val(); if(!v?.mission) return;
+  const flags = v.mission.flags || {};
+
+  // #9：右2 + ランダム数値2枚
+  if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
+    const lane = buildNumLaneDOM([
+      {kind:'rule', img: imgRule('right2')},
+      {kind:'num',  img: imgNumber(randNum())},
+      {kind:'num',  img: imgNumber(randNum())}
+    ]);
+    mountLaneUnderItemsBar(lane);
+  }
+
+  // #11：パターン1（山札→めくる）
+  if(flags.needsNumberLane && flags.pattern==='P1'){
+    const lane = buildDeckLaneP1();
+    mountLaneUnderItemsBar(lane);
+  }
+
+  // #12：パターン2（各アイテム下に同枚数）
+  if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
+    const items = document.querySelectorAll('#items .item');
+    items.forEach(it=>{
+      const lane = buildDeckLaneP2(2); // 枚数は2（必要なら変更）
+      it.after(lane);
+    });
+  }
+
+  function randNum(){ return MATERIALS.numbers[(Math.random()*12)|0]; }
+}
+
+/* ==== 数値カード表示ユーティリティ ==== */
+function buildNumLaneDOM(cells){
+  const lane = document.createElement('div'); lane.className='numlane';
+  cells.forEach(c=>{
+    const div = document.createElement('div');
+    if(c.kind==='rule'){ div.className='rulecard'; div.style.backgroundImage=`url('${c.img}')`; }
+    if(c.kind==='num'){  div.className='numcard';  div.style.backgroundImage=`url('${c.img}')`; }
+    lane.appendChild(div);
+  });
+  return lane;
+}
+function mountLaneUnderItemsBar(lane){
+  const bar = document.getElementById('itemsBar');
+  bar.insertAdjacentElement('afterend', lane);
+}
+
+/* パターン1：山札→めくる */
+function buildDeckLaneP1(){
+  const lane = document.createElement('div'); lane.className='numlane';
+  const deck = MATERIALS.numbers.slice(); shuffle(deck);
+  let rest = deck.length;
+
+  const deckBtn = document.createElement('div');
+  deckBtn.className='numdeck';
+  deckBtn.title='めくる';
+  const restLbl = document.createElement('span'); restLbl.className='numrest'; restLbl.textContent=`残:${rest}`;
+  lane.appendChild(deckBtn); lane.appendChild(restLbl);
+
+  deckBtn.onclick = ()=>{
+    if(rest<=0){
+      deck.splice(0, deck.length, ...MATERIALS.numbers.slice()); shuffle(deck);
+      rest = deck.length; restLbl.textContent=`残:${rest}`;
+      deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
+      deckBtn.title='めくる';
+      return;
+    }
+    const n = deck.pop(); rest--; restLbl.textContent=`残:${rest}`;
+    const nc = document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=`url('${imgNumber(n)}')`;
+    lane.appendChild(nc);
+
+    if(rest===0){
+      deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
+      deckBtn.title='山札を作る';
+    }
+  };
+  return lane;
+}
+
+/* パターン2：デッキからn枚→並べる（アイテム下） */
+function buildDeckLaneP2(n=2){
+  const lane = document.createElement('div'); lane.className='numlane';
+  const deck = MATERIALS.numbers.slice(); shuffle(deck);
+  const picks = deck.slice(0, n);
+  picks.forEach(x=>{
+    const nc = document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=`url('${imgNumber(x)}')`;
+    lane.appendChild(nc);
+  });
+  return lane;
+}
+
+/* パターン3：指定カードを固定並べ（必要時） */
+function buildFixedLane(list){
+  return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
+}
+
+
+  
 function missionInfo(id, x=null){
   // 表示も新定義に合わせる
   switch(id){
@@ -1132,12 +1316,54 @@ function missionInfo(id, x=null){
       const dispX = (x!=null) ? x : ((Math.random()*11|0)+1)+0.1;
       return {id:2, name:'黄コード', desc:'黄コードが1つ', display:[`#2 黄コード`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
     }
-    case 3:{
-      // 例：赤系の候補から3つ提示（必要ならここも調整可）
+  case 3:{
       const list=[1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5]; shuffle(list);
       const pick=list.slice(0,3);
       return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
     }
+
+    case 9: {
+      return {
+        id:9, name:'#9 aaa', desc:'',
+        display: ['#9 aaa',
+          '最初の左にあるカードを切断しなければ、右にあるカードを切断できない。',
+          '手番に切断できるコードがなければ起爆ダイヤルを1進める。'
+        ],
+        flags: { needsRuleRow:true, rule: { type:'R2with2', rightCount:2 } }
+      };
+    }
+    case 10: {
+      return {
+        id:10, name:'#10 bbb', desc:'',
+        display: ['#10 bbb',
+          '15分以内に解除しなければならない！',
+          '時計回りではなく、手番を行いたいプレイヤーが「チョキン！」と言ってから、切断を実行する。',
+          '2人になった場合を除いて、連続で手番をプレイできない。'
+        ],
+        flags: { timed:true, freeTurnCall:true }
+      };
+    }
+    case 11: {
+      return {
+        id:11, name:'#11 ccc', desc:'',
+        display: ['#11 ccc',
+          '数値カードの数字のコードは全て赤コードと見なされる。',
+          '手札がこのコードだけになった場合、公開して手番を終えられる。'
+        ],
+        flags: { numberAsRed:true, needsNumberLane:true, pattern:'P1' } // パターン1
+      };
+    }
+    case 12: {
+      return {
+        id:12, name:'#12', desc:'',
+        display: ['#12',
+          'それぞれの装備カードの下に数値カードを置く。',
+          'その装備を使うにはその数値カードの数字と、装備カードの数字を2本ずつ解除しなければならない。'
+        ],
+        flags: { needsNumberLane:true, pattern:'P2-eachItem' } // パターン2
+      };
+    }
+
     case 42:{ return {id:42, name:'#42', desc:'特殊なし', display:['#42','特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'特殊なし', display:['#43','特殊なし']}; }
     default: return {id, name:`#${id}`, desc:'', display:[`#${id}`]};
