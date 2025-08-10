@@ -468,6 +468,72 @@ const imgNumber = n => `./s${n}.jpg`;
 const imgBack   = `./numbercardback.jpg`;
 const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
 
+/* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
+function pickK(arr, k){
+  const a = arr.slice(); shuffle(a);
+  return a.slice(0, Math.max(0, Math.min(k, a.length)));
+}
+
+/**
+ * ミッションごとの「赤/黄の混入仕様」をここで定義
+ */
+function buildMixPlan(missionId){
+  const plans = {
+    9:  [
+      {type:'redPick',    k:1},
+      {type:'yellowPick', k:2},
+    ],
+    10: [
+      {type:'redPick',    k:1},
+      {type:'yellowPick', k:4},
+    ],
+    11: [
+      {type:'redPick',    k:2},
+    ],
+    12: [
+      {type:'redPick',    k:1},
+      {type:'yellowPick', k:4},
+    ],
+  };
+  return plans[missionId] || [];
+}
+
+/**
+ * ミックス実行
+ */
+function executeMixPlan(planList){
+  const toAdd = [];
+  const mixLines = [];
+  const chooseLines = [];
+
+  planList.forEach(p=>{
+    if(p.type==='redPick'){
+      const cand = pickK(MATERIALS.redCodes, p.k);
+      cand.forEach(n=> toAdd.push({num:n, kind:'red'}));
+      mixLines.push('赤' + cand.map(v=>`[${v}]`).join(''));
+    }
+    if(p.type==='yellowPick'){
+      const cand = pickK(MATERIALS.yellowCodes, p.k);
+      cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
+      mixLines.push('黄' + cand.map(v=>`[${v}]`).join(''));
+    }
+    if(p.type==='redChoose'){
+      const cand = pickK(MATERIALS.redCodes, p.from);
+      chooseLines.push(`赤コード ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
+      const take = pickK(cand, p.take);
+      take.forEach(n=> toAdd.push({num:n, kind:'red'}));
+    }
+    if(p.type==='yellowChoose'){
+      const cand = pickK(MATERIALS.yellowCodes, p.from);
+      chooseLines.push(`黄コード ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
+      const take = pickK(cand, p.take);
+      take.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
+    }
+  });
+
+  return { toAdd, mixLines, chooseLines };
+}
+
 /* pop positioning */
 function placeInsideViewport(div, x, y){
   popLayer.appendChild(div);
@@ -1276,26 +1342,31 @@ async function startGame(playerCount, missionId){
   const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
   shuffle(base);
 
-  if(missionId===1){
-    // ★ 赤コード（1.5,2.5,...,11.5）から1枚
-    const x = (Math.random()*11|0) + 1; // 1..11
-    const specialNum = x + 0.5;
-    const special = { id:crypto.randomUUID(), num:specialNum, kind:'red', open:false, ownerId:null };
-    deck = base.concat([special]);
-    shuffle(deck);
-    missionMeta = missionInfo(1, specialNum);
-  }else if(missionId===2){
-    // ★ 黄コード（1.1,2.1,...,11.1）から1枚
-    const x = (Math.random()*11|0) + 1; // 1..11
-    const specialNum = x + 0.1;
-    const special = { id:crypto.randomUUID(), num:specialNum, kind:'yellow', open:false, ownerId:null };
-    deck = base.concat([special]);
-    shuffle(deck);
-    missionMeta = missionInfo(2, specialNum);
-  }else{
-    deck = base; // 通常
-    missionMeta = missionInfo(missionId);
+  // ▼ ミッション別：赤/黄の混入プランを取得＆実行
+  const planList = buildMixPlan(missionId);
+  const { toAdd, mixLines, chooseLines } = executeMixPlan(planList);
+
+  // #1/#2の旧実装は planList で包含できるが、互換のためフォールバック
+  if(missionId===1 && planList.length===0){
+    const x = (Math.random()*11|0) + 1;
+    toAdd.push({num:x+0.5, kind:'red'});
+    mixLines.push(`赤[${x+0.5}]`);
   }
+  if(missionId===2 && planList.length===0){
+    const x = (Math.random()*11|0) + 1;
+    toAdd.push({num:x+0.1, kind:'yellow'});
+    mixLines.push(`黄[${x+0.1}]`);
+  }
+
+  // デッキ合成
+  deck = base.concat(
+    toAdd.map(s => ({ id:crypto.randomUUID(), num:s.num, kind:s.kind, open:false, ownerId:null }))
+  );
+  shuffle(deck);
+
+  // ミッション表示メタ生成（赤/黄の結果行を先頭に差し込む）
+  missionMeta = missionInfo(missionId, { mixLines, chooseLines });
+
 
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
@@ -1420,27 +1491,40 @@ function buildFixedLane(list){
 
 
   
-function missionInfo(id, x=null){
-  // 表示も新定義に合わせる
+function missionInfo(id, opts={}){
+  const mixLines = opts.mixLines || [];     // 例: ['赤[1.5]', '黄[2.1][5.1]']
+  const chooseLines = opts.chooseLines || [];// 例: ['赤コード[1.5] [3.5] のうち1つ']
+  const linesForMix = [...mixLines, ...chooseLines]; // 表示の先頭に差し込む
+
   switch(id){
-    case 1:{ // 赤コード
-      const dispX = (x!=null) ? x : ((Math.random()*11|0)+1)+0.5;
-      return {id:1, name:'爆弾（赤）', desc:'赤コードが1つ', display:[`#1 爆弾（赤コード）`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
+    case 1:{ // 赤コード1
+      return {
+        id:1, name:'#1 爆弾（赤コード）', desc:'', 
+        display: ['#1 爆弾（赤コード）', ...linesForMix],
+      };
     }
-    case 2:{ // 黄コード
-      const dispX = (x!=null) ? x : ((Math.random()*11|0)+1)+0.1;
-      return {id:2, name:'黄コード', desc:'黄コードが1つ', display:[`#2 黄コード`, `${dispX} が1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
+    case 2:{ // 黄コード1
+      return {
+        id:2, name:'#2 黄コード', desc:'',
+        display: ['#2 黄コード', ...linesForMix],
+      };
     }
-  case 3:{
+    case 3:{
       const list=[1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5]; shuffle(list);
       const pick=list.slice(0,3);
-      return {id:3, name:'さらい爆弾', desc:'x – y – z のうち1つ', display:[`#3 さらい爆弾`, `${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ`, '通常：1～12 / 赤：1.5～11.5 / 黄：1.1～11.1']};
+      return {
+        id:3, name:'#3 さらい爆弾', desc:'',
+        display:[ '#3 さらい爆弾', `${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ`, ...linesForMix ],
+      };
     }
 
+    /* === #9〜#12（指定の引用文と赤/黄表示を合成）=== */
     case 9: {
       return {
         id:9, name:'#9 aaa', desc:'',
-        display: ['#9 aaa',
+        display: [
+          '#9 aaa',
+          ...linesForMix, // ← 赤1・黄2の結果（赤[1.5] / 黄[2.1][…] など）
           '最初の左にあるカードを切断しなければ、右にあるカードを切断できない。',
           '手番に切断できるコードがなければ起爆ダイヤルを1進める。'
         ],
@@ -1450,7 +1534,9 @@ function missionInfo(id, x=null){
     case 10: {
       return {
         id:10, name:'#10 bbb', desc:'',
-        display: ['#10 bbb',
+        display: [
+          '#10 bbb',
+          ...linesForMix,
           '15分以内に解除しなければならない！',
           '時計回りではなく、手番を行いたいプレイヤーが「チョキン！」と言ってから、切断を実行する。',
           '2人になった場合を除いて、連続で手番をプレイできない。'
@@ -1461,29 +1547,34 @@ function missionInfo(id, x=null){
     case 11: {
       return {
         id:11, name:'#11 ccc', desc:'',
-        display: ['#11 ccc',
+        display: [
+          '#11 ccc',
+          ...linesForMix,
           '数値カードの数字のコードは全て赤コードと見なされる。',
           '手札がこのコードだけになった場合、公開して手番を終えられる。'
         ],
-        flags: { numberAsRed:true, needsNumberLane:true, pattern:'P1' } // パターン1
+        flags: { numberAsRed:true, needsNumberLane:true, pattern:'P1' }
       };
     }
     case 12: {
       return {
         id:12, name:'#12', desc:'',
-        display: ['#12',
+        display: [
+          '#12',
+          ...linesForMix,
           'それぞれの装備カードの下に数値カードを置く。',
           'その装備を使うにはその数値カードの数字と、装備カードの数字を2本ずつ解除しなければならない。'
         ],
-        flags: { needsNumberLane:true, pattern:'P2-eachItem' } // パターン2
+        flags: { needsNumberLane:true, pattern:'P2-eachItem' }
       };
     }
 
-    case 42:{ return {id:42, name:'#42', desc:'特殊なし', display:['#42','特殊なし']}; }
-    case 43:{ return {id:43, name:'#43', desc:'特殊なし', display:['#43','特殊なし']}; }
-    default: return {id, name:`#${id}`, desc:'', display:[`#${id}`]};
+    case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
+    case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
+    default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
   }
 }
+
 
 // 画面タップで各種ポップは外側タップで消える
  document.addEventListener('click',(e)=>{ if(!miniPop.contains(e.target)) H(miniPop,true); }, true);
