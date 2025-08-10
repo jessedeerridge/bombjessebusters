@@ -206,11 +206,6 @@
   background:#fff; border:1px solid #eee; border-radius:10px; box-shadow:0 10px 24px rgba(0,0,0,.12);
   padding:8px; z-index:2147483601; display:grid; grid-template-columns:repeat(6, 1fr); gap:6px;
 }
-.info22 .cell{ display:flex; align-items:center; gap:6px;
-  border:1px dashed #bbb; border-radius:6px; padding:6px 4px; text-align:left; font-size:12px; background:#fff; }
-.info22 .num{ display:inline-block; font-weight:700; margin:0; }
-.info22 .val{ display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
-
 .info22 .cell{
   border:1px dashed #bbb; border-radius:6px; padding:6px 4px; text-align:center; font-size:12px;
   background:#fff;
@@ -580,20 +575,6 @@ const popLayer = document.getElementById('popLayer');
 const globalReveal = document.getElementById('globalReveal');
 /* host tool */
 const hostTool = document.getElementById('hostTool');
-
-/* helpers */
-function countNumTokenUsage(n, vOpt){
-  const v = vOpt || state.watching;
-  let total = 0;
-  (v.tables||[]).forEach(T=>{
-    (T.hand||[]).forEach(c=>{
-      (c.tokens||[]).forEach(tk=>{
-        if(tk?.type==='num' && parseInt(tk.value,10)===n) total++;
-      });
-    });
-  });
-  return total;
-}
 
 /* helpers */
 function hiragana(len=4){
@@ -1583,40 +1564,17 @@ function renderM22PickPanel(v){
   const picked = Array.isArray(myTable.m22Tokens) ? myTable.m22Tokens.slice(0,2) : [];
   const pickedSet = new Set(picked);
 
-
+  // 描画
   m22PickPanel.innerHTML = '<span class="cap">未所持の数字から最大2つ選択：</span>';
   candidates.forEach(nn=>{
-    const wrap = document.createElement('div');
-    wrap.style.display='flex';
-    wrap.style.alignItems='center';
-    wrap.style.gap='4px';
-
     const d = document.createElement('div');
     d.className = 'token black' + (pickedSet.has(nn) ? ' disabled' : '');
-    d.textContent = String(nn);
-
-    const x = document.createElement('span');
-    x.textContent = `x${countNumTokenUsage(nn, v)}`;
-    x.style.fontSize='11px';
-    x.style.opacity='0.7';
-
-    d.onclick = async ()=>{
-      if (pickedSet.has(nn)) return;
-      if (picked.length >= 2) return;
-      const next = picked.concat(nn);
-      await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Tokens: next });
-    };
-
-    wrap.appendChild(d);
-    wrap.appendChild(x);
-    m22PickPanel.appendChild(wrap);
-  });
     d.textContent = String(nn);
     d.onclick = async ()=>{
       if (pickedSet.has(nn)) return;        // 既に選択済み
       if (picked.length >= 2) return;       // 上限
       const next = picked.concat(nn);
-await update(ref(db, rooms/${state.roomCode}/tables/${myIdx}), { m22Tokens: next });
+await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Tokens: next });
     };
     m22PickPanel.appendChild(d);
   });
