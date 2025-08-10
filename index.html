@@ -1200,10 +1200,12 @@ btnOpenPicker.onclick = ()=>{
 btnRestartOk.onclick = ()=>{};
 btnRestartCancel.onclick = ()=>{ H(restartPop,true); };
 
-btnStart.onclick = ()=>{ if(!state.isHost) return; H(startPop,false); };
+// ▼ 変更：爆弾を解除！ で下部ピッカーを開く
+btnStart.onclick = ()=>{ if(!state.isHost) return; openMissionPicker(); };
 
 btnStartCancel.onclick = ()=> H(startPop,true);
 btnStartOk.onclick = async ()=>{ const count=clamp(parseInt(selCount.value,10),1,6); const missionId=parseInt(selMission.value,10); H(startPop,true); await startGame(count, missionId); };
+
 
 /* ▼▼ ミッションピッカー実装 ▼▼ */
 let mpSelectedCount = 4;
