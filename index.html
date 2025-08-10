@@ -534,8 +534,12 @@ function renderTables(v){
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
 
+  // ★★ アイテム1に合わせて「＝」上限を i1 使用回数で管理（1回=2個、2回=4個）
   const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
-  const caps = { equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0), x1: uses.i14>=2 ? 2 : (uses.i14>=1 ? 1 : 0) };
+  const caps = { 
+    equal: uses.i1>=2 ? 4 : (uses.i1>=1 ? 2 : 0),
+    x1:    uses.i14>=2 ? 2 : (uses.i14>=1 ? 1 : 0)
+  };
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
   const i2All=v.meta?.i2Flow;
   const i18All=v.meta?.i18Flow;
@@ -669,7 +673,33 @@ function renderTables(v){
               box.classList.add('elevated');
             }});
           }
-          if(canEqual){
+
+          // ★★ アイテム1の仕様：「＝」をもう一度押すとメニュー（消す／数字）
+          if (has('equal')) {
+            entries.push({
+              label:'＝',
+              action: async ()=>{
+                openMenu(ev.clientX, ev.clientY, [
+                  { label:'消す', action: async ()=>{
+                      const next = tokens.filter(tk=>tk.type!=='equal');
+                      await update(ref(db, cardPath), { tokens: next });
+                      await incToken('equal', -1);
+                      const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
+                      box.classList.toggle('elevated', afterHas);
+                    }
+                  },
+                  { label:String(c.num), action: async ()=>{
+                      if(!has('num')){
+                        const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
+                        await update(ref(db, cardPath), { tokens: next });
+                        box.classList.add('elevated');
+                      }
+                    }
+                  }
+                ]);
+              }
+            });
+          } else if (canEqual){
             entries.push({label:'＝', action: async ()=>{
               const updated=[...(tokens), {type:'equal', value:c.num, style:'equal'}];
               await update(ref(db, cardPath), { tokens: updated });
@@ -677,6 +707,7 @@ function renderTables(v){
               box.classList.add('elevated');
             }});
           }
+
           if(canX1){
             entries.push({label:'x1', action: async ()=>{
               const updated=[...(tokens), {type:'x1', value:c.num, style:'x1'}];
@@ -829,25 +860,37 @@ async function addTwoItemsFromDeck(){
   await set(ref(db, `rooms/${state.roomCode}/items`), next);
 }
 
-/* item16: 数字トークンの総使用数を見て、<2の数字から1つ選び画面下に表示（黒/白） */
+/* item16: 数字(1..12)の使用数を集計し、<2の数字から1つ選んで下部に表示（黒/白） */
 async function handleItem16(itemIdx){
   const v = state.watching; if(!v) return;
-  const counts = Object.create(null);
-  const tokens = [];
+
+  // 1..12 の各数字の使用数を集計（数字トークン type:'num' を対象）
+  const counts = Array.from({length:13}, ()=>0); // 1..12 を使用
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       (c.tokens||[]).forEach(tk=>{
-        if(tk && tk.type==='num'){
-          const n = (tk.value|0);
-          if(n>=1 && n<=12){ counts[n] = (counts[n]||0) + 1; tokens.push(tk); }
+        if(tk?.type==='num'){
+          const n = parseInt(tk.value, 10);
+          if(n>=1 && n<=12) counts[n] += 1;
         }
       });
     });
   });
-  const candidates = tokens.filter(tk=> (counts[tk.value|0] || 0) < 2);
-  if(candidates.length===0){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); return; }
-  const pick = candidates[Math.random()*candidates.length|0];
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: { num:(pick.value|0), at: Date.now() } });
+
+  // 使用数が2未満の数字のみ候補に
+  const candidates = [];
+  for(let n=1; n<=12; n++){
+    if((counts[n]||0) < 2) candidates.push(n);
+  }
+
+  if(candidates.length===0){
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null });
+    return;
+  }
+
+  // ランダムに1つ選んで下部に表示（黒背景・白文字は renderGlobalReveal で実現）
+  const pick = candidates[Math.floor(Math.random()*candidates.length)];
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: { num: pick, at: Date.now() } });
 }
 
 /* gear etc */
