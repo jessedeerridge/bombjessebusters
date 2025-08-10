@@ -136,12 +136,18 @@
     z-index:2147483000;
   }
 
+/* 追加：アイテム16の黒トークンをカードの真下に表示 */
 .i16-below{
   position:absolute;
   left:50%;
   top:calc(100% + 4px);
   transform:translateX(-50%);
   z-index:2147483000;
+}
+
+/* 追加：アイテム16使用時はカード本体を上に持ち上げる */
+.i16-lift{
+  transform: translateY(-18px);
 }
     
   .panel{display:flex;flex-direction:column;gap:10px}
@@ -490,6 +496,9 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   };
   below.appendChild(tok);
   div.appendChild(below);
+
+  // 追加：カードを上に持ち上げて下のトークンがスクロールなしで見えるように
+  div.classList.add('i16-lift');
 }
 
     div.onclick=(ev)=>{
