@@ -153,6 +153,7 @@
   .token.x3 { background:#e5e7eb; color:#000; }      /* x3 */
   .token.even { background:#cfe8ff; color:#fff; }    /* 偶数 2/4 */
   .token.odd  { background:#ffd1e6; color:#000; }    /* 奇数 1/3 */
+.token.yellowX { background:#ffd400; color:#000; }
 
   .marker,.blink{
     position:absolute;left:0;right:0;top:-12px;
@@ -638,7 +639,36 @@ function buildMixPlan(missionId){
       {type:'redPick',    k:1},
       {type:'yellowPick', k:4},
     ],
-  };
+  13: [ /* #13 は専用配布をするのでここでは赤を混ぜない */ ],
+  14: [
+    {type:'redPick', k:2},
+    {type:'yellowChoose', from:3, take:2},
+  ],
+  15: [
+    {type:'redChoose', from:3, take:1},
+  ],
+  16: [
+    {type:'redPick', k:1},
+    {type:'yellowChoose', from:3, take:2},
+  ],
+  17: [
+    {type:'redChoose', from:3, take:2},
+  ],
+  18: [
+    {type:'redPick', k:2},
+  ],
+  19: [
+    {type:'redPick', k:1},
+    {type:'yellowChoose', from:3, take:2},
+  ],
+  20: [
+    {type:'redPick', k:2},
+    {type:'yellowPick', k:2},
+  ],
+  21: [
+    {type:'redChoose', from:3, take:1},
+  ],
+      };
   return plans[missionId] || [];
 }
 
@@ -937,7 +967,46 @@ function renderTables(v){
     const header=document.createElement('div'); header.className='t-header';
     const title=document.createElement('div');  title.className='title';
     title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
-    header.appendChild(title); box.appendChild(header);
+    header.appendChild(title); 
+    
+    // #13：名前の右にランダム数字トークン
+if (v.mission?.flags?.m13_headerRandomInfoToken && Array.isArray(v.meta?.m13_header)) {
+  const headerNums = v.meta.m13_header;
+  const idxHeaderNum = headerNums[idx];
+
+  if (idxHeaderNum != null) {
+    // 見た目用の小バッジ
+    const badge = document.createElement('div');
+    badge.className = 'token black';
+    badge.style.marginLeft = '6px';
+    badge.textContent = String(idxHeaderNum);
+    header.appendChild(badge);
+
+    // 同テーブル内で同じ数字の情報トークン（type:'num'）が使われたら自動で消す
+    if (v.mission?.flags?.m13_autoHideHeaderToken) {
+      let used = false;
+      (t.hand || []).forEach(c => {
+        (c.tokens || []).forEach(tk => {
+          if (tk?.type === 'num') {
+            const n = parseInt(tk.value, 10);
+            if (Number.isInteger(n) && n === idxHeaderNum) used = true;
+          }
+        });
+      });
+
+      if (used) {
+        // まだ同じ値のままなら null でクリア（多重更新の抑制）
+        const current = (state.watching?.meta?.m13_header || [])[idx];
+        if (current === idxHeaderNum) {
+          const next = headerNums.slice();
+          next[idx] = null;
+          update(ref(db, `rooms/${state.roomCode}/meta`), { m13_header: next });
+        }
+      }
+    }
+  }
+}
+    box.appendChild(header);
 
     const content=document.createElement('div'); content.className='t-content';
 
@@ -1101,13 +1170,27 @@ if(flags.useParityToken){
 
 const suppressNumberPop = !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
 
-// ▼ 既存の数字ポップは、抑制フラグが無い時だけ出す
+// ▼ 数字ポップの出し方（通常 or #17 隊長用）
+const isCaptain = (state.watching?.captainTable|0) === idx;
 if(!suppressNumberPop && canNum){
-  entries.push({label:String(c.num), action: async ()=>{
-    const updated=[...(tokens), {type:'num', value:c.num, style:'black'}];
-    await update(ref(db, cardPath), { tokens: updated });
-    box.classList.add('elevated');
-  }});
+  if(v.mission?.flags?.m17_captainInverseNumberPop && isCaptain){
+    // 隊長は「自分のカード数値 以外」の 1..12 を候補にする
+    for(let nn=1; nn<=12; nn++){
+      if(nn===c.num) continue;
+      entries.push({label:String(nn), action: async ()=>{
+        const updated=[...(tokens), {type:'num', value:nn, style:'black'}];
+        await update(ref(db, cardPath), { tokens: updated });
+        box.classList.add('elevated');
+      }});
+    }
+  }else{
+    // 通常：そのカードの数字
+    entries.push({label:String(c.num), action: async ()=>{
+      const updated=[...(tokens), {type:'num', value:c.num, style:'black'}];
+      await update(ref(db, cardPath), { tokens: updated });
+      box.classList.add('elevated');
+    }});
+  }
 }
 
           // ＝（アイテム12管理）
@@ -1604,6 +1687,75 @@ async function setupMissionOnStart(code){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
   }
 
+ // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
+  if(v.mission?.flags?.m13_distributeRedToCaptain3){
+    const tcount = v.tableCount|0;
+    const cap = v.captainTable|0;
+    const targets = [cap, (cap+1)%tcount, (cap+2)%tcount];
+
+    // ランダムに赤コード 3 つ
+    const redList = MATERIALS.redCodes.slice(); shuffle(redList);
+    const pick = redList.slice(0,3);
+
+    const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
+    const tbls = tablesSnap.val() || [];
+    const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha=alpha[i%alpha.length]); };
+
+    targets.forEach((ti, idx)=>{
+      const hand = tbls[ti]?.hand || [];
+      hand.push({ id:crypto.randomUUID(), num:pick[idx], kind:'red', open:false, ownerId: tbls[ti]?.playerId||null, tokens:[] });
+      hand.sort((a,b)=> a.num - b.num);
+      realpha(hand);
+      tbls[ti].hand = hand;
+    });
+
+    // 名前の右のランダム数字（各テーブル）
+    const header = Array.from({length:tcount}, ()=> MATERIALS.numbers[(Math.random()*12)|0]);
+
+    await Promise.all([
+      set(ref(db, `rooms/${code}/tables`), tbls),
+      update(ref(db, `rooms/${code}/meta`), { m13_header: header })
+    ]);
+  }
+
+  // ===== #16：「右4」＋ランダム3 をアイテム下に敷く =====
+  if(v.mission?.flags?.m16_ruleRight4With3){
+    const lane = buildNumLaneDOM([
+      {kind:'rule', img: imgRule('right4')},
+      {kind:'num',  img: imgNumber(randNum())},
+      {kind:'num',  img: imgNumber(randNum())},
+      {kind:'num',  img: imgNumber(randNum())},
+    ]);
+    mountLaneUnderItemsBar(lane);
+  }
+
+  // ===== #18：アイテムを 8 のみ、かつ P1 山札 =====
+  if(Array.isArray(v.mission?.flags?.limitItemsTo)){
+    const allow = new Set(v.mission.flags.limitItemsTo);
+    const nextItems = (v.items||[]).filter(it => allow.has(it.no));
+    await set(ref(db, `rooms/${code}/items`), nextItems);
+  }
+
+  // ===== #20：各テーブルで 1 枚を右端へ移動し、黄色✕トークンを付与 =====
+  if(v.mission?.flags?.m20_rightmostX){
+    const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
+    const tbls = tablesSnap.val() || [];
+    const alphaStr='abcdefghijklmnopqrstuvwxyz';
+    tbls.forEach(T=>{
+      const hand = (T.hand||[]).slice().sort((a,b)=> a.num - b.num); // 昇順ベース
+      if(hand.length===0) return;
+      const ri = (Math.random()*hand.length)|0;
+      const chosen = hand.splice(ri,1)[0];
+      hand.push(chosen); // 右端へ
+      // ✕トークン（黄色）をそのカードに付与
+      chosen.tokens = [...(chosen.tokens||[]), {type:'xmark', value:'✕', style:'yellowX'}];
+      // α再付与
+      hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]);
+      T.hand = hand;
+    });
+    await set(ref(db, `rooms/${code}/tables`), tbls);
+  }
+  
 
   function randNum(){ return MATERIALS.numbers[(Math.random()*12)|0]; }
 }
@@ -1801,7 +1953,120 @@ function missionInfo(id, opts={}){
         flags: { needsNumberLane:true, pattern:'P2-eachItem' }
       };
     }
+    case 13: {
+      return {
+        id:13, name:'#13', desc:'',
+        display:[
+          '#13',
+          ...linesForMix,
+          '赤コードからランダムで3つ選び、隊長→次→次の3人に1つずつ配布する。',
+          '各プレイヤー名の右に 1~12 の情報トークンをランダムで1つ表示し、そのプレイヤーのテーブル内で同じ数字の情報トークンが使用されたら消える。',
+          '「情報トークンはランダムに1枚引いてコードの前に置く」「隊長から順に赤コードを1枚ずつ配布」',
+          '「誰でも赤コードの場所を3つ同時に指摘して解除できるが、間違えると爆発」「赤コードの切断にアイテムは使用不可」'
+        ],
+        flags:{ m13_distributeRedToCaptain3:true, m13_headerRandomInfoToken:true, m13_autoHideHeaderToken:true }
+      };
+    }
 
+    case 14: {
+      return {
+        id:14, name:'#14', desc:'',
+        display:[
+          '#14', ...linesForMix,
+          '隊長カードの持ち主は「新人」。新人が切断に失敗すると爆発。新人は「万能氷」を使えない。'
+        ],
+        flags:{ m14_rookieIsCaptain:true }
+      };
+    }
+
+    case 15: {
+      return {
+        id:15, name:'#15', desc:'',
+        display:[
+          '#15', ...linesForMix,
+          'アイテムカードは最初は裏向きで同数表示。',
+          '数値カードの山札（パターン1）。',
+          '「数値カードの数字を4本切断した時、即座に最初の装備を1枚使える」',
+          '「次にめくる数値が全て切断済みなら引き直す」'
+        ],
+        flags:{ itemsFaceDownStart:true, needsNumberLane:true, pattern:'P1' }
+      };
+    }
+
+    case 16: {
+      return {
+        id:16, name:'#16', desc:'',
+        display:[
+          '#16', ...linesForMix,
+          'アイテムの下に「右4」カード＋ランダム数値3枚を並べる。',
+          '「左側の数値4本を切断しなければ右の数値を切断できない」',
+          '「手番に切断できるコードがなければ爆発」'
+        ],
+        flags:{ m16_ruleRight4With3:true }
+      };
+    }
+
+    case 17: {
+      return {
+        id:17, name:'#17', desc:'',
+        display:[
+          '#17', ...linesForMix,
+          '隊長だけ、アルファベットを押すとカードの数値と異なる全ての数字が候補になる。',
+          '隊長は「セルジオ」。セルジオは「フツーノ探知機」「装備」不可。最初に誤った情報トークンを2枚置く。'
+        ],
+        flags:{ m17_captainInverseNumberPop:true }
+      };
+    }
+
+    case 18: {
+      return {
+        id:18, name:'#18', desc:'',
+        display:[
+          '#18', ...linesForMix,
+          'アイテムは「8」の1枚のみ表示。',
+          'アイテム下に数値カード山札（パターン1）。',
+          '「最初に情報トークンは置かない」',
+          '❶手番開始時に山札を1枚めくる → ❷その数字で「なんでもレーダー」 → ❸切断役を指名 → 指名者が切断'
+        ],
+        flags:{ limitItemsTo:[8], needsNumberLane:true, pattern:'P1' }
+      };
+    }
+
+    case 19: {
+      return {
+        id:19, name:'#19', desc:'',
+        display:[ '#19', ...linesForMix, '音声を聞こう。' ],
+        flags:{}
+      };
+    }
+
+    case 20: {
+      return {
+        id:20, name:'#20', desc:'',
+        display:[
+          '#20', ...linesForMix,
+          '各テーブル：手札からランダム1枚を一番右に移動し、そのカードのアルファベット下に ✕（黄背景・黒文字）を付ける。',
+          'その他のカードは通常どおり昇順。',
+          '「ランダムのコードを右側に配置する」'
+        ],
+        flags:{ m20_rightmostX:true }
+      };
+    }
+
+    case 21: {
+      return {
+        id:21, name:'#21', desc:'',
+        display:[
+          '#21', ...linesForMix,
+          '情報トークンはカードの数字そのものは選べない。',
+          '偶数なら「2/4」（水色・白文字）、奇数なら「1/3」（ピンク・白文字）のみ使用可。'
+        ],
+        flags:{ useParityToken:true }
+      };
+    }
+
+
+      
     case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
     default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
