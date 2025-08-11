@@ -1972,6 +1972,7 @@ function openConstraintZoom(letter, myIdx){
     big.addEventListener('click', (e)=>{
       e.stopPropagation();
       // メニューが無ければ生成／あればトグル
+       if (typeof myIdx !== 'number') return;
       let m = wrap.querySelector('.conzoom-menu');
       if (m){ m.remove(); return; }
       m = document.createElement('div');
@@ -2982,7 +2983,8 @@ function buildConDeckLaneP1(){
         node.style.left = off + 'px';
         node.style.top  = off + 'px';
       }
-
+   node.title = '拡大';
+　　node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
       pile.appendChild(node);
 
       // ★ ここから変更：1枚目でも必ず高さ/余白を更新する
