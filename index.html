@@ -1508,14 +1508,10 @@ if(!suppressNumberPop && canNum){
     if (openYellowCount >= 2 && !alreadyShown) {
       // フラッシュ防止：描画は次の onValue レンダーに任せる
       update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown: true });
+        showInfo22Panel(state.watching || v); // ← 一度だけ明示的に出す
     }
   }
   renderM22PickPanel(v);
-
-  /* ▼▼ 追加：#22 表を既に表示済みなら、毎回再レンダリングして最新化 ▼▼ */
-  if (v.meta?.m22_infoShown) {
-    showInfo22Panel(v);
-  }
 
   // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行...）
 // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行）
@@ -1630,7 +1626,7 @@ async function consumeM22IfMatches(tableIdx, n){
 /* === #22 用：情報トークン表（3×4）：黒トークン + x0/x1/x2 を横並び表示 === */
 function showInfo22Panel(vNow){
   const exist = document.getElementById('info22');
-  if (exist) exist.remove();
+ if (exist) return; // 既に表示中 / 以前に隠した後でも勝手に再表示しない
 
   const v = vNow || state.watching;
   if (!v) return;
