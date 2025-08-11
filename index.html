@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BstttnrS</title>
+<title>BEErS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -71,7 +71,12 @@
   .numcard.overlay { position:absolute; left:2px; top:2px; opacity:0.9; }
   .numcard.overlay:nth-child(3){ left:4px; top:4px; opacity:0.85; }
   .numcard.overlay:nth-child(4){ left:6px; top:6px; opacity:0.8; }
-
+  .conlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
+  .concard {
+    width:var(--item-w); height:var(--item-h);
+    border-radius:8px; border:1px solid #ddd;
+    background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
+  }
   /* ★ ミッション12：アイテム中央下に固定配置するピン */
   /* ★ ミッション12：アイテムの“外側の真下”に並べる帯 */
   .num-under{
@@ -584,6 +589,7 @@ const MATERIALS = {
 const imgNumber = n => `./s${n}.jpg`;
 const imgBack   = `./numbercardback.jpg`;
 const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
+const imgConstraint = L => `./${String(L).toLowerCase()}.jpg`;
 
 
 /* ===== 数値カード一意管理＆重ね表示ユーティリティ ===== */
@@ -603,7 +609,8 @@ function clearMissionOverlays(){
   if (m27) m27.remove();
   NUMCARD_REG.clear();
 }
-
+ const m31h = document.getElementById('m31HandRow'); if (m31h) m31h.remove();
+  const m31c = document.getElementById('m31CenterRow'); if (m31c) m31c.remove();
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
@@ -905,7 +912,7 @@ if (v) {
     return;
   }
 }    
-    renderItemsAndDi(v);  renderM29(v); renderTables(v); 
+    renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
     if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
@@ -1710,7 +1717,7 @@ function renderM22PickPanel(v){
   m22PickPanel.classList.remove('hidden');
 }
 
-/* ▼▼ ここから追加：#29 描画・操作ロジック ▼▼ */
+/* ：#29 描画・操作ロジック ▼▼ */
 function renderM29(v){
   const isM29 = (v?.mission?.id|0) === 29;
   // 既存行の掃除
@@ -1836,6 +1843,84 @@ function renderM29(v){
       row.appendChild(cell);
     });
 
+    bar.insertAdjacentElement('afterend', row);
+  }
+}
+
+/* ここから追加：#31 描画・操作ロジック */
+function renderM31(v){
+  const isM31 = (v?.mission?.id|0) === 31;
+  // 既存行の掃除
+  const oldH = document.getElementById('m31HandRow'); if (oldH) oldH.remove();
+  const oldC = document.getElementById('m31CenterRow'); if (oldC) oldC.remove();
+  if (!isM31) return;
+
+  const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+  const myLetter = (myIdx>=0) ? v.tables[myIdx]?.m31Con : null;
+  const center = Array.isArray(v.m31_center) ? v.m31_center : [];
+
+  // --- 自分の手札（下部：ミッション詳細の上）---
+  // 自分のカードがセンターに出ている間は下部に出さない
+  const myOut = center.some(o => o?.by === myIdx);
+  const footer = document.getElementById('missionFooter');
+  if (footer && myIdx>=0 && myLetter && !myOut) {
+    const row = document.createElement('div');
+    row.id = 'm31HandRow';
+    row.className = 'conlane';
+    const c = document.createElement('div');
+    c.className = 'concard';
+    c.style.backgroundImage = `url('${imgConstraint(myLetter)}')`;
+    c.title = '出す';
+    c.onclick = async (ev)=>{
+      try{
+        // センターへ安全に積む（重複/同時押しガード）
+        const rRef = ref(db, `rooms/${state.roomCode}`);
+        const rSnap = await get(rRef);
+        const R = rSnap.val()||{};
+        const cur = Array.isArray(R.m31_center) ? R.m31_center.slice() : [];
+        if (!cur.some(o => o?.by === myIdx)) {
+          cur.push({ ch: myLetter, by: myIdx });
+          await update(rRef, { m31_center: cur });
+        }
+      }catch(e){ console.error(e); }
+    };
+    row.appendChild(c);
+
+    // タイトルの直前に差し込む（#29と同様）
+    const title = document.getElementById('missionDetailTitle');
+    if (title && title.parentNode === footer) {
+      footer.insertBefore(row, title);
+    } else {
+      footer.appendChild(row);
+    }
+  }
+
+  // --- センター（アイテム列の直下・横並び）---
+  const bar = document.getElementById('itemsBar');
+  if (!bar) return;
+  if (center.length>0){
+    const row = document.createElement('div');
+    row.id = 'm31CenterRow';
+    row.className = 'conlane';
+    center.forEach((obj, idx)=>{
+      const cell = document.createElement('div');
+      cell.className = 'concard';
+      cell.style.backgroundImage = `url('${imgConstraint(obj.ch)}')`;
+      cell.title = '戻す';
+      cell.onclick = async ()=>{
+        try{
+          const rRef = ref(db, `rooms/${state.roomCode}`);
+          const rSnap = await get(rRef);
+          const R = rSnap.val()||{};
+          const cur = Array.isArray(R.m31_center) ? R.m31_center.slice() : [];
+          if (idx>=0 && idx<cur.length){
+            cur.splice(idx,1);
+            await update(rRef, { m31_center: cur });
+          }
+        }catch(e){ console.error(e); }
+      };
+      row.appendChild(cell);
+    });
     bar.insertAdjacentElement('afterend', row);
   }
 }
@@ -2562,6 +2647,21 @@ async function setupMissionOnStart(code){
     const cap = v.captainTable|0;
     const targets = [cap, (cap+1)%tcount, (cap+2)%tcount];
 
+  // ===== #31：制約カード（A〜E）を各テーブルに1枚ずつ配布、センター初期化 =====
+  if ((v.mission?.id|0) === 31) {
+    const tables = (v.tables||[]).map(T => ({...T}));
+    const letters = ['A','B','C','D','E'];
+    shuffle(letters);
+    for (let i=0; i<tables.length; i++){
+      const L = letters[i % letters.length];
+      if (!tables[i].m31Con) tables[i].m31Con = L; // 既にあれば尊重
+    }
+    await update(ref(db, `rooms/${code}`), {
+      tables,
+      m31_center: Array.isArray(v.m31_center) ? v.m31_center : []
+    });
+  }
+    
     // ランダムに赤コード 3 つ
     const redList = MATERIALS.redCodes.slice(); shuffle(redList);
     const pick = redList.slice(0,3);
