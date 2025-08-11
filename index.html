@@ -2755,9 +2755,9 @@ async function setupMissionOnStart(code){
   }
 
 /* #36 横並び5枚＋左右ブランク(rulecard) */
-  if ((v.mission?.id|0) === 36){
-    await ensureM36Meta();
-    renderM36Row(v);
+ if ((v.mission?.id|0) === 36){
+    await ensureM36Init();
+    renderM36Lane(v);
   } else {
     const ex = document.getElementById('m36Lane'); if (ex) ex.remove();
   }
@@ -2903,11 +2903,14 @@ function renderM36Row(v){
   const left = document.createElement('div');
   left.className = 'rulecard';
   left.title = 'right2 を出す';
-  left.style.backgroundImage = (dir==='right2') ? `url('${imgRule('right2')}')` : '';
+  if (dir === 'right2') left.style.backgroundImage = `url("${imgRule('right2')}")`;
   left.onclick = async ()=>{
     const cur = (state.watching?.meta?.m36_dir || null);
-    const next = (cur==='right2') ? null : 'right2';
+    const next = (cur === 'right2') ? null : 'right2';
     await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_dir: next });
+    // 即時反映（相互排他）
+    left.style.backgroundImage  = (next==='right2') ? `url("${imgRule('right2')}")` : '';
+    right.style.backgroundImage = '';
   };
   lane.appendChild(left);
 
@@ -2923,11 +2926,14 @@ function renderM36Row(v){
   const right = document.createElement('div');
   right.className = 'rulecard';
   right.title = 'left2 を出す';
-  right.style.backgroundImage = (dir==='left2') ? `url('${imgRule('left2')}')` : '';
+ if (dir === 'left2') right.style.backgroundImage = `url("${imgRule('left2')}")`;
   right.onclick = async ()=>{
     const cur = (state.watching?.meta?.m36_dir || null);
-    const next = (cur==='left2') ? null : 'left2';
+    const next = (cur === 'left2') ? null : 'left2';
     await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_dir: next });
+    // 即時反映（相互排他）
+    right.style.backgroundImage = (next==='left2') ? `url("${imgRule('left2')}")` : '';
+    left.style.backgroundImage  = '';
   };
   lane.appendChild(right);
 
