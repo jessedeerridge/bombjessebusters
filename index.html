@@ -1551,15 +1551,20 @@ async function incToken(kind, delta){
 
 }
 function renderM22PickPanel(v){
+  // ミッション22以外は消す
   if (!v?.mission?.id || v.mission.id !== 22) {
     if (m22PickPanel) m22PickPanel.classList.add('hidden');
     return;
   }
-  // 自分が席に座っていなければ隠す
+  // 自分が未着席なら消す
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
   if (myIdx < 0) { if (m22PickPanel) m22PickPanel.classList.add('hidden'); return; }
 
   const myTable = v.tables[myIdx] || {};
+  // すでに完了しているなら表示しない
+  if (myTable.m22Done) { m22PickPanel.classList.add('hidden'); return; }
+
+  // 手札にある整数の集合
   const myHandInts = new Set((myTable.hand||[])
     .filter(c => Number.isInteger(c.num))
     .map(c => c.num|0));
@@ -1568,8 +1573,20 @@ function renderM22PickPanel(v){
   const candidates = [];
   for (let n=1; n<=12; n++) if (!myHandInts.has(n)) candidates.push(n);
 
+  // 既に自分が選んだトークン
   const picked = Array.isArray(myTable.m22Tokens) ? myTable.m22Tokens.slice(0,2) : [];
   const pickedSet = new Set(picked);
+
+  // 上限：候補が1つなら1、2つ以上なら2
+  const maxPick = Math.min(2, candidates.length);
+
+  // もう必要数選び終わってたら閉じる（他端末で同期していてもOK）
+  if (picked.length >= maxPick) {
+    // DBにも完了フラグを残す（再表示防止）
+    update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Done: true });
+    m22PickPanel.classList.add('hidden');
+    return;
+  }
 
   // 描画
   m22PickPanel.innerHTML = '<span class="cap">未所持の数字から最大2つ選択：</span>';
@@ -1578,16 +1595,29 @@ function renderM22PickPanel(v){
     d.className = 'token black' + (pickedSet.has(nn) ? ' disabled' : '');
     d.textContent = String(nn);
     d.onclick = async ()=>{
-      if (pickedSet.has(nn)) return;        // 既に選択済み
-      if (picked.length >= 2) return;       // 上限
+      if (pickedSet.has(nn)) return;           // 既に選択済み
+      if (picked.length >= maxPick) return;    // 上限
+
       const next = picked.concat(nn);
-await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Tokens: next });
+
+      // 選び切ったら：m22Tokens + m22Done を同時に保存 → パネルを即非表示
+      if (next.length >= maxPick) {
+        await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), {
+          m22Tokens: next,
+          m22Done: true
+        });
+        m22PickPanel.classList.add('hidden');
+      } else {
+        // まだ上限に達していない：選択だけ保存して続行
+        await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Tokens: next });
+      }
     };
     m22PickPanel.appendChild(d);
   });
 
   m22PickPanel.classList.remove('hidden');
 }
+
 /* === #22 用：数字トークンの使用数を集計 === */
 function countNumTokenUsage(n, v){
   const vv = v || state.watching;
