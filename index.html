@@ -1714,9 +1714,12 @@ const shown = 2 - Math.min(2, used);
 
               // 自分は渡し済みにする（DB保持）
               await update(ref(db, gPath), { [state.userId]: true });
-            }catch(e){
-              state.m22GaveOnce = false;
-              console.error(e);
+    // ★ 渡したら表を自動で隠す
+    const panel = document.getElementById('info22');
+    if (panel) panel.remove();
+  }catch(e){
+    state.m22GaveOnce = false;
+    console.error(e);
             }
           } }
       ]);
