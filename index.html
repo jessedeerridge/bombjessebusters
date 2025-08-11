@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BEyyyyrS</title>
+<title>BEyｓｆｓrS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -2149,8 +2149,8 @@ async function consumeM22IfMatches(tableIdx, n){
 
 /* === #22 用：情報トークン表（3×4）：黒トークン + x0/x1/x2 を横並び表示 === */
 function showInfo22Panel(vNow){
-  const exist = document.getElementById('info22');
- if (exist) return; // 既に表示中 / 以前に隠した後でも勝手に再表示しない
+  if (window.m22_alreadyShown) return;  // ★ここから追加：一度だけ表示
+  window.m22_alreadyShown = true;   
 
   const v = vNow || state.watching;
   if (!v) return;
