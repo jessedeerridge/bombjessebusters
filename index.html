@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BsnwwwwwwnnrS</title>
+<title>BsnnnnrS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -910,7 +910,7 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
- if (!state.seatedTable && !v?.started && seatPop.classList.contains('hidden')) {
+ if (!state.seatedTable && v?.started && seatPop.classList.contains('hidden')) {
       btnSit.onclick();   // ← これが seatTabs の生成まで全部やってくれる
     }
     
@@ -2320,8 +2320,6 @@ async function leaveSeatNow(){
 btnSit.onclick = ()=>{
   if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
   const v=state.watching; if(!v?.started){ return; }
-
-  
   seatTabs.innerHTML='';
   (v.tables||[]).forEach((t,i)=>{
     const tab=document.createElement('div'); tab.className='tab';
@@ -2544,17 +2542,7 @@ async function setupMissionOnStart(code){
       ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
     }
   }
-  // #30：山札を押すと 1/2/3 のポップ → その枚数だけ右に横並びで出す
-  if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
-    const lane = buildDeckLaneP1_pop123();
-    mountLaneUnderItemsBar(lane);
-  }
-    
-  // #30：パターン1（山札→1/2/3のポップで複数同時ドロー・横並び）
-  if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
-    const lane = buildDeckLaneP1_pop123();
-    mountLaneUnderItemsBar(lane);
-  }
+
   // #12：各アイテムの中央下に「1枚ずつ」固定配置
   if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
@@ -2688,55 +2676,62 @@ function buildDeckLaneP1(){
   lane.appendChild(restLbl);
   lane.appendChild(pile);
 
+  // 積み重ね追加
+  function addToPile(n){
+    const already = pile.querySelectorAll('.numcard').length;
+    const node = document.createElement('div');
+    node.className = 'numcard';
+    node.style.backgroundImage = `url('${imgNumber(n)}')`;
 
- function buildDeckLaneP1_pop123(){
-  const lane = document.createElement('div');
-  lane.className = 'numlane';
-
-  // 1..12 の山札（重複なし）
-  const deck = MATERIALS.numbers.slice();
-  shuffle(deck);
-  let rest = deck.length;
-
-  // 山札ボタンと残数ラベル
-  const deckBtn = document.createElement('div');
-  deckBtn.className = 'numdeck';
-  deckBtn.title = '引く（1/2/3）';
-
-  const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
-  restLbl.textContent = `残:${rest}`;
-
-  // 右側に“横並び”で公開札を置くトレイ
-  const tray = document.createElement('div');
-  tray.style.display = 'flex';
-  tray.style.gap = '6px';
-
-  lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
-  lane.appendChild(tray);
-
-  function draw(k){
-    const take = [];
-    for(let i=0;i<k && rest>0;i++){
-      const n = deck.pop();
-      if(n!=null){ take.push(n); rest--; }
+    if(already>0){
+      const off = already * 2; // 2px刻み
+      node.style.position = 'absolute';
+      node.style.left = off + 'px';
+      node.style.top  = off + 'px';
     }
-    restLbl.textContent = `残:${rest}`;
-    take.forEach(n=>{
-      const div = document.createElement('div');
-      div.className = 'numcard';
-      div.style.backgroundImage = `url('${imgNumber(n)}')`;
-      tray.appendChild(div);
-    });
+    pile.appendChild(node);
+
+    // ★ 高さ調整（見切れ防止）
+    const extraH = already * 2; // 下方向へのズレ分
+    pile.style.height = (48 + extraH) + 'px'; // 48pxはカード高さ
+    lane.style.marginBottom = extraH + 'px'; // テーブルを少し下げる
   }
 
   deckBtn.onclick = (ev)=>{
-    openMenu(ev.clientX, ev.clientY, [
-      {label:'1', action:()=> draw(1)},
-      {label:'2', action:()=> draw(2)},
-      {label:'3', action:()=> draw(3)}
-    ]);
+    if(rest<=0){
+      openOneMini(ev.clientX, ev.clientY, '山札を作る', async ()=>{
+        deck.splice(0, deck.length, ...MATERIALS.numbers.slice()); 
+        shuffle(deck);
+        rest = deck.length;
+        restLbl.textContent = `残:${rest}`;
+        deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
+        deckBtn.style.background = '';
+        deckBtn.title = 'めくる';
+        pile.innerHTML = '';
+        pile.style.height = '48px';
+        lane.style.marginBottom = '0px';
+        NUMCARD_REG.clear();
+      });
+      return;
+    }
+
+    const n = deck.pop();
+    rest--;
+    restLbl.textContent = `残:${rest}`;
+    addToPile(n);
+
+    // ★ #23：表になった数値をメタに記録（重複は追加しない）
+     try{
+       const cur = (state.watching?.meta?.m23_drawnNumbers) || [];
+      if (!cur.includes(n)) {
+         update(ref(db, `rooms/${state.roomCode}/meta`), { m23_drawnNumbers: cur.concat(n) });
+       }
+     }catch(_){}
+   
+    if(rest===0){
+      deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
+      deckBtn.title='山札を作る';
+    }
   };
 
   return lane;
