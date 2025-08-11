@@ -2542,7 +2542,11 @@ async function setupMissionOnStart(code){
       ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
     }
   }
-
+  // #30：パターン1（山札→1/2/3のポップで複数同時ドロー・横並び）
+  if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
+    const lane = buildDeckLaneP1_pop123();
+    mountLaneUnderItemsBar(lane);
+  }
   // #12：各アイテムの中央下に「1枚ずつ」固定配置
   if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
@@ -2676,6 +2680,64 @@ function buildDeckLaneP1(){
   lane.appendChild(restLbl);
   lane.appendChild(pile);
 
+
+  // パターン1（#30用）：山札を押すと 1/2/3 ポップ → その枚数だけ右に横並びで出す
+  function buildDeckLaneP1_pop123(){
+    const lane = document.createElement('div');
+    lane.className = 'numlane';
+
+    // 1..12 の山札（重複なし）
+    const deck = MATERIALS.numbers.slice();
+    shuffle(deck);
+    let rest = deck.length;
+
+    // 山札ボタンと残数ラベル
+    const deckBtn = document.createElement('div');
+    deckBtn.className = 'numdeck';
+    deckBtn.title = '引く（1/2/3）';
+
+    const restLbl = document.createElement('span');
+    restLbl.className = 'numrest';
+    restLbl.textContent = `残:${rest}`;
+
+    // 右側に“横並びで”公開札を置くトレイ
+    const tray = document.createElement('div');
+    tray.style.display = 'flex';
+    tray.style.gap = '6px';
+
+    lane.appendChild(deckBtn);
+    lane.appendChild(restLbl);
+    lane.appendChild(tray);
+
+    function draw(k){
+      // 山の上から（末尾から）k枚取り出す
+      const take = [];
+      for(let i=0;i<k && rest>0;i++){
+        const n = deck.pop();
+        if(n!=null) take.push(n), rest--;
+      }
+      restLbl.textContent = `残:${rest}`;
+      // 横に並べて追加
+      take.forEach(n=>{
+        const div = document.createElement('div');
+        div.className = 'numcard';
+        div.style.backgroundImage = `url('${imgNumber(n)}')`;
+        tray.appendChild(div);
+      });
+    }
+
+    deckBtn.onclick = (ev)=>{
+      // ポップ 1/2/3
+      openMenu(ev.clientX, ev.clientY, [
+        {label:'1', action:()=> draw(1)},
+        {label:'2', action:()=> draw(2)},
+        {label:'3', action:()=> draw(3)}
+      ]);
+    };
+
+    return lane;
+  }
+  
   // 積み重ね追加
   function addToPile(n){
     const already = pile.querySelectorAll('.numcard').length;
