@@ -1295,8 +1295,8 @@ const flags = state.watching?.mission?.flags || {};
 const myHand = (t.hand||[]).filter(cc => cc.ownerId===state.userId);
 const countSame = myHand.filter(cc => cc.num===c.num).length;
 
-// 黄コードトークン（▧）
-if(flags.useYellowToken){
+// 黄コードトークン（▧）— ミッションに関係なく「黄コードなら常に」出す
+if (flags.useYellowToken || c.kind === 'yellow') {
   entries.push({label:'▧', action: async ()=>{
     const updated=[...(tokens), {type:'yellow', value:'▧', style:'yellow'}];
     await update(ref(db, cardPath), { tokens: updated });
@@ -1341,8 +1341,8 @@ if(flags.useParityToken){
   }
 }
 
-const suppressNumberPop = !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
-
+const suppressNumberPop = (c.kind !== 'normal')   // ★ 赤/黄では数字トークン禁止
+  || !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
 // ▼ 数字ポップの出し方（通常 or #17 隊長用）
 const isCaptain = (state.watching?.captainTable|0) === idx;
 if(!suppressNumberPop && canNum){
@@ -1380,13 +1380,16 @@ if(!suppressNumberPop && canNum){
                       const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
                       box.classList.toggle('elevated', afterHas);
                     }},
-                  { label:String(c.num), action: async ()=>{
-                      if(!has('num')){
-                        const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
-                        await update(ref(db, cardPath), { tokens: next });
-                        box.classList.add('elevated');
-                      }
-                    }}
+// ★ 数字付与は通常コードのみ
+if (c.kind === 'normal') {
+  entries2.push({ label:String(c.num), action: async ()=>{
+    if(!has('num')){
+      const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
+      await update(ref(db, cardPath), { tokens: next });
+      box.classList.add('elevated');
+    }
+  }});
+}
                 ]);
               }
             });
@@ -1452,13 +1455,16 @@ if(!suppressNumberPop && canNum){
                   const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
                   box.classList.toggle('elevated', afterHas);
                 }},
-                {label:String(c.num), action: async ()=>{
-                  if(!has('num')){
-                    const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
-                    await update(ref(db, cardPath), { tokens: next });
-                    box.classList.add('elevated');
-                  }
-                }},
+// ★ 数字付与は通常コードのみ
+if (c.kind === 'normal') {
+  entries2.push({ label:String(c.num), action: async ()=>{
+    if(!has('num')){
+      const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
+      await update(ref(db, cardPath), { tokens: next });
+      box.classList.add('elevated');
+    }
+  }});
+}
               ]);
             }});
           }
