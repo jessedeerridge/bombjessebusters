@@ -764,41 +764,6 @@ function buildMixPlan(missionId){
     {type:'redPick',    k:2},
     {type:'yellowPick', k:4},
   ],
-
- 29: [  // 赤3
-    {type:'redPick', k:3},
-  ],
-
-  30: [  // 赤2-1、黄4
-    {type:'redChoose',  from:2, take:1},
-    {type:'yellowPick', k:4},
-  ],
-
-  31: [  // 赤3-2
-    {type:'redChoose', from:3, take:2},
-  ],
-
-  32: [  // 赤2
-    {type:'redPick', k:2},
-  ],
-
-  33: [  // 赤3-2
-    {type:'redChoose', from:3, take:2},
-  ],
-
-  34: [  // 赤1
-    {type:'redPick', k:1},
-  ],
-
-  35: [  // 赤3-2 黄4
-    {type:'redChoose',  from:3, take:2},
-    {type:'yellowPick', k:4},
-  ],
-
-  36: [  // 赤3-1 黄2
-    {type:'redChoose',  from:3, take:1},
-    {type:'yellowPick', k:2},
-  ],
 };
 return plans[missionId] || [];
 
@@ -1069,9 +1034,6 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
       {label:'進める', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
       {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
     ]);
-  // #36：左右ブランク列の描画（条件を満たせば）
-  try{ renderM36Row(state.watching); }catch(_){}
-    
   };
 }
 
@@ -2401,11 +2363,7 @@ async function setupMissionOnStart(code){
       ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
     }
   }
- // #30：P1拡張（1/2/3枚の選択めくり）
-  if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
-    const lane = buildDeckLaneP1_pop123();
-    mountLaneUnderItemsBar(lane);
-  }
+
   // #12：各アイテムの中央下に「1枚ずつ」固定配置
   if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
@@ -2616,67 +2574,7 @@ function buildDeckLaneP2(n=2){
 function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
 }
-/* パターン1拡張：山札→「1/2/3」から選んで右に横並び（#30用） */
-function buildDeckLaneP1_pop123(){
-  const lane = document.createElement('div');
-  lane.className = 'numlane';
 
-  const deck = MATERIALS.numbers.slice(); shuffle(deck);
-  let rest = deck.length;
-
-  const deckBtn = document.createElement('div');
-  deckBtn.className='numdeck';
-  deckBtn.title='1/2/3枚を選んで出す';
-
-  const restLbl = document.createElement('span');
-  restLbl.className='numrest';
-  restLbl.textContent = `残:${rest}`;
-
-  // 右に横並びで公開置き場
-  const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.gap = '6px';
-
-  lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
-  lane.appendChild(row);
-
-  function draw(k){
-    for(let i=0;i<k;i++){
-      if(rest<=0) break;
-      const n = deck.pop(); rest--;
-      const nc=document.createElement('div');
-      nc.className='numcard';
-      nc.style.backgroundImage=`url('${imgNumber(n)}')`;
-      row.appendChild(nc);
-    }
-    restLbl.textContent = `残:${rest}`;
-    if(rest===0){
-      deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
-      deckBtn.title='山札を作る';
-    }
-  }
-
-  deckBtn.onclick = (ev)=>{
-    if(rest<=0){
-      openOneMini(ev.clientX, ev.clientY, '山札を作る', ()=>{
-        deck.splice(0, deck.length, ...MATERIALS.numbers.slice());
-        shuffle(deck); rest=deck.length; restLbl.textContent=`残:${rest}`;
-        deckBtn.style.background=''; deckBtn.title='1/2/3枚を選んで出す';
-        row.innerHTML='';
-      });
-      return;
-    }
-    // 1/2/3 のポップ
-    openMenu(ev.clientX, ev.clientY, [
-      {label:'1', action: ()=> draw(1)},
-      {label:'2', action: ()=> draw(2)},
-      {label:'3', action: ()=> draw(3)},
-    ]);
-  };
-
-  return lane;
-}
  
 /* ===== ★ #23：アイテム山（7枚）を数値山レーンの右側に表示 ===== */
 async function ensureM23MetaInit(){
@@ -2783,66 +2681,6 @@ function attachM23DeckUI(lane){
     refreshRest();
   };
 
-  /* ===== #36：数値5枚＋左右ブランク（押すと反対側の2枚を表示） ===== */
-async function ensureM36MetaInit(){
-  const v = state.watching; if(!v) return;
-  const meta = v.meta || {};
-  if(Array.isArray(meta.m36_nums) && meta.m36_nums.length===5) return;
-  const pool = MATERIALS.numbers.slice(); shuffle(pool);
-  const five = pool.slice(0,5).sort((a,b)=>a-b);
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_nums: five, m36_side:'L' });
-}
-
-/** itemsBar 直下へ描画 */
-function renderM36Row(v){
-  const flags = v?.mission?.flags || {};
-  if(!flags.m36_directionRow) return;
-
-  const old = document.getElementById('m36Row');
-  if(old) old.remove();
-
-  const nums = (v?.meta?.m36_nums)||[];
-  if(nums.length!==5) return;
-
-  const side = v?.meta?.m36_side || 'L';
-
-  const lane = document.createElement('div');
-  lane.className = 'numlane';
-  lane.id = 'm36Row';
-
-  // 左ブランク
-  const left = document.createElement('div');
-  left.className = 'rulecard';
-  left.title = '左のブランク（押すと右2を表示）';
-  lane.appendChild(left);
-
-  // 5枚
-  const cells = nums.map(n=>{
-    const nc = document.createElement('div');
-    nc.className = 'numcard';
-    nc.style.backgroundImage = `url('${imgNumber(n)}')`;
-    lane.appendChild(nc);
-    return nc;
-  });
-
-  // 右ブランク
-  const right = document.createElement('div');
-  right.className = 'rulecard';
-  right.title = '右のブランク（押すと左2を表示）';
-  lane.appendChild(right);
-
-  function apply(sideNow){
-    cells.forEach((el,i)=>{
-      const show = (sideNow==='L') ? (i<=1) : (i>=3);
-      el.style.visibility = show ? 'visible' : 'hidden';
-    });
-  }
-  apply(side);
-
-  left.onclick = async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_side:'R' }); };
-  right.onclick = async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_side:'L' }); };
-
-  mountLaneUnderItemsBar(lane);
 }
 
 /* ===== ★ #26：1〜12 を 3×4 で並べ、裏表をトグル ===== */
@@ -3175,113 +3013,6 @@ function missionInfo(id, opts={}){
       };
     }
  
-    case 29: {
-      return {
-        id:29, name:'#29', desc:'',
-        display:[
-          '#29', ...linesForMix,
-          '数値カードをシャッフルして、全員に2枚ずつ配る。隊長の前の数字のプレイヤー(X)には3枚配る。',
-          '配られた数値カードは自分だけに表示。画面下部（ミッション詳細の上）に並べる。',
-          '自分の数値カードをクリックすると「場に出す」。場に出すとアイテム列の下かつ画面左右の真ん中に裏向きで全員に表示される。',
-          '出した本人は「戻す」「めくる」。めくる後5秒表示し、そのカードは「出したプレイヤーの次のテーブル」に移動する。'
-        ],
-        // ※UIは段階導入。初回は説明のみ（今後のPRでアクション実装予定）
-        flags:{}
-      };
-    }
-
-    case 30: {
-      return {
-        id:30, name:'#30', desc:'',
-        display:[
-          '#30', ...linesForMix,
-          '「赤x-yから1枚　　黄a-b-c-d」',
-          'アイテムカードの下に数値カードの山札を表示。山札を押すと 1/2/3 のポップが出て、その枚数だけ右に横並びで出す。'
-        ],
-        flags:{ needsNumberLane:true, pattern:'P1-pop123' }
-      };
-    }
-
-    case 31: {
-      return {
-        id:31, name:'#31', desc:'',
-        display:[
-          '#31',
-          '制約カード（A〜E）はアイテムカードと同サイズで表示。',
-          '各プレイヤーにA〜Eをシャッフルして1枚ずつ非公開で配布し、押すと「出す」で場（アイテム下）に横並び表示。「戻す」で自分の下に戻せる。',
-          '「プレイヤーは常にこの制約を適用」「適用できなくなったとき、公開して通常通りプレイ」'
-        ],
-        // ※表示・配布UIは今後追加予定（今回の差分は説明表示のみ）
-        flags:{}
-      };
-    }
-
-    case 32: {
-      return {
-        id:32, name:'#32', desc:'',
-        display:[
-          '#32',
-          '制約カードの山札をアイテム下に表示。クリックで「めくる」→右に表で並べる（全員に適用）。',
-          '「隊長の手番で引き直し可」「制約が適用できないプレイヤーは手番を飛ばす」'
-        ],
-        // ※今回：説明表示のみ。山札UIは次の差分で追加予定
-        flags:{}
-      };
-    }
-
-    case 33: {
-      return {
-        id:33, name:'#33', desc:'',
-        display:[
-          '#33',
-          '情報トークンは偶数/奇数トークンのみ使用する。'
-        ],
-        // 既存の #21 と同様のフラグで偶奇トークンだけを許可
-        flags:{ useParityToken:true }
-      };
-    }
-
-    case 34: {
-      return {
-        id:34, name:'#34', desc:'',
-        display:[
-          '#34',
-          'このミッションではキャラクターカードは自分にしか見えない（他テーブルはブランク表示）。',
-          'A〜Eの制約カードを全員に1枚ずつ配り、アイテム下に表示。',
-          '「隊長カードの持ち主はウィーケスト・リンク。彼のみ制約適用」',
-          '「制約により行動できなければ宣言し、起爆ダイヤル+2」',
-          '「誰かがプレイヤーと制約の両方を指摘できたら解除。どちらかでも誤りなら起爆ダイヤル+1」'
-        ],
-        // ※今回：表示のみ。秘匿/推理UIは後続PRで
-        flags:{}
-      };
-    }
-
-    case 35: {
-      return {
-        id:35, name:'#35', desc:'',
-        display:[
-          '#35',
-          '各テーブル：手札からランダムで1枚を一番右へ移動し、そのカードに ✕（黄背景/黒文字）トークンを付ける。他は昇順。',
-          '「スタンド右側にランダムのコード」「このコードにアイテムは使用不可」「黄コードを全て解除しないと✕コードを解除できない」'
-        ],
-        // #20 と同じ右端✕処理を流用
-        flags:{ m20_rightmostX:true }
-      };
-    }
-
-    case 36: {
-      return {
-        id:36, name:'#36', desc:'',
-        display:[
-          '#36',
-          '数値1〜12からランダム5枚を横並び。左右にブランク枠を付ける。',
-          '左ブランクを押すと「右側の2枚」を表示。右ブランクを押すと「左側の2枚」を表示。',
-          '「隊長が解除する順番（向き）を決める。」「対象2本を切断するたび、相談なしで新しい向きを置き直せる」「それ以外の数値は切断可能」'
-        ],
-        flags:{ m36_directionRow:true }
-      };
-    }
 
 
 
