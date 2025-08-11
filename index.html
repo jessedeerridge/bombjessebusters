@@ -2968,25 +2968,29 @@ function buildConDeckLaneP1(){
   lane.appendChild(restLbl);
   lane.appendChild(pile);
 
-  // 1枚めくって公開札（右側）に積む：挙動は数値P1と同じ
-  const addToPile = (ch)=>{
-    const node = document.createElement('div');
-    node.className = 'concard';
-    node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
-    // 数値P1と同様の“2pxずらし”＆見切れ対策
-    const already = pile.querySelectorAll('.concard').length;
-    if (already > 0){
+    // 1枚めくって公開札（右側）に積む：挙動は数値P1と同じ
+    const addToPile = (ch)=>{
+      const node = document.createElement('div');
+      node.className = 'concard';
+      node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+
+      const already = pile.querySelectorAll('.concard').length;
       const off = already * 2;
-      node.style.position = 'absolute';
-      node.style.left = off + 'px';
-      node.style.top  = off + 'px';
-      // 高さと下マージンも増やす（制約カード高＝--con-h≒--item-h）
+
+      if (already > 0){
+        node.style.position = 'absolute';
+        node.style.left = off + 'px';
+        node.style.top  = off + 'px';
+      }
+
+      pile.appendChild(node);
+
+      // ★ ここから変更：1枚目でも必ず高さ/余白を更新する
       const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
       pile.style.height = (baseH + off) + 'px';
       lane.style.marginBottom = off + 'px';
-    }
-    pile.appendChild(node);
-  };
+      // ★ ここまで変更
+    };
 
   deckBtn.onclick = ()=>{
     if (rest <= 0) return;
