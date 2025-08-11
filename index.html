@@ -2394,33 +2394,33 @@ function missionInfo(id, opts={}){
   switch(id){
     case 1:{ // 赤コード1
       return {
-        id:1, name:'#1 爆弾（赤コード）', desc:'', 
-        display: ['#1 爆弾（赤コード）', ...linesForMix],
+        id:1, name:'#1', desc:'', 
+        display: ['#1', ...linesForMix],
       };
     }
     case 2:{ // 黄コード1
       return {
-        id:2, name:'#2 黄コード', desc:'',
-        display: ['#2 黄コード', ...linesForMix],
+        id:2, name:'#2', desc:'',
+        display: ['#2', ...linesForMix],
       };
     }
     case 3:{
       const list=[1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5]; shuffle(list);
       const pick=list.slice(0,3);
       return {
-        id:3, name:'#3 さらい爆弾', desc:'',
-        display:[ '#3 さらい爆弾', `${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ`, ...linesForMix ],
+        id:3, name:'#3', desc:'',
+        display:[ '#3', `${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ`, ...linesForMix ],
       };
     }
 
     /* === #9〜#12（指定の引用文と赤/黄表示を合成）=== */
     case 9: {
       return {
-        id:9, name:'#9 aaa', desc:'',
+        id:9, name:'#9', desc:'',
         display: [
-          '#9 aaa',
+          '#9',
           ...linesForMix, // ← 赤1・黄2の結果（赤[1.5] / 黄[2.1][…] など）
-          '最初の左にあるカードを切断しなければ、右にあるカードを切断できない。',
+          '最初に左にあるカードを切断しなければ、右にあるカードを切断できない。',
           '手番に切断できるコードがなければ起爆ダイヤルを1進める。'
         ],
         flags: { needsRuleRow:true, rule: { type:'R2with2', rightCount:2 } }
@@ -2428,9 +2428,9 @@ function missionInfo(id, opts={}){
     }
     case 10: {
       return {
-        id:10, name:'#10 bbb', desc:'',
+        id:10, name:'#10', desc:'',
         display: [
-          '#10 bbb',
+          '#10',
           ...linesForMix,
           '15分以内に解除しなければならない！',
           '時計回りではなく、手番を行いたいプレイヤーが「チョキン！」と言ってから、切断を実行する。',
@@ -2441,9 +2441,9 @@ function missionInfo(id, opts={}){
     }
     case 11: {
       return {
-        id:11, name:'#11 ccc', desc:'',
+        id:11, name:'#11', desc:'',
         display: [
-          '#11 ccc',
+          '#11',
           ...linesForMix,
           '数値カードの数字のコードは全て赤コードと見なされる。',
           '手札がこのコードだけになった場合、公開して手番を終えられる。'
@@ -2469,10 +2469,10 @@ function missionInfo(id, opts={}){
         display:[
           '#13',
           ...linesForMix,
-          '赤コードからランダムで3つ選び、隊長→次→次の3人に1つずつ配布する。',
-          '各プレイヤー名の右に 1~12 の情報トークンをランダムで1つ表示し、そのプレイヤーのテーブル内で同じ数字の情報トークンが使用されたら消える。',
-          '「情報トークンはランダムに1枚引いてコードの前に置く」「隊長から順に赤コードを1枚ずつ配布」',
-          '「誰でも赤コードの場所を3つ同時に指摘して解除できるが、間違えると爆発」「赤コードの切断にアイテムは使用不可」'
+          '情報トークンはランダムに1枚引いてコードの前に置く。（同じ数字のコードがなければ手元に残す。）',
+          '赤コードを3つ、隊長から順番通りに配布する。',
+          '誰でも赤コードの場所を3つ同時に指摘して解除できるが、間違えると爆発する。',
+          '赤コードの切断に「フツーノ探知機」や装備カードは使えない。'
         ],
         flags:{ m13_distributeRedToCaptain3:true, m13_headerRandomInfoToken:true, m13_autoHideHeaderToken:true }
       };
