@@ -1245,6 +1245,14 @@ if(!seatedAny){
     await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
   };
 }
+
+if (seatedAny && (v.mission?.id|0) === 34 && t.playerId !== state.userId){
+  // #34：他者のキャラはブランク表示（画像も操作も無し）
+  char.removeAttribute('style');
+  char.onclick = null;
+  char.classList.add('blank');
+}
+    
 charCol.appendChild(char);
 
 // ★ #13：初期情報トークンはキャラの「下」に小さく表示（meta.m13_header をそのまま使う）
@@ -2729,7 +2737,7 @@ async function setupMissionOnStart(code){
   }
 
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
-  if ((v.mission?.id|0) === 32){
+  if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
     const old = document.getElementById('m32ConRow');
     if (old) old.remove();
@@ -2737,7 +2745,12 @@ async function setupMissionOnStart(code){
     mountLaneUnderItemsBar(lane);
   }
 
-
+  if ((v.mission?.id|0) === 36){
+    const old = document.getElementById('m36Row');
+    if (old) old.remove();
+    const lane = buildM36Lane();      // 新規：下で定義
+    mountLaneUnderItemsBar(lane);
+  }
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
     const tcount = v.tableCount|0;
@@ -2793,6 +2806,35 @@ try{
     await set(ref(db, `rooms/${code}/items`), nextItems);
   }
 
+  if ((v.mission?.id|0) === 35) {
+    const tRef = ref(db, `rooms/${code}/tables`);
+    const tSnap = await get(tRef);
+    const tbls = tSnap.val() || [];
+    const realpha = (hand)=>{ const A='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = A[i % A.length]); };
+
+    (tbls||[]).forEach(T=>{
+      const hand = Array.isArray(T?.hand) ? T.hand : [];
+      if (hand.length === 0) return;
+      const pick = (Math.random()*hand.length)|0;
+      const picked = hand.splice(pick, 1)[0];
+
+      // 他のカードは昇順
+      hand.sort((a,b)=> (a.num|0) - (b.num|0));
+      // 右端に選ばれたカードを配置
+      hand.push(picked);
+
+      // ✕トークン（黄地/黒文字）を付与
+      const toks = Array.isArray(picked.tokens) ? picked.tokens.slice() : [];
+      toks.push({ type:'xmark', text:'✕', style:'yellowX' });
+      picked.tokens = toks;
+
+      realpha(hand);
+      T.hand = hand;
+    });
+
+    await set(tRef, tbls);
+  }
+  
   // ===== #20：各テーブルで 1 枚を右端へ移動し、黄色✕トークンを付与 =====
   if(v.mission?.flags?.m20_rightmostX){
     const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
@@ -3129,6 +3171,57 @@ function buildDeckLaneP1Pop123(){
   return lane;
 }
 
+/* ここから追加：#36 レーン実装 */
+function buildM36Lane(){
+  // レーン本体
+  const lane = document.createElement('div');
+  lane.className = 'numlane';
+  lane.id = 'm36Row';
+
+  // 左ブランク（横向きカード枠を流用）
+  const leftB = document.createElement('div');
+  leftB.className = 'rulecard';
+  leftB.title = '左ブランク（クリックで右2を表示）';
+
+  // 数値5枚（未使用から抽選）
+  const picks = pickUnusedNumbers(5);  // 1..12 から5
+  picks.forEach(n=>{
+    placeNumberCard(n, lane);          // 既存の「1数字＝1ホルダー」を配置
+  });
+
+  // 右ブランク
+  const rightB = document.createElement('div');
+  rightB.className = 'rulecard';
+  rightB.title = '右ブランク（クリックで左2を表示）';
+
+  // 先頭と末尾に配置
+  lane.insertBefore(leftB, lane.firstChild);
+  lane.appendChild(rightB);
+
+  // 補助：ブランク内をクリア
+  const clearBlank = (el)=>{ while(el.firstChild) el.removeChild(el.firstChild); };
+
+  // 補助：ブランクに n を水平2枚で表示（オーバーレイではなく中に2個の .numcard-holder を置く）
+  const putTwo = (host, arr)=>{
+    clearBlank(host);
+    arr.slice(0,2).forEach(n=>{
+      const holder = document.createElement('div');
+      holder.className = 'numcard-holder';
+      const base = document.createElement('div');
+      base.className = 'numcard overlay';   // 少しずらして重なり表現
+      base.style.backgroundImage = `url('${imgNumber(n)}')`;
+      holder.appendChild(base);
+      host.appendChild(holder);
+    });
+  };
+
+  // クリック挙動：左ブランク＝「右2」、右ブランク＝「左2」
+  leftB.onclick  = ()=>{ putTwo(leftB,  [picks[3], picks[4]].filter(Boolean)); clearBlank(rightB); };
+  rightB.onclick = ()=>{ putTwo(rightB, [picks[0], picks[1]].filter(Boolean)); clearBlank(leftB); };
+
+  return lane;
+}
+/* ここまで追加 */
 
   
 /* パターン2：デッキからn枚→並べる（アイテム下） */
