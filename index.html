@@ -2754,13 +2754,6 @@ async function setupMissionOnStart(code){
     mountLaneUnderItemsBar(lane);
   }
 
-/* #36 横並び5枚＋左右ブランク(rulecard) */
- if ((v.mission?.id|0) === 36){
-    await ensureM36Init();
-    renderM36Lane(v);
-  } else {
-    const ex = document.getElementById('m36Lane'); if (ex) ex.remove();
-  }
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
     const tcount = v.tableCount|0;
@@ -2873,72 +2866,7 @@ function mountLaneUnderItemsBar(lane){
   const bar = document.getElementById('itemsBar');
   bar.insertAdjacentElement('afterend', lane);
 }
-/*#36 初期化 & 描画 */
-async function ensureM36Meta(){
-  const v = state.watching; if(!v) return;
-  const meta = v.meta||{};
-  if (!Array.isArray(meta.m36_numbers) || meta.m36_numbers.length!==5){
-    const deck = MATERIALS.numbers.slice(); shuffle(deck);
-    const five = deck.slice(0,5);
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_numbers: five, m36_dir: null });
-  }
-}
-function renderM36Row(v){
-  const isM36 = ((v?.mission?.id|0) === 36);
-  // 既存除去
-  { const ex = document.getElementById('m36Lane'); if (ex) ex.remove(); }
-  if (!isM36) return;
 
-  const bar = document.getElementById('itemsBar');
-  if (!bar) return;
-
-  const nums = (v?.meta?.m36_numbers || []).slice(0,5);
-  const dir  = v?.meta?.m36_dir || null; // 'left2' | 'right2' | null
-
-  const lane = document.createElement('div');
-  lane.id = 'm36Lane';
-  lane.className = 'numlane';
-
-  // 左ブランク（rulecard）
-  const left = document.createElement('div');
-  left.className = 'rulecard';
-  left.title = 'right2 を出す';
-  if (dir === 'right2') left.style.backgroundImage = `url("${imgRule('right2')}")`;
-  left.onclick = async ()=>{
-    const cur = (state.watching?.meta?.m36_dir || null);
-    const next = (cur === 'right2') ? null : 'right2';
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_dir: next });
-    // 即時反映（相互排他）
-    left.style.backgroundImage  = (next==='right2') ? `url("${imgRule('right2')}")` : '';
-    right.style.backgroundImage = '';
-  };
-  lane.appendChild(left);
-
-  // 5枚の数値カード
-  nums.forEach(n=>{
-    const nc = document.createElement('div');
-    nc.className = 'numcard';
-    nc.style.backgroundImage = `url('${imgNumber(n)}')`;
-    lane.appendChild(nc);
-  });
-
-  // 右ブランク（rulecard）
-  const right = document.createElement('div');
-  right.className = 'rulecard';
-  right.title = 'left2 を出す';
- if (dir === 'left2') right.style.backgroundImage = `url("${imgRule('left2')}")`;
-  right.onclick = async ()=>{
-    const cur = (state.watching?.meta?.m36_dir || null);
-    const next = (cur === 'left2') ? null : 'left2';
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_dir: next });
-    // 即時反映（相互排他）
-    right.style.backgroundImage = (next==='left2') ? `url("${imgRule('left2')}")` : '';
-    left.style.backgroundImage  = '';
-  };
-  lane.appendChild(right);
-
-  mountLaneUnderItemsBar(lane);
-}
 
 
   
