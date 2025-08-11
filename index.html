@@ -924,7 +924,7 @@ if (v) {
     return;
   }
 }    H(listsBox, !!v?.started);
-    renderLists(v); renderItemsAndDi(v); renderTables(v); 
+    renderLists(v); renderItemsAndDi(v);  renderM29(v); renderTables(v); 
     if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
@@ -1165,6 +1165,12 @@ function renderTables(v){
 const header=document.createElement('div'); header.className='t-header';
 const title=document.createElement('div');  title.className='title';
 title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
+/* ▼▼ ここから追加：#29 所持数表示 ▼▼ */
+if ((v.mission?.id|0) === 29) {
+  const cnt = (Array.isArray(t.m29Hand) ? t.m29Hand.length : 0);
+  title.textContent += `（${cnt}）`;
+}
+    
 header.appendChild(title); 
 
 
@@ -1718,6 +1724,130 @@ function renderM22PickPanel(v){
   m22PickPanel.classList.remove('hidden');
 }
 
+/* ▼▼ ここから追加：#29 描画・操作ロジック ▼▼ */
+function renderM29(v){
+  const isM29 = (v?.mission?.id|0) === 29;
+  // 既存行の掃除
+  const oldHand = document.getElementById('m29HandRow');
+  const oldCenter = document.getElementById('m29CenterRow');
+  if (!isM29) { if (oldHand) oldHand.remove(); if (oldCenter) oldCenter.remove(); return; }
+
+  // 自分の席
+  const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+  const myHand = (myIdx>=0) ? (v.tables[myIdx]?.m29Hand||[]) : [];
+
+  // ---- 自分の手札（画面下部：ミッション詳細の上） ----
+  const footer = document.getElementById('missionFooter');
+  if (footer) {
+    // いったん既存を消す
+    const ex = document.getElementById('m29HandRow'); if (ex) ex.remove();
+    if (myIdx>=0 && myHand.length>0) {
+      const row = document.createElement('div');
+      row.id = 'm29HandRow';
+      row.className = 'numlane';
+      row.style.marginTop = '4px';
+      // 各カード
+      myHand.forEach(n=>{
+        const c = document.createElement('div');
+        c.className = 'numcard';
+        c.textContent = String(n); // 軽量：テキスト表示
+        c.style.display = 'grid'; c.style.placeItems = 'center'; c.style.fontWeight = 'bold';
+        c.title = '場に出す';
+        c.onclick = async (ev)=>{
+          try{
+            // DBから再取得して安全に更新
+            const tRef = ref(db, `rooms/${state.roomCode}/tables/${myIdx}`);
+            const mRef = ref(db, `rooms/${state.roomCode}`);
+            const [tSnap, rSnap] = await Promise.all([get(tRef), get(mRef)]);
+            const T = tSnap.val()||{};
+            const R = rSnap.val()||{};
+            const hand = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
+            const pos  = hand.indexOf(n);
+            if (pos<0) return;
+            hand.splice(pos,1);
+            const center = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
+            center.push({ n, by: myIdx, faceUp:false });
+            await Promise.all([
+              update(tRef, { m29Hand: hand }),
+              update(ref(db, `rooms/${state.roomCode}`), { m29_center: center })
+            ]);
+          }catch(e){ console.error(e); }
+        };
+        row.appendChild(c);
+      });
+      // ミッション詳細タイトルの直前に差し込む
+      const title = document.getElementById('missionDetailTitle');
+      if (title && title.parentNode === footer) {
+        footer.insertBefore(row, title);
+      } else {
+        footer.appendChild(row);
+      }
+    }
+  }
+
+  // ---- センター（アイテム下・中央寄せ） ----
+  const bar = document.getElementById('itemsBar');
+  if (!bar) return;
+  { const ex = document.getElementById('m29CenterRow'); if (ex) ex.remove(); }
+
+  const center = Array.isArray(v.m29_center) ? v.m29_center : [];
+  if (center.length>0){
+    const row = document.createElement('div');
+    row.id = 'm29CenterRow';
+    row.className = 'numlane';
+    row.style.justifyContent = 'center';
+    // 各センター札
+    center.forEach((obj, idx)=>{
+      const cell = document.createElement('div');
+      cell.className = 'numcard';
+      cell.style.display = 'grid'; cell.style.placeItems = 'center'; cell.style.fontWeight = 'bold';
+      if (obj.faceUp) {
+        cell.textContent = String(obj.n);
+      } else {
+        cell.textContent = ''; // 裏向き
+        cell.style.background = "#fff url('./numbercardback.jpg') center/cover no-repeat";
+      }
+      cell.title = obj.faceUp ? '出したプレイヤーの次のテーブルへ移す' : 'めくる';
+      cell.onclick = async ()=>{
+        try{
+          const rRef = ref(db, `rooms/${state.roomCode}`);
+          const rSnap = await get(rRef);
+          const R = rSnap.val()||{};
+          const cur = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
+          // インデックス安全化
+          if (idx<0 || idx>=cur.length) return;
+          const curObj = cur[idx];
+          if (!curObj) return;
+
+          if (!curObj.faceUp){
+            // 表にする
+            cur[idx] = { ...curObj, faceUp:true };
+            await update(rRef, { m29_center: cur });
+          } else {
+            // 「出したプレイヤーの次のテーブル」へ移す
+            const toIdx = ((curObj.by|0) + 1) % (v.tableCount|0);
+            // 受け取り先の手札を更新
+            const tRef = ref(db, `rooms/${state.roomCode}/tables/${toIdx}`);
+            const tSnap = await get(tRef);
+            const T = tSnap.val()||{};
+            const hand = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
+            hand.push(curObj.n);
+            // センターから取り除く
+            cur.splice(idx,1);
+            await Promise.all([
+              update(tRef, { m29Hand: hand }),
+              update(rRef, { m29_center: cur })
+            ]);
+          }
+        }catch(e){ console.error(e); }
+      };
+      row.appendChild(cell);
+    });
+
+    bar.insertAdjacentElement('afterend', row);
+  }
+}
+  
 /* === #22 用：数字トークンの使用数を集計 === */
 function countNumTokenUsage(n, v){
   const vv = v || state.watching;
@@ -2335,7 +2465,23 @@ async function startGame(playerCount, missionId){
 
   // ミッション表示メタ生成（赤/黄の結果行を先頭に差し込む）
   missionMeta = missionInfo(missionId, { mixLines, chooseLines });
-
+  /* ▼▼ ここから追加：#29 数値カードの配布とセンター初期化 ▼▼ */
+  if (missionId === 29) {
+    const nums = MATERIALS.numbers.slice(); shuffle(nums); // 1..12 をシャッフル
+    // 全員に2枚、隊長の前（cap-1）のテーブルに +1
+    const cap = captainIndex|0;
+    const x   = (cap - 1 + playerCount) % playerCount;
+    let pi = 0;
+    tables.forEach((T, i) => {
+      const take = (i===x) ? 3 : 2;
+      T.m29Hand = [];
+      for (let k=0; k<take && pi<nums.length; k++) T.m29Hand.push(nums[pi++]);
+    });
+    // センター（場に出した数値カード置き場）
+    // 形式: { n: number, by: tableIndex, faceUp: boolean }
+    missionMeta.flags = { ...(missionMeta.flags||{}), m29:true };
+  }
+  /* ▲▲ ここまで追加：#29 ▼▼ */
 
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
@@ -2369,6 +2515,9 @@ const items = pool
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
     di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
+     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
+    m29_center: (missionMeta?.id===29 ? [] : undefined),
+    /* ▲▲ ここまで追加 ▼▼ */
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
 
