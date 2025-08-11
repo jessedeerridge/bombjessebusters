@@ -379,10 +379,6 @@
 
 
     <div id="lobby" class="hidden">
-      <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:4px">
-     <button class="btn primary" id="btnStart" title="ホストのみ">爆弾を解除！</button>
-<span class="small" id="startHint">（ホストのみ押せます）</span>
-</div>
 
       <div class="items-bar hidden" id="itemsBar">
         <div class="items" id="items"></div>
@@ -525,8 +521,6 @@ const btnJoin = document.getElementById('btnJoin');
 const btnRandom=document.getElementById('btnRandom');
 
 const lobby   = document.getElementById('lobby');
-const btnStart= document.getElementById('btnStart');
-const startHint=document.getElementById('startHint');
 // ▼ 追加：クイックミッションピッカー起動ボタン
 const btnOpenPicker = document.getElementById('btnOpenPicker');
 
@@ -938,8 +932,6 @@ if (v) {
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
 
-    H(btnStart, !(state.isHost && !state.gameStarted));
-    H(startHint, !(state.isHost && !state.gameStarted));
 
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
