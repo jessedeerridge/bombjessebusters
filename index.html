@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BOMB　BU２ｓSTERS</title>
+<title>BOMB　BｓSTERS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -1750,10 +1750,8 @@ function renderM29(v){
       myHand.forEach(n=>{
         const c = document.createElement('div');
         c.className = 'numcard';
-         /* ここから追加：数値カードの表面は画像を使用 */
-       c.style.backgroundImage = `url('${imgNumber(n)}')`;
-       c.style.backgroundSize = 'cover';
-       c.style.backgroundPosition = 'center';
+        c.textContent = String(n); // 軽量：テキスト表示
+        c.style.display = 'grid'; c.style.placeItems = 'center'; c.style.fontWeight = 'bold';
         c.title = '場に出す';
         c.onclick = async (ev)=>{
           try{
@@ -1803,16 +1801,12 @@ function renderM29(v){
       const cell = document.createElement('div');
       cell.className = 'numcard';
       cell.style.display = 'grid'; cell.style.placeItems = 'center'; cell.style.fontWeight = 'bold';
-         /* ここから追加：数値カードは表＝数字画像／裏＝背面画像 */
-     if (obj.faceUp) {
-       cell.style.backgroundImage = `url('${imgNumber(obj.n)}')`;
-       cell.style.backgroundSize = 'cover';
-       cell.style.backgroundPosition = 'center';
-     } else {
-       cell.style.backgroundImage = "url('./numbercardback.jpg')";
-       cell.style.backgroundSize = 'cover';
-       cell.style.backgroundPosition = 'center';
-     }
+      if (obj.faceUp) {
+        cell.textContent = String(obj.n);
+      } else {
+        cell.textContent = ''; // 裏向き
+        cell.style.background = "#fff url('./numbercardback.jpg') center/cover no-repeat";
+      }
       cell.title = obj.faceUp ? '出したプレイヤーの次のテーブルへ移す' : 'めくる';
       cell.onclick = async ()=>{
         try{
