@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BEErS</title>
+<title>BEyyyyrS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -1850,7 +1850,8 @@ function renderM29(v){
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
   const isM31 = (v?.mission?.id|0) === 31;
-  // 既存行の掃除
+
+  // 既存除去
   const oldH = document.getElementById('m31HandRow'); if (oldH) oldH.remove();
   const oldC = document.getElementById('m31CenterRow'); if (oldC) oldC.remove();
   if (!isM31) return;
@@ -1859,8 +1860,7 @@ function renderM31(v){
   const myLetter = (myIdx>=0) ? v.tables[myIdx]?.m31Con : null;
   const center = Array.isArray(v.m31_center) ? v.m31_center : [];
 
-  // --- 自分の手札（下部：ミッション詳細の上）---
-  // 自分のカードがセンターに出ている間は下部に出さない
+  // ── 自分の下部（場に出してないときだけ表示）
   const myOut = center.some(o => o?.by === myIdx);
   const footer = document.getElementById('missionFooter');
   if (footer && myIdx>=0 && myLetter && !myOut) {
@@ -1871,9 +1871,8 @@ function renderM31(v){
     c.className = 'concard';
     c.style.backgroundImage = `url('${imgConstraint(myLetter)}')`;
     c.title = '出す';
-    c.onclick = async (ev)=>{
+    c.onclick = async ()=>{
       try{
-        // センターへ安全に積む（重複/同時押しガード）
         const rRef = ref(db, `rooms/${state.roomCode}`);
         const rSnap = await get(rRef);
         const R = rSnap.val()||{};
@@ -1885,20 +1884,14 @@ function renderM31(v){
       }catch(e){ console.error(e); }
     };
     row.appendChild(c);
-
-    // タイトルの直前に差し込む（#29と同様）
     const title = document.getElementById('missionDetailTitle');
-    if (title && title.parentNode === footer) {
-      footer.insertBefore(row, title);
-    } else {
-      footer.appendChild(row);
-    }
+    if (title && title.parentNode === footer) footer.insertBefore(row, title);
+    else footer.appendChild(row);
   }
 
-  // --- センター（アイテム列の直下・横並び）---
+  // ── センター（アイテム列の直下）
   const bar = document.getElementById('itemsBar');
-  if (!bar) return;
-  if (center.length>0){
+  if (bar && center.length>0){
     const row = document.createElement('div');
     row.id = 'm31CenterRow';
     row.className = 'conlane';
@@ -2646,21 +2639,6 @@ async function setupMissionOnStart(code){
     const tcount = v.tableCount|0;
     const cap = v.captainTable|0;
     const targets = [cap, (cap+1)%tcount, (cap+2)%tcount];
-
-  // ===== #31：制約カード（A〜E）を各テーブルに1枚ずつ配布、センター初期化 =====
-  if ((v.mission?.id|0) === 31) {
-    const tables = (v.tables||[]).map(T => ({...T}));
-    const letters = ['A','B','C','D','E'];
-    shuffle(letters);
-    for (let i=0; i<tables.length; i++){
-      const L = letters[i % letters.length];
-      if (!tables[i].m31Con) tables[i].m31Con = L; // 既にあれば尊重
-    }
-    await update(ref(db, `rooms/${code}`), {
-      tables,
-      m31_center: Array.isArray(v.m31_center) ? v.m31_center : []
-    });
-  }
     
     // ランダムに赤コード 3 つ
     const redList = MATERIALS.redCodes.slice(); shuffle(redList);
@@ -2736,7 +2714,20 @@ try{
     mountM26GridUnderItems();
   }
   
-
+// #31：A〜E を各テーブルに1枚ずつ（人数>5のときは循環）
+if ((v.mission?.id|0) === 31) {
+  const codeSnap = await get(ref(db, `rooms/${code}`));
+  const vv = codeSnap.val() || {};
+  const tables = (vv.tables||[]).map(T => ({...T}));
+  const letters = ['A','B','C','D','E']; shuffle(letters);
+  for (let i=0; i<tables.length; i++){
+    if (!tables[i].m31Con) tables[i].m31Con = letters[i % letters.length];
+  }
+  await update(ref(db, `rooms/${code}`), {
+    tables,
+    m31_center: Array.isArray(vv.m31_center) ? vv.m31_center : []
+  });
+}
   function randNum(){ return MATERIALS.numbers[(Math.random()*12)|0]; }
 }
 
