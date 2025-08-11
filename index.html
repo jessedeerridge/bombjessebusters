@@ -380,8 +380,6 @@
 
     <div id="lobby" class="hidden">
       <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:4px">
-     <button class="btn primary" id="btnStart" title="ホストのみ">爆弾を解除！</button>
-<span class="small" id="startHint">（ホストのみ押せます）</span>
 </div>
 
       <div class="items-bar hidden" id="itemsBar">
@@ -880,14 +878,22 @@ async function enter(mode){
 
   const roomRef = ref(db, `rooms/${code}`);
   const snap=await get(roomRef);
-  if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
-  else{ state.isHost = snap.val()?.hostId === state.userId; }
+  let createdNow = false;
+  if(!snap.exists()){
+    state.isHost = true;
+    await set(roomRef, baseRoom(state.userId));
+    createdNow = true;           // ← 新規作成フラグ
+  }else{
+    state.isHost = snap.val()?.hostId === state.userId;
+  }
 
   await set(ref(db, `rooms/${code}/players/${state.userId}`), {name:state.userName, at:Date.now()});
   onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
   listenRoom(code);
 
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
+ 　if (createdNow && state.isHost) { openMissionPicker(); }
+
 }
 function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード：${state.roomCode}　/　あなた：${state.userName}` : ''; }
 
@@ -923,8 +929,8 @@ if (v) {
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
 
-    H(btnStart, !(state.isHost && !state.gameStarted));
-    H(startHint, !(state.isHost && !state.gameStarted));
+    H(btnStart, true);
+    H(startHint, true);
 
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
