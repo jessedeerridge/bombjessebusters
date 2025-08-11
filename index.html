@@ -209,11 +209,11 @@
 }
 .info22 .cell{
   display:flex; align-items:center; gap:6px;
-  border:1px dashed #bbb; border-radius:6px; padding:6px 8px; background:#fff; font-size:12px;
-}
+  border:1px dashed #bbb; border-radius:6px; padding:6px 8px; background:#fff; font-size:12px;}
 .info22 .cell .token{ width:22px; height:22px; } /* 既存の .token を流用（黒） */
 .info22 .xlabel{ font-family:ui-monospace, SFMono-Regular, Menlo, monospace; opacity:.8; }
-
+/* x0 セルを薄くしてクリック不可にする */
+.info22 .cell.disabled { opacity: 0.5; pointer-events: none;　}
 
 /* ★ チェック表（テーブル1の真上） */
 .checklist{
@@ -1656,6 +1656,9 @@ const shown = 2 - Math.min(2, used);
     tok.className = 'token black';
     tok.textContent = String(n);
 
+// ★ shown が 0 の場合は無効スタイルを付与
+if (shown === 0) cell.classList.add('disabled');
+    
     // 右側の xラベル
     const xl = document.createElement('span');
     xl.className = 'xlabel';
@@ -1668,6 +1671,9 @@ const shown = 2 - Math.min(2, used);
     const handleGiveOrHide = async (ev)=>{
       ev.stopPropagation();
 
+  // ★ x0 はポップを出さない（何もしない）
+  if (shown === 0) return;
+      
       const latest = state.watching || v;
       const givenMap = latest?.meta?.m22_given || {};
       const iGaveNow = !!givenMap[state.userId];
