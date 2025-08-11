@@ -1281,7 +1281,7 @@ content.appendChild(charCol);
     (t.hand||[]).forEach((c,ci)=>{
       const wrap=document.createElement('div'); wrap.className='card-wrap';
       const card=document.createElement('div'); card.className='card';
-      const isMine = c.ownerId === state.userId;
+ const isMine = ((c.ownerId ?? t.playerId) === state.userId);
       if(!isMine && !c.open) card.classList.add('back');
       if(c.open) card.classList.add('open');
 
@@ -2488,8 +2488,12 @@ btnSit.onclick = ()=>{
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
       await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {playerId:state.userId, playerName:state.userName});
-      const hand=(v.tables[i].hand||[]);
-      await Promise.all(hand.map((_,idx)=> update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), {ownerId:state.userId})));
+      const hRef = ref(db, `rooms/${state.roomCode}/tables/${i}/hand`);
+      const hSnap = await get(hRef);
+      const hand = hSnap.val() || [];
+      await Promise.all(hand.map((_,idx)=> 
+        update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), { ownerId: state.userId })
+      ));
       state.seatedTable=i; H(seatPop,true); updateMenuButtons();
     };
     seatTabs.appendChild(tab);
