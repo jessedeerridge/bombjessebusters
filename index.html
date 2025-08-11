@@ -1649,7 +1649,8 @@ const shown = 2 - Math.min(2, used);
 
       const cell = document.createElement('div');
     cell.className = 'cell';
-
+　  // ★ x0 は押しても何も出さない（ハンドラ付けない）
+   const isZero = (shown === 0);
     // 黒トークン本体（既存の .token.black を再利用）
     const tok = document.createElement('div');
     tok.className = 'token black';
@@ -1662,7 +1663,13 @@ const shown = 2 - Math.min(2, used);
 
     cell.appendChild(tok);
     cell.appendChild(xl);
-
+   // ★ x0 はクリック不可
+   if (isZero) {
+     cell.classList.add('disabled');
+     div.appendChild(cell);
+     continue;
+   }
+    
     // ▼ セル全域／トークンどちらを押しても同じ挙動：自分は1回だけ「渡す」可能。以降は「隠す」のみ
     const handleGiveOrHide = async (ev)=>{
       ev.stopPropagation();
