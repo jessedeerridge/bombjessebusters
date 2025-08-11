@@ -496,7 +496,7 @@ const db  = getDatabase(app);
 
 /* State */
 const state = {
-  roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
+  roomCode:null, userId:crypto.randomUUID(), userName:'', openPickerAfterJoin:false,
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
   m22GaveOnce:false  // ★ #22：自分が渡した一回ガード（即時連打対策）
 };
@@ -880,7 +880,9 @@ async function enter(mode){
 
   const roomRef = ref(db, `rooms/${code}`);
   const snap=await get(roomRef);
-  if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
+  if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); 
+  // 誰もいない＝この参加者がホスト。初回同期後にピッカーを自動表示
+  state.openPickerAfterJoin = true;  }
   else{ state.isHost = snap.val()?.hostId === state.userId; }
 
   await set(ref(db, `rooms/${code}/players/${state.userId}`), {name:state.userName, at:Date.now()});
@@ -925,7 +927,16 @@ if (v) {
 
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
+   // 旧フロー撤廃：開始ボタン/ヒントは常に非表示
+    H(btnStart, true);
+    H(startHint, true);
 
+    // 新規ルーム作成直後のみ、初回スナップでミッション/人数ピッカーを自動表示
+    if (state.openPickerAfterJoin && state.isHost && !state.gameStarted) {
+      state.openPickerAfterJoin = false; // ワンショット
+      // 人数未設定の場合は openMissionPicker() 側の既定値にフォールバック
+      openMissionPicker();
+    }
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
 
