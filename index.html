@@ -2319,7 +2319,9 @@ async function leaveSeatNow(){
 
 btnSit.onclick = ()=>{
   if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
-  const v=state.watching; if(!v?.started){ alert('ゲーム開始後に席を選べます'); return; }
+  const v=state.watching; if(!v?.started){ return; }
+
+  
   seatTabs.innerHTML='';
   (v.tables||[]).forEach((t,i)=>{
     const tab=document.createElement('div'); tab.className='tab';
