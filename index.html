@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BOMB　BU２STERS</title>
+<title>BOMB　BaaERS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -901,7 +901,10 @@ async function enter(mode){
 
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
 }
-
+ setTimeout(()=>{
+    const v = state.watching;
+    if (state.isHost && !(v?.started)) openMissionPicker();
+  }, 200);
                         
 function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード：${state.roomCode}　/　あなた：${state.userName}` : ''; }
 
@@ -2524,7 +2527,7 @@ const items = pool
     started:true, tableCount:playerCount, tables, items,
     di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
      /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
-    m29_center: (missionMeta?.id===29 ? [] : undefined),
+    m29_center: (missionMeta?.id===29 ? [] : null),
     /* ▲▲ ここまで追加 ▼▼ */
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
