@@ -1296,7 +1296,7 @@ const myHand = (t.hand||[]).filter(cc => cc.ownerId===state.userId);
 const countSame = myHand.filter(cc => cc.num===c.num).length;
 
 // 黄コードトークン（▧）— ミッションに関係なく「黄コードなら常に」出す
-if (flags.useYellowToken || c.kind === 'yellow') {
+if(flags.useYellowToken){
   entries.push({label:'▧', action: async ()=>{
     const updated=[...(tokens), {type:'yellow', value:'▧', style:'yellow'}];
     await update(ref(db, cardPath), { tokens: updated });
