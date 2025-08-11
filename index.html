@@ -752,22 +752,22 @@ function executeMixPlan(planList){
     if(p.type==='redPick'){
       const cand = pickK(MATERIALS.redCodes, p.k);
       cand.forEach(n=> toAdd.push({num:n, kind:'red'}));
-      mixLines.push('赤' + cand.map(v=>`[${v}]`).join(''));
+      mixLines.push('<span style="color:red;">●</span>' + cand.map(v=>`[${v}]`).join(''));
     }
     if(p.type==='yellowPick'){
       const cand = pickK(MATERIALS.yellowCodes, p.k);
       cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
-      mixLines.push('黄' + cand.map(v=>`[${v}]`).join(''));
+　     mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
     }
     if(p.type==='redChoose'){
       const cand = pickK(MATERIALS.redCodes, p.from);
-      chooseLines.push(`赤コード ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
+      chooseLines.push(`<span style="color:red;">●</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
       const take = pickK(cand, p.take);
       take.forEach(n=> toAdd.push({num:n, kind:'red'}));
     }
     if(p.type==='yellowChoose'){
       const cand = pickK(MATERIALS.yellowCodes, p.from);
-      chooseLines.push(`黄コード ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
+      chooseLines.push(`<span style="color:gold;">▧</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
       const take = pickK(cand, p.take);
       take.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
     }
@@ -2210,7 +2210,7 @@ async function setupMissionOnStart(code){
 try{
   const dispSnap = await get(ref(db, `rooms/${code}/mission/display`));
   const disp = dispSnap.val() || [];
-  const redLine = '赤' + pick.map(n => `[${n}]`).join('');
+  const redLine = '<span style="color:red;">●</span>' + pick.map(n => `[${n}]`).join('');
   await update(ref(db, `rooms/${code}/mission`), { display: [disp[0] || '#13', redLine, ...disp.slice(1)] });
 }catch(_){}
     const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
