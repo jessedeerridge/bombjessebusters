@@ -407,11 +407,6 @@
 
   <div class="col side">
     <div class="panel">
-      <div class="mission" id="missionBox">
-        <h3>ミッション</h3>
-        <div id="missionTitle" class="bold">（未選択）</div>
-        <div id="missionText" class="small">開始時に人数と一緒に選びます</div>
-      </div>
     </div>
   </div>
 </main>
@@ -551,9 +546,6 @@ const selMission=document.getElementById('selMission');
 const btnStartOk=document.getElementById('btnStartOk');
 const btnStartCancel=document.getElementById('btnStartCancel');
 
-const missionTitle=document.getElementById('missionTitle');
-const missionText =document.getElementById('missionText');
-const missionBox  =document.getElementById('missionBox');
 
 const missionFooter = document.getElementById('missionFooter');
 const missionDetailTitle = document.getElementById('missionDetailTitle');
@@ -947,14 +939,16 @@ if (v) {
 /* mission panels */
 function renderMissionPanels(v){
   if(!v?.mission){
-    missionTitle.textContent='（未選択）';
-    missionText.textContent='開始時に人数と一緒に選びます';
-    missionDetailTitle.textContent=''; missionDetailBody.innerHTML='';
-    H(missionFooter,true); H(missionBox,false); return;
+    // 右サイドの missionBox を廃止したので未選択表示は出さない
+    missionDetailTitle.textContent = '';
+    missionDetailBody.innerHTML = '';
+    H(missionFooter, true);
+    return;
   }
   missionDetailTitle.textContent = v.mission.display?.[0] || '';
-  missionDetailBody.innerHTML = (v.mission.display||[]).slice(1).map(line=>`<div class="line">${line}</div>`).join('');
-  H(missionFooter, !v.started); H(missionBox, !!v.started);
+  missionDetailBody.innerHTML = (v.mission.display||[]).slice(1)
+    .map(line=>`<div class="line">${line}</div>`).join('');
+  H(missionFooter, !v.started);
 }
 
 
