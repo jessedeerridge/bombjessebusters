@@ -9,6 +9,7 @@
     --card-w:24px; --card-h:40px; --card-gap:3px;
     --char-w:40px; --char-h:60px;
     --item-w:50px; --item-h:75px;
+    --con-w: var(--item-w); --con-h: var(--item-h); 
     --di-w:70px; --di-h:65px;
     /* テーブルの見えている枠は固定。内部だけ広げる */
     --table-h:96px; --header-h:8px;
@@ -71,9 +72,9 @@
   .numcard.overlay { position:absolute; left:2px; top:2px; opacity:0.9; }
   .numcard.overlay:nth-child(3){ left:4px; top:4px; opacity:0.85; }
   .numcard.overlay:nth-child(4){ left:6px; top:6px; opacity:0.8; }
-  .conlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
+ .conlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .concard {
-    width:var(--item-w); height:var(--item-h);
+    /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     border-radius:8px; border:1px solid #ddd;
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
   }
@@ -84,8 +85,8 @@
     z-index:9999;
   }
   .conzoom-wrap{ position:relative; }
-  .conzoom-card{
-    width:var(--con-w); height:var(--con-h);
+ .conzoom-card{
+    /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     transform:scale(2); transform-origin:center;
     border-radius:12px; border:2px solid #fff; background:#fff center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.35); cursor:pointer;
