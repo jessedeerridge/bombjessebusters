@@ -1382,14 +1382,13 @@ if(!suppressNumberPop && canNum){
                     }},
 // ★ 数字付与は通常コードのみ
 if (c.kind === 'normal') {
-  entries.push({ label:String(c.num), action: async ()=>{
-    if(!has('num')){
-      const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
-      await update(ref(db, cardPath), { tokens: next });
-      box.classList.add('elevated');
-    }
-  }});
-}
+{ label:String(c.num), action: async ()=>{
+  if(!has('num')){
+    const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
+    await update(ref(db, cardPath), { tokens: next });
+    box.classList.add('elevated');
+  }
+}}
                 ]);
               }
             });
@@ -1457,14 +1456,13 @@ if (c.kind === 'normal') {
                 }},
 // ★ 数字付与は通常コードのみ
 if (c.kind === 'normal') {
-  entries.push({ label:String(c.num), action: async ()=>{
-    if(!has('num')){
-      const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
-      await update(ref(db, cardPath), { tokens: next });
-      box.classList.add('elevated');
-    }
-  }});
-}
+{ label:String(c.num), action: async ()=>{
+  if(!has('num')){
+    const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
+    await update(ref(db, cardPath), { tokens: next });
+    box.classList.add('elevated');
+  }
+}}
               ]);
             }});
           }
