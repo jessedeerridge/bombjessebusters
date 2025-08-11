@@ -1024,7 +1024,11 @@ hostTool.onclick = ()=> alert('全体公開されている通常コードの枚�
 /* ===== Tables ===== */
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
-
+  if (!(v.meta?.m22_infoShown)) {
+    const old = document.getElementById('info22');
+    if (old) old.remove();
+  }
+  
   /* ★ 全体公開中の通常コードの「数字別枚数」を集計 */
   const openCountByNum = {};
   (v.tables||[]).forEach(T=>{
