@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BqqqftｓrS</title>
+<title>BssssssstｓrS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -911,9 +911,8 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
-
-  if (!state.seatedTable) {  // まだ座っていない場合
-      H(seatPop, false);       // seatPopを表示
+ if (!state.seatedTable && v?.started && seatPop.classList.contains('hidden')) {
+      btnSit.onclick();   // ← これが seatTabs の生成まで全部やってくれる
     }
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
