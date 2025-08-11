@@ -1497,8 +1497,8 @@ if(!suppressNumberPop && canNum){
 
     const alreadyShown = !!v.meta?.m22_infoShown;
     if (openYellowCount >= 2 && !alreadyShown) {
-      await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown: true });
-      showInfo22Panel(v); // 直ちに描画
+   update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown: true })
+     .then(()=> showInfo22Panel(v)); // 直ちに描画
     }
   }
   renderM22PickPanel(v);
