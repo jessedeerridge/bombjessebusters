@@ -1890,6 +1890,13 @@ function renderM29(v){
   
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
+
+  const conDeckElem = document.getElementById('condeck');
+  if (conDeckElem) conDeckElem.innerHTML = '';
+
+  const conPileElem = document.getElementById('conpile');
+  if (conPileElem) conPileElem.innerHTML = '';
+  
   const isM31 = (v?.mission?.id|0) === 31;
 
   // 既存除去
