@@ -1245,6 +1245,13 @@ if(!seatedAny){
     await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
   };
 }
+
+    if ((state.watching?.mission?.id|0) === 34 && t.playerId !== state.userId){
+  // #34：自分以外はブランク表示・操作不可
+  char.removeAttribute('style');
+  char.onclick = null;
+  char.classList.add('blank');
+}
 charCol.appendChild(char);
 
 // ★ #13：初期情報トークンはキャラの「下」に小さく表示（meta.m13_header をそのまま使う）
@@ -1890,7 +1897,7 @@ function renderM29(v){
   
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
-  const isM31 = (v?.mission?.id|0) === 31;
+  const isM31 = ((v?.mission?.id|0) === 31) || ((v?.mission?.id|0) === 34);
 
   // 既存除去
   const oldH = document.getElementById('m31HandRow'); if (oldH) oldH.remove();
@@ -2729,7 +2736,7 @@ async function setupMissionOnStart(code){
   }
 
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
-  if ((v.mission?.id|0) === 32){
+if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
     const old = document.getElementById('m32ConRow');
     if (old) old.remove();
@@ -2831,7 +2838,7 @@ try{
   }
   
 // #31：A〜E を各テーブルに1枚ずつ（人数>5のときは循環）
-if ((v.mission?.id|0) === 31) {
+if ((v.mission?.id|0) === 31 || (v.mission?.id|0) === 34) {
   const codeSnap = await get(ref(db, `rooms/${code}`));
   const vv = codeSnap.val() || {};
   const tables = (vv.tables||[]).map(T => ({...T}));
