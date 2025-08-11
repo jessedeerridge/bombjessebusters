@@ -2731,6 +2731,14 @@ async function setupMissionOnStart(code){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
   }
 
+  // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
+  if ((v.mission?.id|0) === 32){
+    // 既存があれば一度除去（再実行対策）
+    const old = document.getElementById('m32ConRow');
+    if (old) old.remove();
+    const lane = buildConDeckLaneP1();
+    mountLaneUnderItemsBar(lane);
+  }
 
 
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
@@ -2930,6 +2938,66 @@ function buildDeckLaneP1(){
       deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
       deckBtn.title='山札を作る';
     }
+  };
+
+  return lane;
+}
+/* 制約カード版：P1（山札→めくる）*/
+function buildConDeckLaneP1(){
+  // ミッション31と同じ見た目サイズにするため、帯は conlane、カードは concard を使う
+  const lane = document.createElement('div');
+  lane.className = 'conlane';
+  lane.id = 'm32ConRow'; // 念のため一意ID
+
+  // 制約カード12枚（A〜L）
+  const deck = 'ABCDEFGHIJKL'.split('');
+  shuffle(deck);
+  let rest = deck.length;
+
+  // 山札ボタンと残表示（数値P1と同じUI部品を流用）
+  const deckBtn = document.createElement('div');
+  deckBtn.className = 'numdeck';   // 見た目は共通のデッキボタンでOK
+  deckBtn.title = 'めくる';
+
+  const restLbl = document.createElement('span');
+  restLbl.className = 'numrest';
+  restLbl.textContent = `残:${rest}`;
+
+  // 右側に公開札の積み重ね置き場（制約カードは concard で積む）
+  const pile = document.createElement('div');
+  pile.className = 'numcard-holder';
+  pile.style.position = 'relative';
+
+  lane.appendChild(deckBtn);
+  lane.appendChild(restLbl);
+  lane.appendChild(pile);
+
+  // 1枚めくって公開札（右側）に積む：挙動は数値P1と同じ
+  const addToPile = (ch)=>{
+    const node = document.createElement('div');
+    node.className = 'concard';
+    node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+    // 数値P1と同様の“2pxずらし”＆見切れ対策
+    const already = pile.querySelectorAll('.concard').length;
+    if (already > 0){
+      const off = already * 2;
+      node.style.position = 'absolute';
+      node.style.left = off + 'px';
+      node.style.top  = off + 'px';
+      // 高さと下マージンも増やす（制約カード高＝--con-h≒--item-h）
+      const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
+      pile.style.height = (baseH + off) + 'px';
+      lane.style.marginBottom = off + 'px';
+    }
+    pile.appendChild(node);
+  };
+
+  deckBtn.onclick = ()=>{
+    if (rest <= 0) return;
+    const ch = deck.pop(); // 末尾から1枚
+    rest -= 1;
+    restLbl.textContent = `残:${rest}`;
+    addToPile(ch);
   };
 
   return lane;
