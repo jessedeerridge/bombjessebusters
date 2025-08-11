@@ -768,10 +768,8 @@ function buildMixPlan(missionId){
     {type:'redPick',    k:2},
     {type:'yellowPick', k:4},
   ],
-};
 
-ここから追加
-  29: [  // 赤3
+ 29: [  // 赤3
     {type:'redPick', k:3},
   ],
 
@@ -2622,7 +2620,7 @@ function buildDeckLaneP2(n=2){
 function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
 }
-* パターン1拡張：山札→「1/2/3」から選んで右に横並び（#30用） */
+/* パターン1拡張：山札→「1/2/3」から選んで右に横並び（#30用） */
 function buildDeckLaneP1_pop123(){
   const lane = document.createElement('div');
   lane.className = 'numlane';
