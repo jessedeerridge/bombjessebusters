@@ -2464,45 +2464,74 @@ function attachM23DeckUI(lane){
   lane.appendChild(deckBtn);
   lane.appendChild(restLbl);
 
-  deckBtn.onclick = (ev)=>{
+  // ★ 追加：表向き捨て札の積み重ね表示（アイテム）
+  const pile = document.createElement('div');
+  pile.className = 'numcard-holder';
+  pile.style.position = 'relative';
+  pile.style.width = cssNum('--item-w') + 'px';
+  pile.style.height = cssNum('--item-h') + 'px';
+  lane.appendChild(pile);
+
+  const addToItemPile = (no)=>{
+    const already = pile.querySelectorAll('.item').length;
+    const node = document.createElement('div');
+    node.className = 'item';
+    node.style.backgroundImage = `url("./item${no}.jpg")`;
+    if(already>0){
+      const off = already * 2; // 数値山札と同じ2px刻み
+      node.style.position = 'absolute';
+      node.style.left = off + 'px';
+      node.style.top  = off + 'px';
+      // 見切れ防止：高さと下マージンを増やす
+      const baseH = cssNum('--item-h');
+      pile.style.height = (baseH + off) + 'px';
+      lane.style.marginBottom = off + 'px';
+    }
+    pile.appendChild(node);
+  };
+
+  // ★ 既存の捨て札を描画（リロード/再入室対策）
+  (state.watching?.meta?.m23_discards || []).forEach(addToItemPile);
+
+  deckBtn.onclick = async (ev)=>{
     const v=state.watching, meta=v?.meta||{};
     const d=(meta.m23_deck||[]), x=(meta.m23_discards||[]);
     const remain = d.filter(n=>!x.includes(n));
 
-    // 4枚公開の条件：数値山で表になった数字のうち、同じ数字の通常コードが4枚全体公開になっているものがある
+    // 「広げる」条件は従来通りポップで提示（指示は“めくる”のみポップ廃止）
     const drawn = new Set(meta.m23_drawnNumbers||[]);
     const openCountByNum = {};
     (v.tables||[]).forEach(T=> (T.hand||[]).forEach(c=>{
       if(c?.kind==='normal' && c.open===true){
         const nn=c.num|0; openCountByNum[nn]=(openCountByNum[nn]||0)+1;
       }
-   }));
+    }));
     const ready = Array.from(drawn).some(nn => (openCountByNum[nn]||0)===4);
 
     if (!meta.m23_spread && ready){
       openOneMini(ev.clientX, ev.clientY, '広げる', async ()=>{
-        // 未捨て札のアイテムを全て表にして上段（items）へ
         const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
         await Promise.all([
-         set(ref(db, `rooms/${state.roomCode}/items`), list),
+          set(ref(db, `rooms/${state.roomCode}/items`), list),
           update(ref(db, `rooms/${state.roomCode}/meta`), { m23_spread:true })
         ]);
-       refreshRest();
+        // 展開後は右側積みはクリア
+        pile.innerHTML = '';
+        pile.style.height = cssNum('--item-h') + 'px';
+        lane.style.marginBottom = '0px';
+        refreshRest();
       });
-     return;
-   }
+      return;
+    }
 
-    // 通常：1枚めくって捨て札に入れる
-    openOneMini(ev.clientX, ev.clientY, 'めくる', async ()=>{
-      const v2=state.watching, meta2=v2?.meta||{};
-     const d2=(meta2.m23_deck||[]), x2=(meta2.m23_discards||[]);
-     const remain2 = d2.filter(n=>!x2.includes(n));
-      if (remain2.length<=0) return;
-     const pick = remain2[(Math.random()*remain2.length)|0];
-      await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_discards: (x2||[]).concat(pick) });
-      refreshRest();
-    });
+    // ★ 「めくる」は即時実行（ポップなし）
+    if (remain.length<=0) return;
+    const pick = remain[(Math.random()*remain.length)|0];
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_discards: (x||[]).concat(pick) });
+    addToItemPile(pick);  // 右側に表で重ねる
+    refreshRest();
   };
+
 }
 
 /* ===== ★ #26：1〜12 を 3×4 で並べ、裏表をトグル ===== */
@@ -2514,7 +2543,7 @@ function mountM26GridUnderItems(){
   wrap.style.flexDirection = 'column';
  wrap.style.alignItems = 'flex-start';
   wrap.style.gap = '6px';
- const rows = [ [1,2,3,4], [5,6,7,8,9], [10,11,12] ];
+  const rows = [ [1,2,3,4,5,6], [7,8,9,10,11,12] ];
   rows.forEach(arr=>{
     const row = document.createElement('div');
     row.className = 'numlane';
