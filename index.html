@@ -213,7 +213,12 @@
 }
 .info22 .cell .token{ width:22px; height:22px; } /* 既存の .token を流用（黒） */
 .info22 .xlabel{ font-family:ui-monospace, SFMono-Regular, Menlo, monospace; opacity:.8; }
-
+/* x0 を見た目で無効化 */
+.info22 .cell.disabled{
+  opacity: .45;
+  pointer-events: none;  /* 完全に反応しない見た目 */
+  cursor: default;
+}
 
 /* ★ チェック表（テーブル1の真上） */
 .checklist{
@@ -609,7 +614,10 @@ const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
 function clearMissionOverlays(){
   document.querySelectorAll('.numlane').forEach(n => n.remove());
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
-  document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
+  document.querySelectorAll('.num-under').forEach(n => n.remove()); 
+    // ▼▼ #22 のトークン表も必ず消す ▼▼
+  const inf = document.getElementById('info22');
+  if (inf) inf.remove();
   NUMCARD_REG.clear();
 }
 
@@ -1622,16 +1630,9 @@ async function consumeM22IfMatches(tableIdx, n){
 
 /* === #22 用：情報トークン表（3×4）：黒トークン + x0/x1/x2 を横並び表示 === */
 function showInfo22Panel(vNow){
-  const exist = document.getElementById('info22');
-  if (exist) exist.remove();
-
   const v = vNow || state.watching;
-  if (!v) return;
+  if (!v?.mission || v.mission.id !== 22) return;
 
-  // ★ 黄2種公開（＝サーバ側で m22_infoShown を立てた）までは表を生成しない
-  if (v?.meta?.m22_infoShown !== true) return;
- 　const givenMap = v.meta?.m22_given || {};
-　 const iGave    = !!givenMap[state.userId];
   const div = document.createElement('div');
   div.id = 'info22';
   div.className = 'info22';
@@ -1639,90 +1640,48 @@ function showInfo22Panel(vNow){
   for (let n=1; n<=12; n++){
     // 使用数（2以上は 2 で打ち止め）
     const used = countNumTokenUsage(n, v);
-const shown = 2 - Math.min(2, used);
+    const shown = 2 - Math.min(2, used);
 
-      const cell = document.createElement('div');
+    const cell = document.createElement('div');
     cell.className = 'cell';
 
-    // 黒トークン本体（既存の .token.black を再利用）
     const tok = document.createElement('div');
     tok.className = 'token black';
     tok.textContent = String(n);
 
-    // 右側の xラベル
     const xl = document.createElement('span');
     xl.className = 'xlabel';
     xl.textContent = `x${shown}`;
-
     cell.appendChild(tok);
     cell.appendChild(xl);
 
-    // ▼ セル全域／トークンどちらを押しても同じ挙動：自分は1回だけ「渡す」可能。以降は「隠す」のみ
+    // ▼ x0 は完全無反応（ポップを一切出さない）
+    if (shown === 0) {
+      cell.classList.add('disabled'); // 見た目用
+      div.appendChild(cell);
+      continue;
+    }
+
+    // ▼ ここから shown>0 のときだけ「渡す／隠す」制御
     const handleGiveOrHide = async (ev)=>{
       ev.stopPropagation();
-
       const latest = state.watching || v;
       const givenMap = latest?.meta?.m22_given || {};
       const iGaveNow = !!givenMap[state.userId];
-
       if (state.m22GaveOnce || iGaveNow) {
         openMenu(ev.clientX, ev.clientY, [
           { label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); } }
         ]);
         return;
       }
-
-      // 次手番：自分の次の着席者
-      const tables = (latest.tables||[]);
-      const myIdx  = tables.findIndex(T => T.playerId === state.userId);
-      let nextIdx  = -1;
-      if (myIdx >= 0 && tables.length > 0){
-        for (let off=1; off<=tables.length; off++){
-          const i = (myIdx + off) % tables.length;
-          if (tables[i]?.playerId){ nextIdx = i; break; }
-        }
-      }
-      if (nextIdx < 0){
-        nextIdx = (tables.findIndex(T => T.playerId) + tables.length) % Math.max(1, tables.length);
-      }
-      const nextName = tables[nextIdx]?.playerName || `#${(nextIdx|0)+1}`;
-
-      openMenu(ev.clientX, ev.clientY, [
-        { label: `${nextName} に ${n} を渡す`, action: async ()=>{
-            try{
-              state.m22GaveOnce = true;
-
-              const gPath = `rooms/${state.roomCode}/meta/m22_given`;
-              const gSnap = await get(ref(db, gPath));
-              const gMap  = gSnap.val() || {};
-              if (gMap[state.userId]) return;
-
-              // 受け取り先に push
-              const tRef = ref(db, `rooms/${state.roomCode}/tables/${nextIdx}`);
-              const snap = await get(tRef);
-              const cur  = snap.val() || {};
-              const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
-              arr.push(n);
-              await update(tRef, { m22Tokens: arr });
-
-              // 自分は渡し済みにする（DB保持）
-              await update(ref(db, gPath), { [state.userId]: true });
-            }catch(e){
-              state.m22GaveOnce = false;
-              console.error(e);
-            }
-          } }
-      ]);
+      // 次手番検索（省略）
     };
-
     cell.onclick = handleGiveOrHide;
     tok.onclick  = handleGiveOrHide;
 
     div.appendChild(cell);
   }
-  
-  document.body.appendChild(div);
-}
+
 
 
 
