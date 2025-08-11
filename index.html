@@ -2383,6 +2383,8 @@ missionIds.forEach(id=>{
   b.className = 'btn small';
   b.textContent = `#${id}`; // ★ #付き
   b.onclick = async ()=>{
+     H(btnStart, true);
+  H(startHint, true);
     await leaveSeatNow();
     closeMissionPicker();
     await startGame(mpSelectedCount, id);
