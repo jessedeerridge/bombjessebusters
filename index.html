@@ -867,7 +867,9 @@ if (v) {
 
     // ▼ 追加：ホストなら開始前後いつでもクイックピッカーを使える
     updateHeaderInfo();
-
+    // ★ 自分の席がDB上で消えていたらローカルもクリア（やり直し直後の残留防止）
+    const myIdxNow = (v?.tables||[]).findIndex(T => T.playerId === state.userId);
+    if (myIdxNow < 0) state.seatedTable = null;
   });
 }
 
@@ -1497,8 +1499,8 @@ if(!suppressNumberPop && canNum){
 
     const alreadyShown = !!v.meta?.m22_infoShown;
     if (openYellowCount >= 2 && !alreadyShown) {
-   update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown: true })
-     .then(()=> showInfo22Panel(v)); // 直ちに描画
+      // フラッシュ防止：描画は次の onValue レンダーに任せる
+      update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown: true });
     }
   }
   renderM22PickPanel(v);
@@ -1507,6 +1509,7 @@ if(!suppressNumberPop && canNum){
   if (v.meta?.m22_infoShown) {
     showInfo22Panel(v);
   }
+
   // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行...）
 // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行）
 if (!m13HeaderUpdateScheduled && m13HeaderClearIndices && m13HeaderClearIndices.size > 0) {
@@ -1638,7 +1641,7 @@ function showInfo22Panel(vNow){
     const used = countNumTokenUsage(n, v);
 const shown = 2 - Math.min(2, used);
 
-    const cell = document.createElement('div');
+      const cell = document.createElement('div');
     cell.className = 'cell';
 
     // 黒トークン本体（既存の .token.black を再利用）
@@ -1646,33 +1649,40 @@ const shown = 2 - Math.min(2, used);
     tok.className = 'token black';
     tok.textContent = String(n);
 
-    // ▼ トークンをクリック → 「次の手番のプレイヤーに n を渡す」or「隠す」
-    tok.onclick = (ev)=>{
+    // 右側の xラベル
+    const xl = document.createElement('span');
+    xl.className = 'xlabel';
+    xl.textContent = `x${shown}`;
+
+    cell.appendChild(tok);
+    cell.appendChild(xl);
+
+    // ▼ セル全域／トークンどちらを押しても同じ挙動：自分は1回だけ「渡す」可能。以降は「隠す」のみ
+    const handleGiveOrHide = async (ev)=>{
       ev.stopPropagation();
 
-      // ★ 二重ガード：即時の連打防止（クライアント）＋持続フラグ（DB）
-      if (state.m22GaveOnce || iGave) {
+      const latest = state.watching || v;
+      const givenMap = latest?.meta?.m22_given || {};
+      const iGaveNow = !!givenMap[state.userId];
+
+      if (state.m22GaveOnce || iGaveNow) {
         openMenu(ev.clientX, ev.clientY, [
           { label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); } }
         ]);
         return;
       }
 
-      // ▼▼ ここで“次の手番”候補を自前で決める（席についている自分の次の着席者）
-      const tables = (v.tables||[]);
+      // 次手番：自分の次の着席者
+      const tables = (latest.tables||[]);
       const myIdx  = tables.findIndex(T => T.playerId === state.userId);
       let nextIdx  = -1;
       if (myIdx >= 0 && tables.length > 0){
         for (let off=1; off<=tables.length; off++){
           const i = (myIdx + off) % tables.length;
-          if (tables[i]?.playerId){
-            nextIdx = i;
-            break;
-          }
+          if (tables[i]?.playerId){ nextIdx = i; break; }
         }
       }
       if (nextIdx < 0){
-        // フォールバック：最初の着席者
         nextIdx = (tables.findIndex(T => T.playerId) + tables.length) % Math.max(1, tables.length);
       }
       const nextName = tables[nextIdx]?.playerName || `#${(nextIdx|0)+1}`;
@@ -1685,18 +1695,15 @@ const shown = 2 - Math.min(2, used);
               const gPath = `rooms/${state.roomCode}/meta/m22_given`;
               const gSnap = await get(ref(db, gPath));
               const gMap  = gSnap.val() || {};
-              if (gMap[state.userId]) return; // 既に渡し済みなら中止
+              if (gMap[state.userId]) return;
 
-              // 受け取り先テーブルへ push
+              // 受け取り先に push
               const tRef = ref(db, `rooms/${state.roomCode}/tables/${nextIdx}`);
               const snap = await get(tRef);
               const cur  = snap.val() || {};
               const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
               arr.push(n);
               await update(tRef, { m22Tokens: arr });
-
-              // 「渡した以降は隠すメニューのみ」フラグ
-              await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_afterGiven: true });
 
               // 自分は渡し済みにする（DB保持）
               await update(ref(db, gPath), { [state.userId]: true });
@@ -1708,33 +1715,10 @@ const shown = 2 - Math.min(2, used);
       ]);
     };
 
-
-    
-    // 右側の xラベル
-    const xl = document.createElement('span');
-    xl.className = 'xlabel';
-    xl.textContent = `x${shown}`;
-
-    cell.appendChild(tok);
-    cell.appendChild(xl);
-
-    // タップで「隠す」
-    cell.onclick = (ev)=> {
-      openMenu(ev.clientX, ev.clientY, [
-        {label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); }}
-      ]);
-    };
+    cell.onclick = handleGiveOrHide;
+    tok.onclick  = handleGiveOrHide;
 
     div.appendChild(cell);
-  }
-
-  // ▼ 「渡した以降」は、表全体のクリックで「隠す」を出す
-  if ((v.meta && v.meta.m22_afterGiven) === true) {
-    div.addEventListener('click', (ev)=>{
-      openMenu(ev.clientX, ev.clientY, [
-        {label:'隠す', action: ()=>{ const x=document.getElementById('info22'); if(x) x.remove(); }}
-      ]);
-    });
   }
   
   document.body.appendChild(div);
@@ -2036,7 +2020,11 @@ async function startGame(playerCount, missionId){
   if(globalReveal){ globalReveal.innerHTML=''; H(globalReveal,true); }
  // ★ #22：渡し済みガードのリセット
   state.m22GaveOnce = false;
-
+  // ★ #22：サーバ側メタも初期化（可視フラグ／渡し済み表）
+  try{
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown:false, m22_given:null });
+  }catch(_){}
+  
   const code = state.roomCode;
 
 
