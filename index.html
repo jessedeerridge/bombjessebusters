@@ -2516,7 +2516,7 @@ const items = pool
     started:true, tableCount:playerCount, tables, items,
     di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
      /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
-    m29_center: (missionMeta?.id===29 ? [] : undefined),
+    m29_center: (missionMeta?.id===29 ? [] : null),
     /* ▲▲ ここまで追加 ▼▼ */
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
