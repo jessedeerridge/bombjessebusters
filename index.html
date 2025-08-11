@@ -2206,7 +2206,13 @@ async function setupMissionOnStart(code){
     // ランダムに赤コード 3 つ
     const redList = MATERIALS.redCodes.slice(); shuffle(redList);
     const pick = redList.slice(0,3);
-
+// ▼ 追加：選ばれた赤コードをミッション表示に反映（先頭に1行差し込み）
+try{
+  const dispSnap = await get(ref(db, `rooms/${code}/mission/display`));
+  const disp = dispSnap.val() || [];
+  const redLine = '赤' + pick.map(n => `[${n}]`).join('');
+  await update(ref(db, `rooms/${code}/mission`), { display: [disp[0] || '#13', redLine, ...disp.slice(1)] });
+}catch(_){}
     const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
     const tbls = tablesSnap.val() || [];
     const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha=alpha[i%alpha.length]); };
