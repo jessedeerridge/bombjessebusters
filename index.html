@@ -626,6 +626,7 @@ function clearMissionOverlays(){
   document.querySelectorAll('.numlane').forEach(n => n.remove());
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
   document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
+  const m36 = document.getElementById('m36Row'); if (m36) m36.remove();
   // ★ ミッション22：情報トークン表を確実に消す
   const info22 = document.getElementById('info22');
   if (info22) info22.remove();
@@ -948,8 +949,10 @@ if (v) {
     return;
   }
 }    
-    renderItemsAndDi(v);  renderM29(v); renderM31(v);  if (v?.started && ((v?.mission?.id|0)===36)) { renderM36Lane(v); }  renderTables(v);
-    if (v?.meta?.m22_infoShown === true) {
+ renderItemsAndDi(v);  renderM29(v); renderM31(v);
+    if ((v?.mission?.id|0)===36){ await ensureM36Init(); renderM36(v); }
+    else { const ex = document.getElementById('m36Row'); if (ex) ex.remove(); }
+    renderTables(v);    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
