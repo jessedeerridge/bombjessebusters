@@ -512,6 +512,7 @@ const state = {
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
+state._mpAutoOnce = false;  // 「参加」後に自動でピッカーを開いたか（ホストのみ）  
 
 
 /* Elements */
@@ -942,7 +943,13 @@ if (v) {
 
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
-
+// 条件：ホスト && 未開始 && まだミッション未選択 && まだ未実行
+    // v.started は false、v.mission は null で入ってくる
+    /* ここから追加 */
+    if (state.isHost && !v?.started && !v?.mission && !state._mpAutoOnce) {
+      openMissionPicker();        // 下部ピッカーを表示
+      state._mpAutoOnce = true;   // 以後は開かない
+    }
     // ▼ 追加：ホストなら開始前後いつでもクイックピッカーを使える
     updateHeaderInfo();
     // ★ 自分の席がDB上で消えていたらローカルもクリア（やり直し直後の残留防止）
