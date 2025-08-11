@@ -411,15 +411,6 @@
 
   <div class="col side">
     <div class="panel">
-      <div class="list" id="listsBox">
-        <h3>参加者</h3><div id="players"></div>
-        <h3 style="margin-top:10px">観戦者</h3><div id="spectators"></div>
-      </div>
-      <div class="mission" id="missionBox">
-        <h3>ミッション</h3>
-        <div id="missionTitle" class="bold">（未選択）</div>
-        <div id="missionText" class="small">開始時に人数と一緒に選びます</div>
-      </div>
     </div>
   </div>
 </main>
@@ -551,9 +542,6 @@ const mpCounts = document.getElementById('mpCounts');
 const mpMissions = document.getElementById('mpMissions');
 const btnMpBack = document.getElementById('btnMpBack');
 
-const playersEl=document.getElementById('players');
-const specsEl  =document.getElementById('spectators');
-const listsBox =document.getElementById('listsBox');
 
 const miniPop = document.getElementById('miniPop');
 
@@ -563,9 +551,6 @@ const selMission=document.getElementById('selMission');
 const btnStartOk=document.getElementById('btnStartOk');
 const btnStartCancel=document.getElementById('btnStartCancel');
 
-const missionTitle=document.getElementById('missionTitle');
-const missionText =document.getElementById('missionText');
-const missionBox  =document.getElementById('missionBox');
 
 const missionFooter = document.getElementById('missionFooter');
 const missionDetailTitle = document.getElementById('missionDetailTitle');
@@ -923,13 +908,13 @@ if (v) {
     remove(ref(db, `rooms/${code}`));
     return;
   }
-}    H(listsBox, !!v?.started);
-    renderLists(v); renderItemsAndDi(v);  renderM29(v); renderTables(v); 
+}   
+     renderItemsAndDi(v);  renderM29(v); renderTables(v); 
     if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
-    renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
+    renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 
     // ▼ ホスト判定を最新化
@@ -947,27 +932,6 @@ if (v) {
     const myIdxNow = (v?.tables||[]).findIndex(T => T.playerId === state.userId);
     if (myIdxNow < 0) state.seatedTable = null;
   });
-}
-
-
-/* mission panels */
-function renderMissionPanels(v){
-  if(!v?.mission){
-    missionTitle.textContent='（未選択）';
-    missionText.textContent='開始時に人数と一緒に選びます';
-    missionDetailTitle.textContent=''; missionDetailBody.innerHTML='';
-    H(missionFooter,true); H(missionBox,false); return;
-  }
-  missionDetailTitle.textContent = v.mission.display?.[0] || '';
-  missionDetailBody.innerHTML = (v.mission.display||[]).slice(1).map(line=>`<div class="line">${line}</div>`).join('');
-  H(missionFooter, !v.started); H(missionBox, !!v.started);
-}
-
-/* lists */
-function renderLists(v){
-  playersEl.innerHTML=''; specsEl.innerHTML=''; if(!v) return;
-  Object.values(v.players||{}).forEach(u=>{ const d=document.createElement('div'); d.className='name'; d.textContent=u.name||'(?)'; playersEl.appendChild(d); });
-  Object.values(v.spectators||{}).forEach(u=>{ const d=document.createElement('div'); d.className='name muted'; d.textContent=u.name||'(?)'; specsEl.appendChild(d); });
 }
 
 /* ===== Items & DI ===== */
