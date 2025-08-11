@@ -901,6 +901,11 @@ async function enter(mode){
 
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
 }
+ setTimeout(()=>{
+    const v = state.watching;
+    if (state.isHost && !(v?.started)) openMissionPicker();
+  }, 200);
+                        
 function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード：${state.roomCode}　/　あなた：${state.userName}` : ''; }
 
 /* room base */
