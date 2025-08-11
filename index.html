@@ -2542,23 +2542,17 @@ function mountM26GridUnderItems(){
       const n = parseInt(el.dataset.num,10);
       const v = state.watching||{}; const hidden = new Set((v.meta?.m26_hidden)||[]);
       const allHidden = hidden.size===12;
-      if (!hidden.has(n)){
-        openOneMini(ev.clientX, ev.clientY, '裏返す', async ()=>{
-          hidden.add(n);
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { m26_hidden: Array.from(hidden) });
+      // ★ 全部が裏のときだけポップで「全て表にする」
+      if (allHidden){
+        openOneMini(ev.clientX, ev.clientY, '全て表にする', async ()=>{
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m26_hidden: [] });
           sync();
         });
-      }else{
-       openOneMini(ev.clientX, ev.clientY, allHidden ? '全て表にする' : '表にする', async ()=>{
-          if (allHidden){
-            await update(ref(db, `rooms/${state.roomCode}/meta`), { m26_hidden: [] });
-          }else{
-           hidden.delete(n);
-            await update(ref(db, `rooms/${state.roomCode}/meta`), { m26_hidden: Array.from(hidden) });
-          }
-          sync();
-        });
+        return;
       }
+      // ★ それ以外は即時トグル（ポップを出さない）
+      (hidden.has(n) ? hidden.delete(n) : hidden.add(n));
+      update(ref(db, `rooms/${state.roomCode}/meta`), { m26_hidden: Array.from(hidden) }).then(sync);
     };
   });
 }
