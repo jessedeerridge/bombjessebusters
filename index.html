@@ -2737,6 +2737,18 @@ async function setupMissionOnStart(code){
     mountLaneUnderItemsBar(lane);
   }
 
+  /* ▼▼ （#36：数値5枚を横一列） ▼▼ */
+  if ((v.mission?.id|0) === 36){
+    // 既存があれば一度除去（再実行対策）
+    const old36 = document.getElementById('m36NumRow');
+    if (old36) old36.remove();
+
+    // ランダム5枚を横並びで生成して設置
+    const lane36 = buildDeckLaneP2(5);
+    lane36.id = 'm36NumRow';
+    mountLaneUnderItemsBar(lane36);
+  }
+  
 
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
