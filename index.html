@@ -2543,12 +2543,11 @@ async function setupMissionOnStart(code){
     }
   }
 
-  // 1：右に“積む”（既存P1と同じ）／ 2・3：横並びで右に出す
-if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
-  const lane = buildDeckLaneP1Pop123();
-  mountLaneUnderItemsBar(lane);
-}
-
+  // #30：P1-pop123（山札→1/2/3ポップ／横並びは上限リセット）
+  if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
+    const lane = buildDeckLaneP1Pop123();
+    mountLaneUnderItemsBar(lane);
+  }
   
   // #12：各アイテムの中央下に「1枚ずつ」固定配置
   if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
@@ -2746,8 +2745,9 @@ function buildDeckLaneP1(){
   return lane;
 }
 
-/* パターン1拡張：山札→ポップ（1/2/3）→
-   1枚なら“いつも通り”右に積む／2・3枚なら横並びで右に出す */
+/* パターン1拡張：山札→1/2/3のポップ
+   1=“いつも通り”右に積む（既存P1）
+   2=横エリアは常に最大2枚、3=横エリアは常に最大3枚 */
 function buildDeckLaneP1Pop123(){
   const lane = document.createElement('div');
   lane.className = 'numlane';
@@ -2757,7 +2757,7 @@ function buildDeckLaneP1Pop123(){
   shuffle(deck);
   let rest = deck.length;
 
-  // 山札ボタンと残表示
+  // UI部品
   const deckBtn = document.createElement('div');
   deckBtn.className = 'numdeck';
   deckBtn.title = 'めくる';
@@ -2766,12 +2766,12 @@ function buildDeckLaneP1Pop123(){
   restLbl.className = 'numrest';
   restLbl.textContent = `残:${rest}`;
 
-  // 単枚時：右側に“積み重ね”するホルダー（＝既存P1と同じ見た目）
+  // 単枚は積み重ね（既存P1と同じ見た目）
   const pile = document.createElement('div');
   pile.className = 'numcard-holder';
   pile.style.position = 'relative';
 
-  // 複数枚時：横並びで出すエリア
+  // 複数枚は横並び
   const row = document.createElement('div');
   row.style.display = 'flex';
   row.style.gap = '6px';
@@ -2781,30 +2781,28 @@ function buildDeckLaneP1Pop123(){
   lane.appendChild(pile);
   lane.appendChild(row);
 
-  // 積み重ね（既存P1と同ロジック）
+  // 積み重ね（既存P1相当）
   function addToPile(n){
     const already = pile.querySelectorAll('.numcard').length;
     const node = document.createElement('div');
     node.className = 'numcard';
     node.style.backgroundImage = `url('${imgNumber(n)}')`;
-
     if(already>0){
-      const off = already * 2; // 2px刻み
+      const off = already * 2;
       node.style.position = 'absolute';
       node.style.left = off + 'px';
       node.style.top  = off + 'px';
     }
     pile.appendChild(node);
-
-    // 見切れ防止：高さと下マージンを増やす（既存P1と同じ）
     const extraH = already * 2;
     pile.style.height = (48 + extraH) + 'px';
     lane.style.marginBottom = extraH + 'px';
   }
 
-  // 横並び追加
-  function addToRow(list){
-    list.forEach(n=>{
+  // 横並び：常に希望枚数の上限で“リセットしてから”並べる
+  function setRowCards(list, max){
+    row.innerHTML = '';                   // ←毎回クリア（累積しない）
+    list.slice(0, max).forEach(n=>{
       const nc = document.createElement('div');
       nc.className = 'numcard';
       nc.style.backgroundImage = `url('${imgNumber(n)}')`;
@@ -2825,14 +2823,11 @@ function buildDeckLaneP1Pop123(){
     shuffle(deck);
     rest = deck.length;
     restLbl.textContent = `残:${rest}`;
-    deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
     deckBtn.style.background = '';
     deckBtn.title = 'めくる';
-    pile.innerHTML = '';
-    pile.style.height = '48px';
+    pile.innerHTML = ''; pile.style.height = '48px';
     lane.style.marginBottom = '0px';
     row.innerHTML = '';
-    NUMCARD_REG.clear();
   }
 
   // クリック：1/2/3 のポップ
@@ -2841,54 +2836,38 @@ function buildDeckLaneP1Pop123(){
       openOneMini(ev.clientX, ev.clientY, '山札を作る', async ()=>{ rebuildDeck(); });
       return;
     }
-
     openMenu(ev.clientX, ev.clientY, [
       { label:'1', action: async ()=>{
           if(rest<=0) return;
           const n1 = deck.pop(); rest--;
           addToPile(n1);
-          // （#23連携のため）メタに表になった数値を追記（重複不可）
-          try{
-            const cur = (state.watching?.meta?.m23_drawnNumbers) || [];
-            if(!cur.includes(n1)) await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_drawnNumbers: cur.concat(n1) });
-          }catch(_){}
           afterDraw();
-        } },
+        }},
       { label:'2', action: async ()=>{
           const take = Math.min(2, rest); if(take<=0) return;
           const drawn = [];
-          for(let i=0;i<take;i++){ drawn.push(deck.pop()); }
+          for(let i=0;i<take;i++) drawn.push(deck.pop());
           rest -= take;
-          // 1枚目は“積み重ね”、2枚目以降は横並び
+          // 1枚目は積み重ね、横は“最大2枚”になるよう毎回リセット
           if(drawn[0]!=null) addToPile(drawn[0]);
-          if(drawn.length>1) addToRow(drawn.slice(1));
-          try{
-            const cur = (state.watching?.meta?.m23_drawnNumbers) || [];
-            const add = drawn.filter(n=>!cur.includes(n));
-            if(add.length>0) await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_drawnNumbers: cur.concat(add) });
-          }catch(_){}
+          setRowCards(drawn.slice(1), 2);
           afterDraw();
-        } },
+        }},
       { label:'3', action: async ()=>{
           const take = Math.min(3, rest); if(take<=0) return;
           const drawn = [];
-          for(let i=0;i<take;i++){ drawn.push(deck.pop()); }
+          for(let i=0;i<take;i++) drawn.push(deck.pop());
           rest -= take;
+          // 1枚目は積み重ね、横は“最大3枚”になるよう毎回リセット
           if(drawn[0]!=null) addToPile(drawn[0]);
-          if(drawn.length>1) addToRow(drawn.slice(1));
-          try{
-            const cur = (state.watching?.meta?.m23_drawnNumbers) || [];
-            const add = drawn.filter(n=>!cur.includes(n));
-            if(add.length>0) await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_drawnNumbers: cur.concat(add) });
-          }catch(_){}
+          setRowCards(drawn.slice(1), 3);
           afterDraw();
-        } },
+        }},
     ]);
   };
 
   return lane;
 }
-
 
 
   
