@@ -922,7 +922,7 @@ if (v) {
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
-
+const showStart = (state.isHost && !v?.started); // ← v を直参照
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
 
