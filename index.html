@@ -1682,9 +1682,11 @@ function showInfo22Panel(vNow){
     div.appendChild(cell);
   }
 
-
-
-
+  // 既存パネルがあれば消してから表示
+  const old = document.getElementById('info22');
+  if (old) old.remove();
+  document.body.appendChild(div);
+} // ← ← ← ここで showInfo22Panel を閉じる
 
 
 /* ===== Item 2 swap ===== */
