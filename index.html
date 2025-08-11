@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BOｂｂｂERS</title>
+<title>BOMB　BU２STERS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -411,6 +411,15 @@
 
   <div class="col side">
     <div class="panel">
+      <div class="list" id="listsBox">
+        <h3>参加者</h3><div id="players"></div>
+        <h3 style="margin-top:10px">観戦者</h3><div id="spectators"></div>
+      </div>
+      <div class="mission" id="missionBox">
+        <h3>ミッション</h3>
+        <div id="missionTitle" class="bold">（未選択）</div>
+        <div id="missionText" class="small">開始時に人数と一緒に選びます</div>
+      </div>
     </div>
   </div>
 </main>
@@ -496,7 +505,7 @@ const db  = getDatabase(app);
 
 /* State */
 const state = {
-  roomCode:null, userId:crypto.randomUUID(), userName:'', openPickerAfterJoin:false,
+  roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
   m22GaveOnce:false  // ★ #22：自分が渡した一回ガード（即時連打対策）
 };
@@ -542,6 +551,9 @@ const mpCounts = document.getElementById('mpCounts');
 const mpMissions = document.getElementById('mpMissions');
 const btnMpBack = document.getElementById('btnMpBack');
 
+const playersEl=document.getElementById('players');
+const specsEl  =document.getElementById('spectators');
+const listsBox =document.getElementById('listsBox');
 
 const miniPop = document.getElementById('miniPop');
 
@@ -880,9 +892,7 @@ async function enter(mode){
 
   const roomRef = ref(db, `rooms/${code}`);
   const snap=await get(roomRef);
-  if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); 
-  // 誰もいない＝この参加者がホスト。初回同期後にピッカーを自動表示
-  state.openPickerAfterJoin = true;  }
+  if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
   else{ state.isHost = snap.val()?.hostId === state.userId; }
 
   await set(ref(db, `rooms/${code}/players/${state.userId}`), {name:state.userName, at:Date.now()});
@@ -913,8 +923,8 @@ if (v) {
     remove(ref(db, `rooms/${code}`));
     return;
   }
-} 
-    renderItemsAndDi(v);  renderM29(v); renderTables(v); 
+}    H(listsBox, !!v?.started);
+    renderLists(v); renderItemsAndDi(v);  renderM29(v); renderTables(v); 
     if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
@@ -927,16 +937,7 @@ if (v) {
 
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
-   // 旧フロー撤廃：開始ボタン/ヒントは常に非表示
-    H(btnStart, true);
-    H(startHint, true);
 
-    // 新規ルーム作成直後のみ、初回スナップでミッション/人数ピッカーを自動表示
-    if (state.openPickerAfterJoin && state.isHost && !state.gameStarted) {
-      state.openPickerAfterJoin = false; // ワンショット
-      // 人数未設定の場合は openMissionPicker() 側の既定値にフォールバック
-      openMissionPicker();
-    }
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
 
@@ -960,6 +961,13 @@ function renderMissionPanels(v){
   missionDetailTitle.textContent = v.mission.display?.[0] || '';
   missionDetailBody.innerHTML = (v.mission.display||[]).slice(1).map(line=>`<div class="line">${line}</div>`).join('');
   H(missionFooter, !v.started); H(missionBox, !!v.started);
+}
+
+/* lists */
+function renderLists(v){
+  playersEl.innerHTML=''; specsEl.innerHTML=''; if(!v) return;
+  Object.values(v.players||{}).forEach(u=>{ const d=document.createElement('div'); d.className='name'; d.textContent=u.name||'(?)'; playersEl.appendChild(d); });
+  Object.values(v.spectators||{}).forEach(u=>{ const d=document.createElement('div'); d.className='name muted'; d.textContent=u.name||'(?)'; specsEl.appendChild(d); });
 }
 
 /* ===== Items & DI ===== */
@@ -2394,8 +2402,6 @@ missionIds.forEach(id=>{
   b.className = 'btn small';
   b.textContent = `#${id}`; // ★ #付き
   b.onclick = async ()=>{
-     H(btnStart, true);
-  H(startHint, true);
     await leaveSeatNow();
     closeMissionPicker();
     await startGame(mpSelectedCount, id);
@@ -2515,15 +2521,14 @@ const items = pool
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
     di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
-     /*：#29 センター初期化 ▼▼ */
-    m29_center: (missionMeta?.id===29 ? [] : null),
+     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
+    m29_center: (missionMeta?.id===29 ? [] : undefined),
+    /* ▲▲ ここまで追加 ▼▼ */
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
 
   await setupMissionOnStart(code);   // ★追加
-  /* 開始後は即時に開始ボタンを隠す（DB反映待ちの瞬間表示を防止） */
-  H(btnStart, true);
-  H(startHint, true);
+
   H(gear,false);
 }
 
