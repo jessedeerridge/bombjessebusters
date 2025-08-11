@@ -74,15 +74,11 @@
   .numcard.overlay:nth-child(4){ left:6px; top:6px; opacity:0.8; }
  .conlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .concard {
-     width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); 
+    /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     border-radius:8px; border:1px solid #ddd;
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
   }
 
-  .concard.back {
-    background: #fff url('./conback.jpg') center/cover no-repeat;
-  }
-  
   #conZoomOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.4);
     display:flex; align-items:center; justify-content:center;
@@ -95,11 +91,6 @@
     border-radius:12px; border:2px solid #fff; background:#fff center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.35); cursor:pointer;
   }
-
-    .conzoom-card.back {
-    background: #fff url('./conback.jpg') center/cover no-repeat;
-  }
-  
   .conzoom-menu{
     position:absolute; top:50%; left:50%;
     translate:-50% calc(-50% + 120px);
@@ -2003,10 +1994,7 @@ function openConstraintZoom(letter, myIdx){
         closeConstraintZoom();
       };
 
-      const btnBack = document.createElement('button');
-      btnBack.textContent = '元に戻す';
-      btnBack.onclick = (ev)=>{ ev.stopPropagation(); closeConstraintZoom(); };
-
+   
       m.appendChild(btnOut);
       m.appendChild(btnBack);
       wrap.appendChild(m);
@@ -2985,7 +2973,6 @@ function buildConDeckLaneP1(){
   const addToPile = (ch)=>{
     const node = document.createElement('div');
     node.className = 'concard';
-    deckCard.classList.add('back');
     node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
     // 数値P1と同様の“2pxずらし”＆見切れ対策
     const already = pile.querySelectorAll('.concard').length;
