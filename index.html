@@ -856,7 +856,12 @@ if (v) {
     return;
   }
 }    H(listsBox, !!v?.started);
-    renderLists(v); renderItemsAndDi(v); renderTables(v); renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
+    renderLists(v); renderItemsAndDi(v); renderTables(v); 
+    if (v?.meta?.m22_infoShown === true) {
+  showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
+  refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
+}
+    renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 
     // ▼ ホスト判定を最新化
@@ -1766,6 +1771,25 @@ if (shown === 0) cell.classList.add('disabled');
   document.body.appendChild(div);
 }
 
+function refreshInfo22(vNow){
+  const panel = document.getElementById('info22');
+  if (!panel) return;
+  const v = vNow || state.watching;
+  // フラグが下がっていたら閉じる
+  if (v?.meta?.m22_infoShown !== true) { panel.remove(); return; }
+
+  // 1..12 の各セルの x表示と disabled を更新
+  const cells = panel.querySelectorAll('.cell');
+  for (let n=1; n<=12; n++){
+    const cell = cells[n-1];
+    if (!cell) continue;
+    const used  = countNumTokenUsage(n, v);          // 既存関数を再利用
+    const shown = 2 - Math.min(2, used);             // 0/1/2
+    const xl = cell.querySelector('.xlabel');
+    if (xl) xl.textContent = `x${shown}`;
+    cell.classList.toggle('disabled', shown===0);    // x0 はクリック無効
+  }
+}
 
 
 
