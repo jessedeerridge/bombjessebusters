@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BOｂｂｄｂERS</title>
+<title>BOｂｂｂERS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -922,7 +922,7 @@ if (v) {
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
-const showStart = (state.isHost && !v?.started); // ← v を直参照
+
     H(btnStart, !(state.isHost && !state.gameStarted));
     H(startHint, !(state.isHost && !state.gameStarted));
 
@@ -2502,14 +2502,15 @@ const items = pool
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
     di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
-     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
+     /*：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
-    /* ▲▲ ここまで追加 ▼▼ */
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
 
   await setupMissionOnStart(code);   // ★追加
-
+  /* 開始後は即時に開始ボタンを隠す（DB反映待ちの瞬間表示を防止） */
+  H(btnStart, true);
+  H(startHint, true);
   H(gear,false);
 }
 
