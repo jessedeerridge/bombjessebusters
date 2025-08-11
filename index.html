@@ -1514,6 +1514,9 @@ if(!suppressNumberPop && canNum){
 
   /* ▼▼ 追加：#22 表を既に表示済みなら、毎回再レンダリングして最新化 ▼▼ */
   if (v.meta?.m22_infoShown) {
+  const givenMap = v.meta?.m22_given || {};
+  const iGave = !!givenMap[state.userId];
+  if (!iGave && !document.getElementById('info22')) {
     showInfo22Panel(v);
   }
 
