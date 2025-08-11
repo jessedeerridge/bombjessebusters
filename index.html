@@ -1279,6 +1279,11 @@ content.appendChild(charCol);
 
     const hand=document.createElement('div'); hand.className='hand';
     (t.hand||[]).forEach((c,ci)=>{
+            /* 無効カードは描画しない（"undefined"表示の根絶） */
+      if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
+        console.warn('[hand] invalid card skipped', { table: idx, ci, card: c });
+        return; // 以降の描画処理に入らない
+      }
       const wrap=document.createElement('div'); wrap.className='card-wrap';
       const card=document.createElement('div'); card.className='card';
  const isMine = ((c.ownerId ?? t.playerId) === state.userId);
@@ -1338,8 +1343,16 @@ content.appendChild(charCol);
       }
 
       const num=document.createElement('div'); num.className='num';
-      num.textContent=String(c.num);
-      num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
+            /*未定義を文字列 "undefined" で出さない */
+      const hasNum = (c.num != null && !Number.isNaN(Number(c.num)));
+      if (hasNum) {
+        num.textContent = String(c.num);
+        num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
+      } else {
+        num.textContent = '';
+        num.style.visibility = 'hidden';
+        console.warn('[hand] card without visible num', { table: idx, ci, card: c });
+      }
       card.appendChild(num);
 
       const bot=document.createElement('div'); bot.className='img-bottom';
