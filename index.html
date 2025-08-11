@@ -379,6 +379,10 @@
 
 
     <div id="lobby" class="hidden">
+      <div class="row" style="display:flex;gap:8px;align-items:center;margin-top:4px">
+     <button class="btn primary" id="btnStart" title="ホストのみ">爆弾を解除！</button>
+<span class="small" id="startHint">（ホストのみ押せます）</span>
+</div>
 
       <div class="items-bar hidden" id="itemsBar">
         <div class="items" id="items"></div>
@@ -876,26 +880,14 @@ async function enter(mode){
 
   const roomRef = ref(db, `rooms/${code}`);
   const snap=await get(roomRef);
- let createdNow = false;
-  if(!snap.exists()){
-    state.isHost = true;
-    await set(roomRef, baseRoom(state.userId));
-    createdNow = true;
-  }else{
-    state.isHost = snap.val()?.hostId === state.userId;
-  }
+  if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
+  else{ state.isHost = snap.val()?.hostId === state.userId; }
 
   await set(ref(db, `rooms/${code}/players/${state.userId}`), {name:state.userName, at:Date.now()});
   onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
   listenRoom(code);
 
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
-  if (createdNow && state.isHost) {
-    // 「爆弾を解除！」は使わないので直接ピッカー
-    // （state.watchingの反映前でも mp はデフォルト4人で開けます）
-    openMissionPicker();
-  }
-  
 }
 function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード：${state.roomCode}　/　あなた：${state.userName}` : ''; }
 
