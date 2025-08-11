@@ -204,6 +204,7 @@
   }
   .m27-row .cap{ font-size:12px; opacity:.75; margin-right:6px; }
   .m27-row .token{ cursor:pointer; }
+  .m27-row .token.disabled{ opacity:.4; cursor:default; pointer-events:none; }
 
 
 /* ★ #22：情報トークン表（3×4）— 黒トークン + 右に x0/x1/x2 */
@@ -1737,6 +1738,7 @@ function countNumTokenUsage(n, v){
      if (old) old.remove();
      return;
    }
+   const iTook = !!(v?.meta?.m27_took && v.meta.m27_took[state.userId]);
 
    // 既存行を再利用 or 新規作成
    let row = document.getElementById('m27Row');
@@ -1759,7 +1761,8 @@ function countNumTokenUsage(n, v){
      tok.className = 'token black';
      tok.textContent = String(n);
      tok.title = 'クリックしたプレイヤーのキャラ下に置く';
-     tok.onclick = async (ev)=>{
+ if (iTook) { tok.classList.add('disabled');  tok.title = '（一人一個まで：取得済み）';     }
+          tok.onclick = async (ev)=>{
        try{
          // 自分の席へ
          const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
