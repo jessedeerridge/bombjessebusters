@@ -197,7 +197,13 @@
   display:flex; gap:2px; margin-top:2px;
 }
 .m22-under .token{ width:20px; height:20px; }
-/* ▲▲ ここまで 追加 ▲▲ */
+
+  /* ミッション27：アイテム列の直下に並べるトークン行 */
+  .m27-row{
+    display:flex; gap:6px; margin-top:4px; align-items:center;
+  }
+  .m27-row .cap{ font-size:12px; opacity:.75; margin-right:6px; }
+  .m27-row .token{ cursor:pointer; }
 
 
 /* ★ #22：情報トークン表（3×4）— 黒トークン + 右に x0/x1/x2 */
@@ -613,6 +619,9 @@ function clearMissionOverlays(){
   // ★ ミッション22：情報トークン表を確実に消す
   const info22 = document.getElementById('info22');
   if (info22) info22.remove();
+    // ★ ミッション27：アイテム直下の行を確実に消す
+  const m27 = document.getElementById('m27Row');
+  if (m27) m27.remove();
   NUMCARD_REG.clear();
 }
 
@@ -1544,6 +1553,25 @@ if(!suppressNumberPop && canNum){
   }
   renderM22PickPanel(v);
 
+    // ★ #27：黄コードが2本公開されたら、アイテム列の直下に提示用トークンを出す
+  if (v.mission?.flags?.m27_poolAfter2Yellows) {
+    // 黄公開枚数を再利用して判定
+    let yOpen = 0;
+    (v.tables||[]).forEach(T=>{
+      (T.hand||[]).forEach(c=>{
+        if (c?.kind==='yellow' && c.open===true) yOpen += 1;
+      });
+    });
+    // 初回だけプールを作ってDBへ保存
+    const shown = !!v.meta?.m27_shown;
+    if (yOpen >= 2 && !shown) {
+      ensureM27Candidates(v).then(()=> renderM27Row(state.watching || v));
+    } else {
+      // 既に用意済みなら毎描画で同期
+      renderM27Row(v);
+    }
+  }
+
   // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行...）
 // ▼ #13 ヘッダートークンの遅延一括更新（次tickで実行）
 if (!m13HeaderUpdateScheduled && m13HeaderClearIndices && m13HeaderClearIndices.size > 0) {
@@ -1668,6 +1696,108 @@ function countNumTokenUsage(n, v){
   return used;
 }
 
+ // ★ #27：候補プールを生成して DB(meta) に保存（初回のみ）
+ async function ensureM27Candidates(vNow){
+   const v = vNow || state.watching;
+   if (!v) return;
+   // 既に用意済みなら何もしない
+   if (Array.isArray(v?.meta?.m27_row) && v.meta.m27_row.length > 0) {
+     await update(ref(db, `rooms/${state.roomCode}/meta`), { m27_shown: true });
+     return;
+   }
+   // Z = 1..12 各2個、使用分（上限2まで）を差し引き
+   const pool = [];
+   for (let n=1; n<=12; n++){
+     const left = 2 - Math.min(2, countNumTokenUsage(n, v));
+     for (let i=0; i<left; i++) pool.push(n);
+   }
+   // 人数ぶんランダム提示（重複は許可：仕様は「各2個」なので重複OK）
+   shuffle(pool);
+   const need = Math.max(0, v.tableCount|0);
+   const picks = pool.slice(0, need);
+   await update(ref(db, `rooms/${state.roomCode}/meta`), {
+     m27_row: picks,
+     m27_shown: true
+   });
+ }
+
+ // ★ #27：アイテム列の直下に提示トークン行を描画
+ function renderM27Row(vNow){
+   const v = vNow || state.watching;
+   const bar = document.getElementById('itemsBar');
+   if (!bar || !v?.mission || v.mission.id !== 27) {
+     const old = document.getElementById('m27Row');
+     if (old) old.remove();
+     return;
+   }
+   const list = Array.isArray(v?.meta?.m27_row) ? v.meta.m27_row.slice() : [];
+   // 行が不要なら消す
+   if (list.length === 0){
+     const old = document.getElementById('m27Row');
+     if (old) old.remove();
+     return;
+   }
+
+   // 既存行を再利用 or 新規作成
+   let row = document.getElementById('m27Row');
+   if (!row){
+     row = document.createElement('div');
+     row.id = 'm27Row';
+     row.className = 'm27-row';
+     // 「提示トークン」ラベル
+     const cap = document.createElement('span');
+     cap.className = 'cap';
+     cap.textContent = '提示トークン：';
+     row.appendChild(cap);
+     bar.insertAdjacentElement('afterend', row);
+   }
+   // ラベル以外を消して再描画
+   [...row.children].forEach((ch,i)=>{ if(i>0) ch.remove(); });
+
+   list.forEach((n, idx)=>{
+     const tok = document.createElement('div');
+     tok.className = 'token black';
+     tok.textContent = String(n);
+     tok.title = 'クリックしたプレイヤーのキャラ下に置く';
+     tok.onclick = async (ev)=>{
+       try{
+         // 自分の席へ
+         const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+         if (myIdx < 0){ alert('席に座ってから選んでください'); return; }
+
+         // m22Tokens を汎用の“保持トークン置き場”として流用（#22 と同じ自動消費ルーチンが使える）
+         const tRef = ref(db, `rooms/${state.roomCode}/tables/${myIdx}`);
+         const snap = await get(tRef);
+         const cur  = snap.val() || {};
+         const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
+         arr.push(n);
+
+         // 行側からも1つ取り除く
+         const metaSnap = await get(ref(db, `rooms/${state.roomCode}/meta`));
+         const meta  = metaSnap.val() || {};
+         const rowNow = Array.isArray(meta.m27_row) ? meta.m27_row.slice() : [];
+         // idx の位置の 1 個を削除（同値が複数あるため index 指定）
+         if (rowNow[idx] === n) rowNow.splice(idx,1);
+         else {
+           const pos = rowNow.indexOf(n);
+           if (pos >= 0) rowNow.splice(pos,1);
+         }
+
+         await Promise.all([
+           update(tRef, { m22Tokens: arr }),
+           update(ref(db, `rooms/${state.roomCode}/meta`), { m27_row: rowNow })
+         ]);
+
+         // 取り終えたら即時再描画（次の onValue を待たずに軽く）
+         renderM27Row(state.watching || v);
+       }catch(e){
+         console.error(e);
+       }
+     };
+     row.appendChild(tok);
+   });
+ }
+  
   /* ▼ #22：自分のキャラ下の保持トークンを1つ消費する */
 async function consumeM22IfMatches(tableIdx, n){
   try{
