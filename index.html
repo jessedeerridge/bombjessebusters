@@ -948,7 +948,7 @@ if (v) {
     return;
   }
 }    
-    renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderM36Lane(v);  renderTables(v); 
+    renderItemsAndDi(v);  renderM29(v); renderM31(v);  if (v?.started && ((v?.mission?.id|0)===36)) { renderM36Lane(v); }  renderTables(v);
     if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
