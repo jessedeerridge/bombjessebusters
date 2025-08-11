@@ -735,6 +735,26 @@ function buildMixPlan(missionId){
     {type:'redPick',    k:1},
     {type:'yellowPick', k:4},
   ],
+  23: [  // 赤3-
+    {type:'redChoose', from:3, take:1},
+  ],
+  24: [  // 赤2
+    {type:'redPick', k:2},
+  ],
+  25: [  // 赤2
+    {type:'redPick', k:2},
+  ],
+  26: [  // 赤2
+    {type:'redPick', k:2},
+  ],
+  27: [  // 赤1 黄4
+    {type:'redPick',    k:1},
+    {type:'yellowPick', k:4},
+  ],
+  28: [  // 赤2 黄4
+    {type:'redPick',    k:2},
+    {type:'yellowPick', k:4},
+  ],
 };
 return plans[missionId] || [];
 
@@ -905,7 +925,13 @@ function renderLists(v){
 /* ===== Items & DI ===== */
 function renderItemsAndDi(v){
   if(!v || !v.started){ H(itemsBar,true); return; }
-  H(itemsBar,false);
+  // ★ #23：広げる前はアイテム列を非表示
+  {
+    const flags = v?.mission?.flags || {};
+    const hide = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
+    H(itemsBar, hide ? true : false);
+    if (hide) return; // ここで終了（数値帯や#23のデッキUIは別途表示）
+  }
 
   itemsEl.innerHTML='';
   const itemNodes = []; // ★ ノード参照を保持
@@ -2190,6 +2216,10 @@ async function setupMissionOnStart(code){
   if(flags.needsNumberLane && flags.pattern==='P1'){
     const lane = buildDeckLaneP1();
     mountLaneUnderItemsBar(lane);
+        // ★ #23：アイテム1〜13からランダム7枚の山札を作り、数値山の右側に表示
+    if (flags.m23_itemDeck7) {
+      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
+    }
   }
 
   // #12：各アイテムの中央下に「1枚ずつ」固定配置
@@ -2270,6 +2300,11 @@ try{
       T.hand = hand;
     });
     await set(ref(db, `rooms/${code}/tables`), tbls);
+  }
+ 
+  // #26：1〜12を3×4で配置（裏表トグル）
+  if (flags.m26_grid12) {
+    mountM26GridUnderItems();
   }
   
 
@@ -2364,6 +2399,14 @@ function buildDeckLaneP1(){
     restLbl.textContent = `残:${rest}`;
     addToPile(n);
 
+    // ★ #23：表になった数値をメタに記録（重複は追加しない）
+     try{
+       const cur = (state.watching?.meta?.m23_drawnNumbers) || [];
+      if (!cur.includes(n)) {
+         update(ref(db, `rooms/${state.roomCode}/meta`), { m23_drawnNumbers: cur.concat(n) });
+       }
+     }catch(_){}
+   
     if(rest===0){
       deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
       deckBtn.title='山札を作る';
@@ -2390,7 +2433,135 @@ function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
 }
 
+ 
+/* ===== ★ #23：アイテム山（7枚）を数値山レーンの右側に表示 ===== */
+async function ensureM23MetaInit(){
+  const v = state.watching; if(!v) return;
+  if (Array.isArray(v?.meta?.m23_deck)) return; // 既に初期化済み
+  const pool = itemDeckNumbers(v?.mission?.id || 23).slice(); // 1..13 or 1..12
+  shuffle(pool);
+  const seven = pool.slice(0,7);
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    m23_deck: seven,        // 山札（番号配列）
+   m23_discards: [],       // 捨て札
+    m23_spread: false,      // 広げたか？
+    m23_drawnNumbers: []    // 数値山で表になった数値
+  });
+}
+function attachM23DeckUI(lane){
+  const deckBtn = document.createElement('div');
+ deckBtn.className = 'numdeck';
+  deckBtn.style.backgroundImage = `url("./itemback.jpg")`;
+  const restLbl = document.createElement('span');
+  restLbl.className = 'numrest';
+  const refreshRest = ()=>{
+    const v=state.watching, meta=v?.meta||{};
+    const d=(meta.m23_deck||[]), x=(meta.m23_discards||[]);
+    const remain = d.filter(n=>!x.includes(n)).length;
+    restLbl.textContent = `残:${remain}`;
+  };
+  refreshRest();
+  lane.appendChild(deckBtn);
+  lane.appendChild(restLbl);
 
+  deckBtn.onclick = (ev)=>{
+    const v=state.watching, meta=v?.meta||{};
+    const d=(meta.m23_deck||[]), x=(meta.m23_discards||[]);
+    const remain = d.filter(n=>!x.includes(n));
+
+    // 4枚公開の条件：数値山で表になった数字のうち、同じ数字の通常コードが4枚全体公開になっているものがある
+    const drawn = new Set(meta.m23_drawnNumbers||[]);
+    const openCountByNum = {};
+    (v.tables||[]).forEach(T=> (T.hand||[]).forEach(c=>{
+      if(c?.kind==='normal' && c.open===true){
+        const nn=c.num|0; openCountByNum[nn]=(openCountByNum[nn]||0)+1;
+      }
+   }));
+    const ready = Array.from(drawn).some(nn => (openCountByNum[nn]||0)===4);
+
+    if (!meta.m23_spread && ready){
+      openOneMini(ev.clientX, ev.clientY, '広げる', async ()=>{
+        // 未捨て札のアイテムを全て表にして上段（items）へ
+        const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
+        await Promise.all([
+         set(ref(db, `rooms/${state.roomCode}/items`), list),
+          update(ref(db, `rooms/${state.roomCode}/meta`), { m23_spread:true })
+        ]);
+       refreshRest();
+      });
+     return;
+   }
+
+    // 通常：1枚めくって捨て札に入れる
+    openOneMini(ev.clientX, ev.clientY, 'めくる', async ()=>{
+      const v2=state.watching, meta2=v2?.meta||{};
+     const d2=(meta2.m23_deck||[]), x2=(meta2.m23_discards||[]);
+     const remain2 = d2.filter(n=>!x2.includes(n));
+      if (remain2.length<=0) return;
+     const pick = remain2[(Math.random()*remain2.length)|0];
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_discards: (x2||[]).concat(pick) });
+      refreshRest();
+    });
+  };
+}
+
+/* ===== ★ #26：1〜12 を 3×4 で並べ、裏表をトグル ===== */
+function mountM26GridUnderItems(){
+  const bar = document.getElementById('itemsBar');
+ // 3行 × 4列（flexレーンを3本作る）
+  const wrap = document.createElement('div');
+  wrap.className = 'numlane';
+  wrap.style.flexDirection = 'column';
+ wrap.style.alignItems = 'flex-start';
+  wrap.style.gap = '6px';
+ const rows = [ [1,2,3,4], [5,6,7,8,9], [10,11,12] ];
+  rows.forEach(arr=>{
+    const row = document.createElement('div');
+    row.className = 'numlane';
+    arr.forEach(n=>{
+     const c = document.createElement('div');
+      c.className = 'numcard';
+      c.dataset.num = String(n);
+      row.appendChild(c);
+    });
+   wrap.appendChild(row);
+  });
+  bar.insertAdjacentElement('afterend', wrap);
+
+  const sync = ()=>{
+    const v = state.watching||{}; const hidden = new Set((v.meta?.m26_hidden)||[]);
+    wrap.querySelectorAll('.numcard').forEach(el=>{
+      const n = parseInt(el.dataset.num,10);
+      el.style.backgroundImage = hidden.has(n) ? `url('${imgBack}')` : `url('${imgNumber(n)}')`;
+    });
+  };
+  sync();
+
+  wrap.querySelectorAll('.numcard').forEach(el=>{
+   el.onclick = (ev)=>{
+      const n = parseInt(el.dataset.num,10);
+      const v = state.watching||{}; const hidden = new Set((v.meta?.m26_hidden)||[]);
+      const allHidden = hidden.size===12;
+      if (!hidden.has(n)){
+        openOneMini(ev.clientX, ev.clientY, '裏返す', async ()=>{
+          hidden.add(n);
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m26_hidden: Array.from(hidden) });
+          sync();
+        });
+      }else{
+       openOneMini(ev.clientX, ev.clientY, allHidden ? '全て表にする' : '表にする', async ()=>{
+          if (allHidden){
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m26_hidden: [] });
+          }else{
+           hidden.delete(n);
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m26_hidden: Array.from(hidden) });
+          }
+          sync();
+        });
+      }
+    };
+  });
+}
   
 function missionInfo(id, opts={}){
   const mixLines = opts.mixLines || [];     // 例: ['赤[1.5]', '黄[2.1][5.1]']
@@ -2594,6 +2765,73 @@ function missionInfo(id, opts={}){
         }
       };
     }
+
+    case 23: {
+      return {
+        id:23, name:'#23', desc:'',
+        display:[
+          '#23', ...linesForMix,
+          '赤3-1。数値カードの山札を表示。アイテムは最初は非表示。',
+         'アイテム1〜13からランダムに7枚の山札を作り、数値山の右に表示。「めくる」で1枚ずつ捨て札。',
+          '数値カードで表に見えている数字と同じ数字の手札カードが4枚全体公開されたら「広げる」を表示。',
+          '「広げる」で未捨て札のアイテムを全て表にして上段に並べる。'
+        ],
+        flags:{ needsNumberLane:true, pattern:'P1', m23_itemDeck7:true, m23_hideItemsUntilSpread:true }
+      };
+    }
+
+   case 24: {
+      return {
+        id:24, name:'#24', desc:'',
+        display:[
+          '#24', ...linesForMix,
+          '赤2。情報トークンは数字不可。代わりに x1 / x2 / x3 を付けられる。'
+        ],
+        flags:{ useXTokens:true }
+      };
+    }
+
+    case 25: {
+      return {
+        id:25, name:'#25', desc:'',
+        display:[ '#25', ...linesForMix, '赤2' ],
+        flags:{}
+      };
+    }
+
+    case 26: {
+      return {
+        id:26, name:'#26', desc:'',
+        display:[
+         '#26', ...linesForMix, '赤2',
+          '1〜12の数値カードをアイテム列の下に 3×4 で並べる（1,2,3,4 / 5,6,7,8,9 / 10,11,12）。',
+          'カード押下で「裏返す／表にする」。全カードが裏のときは「全て表にする」。'
+        ],
+        flags:{ m26_grid12:true }
+      };
+    }
+
+    case 27: {
+      return {
+        id:27, name:'#27', desc:'',
+        display:[
+          '#27', ...linesForMix, '赤1', '黄4',
+          '黄コードが最初に2本全体公開された瞬間：',
+          '1〜12が各2個ある集合Zを作り、場で使われている分を差し引く。残りから人数分をランダム提示。',
+          '提示トークンはクリックしたプレイヤーのキャラ下に置かれ、同じ数字を使用したら自動で消える。'
+        ],
+        flags:{ m27_poolAfter2Yellows:true }
+      };
+    }
+
+    case 28: {
+      return {
+        id:28, name:'#28', desc:'',
+        display:[ '#28', ...linesForMix, '赤2', '黄4' ],
+        flags:{}
+      };
+    }
+ 
 
 
 
