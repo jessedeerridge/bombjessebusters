@@ -1382,7 +1382,7 @@ if(!suppressNumberPop && canNum){
                     }},
 // ★ 数字付与は通常コードのみ
 if (c.kind === 'normal') {
-  entries2.push({ label:String(c.num), action: async ()=>{
+  entries.push({ label:String(c.num), action: async ()=>{
     if(!has('num')){
       const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
       await update(ref(db, cardPath), { tokens: next });
@@ -1457,7 +1457,7 @@ if (c.kind === 'normal') {
                 }},
 // ★ 数字付与は通常コードのみ
 if (c.kind === 'normal') {
-  entries2.push({ label:String(c.num), action: async ()=>{
+  entries.push({ label:String(c.num), action: async ()=>{
     if(!has('num')){
       const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
       await update(ref(db, cardPath), { tokens: next });
