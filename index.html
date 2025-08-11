@@ -611,6 +611,7 @@ function clearMissionOverlays(){
 }
  const m31h = document.getElementById('m31HandRow'); if (m31h) m31h.remove();
   const m31c = document.getElementById('m31CenterRow'); if (m31c) m31c.remove();
+  document.querySelectorAll('.conlane').forEach(n => n.remove());
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
@@ -1068,6 +1069,13 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
     ]);
   };
 }
+  // ★ ミッション32：制約カードの山札をアイテム列の下に表示
+  try { const ex = document.getElementById('m32ConLane'); if (ex) ex.remove(); } catch(_){}
+  if ((v?.mission?.id|0) === 32) {
+    const lane = buildConDeckLane();
+    lane.id = 'm32ConLane';
+    mountLaneUnderItemsBar(lane);
+  }
 
 /* ===== Global badge (item16) ===== */
 function renderGlobalReveal(v){
@@ -2979,7 +2987,83 @@ function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
 }
 
- 
+ // ★★★ ミッション32：制約カード（A〜E）山札 → 「めくる」→ 右に表公開 ★★★
+function buildConDeckLane(){
+  const lane = document.createElement('div');
+  lane.className = 'conlane'; // 幅・高さは .concard がアイテムサイズを使う
+
+  // デッキ：A〜E をシャッフル
+  const deck = ['A','B','C','D','E'];
+  shuffle(deck);
+  let rest = deck.length;
+
+  // 山札ボタン（アイテムサイズで背面を表示）
+  const deckBtn = document.createElement('div');
+  deckBtn.className = 'item';
+  deckBtn.title = 'めくる';
+  deckBtn.style.backgroundImage = `url("./itemback.jpg")`;
+
+  // 残り枚数ラベル
+  const restLbl = document.createElement('span');
+  restLbl.className = 'numrest';
+  restLbl.textContent = `残:${rest}`;
+
+  // 右側：公開札の積み重ね（制約カードはアイテムと同サイズ）
+  const pile = document.createElement('div');
+  pile.style.position = 'relative';
+  pile.style.width  = cssNum('--item-w') + 'px';
+  pile.style.height = cssNum('--item-h') + 'px';
+
+  lane.appendChild(deckBtn);
+  lane.appendChild(restLbl);
+  lane.appendChild(pile);
+
+  // 右の積み重ねに1枚追加
+  function addConToPile(L){
+    const already = pile.querySelectorAll('.concard').length;
+    const node = document.createElement('div');
+    node.className = 'concard';
+    node.style.backgroundImage = `url('${imgConstraint(L)}')`;
+    if(already>0){
+      const off = already * 2;      // 2px刻みでズラす
+      node.style.position = 'absolute';
+      node.style.left = off + 'px';
+      node.style.top  = off + 'px';
+      // 見切れ防止：高さ＆下マージン拡張
+      const baseH = cssNum('--item-h');
+      pile.style.height = (baseH + off) + 'px';
+      lane.style.marginBottom = off + 'px';
+    }
+    pile.appendChild(node);
+  }
+
+  // クリック：タブ「めくる」で1枚めくる／空なら再生成
+  deckBtn.onclick = (ev)=>{
+    if(rest<=0){
+      openOneMini(ev.clientX, ev.clientY, '山札を作る', ()=>{
+        deck.splice(0, deck.length, ...['A','B','C','D','E']);
+        shuffle(deck);
+        rest = deck.length;
+        restLbl.textContent = `残:${rest}`;
+        pile.innerHTML = '';
+        pile.style.height = cssNum('--item-h') + 'px';
+        lane.style.marginBottom = '0px';
+      });
+      return;
+    }
+    openOneMini(ev.clientX, ev.clientY, 'めくる', ()=>{
+      const L = deck.pop(); rest--;
+      restLbl.textContent = `残:${rest}`;
+      if(L) addConToPile(L);
+      if(rest===0){
+        deckBtn.title = '山札を作る';
+      }
+    });
+  };
+
+  return lane;
+}
+  
 /* ===== ★ #23：アイテム山（7枚）を数値山レーンの右側に表示 ===== */
 async function ensureM23MetaInit(){
   const v = state.watching; if(!v) return;
