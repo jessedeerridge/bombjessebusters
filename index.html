@@ -596,9 +596,9 @@ const MATERIALS = {
   numbers : [1,2,3,4,5,6,7,8,9,10,11,12]
 };
 // ★ 修正：文字列リテラル
-const imgNumber = n => ./s${n}.jpg;
-const imgBack   = ./numbercardback.jpg;
-const imgRule   = name => ./${name}.jpg; // right2/left2/right4/left4
+const imgNumber = n => `./s${n}.jpg`;
+const imgBack   = `./numbercardback.jpg`;
+const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
 
 
 /* ===== 数値カード一意管理＆重ね表示ユーティリティ ===== */
@@ -611,12 +611,6 @@ function clearMissionOverlays(){
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
   document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
   NUMCARD_REG.clear();
-  // ★ #22：情報トークン表を確実に掃除
-  const info = document.getElementById('info22');
-  if (info) info.remove();
-  // ★ #22：ローカルの「一回渡した」ガードも初期化
-  state.m22GaveOnce = false;
-  
 }
 
 
@@ -630,7 +624,7 @@ function placeNumberCard(n, mountParent){
   holder.className = 'numcard-holder';
   const base = document.createElement('div');
   base.className = 'numcard';
-  base.style.backgroundImage = url('${imgNumber(n)}');
+  base.style.backgroundImage = `url('${imgNumber(n)}')`;
   holder.appendChild(base);
   mountParent.appendChild(holder);
   NUMCARD_REG.set(n, holder);
@@ -755,22 +749,22 @@ function executeMixPlan(planList){
     if(p.type==='redPick'){
       const cand = pickK(MATERIALS.redCodes, p.k);
       cand.forEach(n=> toAdd.push({num:n, kind:'red'}));
-      mixLines.push('赤' + cand.map(v=>[${v}]).join(''));
+      mixLines.push('赤' + cand.map(v=>`[${v}]`).join(''));
     }
     if(p.type==='yellowPick'){
       const cand = pickK(MATERIALS.yellowCodes, p.k);
       cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
-      mixLines.push('黄' + cand.map(v=>[${v}]).join(''));
+      mixLines.push('黄' + cand.map(v=>`[${v}]`).join(''));
     }
     if(p.type==='redChoose'){
       const cand = pickK(MATERIALS.redCodes, p.from);
-      chooseLines.push(赤コード ${cand.map(v=>[${v}]).join(' ')} のうち${p.take}つ);
+      chooseLines.push(`赤コード ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
       const take = pickK(cand, p.take);
       take.forEach(n=> toAdd.push({num:n, kind:'red'}));
     }
     if(p.type==='yellowChoose'){
       const cand = pickK(MATERIALS.yellowCodes, p.from);
-      chooseLines.push(黄コード ${cand.map(v=>[${v}]).join(' ')} のうち${p.take}つ);
+      chooseLines.push(`黄コード ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
       const take = pickK(cand, p.take);
       take.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
     }
@@ -825,18 +819,18 @@ async function enter(mode){
   if(!code){ alert('コードを入力してください'); return; }
   state.roomCode = code; state.mode=mode;
 
-  const roomRef = ref(db, rooms/${code});
+  const roomRef = ref(db, `rooms/${code}`);
   const snap=await get(roomRef);
   if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
   else{ state.isHost = snap.val()?.hostId === state.userId; }
 
-  await set(ref(db, rooms/${code}/players/${state.userId}), {name:state.userName, at:Date.now()});
-  onDisconnect(ref(db, rooms/${code}/players/${state.userId})).remove();
+  await set(ref(db, `rooms/${code}/players/${state.userId}`), {name:state.userName, at:Date.now()});
+  onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
   listenRoom(code);
 
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
 }
-function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? コード：${state.roomCode}　/　あなた：${state.userName} : ''; }
+function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード：${state.roomCode}　/　あなた：${state.userName}` : ''; }
 
 /* room base */
 function baseRoom(hostId){
@@ -847,7 +841,7 @@ function baseRoom(hostId){
 
 /* watch */
 function listenRoom(code){
-  onValue(ref(db, rooms/${code}),(snap)=>{
+  onValue(ref(db, `rooms/${code}`),(snap)=>{
     const v=snap.val(); state.watching=v;
 if (v) {
   const p = Object.keys(v.players || {}).length;
@@ -855,7 +849,7 @@ if (v) {
   const empty = (p === 0 && s === 0);
   const justCreated = (Date.now() - (v.createdAt || 0) < 2000); // 作成から2秒以内は削除しない
   if (empty && !justCreated) {
-    remove(ref(db, rooms/${code}));
+    remove(ref(db, `rooms/${code}`));
     return;
   }
 }    H(listsBox, !!v?.started);
@@ -889,7 +883,7 @@ function renderMissionPanels(v){
     H(missionFooter,true); H(missionBox,false); return;
   }
   missionDetailTitle.textContent = v.mission.display?.[0] || '';
-  missionDetailBody.innerHTML = (v.mission.display||[]).slice(1).map(line=><div class="line">${line}</div>).join('');
+  missionDetailBody.innerHTML = (v.mission.display||[]).slice(1).map(line=>`<div class="line">${line}</div>`).join('');
   H(missionFooter, !v.started); H(missionBox, !!v.started);
 }
 
@@ -914,9 +908,9 @@ function renderItemsAndDi(v){
     if(!it.used){
       // #15: 最初は裏向き表示（使用可だが faceUp===false の間は裏面アートを表示）
       if(flags.itemsFaceDownStart && it.faceUp===false){
-        div.style.backgroundImage = url("./itemback.jpg");
+        div.style.backgroundImage = `url("./itemback.jpg")`;
       }else{
-        div.style.backgroundImage = url("./item${it.no}.jpg");
+        div.style.backgroundImage = `url("./item${it.no}.jpg")`;
       }
     }
 
@@ -931,7 +925,7 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   tok.title = 'クリックで操作';
   tok.onclick = (ev)=>{
     openMenu(ev.clientX, ev.clientY, [
-      {label:'消す', action: async ()=>{ await update(ref(db, rooms/${state.roomCode}/meta), { i16Badge: null }); }}
+      {label:'消す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); }}
     ]);
   };
   below.appendChild(tok);
@@ -945,7 +939,7 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
       const flags = state.watching?.mission?.flags || {};
       if(it.used){
         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
-          await update(ref(db, rooms/${state.roomCode}/items/${idx}), {used:false});
+          await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
         });
       }else{
         // 未使用時：#15 の「表にする」を追加し、必要なら併記
@@ -955,7 +949,7 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
           entries.push({
             label:'表にする',
             action: async ()=>{
-              await update(ref(db, rooms/${state.roomCode}/items/${idx}), { faceUp:true });
+              await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), { faceUp:true });
             }
           });
         }
@@ -963,8 +957,8 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
         entries.push({
           label:'使用する',
           action: async ()=>{
-            await update(ref(db, rooms/${state.roomCode}/items/${idx}), {used:true});
-            const path=rooms/${state.roomCode}/meta/itemUses;
+            await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
+            const path=`rooms/${state.roomCode}/meta/itemUses`;
             const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
             if(it.no===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
             if(it.no===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
@@ -972,11 +966,11 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
             if(it.no===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
 
             if(it.no===2){
-              await update(ref(db, rooms/${state.roomCode}/meta), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+              await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
             }
             if(it.no===13){ await addTwoItemsFromDeck(); }
             if(it.no===16){ await handleItem16(idx); }
-            if(it.no===18){ await update(ref(db, rooms/${state.roomCode}/meta), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
+            if(it.no===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
           }
         });
 
@@ -991,11 +985,11 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
 
 
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
-  diEl.style.backgroundImage = url("./di${val}.png");
+  diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
     openMenu(ev.clientX, ev.clientY, [
-      {label:'進める', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6); await update(ref(db, rooms/${state.roomCode}/di), {value:next}); }},
-      {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, rooms/${state.roomCode}/di), {value:next}); }},
+      {label:'進める', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
+      {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
     ]);
   };
 }
@@ -1135,10 +1129,10 @@ char.className='char-card';
 if(!seatedAny){ 
   char.classList.add('blank'); 
 }else{
-  const face = t.character?.flipped ? './battery.jpg' : ./${t.character?.face || 'member (1).jpg'};
-  char.style.backgroundImage = url("${face}");
+  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+  char.style.backgroundImage = `url("${face}")`;
   char.onclick=async ()=>{ 
-    await update(ref(db, rooms/${state.roomCode}/tables/${idx}/character), {flipped: !t.character?.flipped}); 
+    await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
   };
 }
 charCol.appendChild(char);
@@ -1162,7 +1156,7 @@ if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
     d.onclick = async (ev)=>{
       ev.stopPropagation();
       const next = (t.m22Tokens || []).filter(x => x !== nn);
-      await update(ref(db, rooms/${state.roomCode}/tables/${idx}), { m22Tokens: next });
+      await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { m22Tokens: next });
     };
     row.appendChild(d);
   });
@@ -1196,16 +1190,16 @@ content.appendChild(charCol);
         card.onclick = async (ev)=>{
           ev.stopPropagation();
           if(canPickSelf){
-            await update(ref(db, rooms/${state.roomCode}/meta/i2Flow), { selA:{table:idx, cardId:c.id}, phase:'pickOther' });
+            await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther' });
           }else if(canPickOther){
-            await update(ref(db, rooms/${state.roomCode}/meta/i2Flow), { selB:{table:idx, cardId:c.id} });
+            await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
             openBottomMenu([
               {label:'交換する', action: async ()=>{
-                const i2 = (await get(ref(db, rooms/${state.roomCode}/meta/i2Flow))).val();
+                const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
                 if(i2?.selA && i2?.selB) await doItem2Swap(i2.selA, i2.selB);
               }},
               {label:'やり直す', action: async ()=>{
-                await update(ref(db, rooms/${state.roomCode}/meta), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+                await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
               }}
             ]);
           }
@@ -1214,10 +1208,10 @@ content.appendChild(charCol);
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
-          await update(ref(db, rooms/${state.roomCode}/meta/i18Flow), { sel:{table:idx, cardId:c.id} });
+          await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:{table:idx, cardId:c.id} });
           openBottomMenu([
-            {label:'とる', action: async ()=>{ const i18=(await get(ref(db, rooms/${state.roomCode}/meta/i18Flow))).val(); if(i18?.sel) await doItem18Take(i18.sel); }},
-            {label:'やり直す', action: async ()=>{ await update(ref(db, rooms/${state.roomCode}/meta/i18Flow), { sel:null, phase:'pickOther' }); }}
+            {label:'とる', action: async ()=>{ const i18=(await get(ref(db, `rooms/${state.roomCode}/meta/i18Flow`))).val(); if(i18?.sel) await doItem18Take(i18.sel); }},
+            {label:'やり直す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:null, phase:'pickOther' }); }}
           ]);
         };
       }else{
@@ -1226,7 +1220,7 @@ content.appendChild(charCol);
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
             if(blockingI2 || blockingI18) return;
-            await update(ref(db, rooms/${state.roomCode}/tables/${idx}/hand/${ci}), {open: !c.open});
+            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open});
           }
         };
       }
@@ -1238,7 +1232,7 @@ content.appendChild(charCol);
 
       const bot=document.createElement('div'); bot.className='img-bottom';
       let img='codenumber.jpg'; if(c.kind==='red') img='redcode.png'; if(c.kind==='yellow') img='yellowcode.png';
-      bot.style.backgroundImage=url("./${img}"); if(card.classList.contains('back')) bot.style.display='none';
+      bot.style.backgroundImage=`url("./${img}")`; if(card.classList.contains('back')) bot.style.display='none';
       card.appendChild(bot);
 
       const badge=document.createElement('div'); badge.className='badge-fixed';
@@ -1273,7 +1267,7 @@ content.appendChild(charCol);
       if(!(i2All && i2All.usingBy===state.userId) && !(i18All && i18All.usingBy===state.userId) && isMine){
         a.onclick=(ev)=>{
           ev.stopPropagation();
-          const cardPath  = rooms/${state.roomCode}/tables/${idx}/hand/${ci};
+          const cardPath  = `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`;
           const tokens = c.tokens || [];
           const has = (type)=> tokens.some(tk=>tk.type===type);
 
@@ -1506,7 +1500,7 @@ if(!suppressNumberPop && canNum){
     const alreadyShown = !!v.meta?.m22_infoShown;
     if (openYellowCount >= 2 && !alreadyShown) {
       // フラッシュ防止：描画は次の onValue レンダーに任せる
-      update(ref(db, rooms/${state.roomCode}/meta), { m22_infoShown: true });
+      update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown: true });
     }
   }
   renderM22PickPanel(v);
@@ -1527,13 +1521,13 @@ if (!m13HeaderUpdateScheduled && m13HeaderClearIndices && m13HeaderClearIndices.
       m13HeaderUpdateScheduled = false;
 
       // 現在のヘッダー配列を取得して、対象 index を null にする
-      const snap = await get(ref(db, rooms/${state.roomCode}/meta/m13_header));
+      const snap = await get(ref(db, `rooms/${state.roomCode}/meta/m13_header`));
       const currentHeader = (snap.val() || []).slice();
       indices.forEach(i => {
         if (i >= 0 && i < currentHeader.length) currentHeader[i] = null;
       });
 
-      await update(ref(db, rooms/${state.roomCode}/meta), { m13_header: currentHeader });
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m13_header: currentHeader });
     } catch (e) {
       console.error('m13 header clear failed', e);
     }
@@ -1542,7 +1536,7 @@ if (!m13HeaderUpdateScheduled && m13HeaderClearIndices && m13HeaderClearIndices.
 
 async function incToken(kind, delta){
   try {
-    const path = rooms/${state.roomCode}/meta/tokenCounts;
+    const path = `rooms/${state.roomCode}/meta/tokenCounts`;
     const snap = await get(ref(db, path));
     const prev = snap.val() || { equal:0, noteq:0, x1:0 };
     const next = { ...prev, [kind]: Math.max(0, (prev[kind] || 0) + delta) };
@@ -1584,7 +1578,7 @@ function renderM22PickPanel(v){
       if (pickedSet.has(nn)) return;        // 既に選択済み
       if (picked.length >= 2) return;       // 上限
       const next = picked.concat(nn);
-await update(ref(db, rooms/${state.roomCode}/tables/${myIdx}), { m22Tokens: next });
+await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m22Tokens: next });
     };
     m22PickPanel.appendChild(d);
   });
@@ -1613,7 +1607,7 @@ function countNumTokenUsage(n, v){
   /* ▼ #22：自分のキャラ下の保持トークンを1つ消費する */
 async function consumeM22IfMatches(tableIdx, n){
   try{
-    const tRef = ref(db, rooms/${state.roomCode}/tables/${tableIdx});
+    const tRef = ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`);
     const snap = await get(tRef);
     const cur  = snap.val() || {};
     const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
@@ -1649,8 +1643,7 @@ const shown = 2 - Math.min(2, used);
 
       const cell = document.createElement('div');
     cell.className = 'cell';
-　  // ★ x0 は押しても何も出さない（ハンドラ付けない）
-   const isZero = (shown === 0);
+
     // 黒トークン本体（既存の .token.black を再利用）
     const tok = document.createElement('div');
     tok.className = 'token black';
@@ -1659,17 +1652,11 @@ const shown = 2 - Math.min(2, used);
     // 右側の xラベル
     const xl = document.createElement('span');
     xl.className = 'xlabel';
-    xl.textContent = x${shown};
+    xl.textContent = `x${shown}`;
 
     cell.appendChild(tok);
     cell.appendChild(xl);
-   // ★ x0 はクリック不可
-   if (isZero) {
-     cell.classList.add('disabled');
-     div.appendChild(cell);
-     continue;
-   }
-    
+
     // ▼ セル全域／トークンどちらを押しても同じ挙動：自分は1回だけ「渡す」可能。以降は「隠す」のみ
     const handleGiveOrHide = async (ev)=>{
       ev.stopPropagation();
@@ -1698,20 +1685,20 @@ const shown = 2 - Math.min(2, used);
       if (nextIdx < 0){
         nextIdx = (tables.findIndex(T => T.playerId) + tables.length) % Math.max(1, tables.length);
       }
-      const nextName = tables[nextIdx]?.playerName || #${(nextIdx|0)+1};
+      const nextName = tables[nextIdx]?.playerName || `#${(nextIdx|0)+1}`;
 
       openMenu(ev.clientX, ev.clientY, [
-        { label: ${nextName} に ${n} を渡す, action: async ()=>{
+        { label: `${nextName} に ${n} を渡す`, action: async ()=>{
             try{
               state.m22GaveOnce = true;
 
-              const gPath = rooms/${state.roomCode}/meta/m22_given;
+              const gPath = `rooms/${state.roomCode}/meta/m22_given`;
               const gSnap = await get(ref(db, gPath));
               const gMap  = gSnap.val() || {};
               if (gMap[state.userId]) return;
 
               // 受け取り先に push
-              const tRef = ref(db, rooms/${state.roomCode}/tables/${nextIdx});
+              const tRef = ref(db, `rooms/${state.roomCode}/tables/${nextIdx}`);
               const snap = await get(tRef);
               const cur  = snap.val() || {};
               const arr  = Array.isArray(cur.m22Tokens) ? cur.m22Tokens.slice() : [];
@@ -1744,7 +1731,7 @@ const shown = 2 - Math.min(2, used);
 /* ===== Item 2 swap ===== */
 async function doItem2Swap(A, B){
   if(!A || !B) return;
-  const snap = await get(ref(db, rooms/${state.roomCode}/tables));
+  const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
   const tables = snap.val() || [];
 
   const pickCard = (tableIdx, cardId)=>{
@@ -1755,7 +1742,7 @@ async function doItem2Swap(A, B){
 
   const a = pickCard(A.table, A.cardId);
   const b = pickCard(B.table, B.cardId);
-  if(!a.card || !b.card){ await update(ref(db, rooms/${state.roomCode}/meta), { i2Flow:null }); return; }
+  if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
 
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
@@ -1772,22 +1759,22 @@ async function doItem2Swap(A, B){
   realpha(a.hand); realpha(b.hand);
 
   await Promise.all([
-    set(ref(db, rooms/${state.roomCode}/tables/${A.table}/hand), a.hand),
-    set(ref(db, rooms/${state.roomCode}/tables/${B.table}/hand), b.hand),
-    update(ref(db, rooms/${state.roomCode}/meta), { i2Flow:null })
+    set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand),
+    set(ref(db, `rooms/${state.roomCode}/tables/${B.table}/hand`), b.hand),
+    update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null })
   ]);
 }
 
 /* ===== Item 18 take ===== */
 async function doItem18Take(sel){
   const myTable = state.watching?.tables?.findIndex(t=> t.playerId===state.userId);
-  if(myTable==null || myTable<0){ alert('席に座ってから使用してください'); await update(ref(db, rooms/${state.roomCode}/meta/i18Flow), {sel:null, phase:'pickOther'}); return; }
-  const snap = await get(ref(db, rooms/${state.roomCode}/tables));
+  if(myTable==null || myTable<0){ alert('席に座ってから使用してください'); await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
+  const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
   const tables = snap.val() || [];
 
   const srcHand = (tables[sel.table]?.hand)||[];
   const si = srcHand.findIndex(c=> c.id===sel.cardId);
-  if(si<0){ await update(ref(db, rooms/${state.roomCode}/meta/i18Flow), {sel:null, phase:'pickOther'}); return; }
+  if(si<0){ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
   const card = srcHand.splice(si,1)[0];
 
   const dstHand = (tables[myTable]?.hand)||[];
@@ -1800,9 +1787,9 @@ async function doItem18Take(sel){
   realpha(dstHand); realpha(srcHand);
 
   await Promise.all([
-    set(ref(db, rooms/${state.roomCode}/tables/${sel.table}/hand), srcHand),
-    set(ref(db, rooms/${state.roomCode}/tables/${myTable}/hand), dstHand),
-    update(ref(db, rooms/${state.roomCode}/meta), { i18Flow:null })
+    set(ref(db, `rooms/${state.roomCode}/tables/${sel.table}/hand`), srcHand),
+    set(ref(db, `rooms/${state.roomCode}/tables/${myTable}/hand`), dstHand),
+    update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:null })
   ]);
 }
 
@@ -1862,7 +1849,7 @@ async function addTwoItemsFromDeck(){
   if(pick.length===0) return;
 
   const next = (v.items||[]).concat(pick);
-  await set(ref(db, rooms/${state.roomCode}/items), next);
+  await set(ref(db, `rooms/${state.roomCode}/items`), next);
 }
 
 
@@ -1888,12 +1875,12 @@ async function handleItem16(itemIdx){
   }
 
   if(candidates.length===0){
-    await update(ref(db, rooms/${state.roomCode}/meta), { i16Badge: null });
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null });
     return;
   }
 
   const pick = candidates[Math.floor(Math.random()*candidates.length)];
-  await update(ref(db, rooms/${state.roomCode}/meta), { i16Badge: { num: pick, at: Date.now() } });
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: { num: pick, at: Date.now() } });
 }
 
 /* gear etc */
@@ -1930,8 +1917,8 @@ gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.co
 async function leaveSeatNow(){
   if(state.seatedTable==null || !state.watching?.tables) return;
   const idx=state.seatedTable; const hand=(state.watching.tables[idx].hand||[]);
-  await update(ref(db, rooms/${state.roomCode}/tables/${idx}), {playerId:null, playerName:null});
-  await Promise.all(hand.map((_,i)=> update(ref(db, rooms/${state.roomCode}/tables/${idx}/hand/${i}), {ownerId:null})));
+  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
+  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
   state.seatedTable=null; updateMenuButtons();
 }
 
@@ -1941,13 +1928,13 @@ btnSit.onclick = ()=>{
   seatTabs.innerHTML='';
   (v.tables||[]).forEach((t,i)=>{
     const tab=document.createElement('div'); tab.className='tab';
-    tab.textContent = t.playerName ? ${i+1}（使用中） : ${i+1};
+    tab.textContent = t.playerName ? `${i+1}（使用中）` : `${i+1}`;
     if(t.playerId) tab.classList.add('disabled');
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
-      await update(ref(db, rooms/${state.roomCode}/tables/${i}), {playerId:state.userId, playerName:state.userName});
+      await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {playerId:state.userId, playerName:state.userName});
       const hand=(v.tables[i].hand||[]);
-      await Promise.all(hand.map((_,idx)=> update(ref(db, rooms/${state.roomCode}/tables/${i}/hand/${idx}), {ownerId:state.userId})));
+      await Promise.all(hand.map((_,idx)=> update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), {ownerId:state.userId})));
       state.seatedTable=i; H(seatPop,true); updateMenuButtons();
     };
     seatTabs.appendChild(tab);
@@ -2004,7 +1991,7 @@ const missionIds = Array.from({length:66}, (_,i) => i+1);
 missionIds.forEach(id=>{
   const b = document.createElement('button');
   b.className = 'btn small';
-  b.textContent = #${id}; // ★ #付き
+  b.textContent = `#${id}`; // ★ #付き
   b.onclick = async ()=>{
     await leaveSeatNow();
     closeMissionPicker();
@@ -2035,7 +2022,7 @@ async function startGame(playerCount, missionId){
   state.m22GaveOnce = false;
   // ★ #22：サーバ側メタも初期化（可視フラグ／渡し済み表）
   try{
-    await update(ref(db, rooms/${state.roomCode}/meta), { m22_infoShown:false, m22_given:null });
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown:false, m22_given:null });
   }catch(_){}
   
   const code = state.roomCode;
@@ -2043,7 +2030,7 @@ async function startGame(playerCount, missionId){
 
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
-  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':member (${faces[i%4]}).jpg; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] }); }
+  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] }); }
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
@@ -2059,12 +2046,12 @@ async function startGame(playerCount, missionId){
   if(missionId===1 && planList.length===0){
     const x = (Math.random()*11|0) + 1;
     toAdd.push({num:x+0.5, kind:'red'});
-    mixLines.push(赤[${x+0.5}]);
+    mixLines.push(`赤[${x+0.5}]`);
   }
   if(missionId===2 && planList.length===0){
     const x = (Math.random()*11|0) + 1;
     toAdd.push({num:x+0.1, kind:'yellow'});
-    mixLines.push(黄[${x+0.1}]);
+    mixLines.push(`黄[${x+0.1}]`);
   }
 
   // デッキ合成
@@ -2104,7 +2091,7 @@ const items = pool
 
 
 
-  await set(ref(db, rooms/${code}), {
+  await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
@@ -2119,7 +2106,7 @@ const items = pool
 
 /* ==== ミッション開始時セットアップ ==== */
 async function setupMissionOnStart(code){
-  const snap = await get(ref(db, rooms/${code}));
+  const snap = await get(ref(db, `rooms/${code}`));
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
 
@@ -2154,7 +2141,7 @@ async function setupMissionOnStart(code){
     const redList = MATERIALS.redCodes.slice(); shuffle(redList);
     const pick = redList.slice(0,3);
 
-    const tablesSnap = await get(ref(db, rooms/${code}/tables));
+    const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
     const tbls = tablesSnap.val() || [];
     const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha=alpha[i%alpha.length]); };
 
@@ -2170,8 +2157,8 @@ async function setupMissionOnStart(code){
     const header = Array.from({length:tcount}, ()=> MATERIALS.numbers[(Math.random()*12)|0]);
 
     await Promise.all([
-      set(ref(db, rooms/${code}/tables), tbls),
-      update(ref(db, rooms/${code}/meta), { m13_header: header })
+      set(ref(db, `rooms/${code}/tables`), tbls),
+      update(ref(db, `rooms/${code}/meta`), { m13_header: header })
     ]);
   }
 
@@ -2190,12 +2177,12 @@ async function setupMissionOnStart(code){
   if(Array.isArray(v.mission?.flags?.limitItemsTo)){
     const allow = new Set(v.mission.flags.limitItemsTo);
     const nextItems = (v.items||[]).filter(it => allow.has(it.no));
-    await set(ref(db, rooms/${code}/items), nextItems);
+    await set(ref(db, `rooms/${code}/items`), nextItems);
   }
 
   // ===== #20：各テーブルで 1 枚を右端へ移動し、黄色✕トークンを付与 =====
   if(v.mission?.flags?.m20_rightmostX){
-    const tablesSnap = await get(ref(db, rooms/${code}/tables));
+    const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
     const tbls = tablesSnap.val() || [];
     const alphaStr='abcdefghijklmnopqrstuvwxyz';
     tbls.forEach(T=>{
@@ -2210,7 +2197,7 @@ async function setupMissionOnStart(code){
       hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]);
       T.hand = hand;
     });
-    await set(ref(db, rooms/${code}/tables), tbls);
+    await set(ref(db, `rooms/${code}/tables`), tbls);
   }
   
 
@@ -2222,8 +2209,8 @@ function buildNumLaneDOM(cells){
   const lane = document.createElement('div'); lane.className='numlane';
   cells.forEach(c=>{
     const div = document.createElement('div');
-    if(c.kind==='rule'){ div.className='rulecard'; div.style.backgroundImage=url('${c.img}'); }
-    if(c.kind==='num'){  div.className='numcard';  div.style.backgroundImage=url('${c.img}'); }
+    if(c.kind==='rule'){ div.className='rulecard'; div.style.backgroundImage=`url('${c.img}')`; }
+    if(c.kind==='num'){  div.className='numcard';  div.style.backgroundImage=`url('${c.img}')`; }
     lane.appendChild(div);
   });
   return lane;
@@ -2250,7 +2237,7 @@ function buildDeckLaneP1(){
 
   const restLbl = document.createElement('span');
   restLbl.className='numrest';
-  restLbl.textContent=残:${rest};
+  restLbl.textContent=`残:${rest}`;
 
   // ★ 右側に公開札積み重ね用ホルダー
   const pile = document.createElement('div');
@@ -2266,7 +2253,7 @@ function buildDeckLaneP1(){
     const already = pile.querySelectorAll('.numcard').length;
     const node = document.createElement('div');
     node.className = 'numcard';
-    node.style.backgroundImage = url('${imgNumber(n)}');
+    node.style.backgroundImage = `url('${imgNumber(n)}')`;
 
     if(already>0){
       const off = already * 2; // 2px刻み
@@ -2288,8 +2275,8 @@ function buildDeckLaneP1(){
         deck.splice(0, deck.length, ...MATERIALS.numbers.slice()); 
         shuffle(deck);
         rest = deck.length;
-        restLbl.textContent = 残:${rest};
-        deckBtn.style.backgroundImage = url('./numberdeck.png');
+        restLbl.textContent = `残:${rest}`;
+        deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
         deckBtn.style.background = '';
         deckBtn.title = 'めくる';
         pile.innerHTML = '';
@@ -2302,11 +2289,11 @@ function buildDeckLaneP1(){
 
     const n = deck.pop();
     rest--;
-    restLbl.textContent = 残:${rest};
+    restLbl.textContent = `残:${rest}`;
     addToPile(n);
 
     if(rest===0){
-      deckBtn.style.background = #fff url('${imgBack}') center/60% no-repeat;
+      deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
       deckBtn.title='山札を作る';
     }
   };
@@ -2320,7 +2307,7 @@ function buildDeckLaneP2(n=2){
   const deck = MATERIALS.numbers.slice(); shuffle(deck);
   const picks = deck.slice(0, n);
   picks.forEach(x=>{
-    const nc = document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=url('${imgNumber(x)}');
+    const nc = document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=`url('${imgNumber(x)}')`;
     lane.appendChild(nc);
   });
   return lane;
@@ -2356,7 +2343,7 @@ function missionInfo(id, opts={}){
       const pick=list.slice(0,3);
       return {
         id:3, name:'#3 さらい爆弾', desc:'',
-        display:[ '#3 さらい爆弾', ${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ, ...linesForMix ],
+        display:[ '#3 さらい爆弾', `${pick[0]} – ${pick[1]} - ${pick[2]} のうち1つ`, ...linesForMix ],
       };
     }
 
@@ -2541,7 +2528,7 @@ function missionInfo(id, opts={}){
       
     case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
-    default:  { return {id, name:#${id}, desc:'', display:[#${id}, ...linesForMix]}; }
+    default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
   }
 }
 
