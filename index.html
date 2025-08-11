@@ -1239,11 +1239,17 @@ char.className='char-card';
 if(!seatedAny){ 
   char.classList.add('blank'); 
 }else{
-  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+ const isM34 = ((v.mission?.id|0) === 34);
+  const isMineTable = (t.playerId === state.userId);
+  if (isM34 && !isMineTable) {
+    char.classList.add('blank');
+  } else {
+    const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
   char.style.backgroundImage = `url("${face}")`;
   char.onclick=async ()=>{ 
     await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
   };
+}
 }
 charCol.appendChild(char);
 
@@ -1891,13 +1897,7 @@ function renderM29(v){
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
 
-  const conDeckElem = document.getElementById('condeck');
-  if (conDeckElem) conDeckElem.innerHTML = '';
-
-  const conPileElem = document.getElementById('conpile');
-  if (conPileElem) conPileElem.innerHTML = '';
-  
-  const isM31 = (v?.mission?.id|0) === 31;
+  const isM31 = ((v?.mission?.id|0) === 31) || ((v?.mission?.id|0) === 34);
 
   // 既存除去
   const oldH = document.getElementById('m31HandRow'); if (oldH) oldH.remove();
@@ -2736,7 +2736,7 @@ async function setupMissionOnStart(code){
   }
 
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
-  if ((v.mission?.id|0) === 32){
+  if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
     const old = document.getElementById('m32ConRow');
     if (old) old.remove();
@@ -2744,7 +2744,13 @@ async function setupMissionOnStart(code){
     mountLaneUnderItemsBar(lane);
   }
 
-
+/* #36 横並び5枚＋左右ブランク(rulecard) */
+  if ((v.mission?.id|0) === 36){
+    await ensureM36Meta();
+    renderM36Row(v);
+  } else {
+    const ex = document.getElementById('m36Lane'); if (ex) ex.remove();
+  }
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
     const tcount = v.tableCount|0;
@@ -2826,7 +2832,7 @@ try{
   }
   
 // #31：A〜E を各テーブルに1枚ずつ（人数>5のときは循環）
-if ((v.mission?.id|0) === 31) {
+if ((v.mission?.id|0) === 31 || (v.mission?.id|0) === 34) {
   const codeSnap = await get(ref(db, `rooms/${code}`));
   const vv = codeSnap.val() || {};
   const tables = (vv.tables||[]).map(T => ({...T}));
@@ -2857,7 +2863,69 @@ function mountLaneUnderItemsBar(lane){
   const bar = document.getElementById('itemsBar');
   bar.insertAdjacentElement('afterend', lane);
 }
+/*#36 初期化 & 描画 */
+async function ensureM36Meta(){
+  const v = state.watching; if(!v) return;
+  const meta = v.meta||{};
+  if (!Array.isArray(meta.m36_numbers) || meta.m36_numbers.length!==5){
+    const deck = MATERIALS.numbers.slice(); shuffle(deck);
+    const five = deck.slice(0,5);
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_numbers: five, m36_dir: null });
+  }
+}
+function renderM36Row(v){
+  const isM36 = ((v?.mission?.id|0) === 36);
+  // 既存除去
+  { const ex = document.getElementById('m36Lane'); if (ex) ex.remove(); }
+  if (!isM36) return;
 
+  const bar = document.getElementById('itemsBar');
+  if (!bar) return;
+
+  const nums = (v?.meta?.m36_numbers || []).slice(0,5);
+  const dir  = v?.meta?.m36_dir || null; // 'left2' | 'right2' | null
+
+  const lane = document.createElement('div');
+  lane.id = 'm36Lane';
+  lane.className = 'numlane';
+
+  // 左ブランク（rulecard）
+  const left = document.createElement('div');
+  left.className = 'rulecard';
+  left.title = 'right2 を出す';
+  left.style.backgroundImage = (dir==='right2') ? `url('${imgRule('right2')}')` : '';
+  left.onclick = async ()=>{
+    const cur = (state.watching?.meta?.m36_dir || null);
+    const next = (cur==='right2') ? null : 'right2';
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_dir: next });
+  };
+  lane.appendChild(left);
+
+  // 5枚の数値カード
+  nums.forEach(n=>{
+    const nc = document.createElement('div');
+    nc.className = 'numcard';
+    nc.style.backgroundImage = `url('${imgNumber(n)}')`;
+    lane.appendChild(nc);
+  });
+
+  // 右ブランク（rulecard）
+  const right = document.createElement('div');
+  right.className = 'rulecard';
+  right.title = 'left2 を出す';
+  right.style.backgroundImage = (dir==='left2') ? `url('${imgRule('left2')}')` : '';
+  right.onclick = async ()=>{
+    const cur = (state.watching?.meta?.m36_dir || null);
+    const next = (cur==='left2') ? null : 'left2';
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_dir: next });
+  };
+  lane.appendChild(right);
+
+  mountLaneUnderItemsBar(lane);
+}
+
+
+  
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
   const lane = document.createElement('div'); 
