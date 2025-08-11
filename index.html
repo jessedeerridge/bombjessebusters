@@ -2520,7 +2520,14 @@ function attachM23DeckUI(lane){
         pile.style.height = cssNum('--item-h') + 'px';
         lane.style.marginBottom = '0px';
         refreshRest();
-      });
+          // ★★★ ここから追加：アイテム山札UIを消滅させる ★★★
+        try{
+          deckBtn.onclick = null;              // 念のため無効化
+          if (restLbl?.parentNode) restLbl.remove();
+          if (pile?.parentNode)    pile.remove();
+          if (deckBtn?.parentNode) deckBtn.remove();
+        }catch(_){}
+    });
       return;
     }
 
