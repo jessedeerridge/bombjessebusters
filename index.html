@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BqqqｓrS</title>
+<title>BqqqあｓrS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -372,8 +372,8 @@
   <!-- ★追加：名前（4文字以内）※未入力でも入室可 -->
   <input id="userName" placeholder="名前（4文字以内）" maxlength="4" />
   <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-  <button class="btn primary" id="btnJoin">参加で入室</button>
-  <button class="btn ghost" id="btnRandom">コード作成</button>
+  <button class="btn primary" id="btnJoin">入室</button>
+  <button class="btn ghost" id="btnRandom">自動コード</button>
   <span class="small">入室後、右下の歯車から席を決められます</span>
 </div>
 
@@ -911,6 +911,11 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
+
+  if (!state.seatedTable) {  // まだ座っていない場合
+      H(seatPop, false);       // seatPopを表示
+    }
+    
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 
