@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BOMB　BUSTERS</title>
+<title>BOMB　BU２STERS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -1341,7 +1341,7 @@ if(flags.useParityToken){
   }
 }
 
-const suppressNumberPop = !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
+const suppressNumberPop = (c.kind !== 'normal') || !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
 
 // ▼ 数字ポップの出し方（通常 or #17 隊長用）
 const isCaptain = (state.watching?.captainTable|0) === idx;
