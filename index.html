@@ -372,7 +372,7 @@
   <!-- ★追加：名前（4文字以内）※未入力でも入室可 -->
   <input id="userName" placeholder="名前（4文字以内）" maxlength="4" />
   <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-  <button class="btn primary" id="btnJoin">入室</button>
+  <button class="btn primary" id="btnJoin">参加で入室</button>
   <button class="btn ghost" id="btnRandom">コード作成</button>
   <span class="small">入室後、右下の歯車から席を決められます</span>
 </div>
@@ -411,8 +411,14 @@
 
   <div class="col side">
     <div class="panel">
-<div class="list" id="listsBox" style="display:none">
+      <div class="list" id="listsBox">
         <h3>参加者</h3><div id="players"></div>
+        <h3 style="margin-top:10px">観戦者</h3><div id="spectators"></div>
+      </div>
+      <div class="mission" id="missionBox">
+        <h3>ミッション</h3>
+        <div id="missionTitle" class="bold">（未選択）</div>
+        <div id="missionText" class="small">開始時に人数と一緒に選びます</div>
       </div>
     </div>
   </div>
@@ -1744,6 +1750,8 @@ function renderM29(v){
       myHand.forEach(n=>{
         const c = document.createElement('div');
         c.className = 'numcard';
+        c.textContent = String(n); // 軽量：テキスト表示
+        c.style.display = 'grid'; c.style.placeItems = 'center'; c.style.fontWeight = 'bold';
          /* ここから追加：数値カードの表面は画像を使用 */
        c.style.backgroundImage = `url('${imgNumber(n)}')`;
        c.style.backgroundSize = 'cover';
@@ -1797,6 +1805,12 @@ function renderM29(v){
       const cell = document.createElement('div');
       cell.className = 'numcard';
       cell.style.display = 'grid'; cell.style.placeItems = 'center'; cell.style.fontWeight = 'bold';
+      if (obj.faceUp) {
+        cell.textContent = String(obj.n);
+      } else {
+        cell.textContent = ''; // 裏向き
+        cell.style.background = "#fff url('./numbercardback.jpg') center/cover no-repeat";
+      }
          /* ここから追加：数値カードは表＝数字画像／裏＝背面画像 */
      if (obj.faceUp) {
        cell.style.backgroundImage = `url('${imgNumber(obj.n)}')`;
