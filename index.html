@@ -627,6 +627,7 @@ function clearMissionOverlays(){
   document.querySelectorAll(
     '.numlane, .num-under, #m27Row, #m29HandRow, #m29CenterRow, #m31HandRow, #m31CenterRow'
   ).forEach(el => el.remove());
+  document.querySelectorAll('.m27-row').forEach(el => el.remove());
   // #22：情報トークン表
   const info22 = document.getElementById('info22'); if (info22) info22.remove();
   // ズームオーバーレイ／ミニポップ／ポップレイヤの中身
