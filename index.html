@@ -944,6 +944,7 @@ if (v) {
 }
  if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
     btnSit.onclick();   // ← これが seatTabs の生成まで全部やってくれる
+ }
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 
