@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>つま1りS</title>
+<title>つまS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -2838,28 +2838,28 @@ try{
     await set(ref(db, `rooms/${code}/tables`), tbls);
   }
 
-  // ===== #38：隊長の手札だけ 1 枚を右端に移動し、✕（黄）トークンを付与 =====
-  if(v.mission?.flags?.m38_rightmostXCaptain){
-    const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
-   const tbls = tablesSnap.val() || [];
-   const cap = v.captainTable|0;
-    const T = tbls[cap];
-    if (T){
-      const alphaStr='abcdefghijklmnopqrstuvwxyz';
-      const hand = (T.hand||[]).slice().sort((a,b)=> a.num - b.num);
-      if (hand.length>0){
-       const ri = (Math.random()*hand.length)|0;
-       const chosen = hand.splice(ri,1)[0];
+
+ /* ここから追加：#38 隊長テーブルのみ 右端✕ */
+  if (v.mission?.flags?.m38_captainRightmostX) {
+    const captainIdx = (v.captainTable|0);
+    if (captainIdx >= 0) {
+      const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
+      const tbls = tablesSnap.val() || [];
+      const T = tbls[captainIdx];
+    if (T && Array.isArray(T.hand) && T.hand.length > 0) {
+       const alphaStr='abcdefghijklmnopqrstuvwxyz';
+        const hand = T.hand.slice().sort((a,b)=> a.num - b.num); // 昇順ベース
+        const ri = (Math.random()*hand.length)|0;
+        const chosen = hand.splice(ri,1)[0];
         hand.push(chosen); // 右端へ
         chosen.tokens = [ ...(chosen.tokens||[]), {type:'xmark', value:'✕', style:'yellowX'} ];
-        hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]);
-       T.hand = hand;
-        await set(ref(db, `rooms/${code}/tables`), tbls);
-     }
+        hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]); // α再付与
+      T.hand = hand;
+     await set(ref(db, `rooms/${code}/tables`), tbls);
+      }
     }
-  }
-
-
+ }
+  /* ここまで追加 */
   
   // #26：1〜12を3×4で配置（裏表トグル）
   if (flags.m26_grid12) {
