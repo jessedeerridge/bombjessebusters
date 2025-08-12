@@ -817,6 +817,27 @@ function buildMixPlan(missionId){
     {type:'redChoose',  from:3, take:1},
     {type:'yellowPick', k:2},
   ],
+ 37: [  // 赤2
+    { type:'redPick', k:2 },
+  ],
+  38: [  // 赤2
+    { type:'redPick', k:2 },
+  ],
+  39: [  // 赤3-2 ＋ 黄4
+    { type:'redChoose', from:3, take:2 },
+    { type:'yellowPick', k:4 },
+  ],
+  40: [  // 赤3
+    { type:'redPick', k:3 },
+  ],
+  41: [  // 赤3-1
+    { type:'redChoose', from:3, take:1 },
+  ],
+  42: [  // 赤3-1 ＋ 黄4
+    { type:'redChoose', from:3, take:1 },
+    { type:'yellowPick', k:4 },
+  ],
+    
 };
 return plans[missionId] || [];
 
@@ -1140,6 +1161,26 @@ function renderTables(v){
     });
   });
 
+/* ：#38 用フラグと初期セットアップ */
+  const isM38 = ((v?.mission?.id|0) === 38);
+  if (isM38) {
+    const capIdx = Number.isInteger(v?.captainTable) ? v.captainTable : -1;
+    const capT   = (capIdx>=0) ? (v.tables?.[capIdx] || null) : null;
+    const rightId = v?.meta?.m38_rightCard;
+    // 初回だけ：隊長の通常数値カードからランダム1枚を右端カードとしてDBに記録し、公開しておく
+    if (capT && rightId == null) {
+      const normals = (capT.hand||[]).filter(cc => cc?.kind==='normal');
+      const pick = normals[(Math.random()*Math.max(normals.length,1))|0] || (capT.hand||[])[0];
+      if (pick && pick.id != null) {
+        // 右端カードIDを保存
+        update(ref(db, `rooms/${state.roomCode}/meta`), { m38_rightCard: pick.id });
+        // 右端カードは全員に公開扱い（ただし未着席なら表示で抑制）
+        const ci = (capT.hand||[]).findIndex(x => x?.id === pick.id);
+        if (ci >= 0) update(ref(db, `rooms/${state.roomCode}/tables/${capIdx}/hand/${ci}`), { open:true });
+      }
+    }
+  }  
+  
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
@@ -1286,9 +1327,21 @@ if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
 }
 content.appendChild(charCol);
 
-
+/* #38 表示順制御（隊長のみ、通常数値カードを昇順。右端カードを最後尾） */
+  let viewHand = (t.hand||[]).slice();
+  if (isM38 && (idx === (Number.isInteger(v?.captainTable) ? v.captainTable : -1))) {
+    const rightId = v?.meta?.m38_rightCard;
+    const normals = viewHand.filter(cc => cc?.kind==='normal');
+    const others  = viewHand.filter(cc => cc?.kind!=='normal');
+    const rightOne = normals.find(cc => cc?.id === rightId) || null;
+    const restNormals = normals.filter(cc => cc?.id !== rightId);
+    // 数値カードだけ昇順、それ以外（赤/黄など）は元の順を維持
+    restNormals.sort((a,b)=> (a.num|0) - (b.num|0));
+    viewHand = others.concat(restNormals).concat(rightOne ? [rightOne] : []);
+  }
+    
     const hand=document.createElement('div'); hand.className='hand';
-    (t.hand||[]).forEach((c,ci)=>{
+        viewHand.forEach((c,ci)=>{
             /* 無効カードは描画しない（"undefined"表示の根絶） */
       if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
         console.warn('[hand] invalid card skipped', { table: idx, ci, card: c });
@@ -1297,6 +1350,7 @@ content.appendChild(charCol);
       const wrap=document.createElement('div'); wrap.className='card-wrap';
       const card=document.createElement('div'); card.className='card';
  const isMine = ((c.ownerId ?? t.playerId) === state.userId);
+      const forceBack = (isM38 && !seatedAny);
       if(!isMine && !c.open) card.classList.add('back');
       if(c.open) card.classList.add('open');
 
