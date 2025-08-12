@@ -3743,6 +3743,18 @@ function missionInfo(id, opts={}){
     }
 
 
+    case 38: {
+     return {
+        id:38, name:'#38', desc:'',
+        display:[
+          '#38',
+          '隊長の手札のみ：ランダムで1枚を右端に移動。他は昇順。',
+          '移動したカードに ✕（黄背景/黒文字）トークンを付ける。'
+       ],
+        flags:{ m38_captainRightmostX:true }
+      };
+    }
+      
       
     case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
