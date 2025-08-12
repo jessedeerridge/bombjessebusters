@@ -2166,14 +2166,19 @@ async function consumeM22IfMatches(tableIdx, n){
 
 /* === #22 用：情報トークン表（3×4）：黒トークン + x0/x1/x2 を横並び表示 === */
 function showInfo22Panel(vNow){
-  if (window.m22_alreadyShown) return;  // ★ここから追加：一度だけ表示
-  window.m22_alreadyShown = true;   
+  // 既に表示済みなら何もしない（ガードはここでは立てない）
+  if (window.m22_alreadyShown) return;
 
   const v = vNow || state.watching;
   if (!v) return;
 
   // ★ 黄2種公開（＝サーバ側で m22_infoShown を立てた）までは表を生成しない
   if (v?.meta?.m22_infoShown !== true) return;
+
+  // 既存DOMが残っていれば再利用して終了（ガードON）
+  const exist = document.getElementById('info22');
+  if (exist) { window.m22_alreadyShown = true; return; }
+  
  　const givenMap = v.meta?.m22_given || {};
 　 const iGave    = !!givenMap[state.userId];
   const div = document.createElement('div');
@@ -2198,6 +2203,10 @@ if (shown === 0) cell.classList.add('disabled');
     
     // 右側の xラベル
     const xl = document.createElement('span');
+
+  // パネル生成が成功したので、ここで一度だけ表示ガードをON
+  window.m22_alreadyShown = true;
+    
     xl.className = 'xlabel';
     xl.textContent = `x${shown}`;
 
