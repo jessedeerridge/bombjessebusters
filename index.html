@@ -942,19 +942,10 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
-   // 自動で座席表を出す条件（再生成はしない）：
-   // 1) 未開始→開始（入室直後含む）：まだ座っていないときだけ開く
-   // 2) 開始→未開始（＝「やり直す」直後想定）：座っていても必ず開く
-   if (
-     seatPop.classList.contains('hidden') &&
-     (
-       (!state.seatedTable && v?.started && !state.gameStarted) || // 1)
-       ( state.gameStarted && !v?.started)                         // 2)
-     )
-   ) {
-     btnSit.onclick(); // ← seatTabs の生成まで実行
-   }
-
+ if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
+   btnSit.onclick();
+    }
+    
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 
@@ -2175,8 +2166,8 @@ async function consumeM22IfMatches(tableIdx, n){
 
 /* === #22 用：情報トークン表（3×4）：黒トークン + x0/x1/x2 を横並び表示 === */
 function showInfo22Panel(vNow){
-  const exist = document.getElementById('info22');
-  if (exist) return;
+  if (window.m22_alreadyShown) return;  // ★ここから追加：一度だけ表示
+  window.m22_alreadyShown = true;   
 
   const v = vNow || state.watching;
   if (!v) return;
@@ -2689,7 +2680,8 @@ const items = pool
   .map(no=>({ id:crypto.randomUUID(), no, used:false, faceUp: faceUpStart }));
 
 
-
+  // ★ 開始エッジを作るために一瞬だけ false を書く（ミッションは未選択状態へ）
+  await update(ref(db, `rooms/${code}`), { started:false, mission:null });
 
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
