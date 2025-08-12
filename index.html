@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BEyｓｆｓrS</title>
+<title>つまS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -632,21 +632,13 @@ function clearMissionOverlays(){
     // ★ ミッション27：アイテム直下の行を確実に消す
   const m27 = document.getElementById('m27Row');
   if (m27) m27.remove();
-  NUMCARD_REG.clear();
-
-  /* ★ ：#31/#32 関連のDOMも必ず掃除 */
-  // 汎用：制約カード用の帯
-  document.querySelectorAll('.conlane').forEach(n => n.remove());
-  // 個別ID
-  ['m31HandRow','m31CenterRow','m32ConRow','m29HandRow','m29CenterRow'].forEach(id=>{
-    const el = document.getElementById(id);
-    if (el) el.remove();
+  // ★追加：制約系UI（#31/#32/#37）を丸ごと掃除
+  document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m31HandRow/m31CenterRow/m32ConRowはconlane
+  ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.remove();
   });
-// 制約カード拡大オーバーレイ
-  const ov = document.getElementById('conZoomOverlay');
-  if (ov) ov.remove();
- }
-
+  NUMCARD_REG.clear();
+}
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
@@ -953,8 +945,8 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
- if (!state.seatedTable && v?.started && seatPop.classList.contains('hidden')) {
-      btnSit.onclick();   // ← これが seatTabs の生成まで全部やってくれる
+ if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
+   btnSit.onclick();
     }
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
@@ -1250,17 +1242,18 @@ char.className='char-card';
 if(!seatedAny){ 
   char.classList.add('blank'); 
 }else{
- const isM34 = ((v.mission?.id|0) === 34);
-  const isMineTable = (t.playerId === state.userId);
-  if (isM34 && !isMineTable) {
-    char.classList.add('blank');
-  } else {
-    const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
   char.style.backgroundImage = `url("${face}")`;
   char.onclick=async ()=>{ 
     await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
   };
 }
+
+    if ((state.watching?.mission?.id|0) === 34 && t.playerId !== state.userId){
+  // #34：自分以外はブランク表示・操作不可
+  char.removeAttribute('style');
+  char.onclick = null;
+  char.classList.add('blank');
 }
 charCol.appendChild(char);
 
@@ -1307,32 +1300,6 @@ content.appendChild(charCol);
       if(!isMine && !c.open) card.classList.add('back');
       if(c.open) card.classList.add('open');
 
-          /* ここから追加（#38 表示ロジック） */
-      const isM38 = ((state.watching?.mission?.id|0) === 38) && (c.m38Special === true);
-      let m38OpenForAll = false;
-      if (isM38){
-        card.classList.remove('back','open');       // いったんリセット
-       const seated = !!state.seatedTable;         // 未着席は全員裏
-        if (!seated){
-          card.classList.add('back');
-        }else if (c.m38FaceUp === true){
-          card.classList.add('open');               // 全員 表
-          m38OpenForAll = true;
-        }else{
-          if (isMine){ card.classList.add('back'); } // 隊長＝通常の裏
-          // 隊長以外＝灰（何もしない）
-        }
-        // 隊長のみ：クリックで裏表トグル（他のブロッキングと整合）
-        if (isMine){
-         card.onclick = async (ev)=>{
-            ev.stopPropagation();
-            const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
-            const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
-            if(blockingI2 || blockingI18) return;
-            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { m38FaceUp: !(c.m38FaceUp===true) });
-          };
-        }
-      }  
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
@@ -1391,9 +1358,6 @@ content.appendChild(charCol);
       if (hasNum) {
         num.textContent = String(c.num);
         num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
-
- if (isM38 && m38OpenForAll){ num.style.visibility = 'visible'; }
-        
       } else {
         num.textContent = '';
         num.style.visibility = 'hidden';
@@ -1936,7 +1900,6 @@ function renderM29(v){
   
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
-
   const isM31 = ((v?.mission?.id|0) === 31) || ((v?.mission?.id|0) === 34);
 
   // 既存除去
@@ -2514,7 +2477,7 @@ function updateMenuButtons(){
   if (canReferInfoTable && !old){
     const b = document.createElement('button');
     b.className = 'btn'; b.id = id; b.textContent = '情報トークン（#22）';
-    b.onclick = ()=> showInfo22Panel(state.watching);
+b.onclick = ()=>{ window.m22_alreadyShown = false; showInfo22Panel(state.watching); };
     menuPop.insertBefore(b, menuPop.firstChild || null);
   }
 }
@@ -2559,7 +2522,7 @@ btnSit.onclick = ()=>{
 };
 btnSeatCancel.onclick=()=> H(seatPop,true);
 
-btnLeave.onclick = async ()=>{ await leaveSeatNow(); };
+btnLeave.onclick = async ()=>{ await leaveSeatNow();btnSit.onclick(); };
 
 /* start / mission-pick */
 btnPickMission.onclick = ()=>{
@@ -2637,9 +2600,11 @@ async function startGame(playerCount, missionId){
   state.m22GaveOnce = false;
   // ★ #22：サーバ側メタも初期化（可視フラグ／渡し済み表）
   try{
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown:false, m22_given:null });
-  }catch(_){}
-  
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m22_infoShown:false, m22_given:null,
+      m27_row: [], m27_shown:false, m27_taken:null
+    });
+   }catch(_){}
   const code = state.roomCode;
 
 
@@ -2720,15 +2685,17 @@ const items = pool
   .map(no=>({ id:crypto.randomUUID(), no, used:false, faceUp: faceUpStart }));
 
 
-
+  // ★ 開始エッジを作るために一瞬だけ false を書く（ミッションは未選択状態へ）
+  await update(ref(db, `rooms/${code}`), { started:false, mission:null });
 
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
     di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
+     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
-    m31_center: (missionMeta?.id===31 ? [] : null),
+    /* ▲▲ ここまで追加 ▼▼ */
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
 
@@ -2775,13 +2742,26 @@ async function setupMissionOnStart(code){
   }
 
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
-  if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
+if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
     const old = document.getElementById('m32ConRow');
     if (old) old.remove();
     const lane = buildConDeckLaneP1();
     mountLaneUnderItemsBar(lane);
   }
+
+  /* ▼▼ （#36：数値5枚を横一列） ▼▼ */
+  if ((v.mission?.id|0) === 36){
+    // 既存があれば一度除去（再実行対策）
+    const old36 = document.getElementById('m36NumRow');
+    if (old36) old36.remove();
+
+    // ランダム5枚を横並びで生成して設置
+    const lane36 = buildDeckLaneP2(5);
+    lane36.id = 'm36NumRow';
+    mountLaneUnderItemsBar(lane36);
+  }
+  
 
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
@@ -2843,29 +2823,6 @@ try{
     const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
     const tbls = tablesSnap.val() || [];
     const alphaStr='abcdefghijklmnopqrstuvwxyz';
-
-    /* （#38：隊長テーブルのみ処理） */
-    if(v.mission?.flags?.m38_captainRightmostBlind){
-      const roomSnap = await get(ref(db, `rooms/${code}`));
-      const roomAll  = roomSnap.val() || {};
-      const capIdx   = (roomAll.captainTable|0);
-      if (Array.isArray(roomAll.tables) && roomAll.tables[capIdx]){
-       const T = roomAll.tables[capIdx];
-        const hand = (T.hand||[]).slice().sort((a,b)=> a.num - b.num); // 他は昇順
-        if (hand.length>0){
-        const ri = (Math.random()*hand.length)|0;
-          const chosen = hand.splice(ri,1)[0];
-         chosen.m38Special = true;          // 右端の対象
-          chosen.m38FaceUp  = false;         // 初期は裏（隊長視点）
-          hand.push(chosen);                 // 右端へ
-         const alphaStr='abcdefghijklmnopqrstuvwxyz';
-         hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]);
-          roomAll.tables[capIdx].hand = hand;
-         await set(ref(db, `rooms/${code}/tables/${capIdx}`), roomAll.tables[capIdx]);
-        }
-      }
-    }
-   
     tbls.forEach(T=>{
       const hand = (T.hand||[]).slice().sort((a,b)=> a.num - b.num); // 昇順ベース
       if(hand.length===0) return;
@@ -2880,7 +2837,32 @@ try{
     });
     await set(ref(db, `rooms/${code}/tables`), tbls);
   }
- 
+
+  // ===== #38：隊長テーブルの手札だけ 1 枚を右端へ移動し、黄色✕トークンを付与 =====
+  if(v.mission?.flags?.m38_rightmostXCaptain){
+    const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
+    const tbls = tablesSnap.val() || [];
+    const cap = v.captainTable|0;                       // ← 隊長テーブルの index
+    const T = tbls[cap];                                // 対象テーブルのみ
+    if (T && Array.isArray(T.hand) && T.hand.length>0){
+      const alphaStr='abcdefghijklmnopqrstuvwxyz';
+      // 昇順をベースに、ランダム1枚を右端へ
+      const hand = T.hand.slice().sort((a,b)=> a.num - b.num);
+      const ri = (Math.random()*hand.length)|0;
+      const chosen = hand.splice(ri,1)[0];
+      hand.push(chosen);
+      // ✕トークン（黄色）
+      chosen.tokens = [ ...(chosen.tokens||[]), {type:'xmark', value:'✕', style:'yellowX'} ];
+      // α再付与
+      hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]);
+      // 書き戻し
+      tbls[cap].hand = hand;
+      await set(ref(db, `rooms/${code}/tables`), tbls);
+    }
+  }
+
+
+  
   // #26：1〜12を3×4で配置（裏表トグル）
   if (flags.m26_grid12) {
     mountM26GridUnderItems();
@@ -2897,7 +2879,7 @@ if ((v.mission?.id|0) === 31 || (v.mission?.id|0) === 34) {
   }
   await update(ref(db, `rooms/${code}`), {
     tables,
-    m31_center: []  // ★ 毎回リセット
+   m31_center: []
   });
 }
   function randNum(){ return MATERIALS.numbers[(Math.random()*12)|0]; }
@@ -2919,9 +2901,6 @@ function mountLaneUnderItemsBar(lane){
   bar.insertAdjacentElement('afterend', lane);
 }
 
-
-
-  
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
   const lane = document.createElement('div'); 
