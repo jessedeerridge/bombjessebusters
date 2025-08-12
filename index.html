@@ -626,12 +626,14 @@ function clearMissionOverlays(){
   document.querySelectorAll('.numlane').forEach(n => n.remove());
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
   document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
+   // ★ #27：上部トークン行を確実に全消去
+  document.querySelectorAll('.m27-row').forEach(n => n.remove());
   // ★ ミッション22：情報トークン表を確実に消す
   const info22 = document.getElementById('info22');
   if (info22) info22.remove();
     // ★ ミッション27：アイテム直下の行を確実に消す
   const m27 = document.getElementById('m27Row');
-  if (m27) m27.remove();
+　if (m27) m27.remove();
 
  document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m31HandRow/m31CenterRow/m32ConRowはconlane
   ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
