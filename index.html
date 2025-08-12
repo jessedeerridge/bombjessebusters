@@ -942,10 +942,7 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
- if (!state.seatedTable && v?.started && seatPop.classList.contains('hidden')) {
-      btnSit.onclick();   // ← これが seatTabs の生成まで全部やってくれる
-    }
-    
+
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 
