@@ -2474,7 +2474,7 @@ function updateMenuButtons(){
   if (canReferInfoTable && !old){
     const b = document.createElement('button');
     b.className = 'btn'; b.id = id; b.textContent = '情報トークン（#22）';
-    b.onclick = ()=> showInfo22Panel(state.watching);
+b.onclick = ()=>{ window.m22_alreadyShown = false; showInfo22Panel(state.watching); };
     menuPop.insertBefore(b, menuPop.firstChild || null);
   }
 }
