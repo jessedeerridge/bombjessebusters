@@ -1307,6 +1307,32 @@ content.appendChild(charCol);
       if(!isMine && !c.open) card.classList.add('back');
       if(c.open) card.classList.add('open');
 
+          /* ここから追加（#38 表示ロジック） */
+      const isM38 = ((state.watching?.mission?.id|0) === 38) && (c.m38Special === true);
+      let m38OpenForAll = false;
+      if (isM38){
+        card.classList.remove('back','open');       // いったんリセット
+       const seated = !!state.seatedTable;         // 未着席は全員裏
+        if (!seated){
+          card.classList.add('back');
+        }else if (c.m38FaceUp === true){
+          card.classList.add('open');               // 全員 表
+          m38OpenForAll = true;
+        }else{
+          if (isMine){ card.classList.add('back'); } // 隊長＝通常の裏
+          // 隊長以外＝灰（何もしない）
+        }
+        // 隊長のみ：クリックで裏表トグル（他のブロッキングと整合）
+        if (isMine){
+         card.onclick = async (ev)=>{
+            ev.stopPropagation();
+            const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
+            const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
+            if(blockingI2 || blockingI18) return;
+            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { m38FaceUp: !(c.m38FaceUp===true) });
+          };
+        }
+      }  
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
@@ -1365,6 +1391,9 @@ content.appendChild(charCol);
       if (hasNum) {
         num.textContent = String(c.num);
         num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
+
+ if (isM38 && m38OpenForAll){ num.style.visibility = 'visible'; }
+        
       } else {
         num.textContent = '';
         num.style.visibility = 'hidden';
