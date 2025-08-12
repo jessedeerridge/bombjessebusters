@@ -2838,26 +2838,24 @@ try{
     await set(ref(db, `rooms/${code}/tables`), tbls);
   }
 
-  // ===== #38：隊長テーブルの手札だけ 1 枚を右端へ移動し、黄色✕トークンを付与 =====
+  // ===== #38：隊長の手札だけ 1 枚を右端に移動し、✕（黄）トークンを付与 =====
   if(v.mission?.flags?.m38_rightmostXCaptain){
     const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
-    const tbls = tablesSnap.val() || [];
-    const cap = v.captainTable|0;                       // ← 隊長テーブルの index
-    const T = tbls[cap];                                // 対象テーブルのみ
-    if (T && Array.isArray(T.hand) && T.hand.length>0){
+   const tbls = tablesSnap.val() || [];
+   const cap = v.captainTable|0;
+    const T = tbls[cap];
+    if (T){
       const alphaStr='abcdefghijklmnopqrstuvwxyz';
-      // 昇順をベースに、ランダム1枚を右端へ
-      const hand = T.hand.slice().sort((a,b)=> a.num - b.num);
-      const ri = (Math.random()*hand.length)|0;
-      const chosen = hand.splice(ri,1)[0];
-      hand.push(chosen);
-      // ✕トークン（黄色）
-      chosen.tokens = [ ...(chosen.tokens||[]), {type:'xmark', value:'✕', style:'yellowX'} ];
-      // α再付与
-      hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]);
-      // 書き戻し
-      tbls[cap].hand = hand;
-      await set(ref(db, `rooms/${code}/tables`), tbls);
+      const hand = (T.hand||[]).slice().sort((a,b)=> a.num - b.num);
+      if (hand.length>0){
+       const ri = (Math.random()*hand.length)|0;
+       const chosen = hand.splice(ri,1)[0];
+        hand.push(chosen); // 右端へ
+        chosen.tokens = [ ...(chosen.tokens||[]), {type:'xmark', value:'✕', style:'yellowX'} ];
+        hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]);
+       T.hand = hand;
+        await set(ref(db, `rooms/${code}/tables`), tbls);
+     }
     }
   }
 
