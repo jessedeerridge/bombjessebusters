@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>とり</title>
+<title>BEyｓｆｓrS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -632,13 +632,21 @@ function clearMissionOverlays(){
     // ★ ミッション27：アイテム直下の行を確実に消す
   const m27 = document.getElementById('m27Row');
   if (m27) m27.remove();
-  // ★追加：制約系UI（#31/#32/#37）を丸ごと掃除
-  document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m31HandRow/m31CenterRow/m32ConRowはconlane
-  ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
-    const el = document.getElementById(id); if (el) el.remove();
-  });
   NUMCARD_REG.clear();
-}
+
+  /* ★ ：#31/#32 関連のDOMも必ず掃除 */
+  // 汎用：制約カード用の帯
+  document.querySelectorAll('.conlane').forEach(n => n.remove());
+  // 個別ID
+  ['m31HandRow','m31CenterRow','m32ConRow','m29HandRow','m29CenterRow'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
+// 制約カード拡大オーバーレイ
+  const ov = document.getElementById('conZoomOverlay');
+  if (ov) ov.remove();
+ }
+
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
@@ -817,27 +825,6 @@ function buildMixPlan(missionId){
     {type:'redChoose',  from:3, take:1},
     {type:'yellowPick', k:2},
   ],
- 37: [  // 赤2
-    { type:'redPick', k:2 },
-  ],
-  38: [  // 赤2
-    { type:'redPick', k:2 },
-  ],
-  39: [  // 赤3-2 ＋ 黄4
-    { type:'redChoose', from:3, take:2 },
-    { type:'yellowPick', k:4 },
-  ],
-  40: [  // 赤3
-    { type:'redPick', k:3 },
-  ],
-  41: [  // 赤3-1
-    { type:'redChoose', from:3, take:1 },
-  ],
-  42: [  // 赤3-1 ＋ 黄4
-    { type:'redChoose', from:3, take:1 },
-    { type:'yellowPick', k:4 },
-  ],
-    
 };
 return plans[missionId] || [];
 
@@ -966,8 +953,8 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
- if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
-   btnSit.onclick();
+ if (!state.seatedTable && v?.started && seatPop.classList.contains('hidden')) {
+      btnSit.onclick();   // ← これが seatTabs の生成まで全部やってくれる
     }
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
@@ -1161,26 +1148,6 @@ function renderTables(v){
     });
   });
 
-/* ：#38 用フラグと初期セットアップ */
-  const isM38 = ((v?.mission?.id|0) === 38);
-  if (isM38) {
-    const capIdx = Number.isInteger(v?.captainTable) ? v.captainTable : -1;
-    const capT   = (capIdx>=0) ? (v.tables?.[capIdx] || null) : null;
-    const rightId = v?.meta?.m38_rightCard;
-    // 初回だけ：隊長の通常数値カードからランダム1枚を右端カードとしてDBに記録し、公開しておく
-    if (capT && rightId == null) {
-      const normals = (capT.hand||[]).filter(cc => cc?.kind==='normal');
-      const pick = normals[(Math.random()*Math.max(normals.length,1))|0] || (capT.hand||[])[0];
-      if (pick && pick.id != null) {
-        // 右端カードIDを保存
-        update(ref(db, `rooms/${state.roomCode}/meta`), { m38_rightCard: pick.id });
-        // 右端カードは全員に公開扱い（ただし未着席なら表示で抑制）
-        const ci = (capT.hand||[]).findIndex(x => x?.id === pick.id);
-        if (ci >= 0) update(ref(db, `rooms/${state.roomCode}/tables/${capIdx}/hand/${ci}`), { open:true });
-      }
-    }
-  }  
-  
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
@@ -1283,18 +1250,17 @@ char.className='char-card';
 if(!seatedAny){ 
   char.classList.add('blank'); 
 }else{
-  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+ const isM34 = ((v.mission?.id|0) === 34);
+  const isMineTable = (t.playerId === state.userId);
+  if (isM34 && !isMineTable) {
+    char.classList.add('blank');
+  } else {
+    const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
   char.style.backgroundImage = `url("${face}")`;
   char.onclick=async ()=>{ 
     await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
   };
 }
-
-    if ((state.watching?.mission?.id|0) === 34 && t.playerId !== state.userId){
-  // #34：自分以外はブランク表示・操作不可
-  char.removeAttribute('style');
-  char.onclick = null;
-  char.classList.add('blank');
 }
 charCol.appendChild(char);
 
@@ -1327,21 +1293,9 @@ if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
 }
 content.appendChild(charCol);
 
-/* #38 表示順制御（隊長のみ、通常数値カードを昇順。右端カードを最後尾） */
-  let viewHand = (t.hand||[]).slice();
-  if (isM38 && (idx === (Number.isInteger(v?.captainTable) ? v.captainTable : -1))) {
-    const rightId = v?.meta?.m38_rightCard;
-    const normals = viewHand.filter(cc => cc?.kind==='normal');
-    const others  = viewHand.filter(cc => cc?.kind!=='normal');
-    const rightOne = normals.find(cc => cc?.id === rightId) || null;
-    const restNormals = normals.filter(cc => cc?.id !== rightId);
-    // 数値カードだけ昇順、それ以外（赤/黄など）は元の順を維持
-    restNormals.sort((a,b)=> (a.num|0) - (b.num|0));
-    viewHand = others.concat(restNormals).concat(rightOne ? [rightOne] : []);
-  }
-    
+
     const hand=document.createElement('div'); hand.className='hand';
-        viewHand.forEach((c,ci)=>{
+    (t.hand||[]).forEach((c,ci)=>{
             /* 無効カードは描画しない（"undefined"表示の根絶） */
       if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
         console.warn('[hand] invalid card skipped', { table: idx, ci, card: c });
@@ -1349,11 +1303,30 @@ content.appendChild(charCol);
       }
       const wrap=document.createElement('div'); wrap.className='card-wrap';
       const card=document.createElement('div'); card.className='card';
- const isMine = ((c.ownerId ?? t.playerId) === state.userId);
-      const forceBack = (isM38 && !seatedAny);
-      if(!isMine && !c.open) card.classList.add('back');
-      if(c.open) card.classList.add('open');
-
+     const isMine = ((c.ownerId ?? t.playerId) === state.userId);
+      /* ▼▼ ここから追加：#38 特例（右端フラグ m38） ▼▼ */
+      let forceFace = false, forceBack = false;
+     if ((v.mission?.id|0) === 38 && c?.m38 === true) {
+        const cap = v.captainTable|0;
+       const seatedAny = (v.tables||[]).some(T => !!T.playerId);
+        if (!seatedAny) {
+          // 着席完了までは全員から裏
+          forceBack = true;
+        } else if (idx === cap) {
+          // 隊長席からは裏
+          forceBack = true;
+        } else {
+          // 隊長以外からは表
+          forceFace = true;
+        }
+     }
+      if (forceBack) {
+       card.classList.add('back');
+      } else {
+        if(!isMine && !c.open && !forceFace) card.classList.add('back');
+       if(c.open || forceFace) card.classList.add('open');
+      }
+ 
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
@@ -1411,9 +1384,12 @@ content.appendChild(charCol);
       const hasNum = (c.num != null && !Number.isNaN(Number(c.num)));
       if (hasNum) {
         num.textContent = String(c.num);
-        num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
-      } else {
-        num.textContent = '';
+        /* ▼▼ ここから追加：#38 の閲覧者別表示 ▼▼ */
+       const showNum = (c.open || isMine || (forceFace && !forceBack)) && !forceBack;
+        num.style.visibility = showNum ? 'visible' : 'hidden';
+       /* ▲▲ ここまで追加 ▼▼ */
+      } else {    
+      num.textContent = '';
         num.style.visibility = 'hidden';
         console.warn('[hand] card without visible num', { table: idx, ci, card: c });
       }
@@ -1954,6 +1930,7 @@ function renderM29(v){
   
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
+
   const isM31 = ((v?.mission?.id|0) === 31) || ((v?.mission?.id|0) === 34);
 
   // 既存除去
@@ -2531,7 +2508,7 @@ function updateMenuButtons(){
   if (canReferInfoTable && !old){
     const b = document.createElement('button');
     b.className = 'btn'; b.id = id; b.textContent = '情報トークン（#22）';
-b.onclick = ()=>{ window.m22_alreadyShown = false; showInfo22Panel(state.watching); };
+    b.onclick = ()=> showInfo22Panel(state.watching);
     menuPop.insertBefore(b, menuPop.firstChild || null);
   }
 }
@@ -2576,7 +2553,7 @@ btnSit.onclick = ()=>{
 };
 btnSeatCancel.onclick=()=> H(seatPop,true);
 
-btnLeave.onclick = async ()=>{ await leaveSeatNow();btnSit.onclick(); };
+btnLeave.onclick = async ()=>{ await leaveSeatNow(); };
 
 /* start / mission-pick */
 btnPickMission.onclick = ()=>{
@@ -2654,11 +2631,9 @@ async function startGame(playerCount, missionId){
   state.m22GaveOnce = false;
   // ★ #22：サーバ側メタも初期化（可視フラグ／渡し済み表）
   try{
-    await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      m22_infoShown:false, m22_given:null,
-      m27_row: [], m27_shown:false, m27_taken:null
-    });
-   }catch(_){}
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown:false, m22_given:null });
+  }catch(_){}
+  
   const code = state.roomCode;
 
 
@@ -2716,9 +2691,42 @@ async function startGame(playerCount, missionId){
 
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
-  let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
-  tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
-
+  let p=0; 
+  while(p<deck.length){
+    for(let t=0; t<playerCount && p<deck.length; t++){
+      const c=deck[p++];
+      tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null});
+    }
+  }
+  /* ▼▼ ここから追加：#38 隊長だけ右端固定 ▼▼ */
+ if (missionId === 38) {
+    const cap = captainIndex|0;
+   tables.forEach((T, idx)=>{
+      if (!Array.isArray(T.hand)) T.hand = [];
+      if (idx === cap && T.hand.length > 0) {
+        // 通常カード（kind==='normal'）の中からランダム1枚を右端へ
+        const normalIdxList = T.hand.map((c,i)=>({c,i})).filter(x=>x.c?.kind==='normal').map(x=>x.i);
+        const pickIdx = normalIdxList.length>0 ? normalIdxList[(Math.random()*normalIdxList.length)|0] : ((Math.random()*T.hand.length)|0);
+        const picked = T.hand.splice(pickIdx,1)[0];
+        // 残りを昇順
+        T.hand.sort((a,b)=> (a.num||0) - (b.num||0));
+        // 右端に挿入し、閲覧制御用フラグを付与
+        T.hand.push({...picked, m38:true});
+      } else {
+       // 非隊長は通常どおり昇順
+        T.hand.sort((a,b)=> (a.num||0) - (b.num||0));
+      }
+      // αを振る
+      T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; });
+    });
+  } else {
+   // 従来どおり：全員昇順 → α付与
+   tables.forEach(T=>{ 
+      T.hand.sort((a,b)=> (a.num||0) - (b.num||0)); 
+      T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); 
+    });
+  }
+  
 // アイテム（人数ぶん） — ミッション規則に合わせて山札を作る
 let pool = itemDeckNumbers(missionId);
 
@@ -2739,17 +2747,15 @@ const items = pool
   .map(no=>({ id:crypto.randomUUID(), no, used:false, faceUp: faceUpStart }));
 
 
-  // ★ 開始エッジを作るために一瞬だけ false を書く（ミッションは未選択状態へ）
-  await update(ref(db, `rooms/${code}`), { started:false, mission:null });
+
 
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
     di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
-     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
-    /* ▲▲ ここまで追加 ▼▼ */
+    m31_center: (missionMeta?.id===31 ? [] : null),
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
 
@@ -2796,27 +2802,13 @@ async function setupMissionOnStart(code){
   }
 
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
-if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
+  if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
     const old = document.getElementById('m32ConRow');
     if (old) old.remove();
     const lane = buildConDeckLaneP1();
     mountLaneUnderItemsBar(lane);
   }
-
-  /* ▼▼ （#36：数値5枚を横一列） ▼▼ */
-  if ((v.mission?.id|0) === 36){
-    // 既存があれば一度除去（再実行対策）
-    const old36 = document.getElementById('m36NumRow');
-    if (old36) old36.remove();
-
-    // ランダム5枚を横並びで生成して設置
-   // ここから変更：#36 専用レーン（左右ブランク付き）
-   const lane36 = buildM36Lane();   /* ← 専用ビルダーに変更 */
-    lane36.id = 'm36NumRow';
-    mountLaneUnderItemsBar(lane36);
-  }
-  
 
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
@@ -2909,7 +2901,7 @@ if ((v.mission?.id|0) === 31 || (v.mission?.id|0) === 34) {
   }
   await update(ref(db, `rooms/${code}`), {
     tables,
-   m31_center: []
+    m31_center: []  // ★ 毎回リセット
   });
 }
   function randNum(){ return MATERIALS.numbers[(Math.random()*12)|0]; }
@@ -2931,6 +2923,9 @@ function mountLaneUnderItemsBar(lane){
   bar.insertAdjacentElement('afterend', lane);
 }
 
+
+
+  
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
   const lane = document.createElement('div'); 
@@ -3223,54 +3218,6 @@ function buildDeckLaneP2(n=2){
   return lane;
 }
 
-/* ここから追加：#36 専用レーン（5枚の“列”の左右にだけブランク） */
-function buildM36Lane(){
-  const lane = document.createElement('div');
-  lane.className = 'numlane';
-
-  // 左ブランク（横向きの空カード）
-  const leftBlank = document.createElement('div');
-  leftBlank.className = 'rulecard';
-  leftBlank.title = '押すと「right2」を表示';
-
-  // 5枚の数値カード
-  const deck = MATERIALS.numbers.slice(); shuffle(deck);
-  const picks = deck.slice(0, 5);
-  const numNodes = picks.map(n=>{
-    const d = document.createElement('div');
-    d.className = 'numcard';
-    d.style.backgroundImage = `url('${imgNumber(n)}')`;
-    return d;
-  });
-
-  // 右ブランク（横向きの空カード）
-  const rightBlank = document.createElement('div');
- rightBlank.className = 'rulecard';
-  rightBlank.title = '押すと「left2」を表示';
-
-  // 相互排他（どちらか一方のみ表示）
-  const clearLeft  = ()=>{ leftBlank.style.backgroundImage  = ''; };
-  const clearRight = ()=>{ rightBlank.style.backgroundImage = ''; };
-
-  leftBlank.onclick  = (ev)=>{ ev.stopPropagation();
-    leftBlank.style.backgroundImage  = `url('${imgRule('right2')}')`; // →→（右向き）を左端に表示
-    clearRight(); // 右端はブランクへ
-  };
-  rightBlank.onclick = (ev)=>{ ev.stopPropagation();
-    rightBlank.style.backgroundImage = `url('${imgRule('left2')}')`;  // ←←（左向き）を右端に表示
-   clearLeft();  // 左端はブランクへ
-  };
-
-  // 並べ順：左ブランク → 5枚の数字 → 右ブランク
-  lane.appendChild(leftBlank);
-  numNodes.forEach(n=> lane.appendChild(n));
-  lane.appendChild(rightBlank);
-
-  return lane;
-}
-
-
-  
 /* パターン3：指定カードを固定並べ（必要時） */
 function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
