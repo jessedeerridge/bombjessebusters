@@ -2166,19 +2166,14 @@ async function consumeM22IfMatches(tableIdx, n){
 
 /* === #22 用：情報トークン表（3×4）：黒トークン + x0/x1/x2 を横並び表示 === */
 function showInfo22Panel(vNow){
-  // 既に表示済みなら何もしない（ガードはここでは立てない）
-  if (window.m22_alreadyShown) return;
+  if (window.m22_alreadyShown) return;  // ★ここから追加：一度だけ表示
+  window.m22_alreadyShown = true;   
 
   const v = vNow || state.watching;
   if (!v) return;
 
   // ★ 黄2種公開（＝サーバ側で m22_infoShown を立てた）までは表を生成しない
   if (v?.meta?.m22_infoShown !== true) return;
-
-  // 既存DOMが残っていれば再利用して終了（ガードON）
-  const exist = document.getElementById('info22');
-  if (exist) { window.m22_alreadyShown = true; return; }
-  
  　const givenMap = v.meta?.m22_given || {};
 　 const iGave    = !!givenMap[state.userId];
   const div = document.createElement('div');
@@ -2203,10 +2198,6 @@ if (shown === 0) cell.classList.add('disabled');
     
     // 右側の xラベル
     const xl = document.createElement('span');
-
-  // パネル生成が成功したので、ここで一度だけ表示ガードをON
-  window.m22_alreadyShown = true;
-    
     xl.className = 'xlabel';
     xl.textContent = `x${shown}`;
 
@@ -2483,7 +2474,7 @@ function updateMenuButtons(){
   if (canReferInfoTable && !old){
     const b = document.createElement('button');
     b.className = 'btn'; b.id = id; b.textContent = '情報トークン（#22）';
-　   b.onclick = ()=>{ window.m22_alreadyShown = false; showInfo22Panel(state.watching); };
+    b.onclick = ()=> showInfo22Panel(state.watching);
     menuPop.insertBefore(b, menuPop.firstChild || null);
   }
 }
@@ -2604,7 +2595,6 @@ async function startGame(playerCount, missionId){
   if(globalReveal){ globalReveal.innerHTML=''; H(globalReveal,true); }
  // ★ #22：渡し済みガードのリセット
   state.m22GaveOnce = false;
-   window.m22_alreadyShown = false;
   // ★ #22：サーバ側メタも初期化（可視フラグ／渡し済み表）
   try{
     await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown:false, m22_given:null });
