@@ -632,10 +632,14 @@ function clearMissionOverlays(){
     // ★ ミッション27：アイテム直下の行を確実に消す
   const m27 = document.getElementById('m27Row');
   if (m27) m27.remove();
+
+ document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m31HandRow/m31CenterRow/m32ConRowはconlane
+  ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.remove();
+  });
+  
   NUMCARD_REG.clear();
 }
- const m31h = document.getElementById('m31HandRow'); if (m31h) m31h.remove();
-  const m31c = document.getElementById('m31CenterRow'); if (m31c) m31c.remove();
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
