@@ -623,22 +623,19 @@ const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
 
 /* === 前のゲームの表示物を全て掃除する === */
 function clearMissionOverlays(){
-  // 数値帯・下部帯・各ミッション行（#27/#29/#31 等）を一括除去
-  document.querySelectorAll(
-    '.numlane, .num-under, #m27Row, #m29HandRow, #m29CenterRow, #m31HandRow, #m31CenterRow'
-  ).forEach(el => el.remove());
-  document.querySelectorAll('.m27-row').forEach(el => el.remove());
-  // #22：情報トークン表
-  const info22 = document.getElementById('info22'); if (info22) info22.remove();
-  // ズームオーバーレイ／ミニポップ／ポップレイヤの中身
-  const ov = document.getElementById('conZoomOverlay'); if (ov) ov.remove();
-  document.querySelectorAll('.mini-pop').forEach(p => p.remove());
-  const pl = document.getElementById('popLayer'); if (pl) pl.innerHTML = '';
-  // #22 の “一度だけ表示” フラグを解除（やり直し後の再表示用）
-  delete window.m22_alreadyShown;
-  // 一意管理レジスタ
+  document.querySelectorAll('.numlane').forEach(n => n.remove());
+  document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
+  document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
+  // ★ ミッション22：情報トークン表を確実に消す
+  const info22 = document.getElementById('info22');
+  if (info22) info22.remove();
+    // ★ ミッション27：アイテム直下の行を確実に消す
+  const m27 = document.getElementById('m27Row');
+  if (m27) m27.remove();
   NUMCARD_REG.clear();
 }
+ const m31h = document.getElementById('m31HandRow'); if (m31h) m31h.remove();
+  const m31c = document.getElementById('m31CenterRow'); if (m31c) m31c.remove();
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
