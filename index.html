@@ -1311,11 +1311,15 @@ content.appendChild(charCol);
           if (t.playerId === state.userId) {
             // 隊長本人：裏向き（黒背景＝back）
             card.classList.add('back');
-          } else {
-            const numEl = document.createElement('div');
-            numEl.className = 'num';
-            numEl.textContent = String(c.num ?? '');
-            card.appendChild(numEl);
+      } else {
+            // 隊長以外：灰背景＋数字（ただし着席するまで数字非表示）
+            if (state.seatedTable != null) {
+              const numEl = document.createElement('div');
+              numEl.className = 'num';
+              numEl.textContent = String(c.num ?? '');
+              card.appendChild(numEl);
+            }
+            // 背景色はデフォルト #bbb（.card）を使用
           }
         } else if (!isMine) {
           // 通常ルール：他人の非公開は裏面
