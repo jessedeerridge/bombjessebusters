@@ -186,6 +186,8 @@
     padding:0;                 /* 中央ぴったりに */
   }  /* ▼▼ 変更1：＝ と ≠ の色を入れ替え ▼▼ */
   .token.equal{background:#cfe8ff;color:#000}
+  body[data-seated="no"] .token { display: none !important; }
+
   .token.black{background:#000;color:#fff}
   .token.x1{background:#e5e7eb;color:#000}
   .token.noteq{background:#ffedd5;color:#000}
@@ -1125,6 +1127,8 @@ hostTool.onclick = ()=> alert('全体公開されている通常コードの枚�
 /* ===== Tables ===== */
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
+  document.body.setAttribute('data-seated', (state.seatedTable==null ? 'no' : 'yes'));
+  
   if (!(v.meta?.m22_infoShown)) {
     const old = document.getElementById('info22');
     if (old) old.remove();
@@ -1299,33 +1303,37 @@ content.appendChild(charCol);
       const card=document.createElement('div'); card.className='card';
  const isMine = ((c.ownerId ?? t.playerId) === state.userId);
 
-    /* ▼▼ ここから変更：#38 隊長の右端✕を特別表示 ▼▼ */
-      const isM38 = ((state.watching?.mission?.id|0) === 38);
-      const isCaptainTable = (idx === (state.watching?.captainTable|0));
-      const isRightmost = (ci === (t.hand||[]).length - 1);
-      const hasX = Array.isArray(c.tokens) && c.tokens.some(tk => String(tk.type) === 'xmark');
-      const m38Special = isM38 && isCaptainTable && isRightmost && hasX;
-
-      if (!c.open) {
-        if (m38Special) {
-          if (t.playerId === state.userId) {
-            // 隊長本人：裏向き（黒背景＝back）
-            card.classList.add('back');
+   const seated = (state.seatedTable != null);
+      if (!seated) {
+        if (!c.open) card.classList.add('back');  // 数字は .back のCSSで非表示
       } else {
-            // 隊長以外：灰背景＋数字（ただし着席するまで数字非表示）
-            if (state.seatedTable != null) {
+        /* ▼▼ 着席後のみ #38 特別表示を適用 ▼▼ */
+        const isM38 = ((state.watching?.mission?.id|0) === 38);
+        const isCaptainTable = (idx === (state.watching?.captainTable|0));
+        const isRightmost = (ci === (t.hand||[]).length - 1);
+        const hasX = Array.isArray(c.tokens) && c.tokens.some(tk => String(tk.type) === 'xmark');
+        const m38Special = isM38 && isCaptainTable && isRightmost && hasX;
+
+        if (!c.open) {
+          if (m38Special) {
+            if (t.playerId === state.userId) {
+              // 隊長本人：裏（黒背景）
+              card.classList.add('back');
+            } else {
+              // 他プレイヤー：灰＋数字（＝自分の非公開手札の見え方）
               const numEl = document.createElement('div');
               numEl.className = 'num';
               numEl.textContent = String(c.num ?? '');
               card.appendChild(numEl);
+              // 背景は .card の #bbb をそのまま利用（back は付けない）
             }
-            // 背景色はデフォルト #bbb（.card）を使用
+          } else if (!isMine) {
+            // 通常の他人カードは裏
+            card.classList.add('back');
           }
-        } else if (!isMine) {
-          // 通常ルール：他人の非公開は裏面
-          card.classList.add('back');
         }
       }
+
       if (c.open) card.classList.add('open');
 
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
