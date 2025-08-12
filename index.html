@@ -2820,6 +2820,19 @@ async function setupMissionOnStart(code){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
   }
 
+  // #13/#39 共通：キャラ下に出すランダム情報トークンの初期化
+  // （このフラグが立っていて、まだ meta.m13_header が無ければ人数ぶん作成）
+  if (flags.m13_headerRandomInfoToken) {
+    const snap2 = await get(ref(db, `rooms/${code}/meta`));
+    const meta  = snap2.val() || {};
+    if (!Array.isArray(meta.m13_header)) {
+      const tcount = v.tableCount|0;
+      const header = Array.from({length:tcount}, ()=> MATERIALS.numbers[(Math.random()*12)|0]);
+      await update(ref(db, `rooms/${code}/meta`), { m13_header: header });
+    }
+  }
+
+  
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
 if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
@@ -3821,7 +3834,21 @@ function missionInfo(id, opts={}){
       };
     }
 
-
+    case 37: {
+      return {
+        id:34, name:'#37', desc:'',
+        display:[
+          '#37',
+          'このミッションではキャラクターカードは自分にしか見えない（他テーブルはブランク表示）。',
+          'A〜Eの制約カードを全員に1枚ずつ配り、アイテム下に表示。',
+          '「隊長カードの持ち主はウィーケスト・リンク。彼のみ制約適用」',
+          '「制約により行動できなければ宣言し、起爆ダイヤル+2」',
+          '「誰かがプレイヤーと制約の両方を指摘できたら解除。どちらかでも誤りなら起爆ダイヤル+1」'
+        ],
+        // ※今回：表示のみ。秘匿/推理UIは後続PRで
+        flags:{}
+      };
+    }
     case 38: {
      return {
         id:38, name:'#38', desc:'',
@@ -3833,7 +3860,18 @@ function missionInfo(id, opts={}){
         flags:{ m38_captainRightmostX:true }
       };
     }
-      
+      case 39: {
+     return {
+       id:39, name:'#39', desc:'',
+       display:[
+         '#39',
+         '各プレイヤーに情報トークンをランダムで1枚ずつ配布し、キャラカードの下に表示（全員に見える）。',
+         'その数字の情報トークンを実際に使用したら自動的に消える。'
+       ],
+       // #13 と同じ仕組みを再利用（表示＆自動消去）
+       flags:{ m13_headerRandomInfoToken:true, m13_autoHideHeaderToken:true }
+     };
+   }
       
     case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
