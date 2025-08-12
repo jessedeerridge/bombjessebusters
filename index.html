@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BEyだｓrS</title>
+<title>BEyｓｆｓrS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -626,14 +626,13 @@ function clearMissionOverlays(){
   document.querySelectorAll('.numlane').forEach(n => n.remove());
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
   document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
-    // ★ ミッション31,32,37：手札・制約カード・制約デッキを確実に削除
-  if ([31, 32, 37].includes(state.watching?.mission?.id|0)) {
-    document.querySelectorAll('.hand, .concard, .condeck').forEach(el => el.remove());
-  }
   // ★ ミッション22：情報トークン表を確実に消す
   const info22 = document.getElementById('info22');
   if (info22) info22.remove();
     // ★ ミッション27：アイテム直下の行を確実に消す
+const m27Top = document.getElementById('m27-row'); // ← 上部トークンのidに合わせる
+  if (m27Top) m27Top.remove();
+  // ★ ミッション27：アイテム直下の行を確実に消す
   const m27 = document.getElementById('m27Row');
   if (m27) m27.remove();
   NUMCARD_REG.clear();
