@@ -169,9 +169,7 @@
   .card.open{background:#000}
   /* ★ アイテム2：選択可能カードの青枠 */
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
-  /* ここから追加：#38「灰＋数字」用の見た目 */
-  .m38-grayfront{ filter:grayscale(100%); background:#777 !important; }
-  
+
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center}
 
@@ -1291,18 +1289,6 @@ content.appendChild(charCol);
 
     const hand=document.createElement('div'); hand.className='hand';
     (t.hand||[]).forEach((c,ci)=>{
-
-    const hand=document.createElement('div'); hand.className='hand';
-    const _cards = (t.hand||[]).slice();
-    /* ここから追加：#38 秘密カード（_m38Secret）を末尾へ寄せる */
-    if (state.watching?.mission?.flags?.m38_secretRightmost && (idx|0)===(state.watching?.captainTable|0)) {
-      const a=_cards.filter(x=>!(x&&x._m38Secret===true));
-      const b=_cards.filter(x=>(x&&x._m38Secret===true));
-     _cards.splice(0,_cards.length,...a,...b);
-    }
-    _cards.forEach((c,ci)=>{
-
-      
             /* 無効カードは描画しない（"undefined"表示の根絶） */
       if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
         console.warn('[hand] invalid card skipped', { table: idx, ci, card: c });
@@ -1311,30 +1297,29 @@ content.appendChild(charCol);
       const wrap=document.createElement('div'); wrap.className='card-wrap';
       const card=document.createElement('div'); card.className='card';
  const isMine = ((c.ownerId ?? t.playerId) === state.userId);
- // ▼ ここから追加：#38 特別表示
- const isM38     = !!(state.watching?.mission?.flags?.m38_secretRightmost);
- const capIdx    = (state.watching?.captainTable|0);
- const isCapTbl  = (idx|0) === capIdx;
- const notSeated = !Number.isInteger(state.seatedTable);
- const isViewerCaptain = Number.isInteger(state.seatedTable) && ((state.seatedTable|0)===capIdx);
- const isSecretRightmost = isM38 && isCapTbl && (c?._m38Secret===true) && (c?._m38Revealed!==true);
-// 着席前は全員 裏（＝何も見せない）
- if (isM38 && notSeated) {
-  card.classList.add('back');
- } else if (isSecretRightmost) {
-  if (isViewerCaptain) {
-     // 隊長には裏で見える
-    card.classList.add('back');
-   } else {
-     // 隊長以外には「灰＋数字」で見える（open扱い＋灰面）
-    card.classList.add('open'); 
-     card.classList.add('m38-grayfront');
-   }
- } else {
-  // 通常
-   if(!isMine && !c.open) card.classList.add('back');
-   if(c.open) card.classList.add('open');
- }
+
+    /* ▼▼ ここから変更：#38 隊長の右端✕を特別表示 ▼▼ */
+      const isM38 = ((state.watching?.mission?.id|0) === 38);
+      const isCaptainTable = (idx === (state.watching?.captainTable|0));
+      const isRightmost = (ci === (t.hand||[]).length - 1);
+      const hasX = Array.isArray(c.tokens) && c.tokens.some(tk => String(tk.type) === 'xmark');
+      const m38Special = isM38 && isCaptainTable && isRightmost && hasX;
+
+      if (!c.open) {
+        if (m38Special) {
+          if (t.playerId === state.userId) {
+            // 隊長本人：裏向き（黒背景＝back）
+            card.classList.add('back');
+          } else {
+            // 隊長以外：自分の非公開手札の見え方＝灰背景＋数字（＝backを付けない）
+            // 何もしない（デフォルトの .card #bbb をそのまま）
+          }
+        } else if (!isMine) {
+          // 通常ルール：他人の非公開は裏面
+          card.classList.add('back');
+        }
+      }
+      if (c.open) card.classList.add('open');
 
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
@@ -1388,36 +1373,12 @@ content.appendChild(charCol);
         };
       }
 
-      /* ここから追加：#38 隊長だけ右端秘密カードの公開トグル */
-      if (state.watching?.mission?.flags?.m38_secretRightmost) {
-        const cap = (state.watching?.captainTable|0);
-        const viewerIsCaptain = Number.isInteger(state.seatedTable) && ((state.seatedTable|0)===cap);
-        const isCapTbl = (idx|0)===cap;
-        if (viewerIsCaptain && isCapTbl && c?._m38Secret===true) {
-          card.addEventListener('click', async (ev)=>{
-            ev.stopPropagation();
-            const path = `rooms/${state.roomCode}/tables/${idx}/hand/${ci}/_m38Revealed`;
-            const next = !(c?._m38Revealed===true);
-            await set(ref(db, path), next);
-          }, { once:false });
-        }
-      }
-
-      
       const num=document.createElement('div'); num.className='num';
             /*未定義を文字列 "undefined" で出さない */
       const hasNum = (c.num != null && !Number.isNaN(Number(c.num)));
       if (hasNum) {
         num.textContent = String(c.num);
-        // ▼ ここから追加：#38「灰＋数字」＝他者にも数字は見える
-        const showGrayNum = (!!(state.watching?.mission?.flags?.m38_secretRightmost)
-                          && (idx|0)===(state.watching?.captainTable|0)
-                           && (c?._m38Secret===true) && (c?._m38Revealed!==true)
-                           && Number.isInteger(state.seatedTable) && ((state.seatedTable|0)!==(state.watching?.captainTable|0)));
-        // 着席前は数字も隠す
-        const notSeated = !Number.isInteger(state.seatedTable);
-        num.style.visibility = notSeated ? 'hidden' : (showGrayNum || c.open || isMine) ? 'visible' : 'hidden';
-
+        num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
       } else {
         num.textContent = '';
         num.style.visibility = 'hidden';
@@ -1437,13 +1398,6 @@ content.appendChild(charCol);
  (c.tokens||[]).forEach(tk=>{
   const el = document.createElement('div');
   el.className = 'token ' + (tk.style || '');
-  const hideX = !!(state.watching?.mission?.flags?.m38_hideCaptainUntilSeated)
-             && !Number.isInteger(state.seatedTable)
-             && String(tk?.type).toLowerCase()==='xmark';
-  if (hideX) return;
-  el.className = 'token ' + (tk.style || '');
-
-   
   col.appendChild(el);
 
   const tokenText = (t)=>{
@@ -2906,28 +2860,26 @@ try{
   }
 
 
-  /* ここから追加：#38 隊長テーブルのみ 右端✕＋秘密フラグ */
+ /* ここから追加：#38 隊長テーブルのみ 右端✕ */
   if (v.mission?.flags?.m38_captainRightmostX) {
-    const cap = Number.isInteger(v.captainTable) ? (v.captainTable|0) : -1;
-    if (cap >= 0) {
-      const snap2 = await get(ref(db, `rooms/${code}/tables/${cap}/hand`));
-     const hand0 = (snap2.val()||[]).slice().sort((a,b)=> (a?.num|0)-(b?.num|0));
-  if (hand0.length>0) {
-        const ri = (Math.random()*hand0.length)|0;
-       const chosen = hand0.splice(ri,1)[0];
-        // 秘密フラグを付けて右端へ移動
-        chosen._m38Secret   = true;
-        chosen._m38Revealed = false;
-        // ✕トークン付与（既存仕様に合わせる）
-        chosen.tokens = [...(chosen.tokens||[]), {type:'xmark', value:'✕', style:'yellowX'}];
-       hand0.push(chosen);
-       // α再付与
-        const alpha='abcdefghijklmnopqrstuvwxyz';
-       hand0.forEach((c,i)=> c.alpha = alpha[i%alpha.length]);
-       await set(ref(db, `rooms/${code}/tables/${cap}/hand`), hand0);
+    const captainIdx = (v.captainTable|0);
+    if (captainIdx >= 0) {
+      const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
+      const tbls = tablesSnap.val() || [];
+      const T = tbls[captainIdx];
+    if (T && Array.isArray(T.hand) && T.hand.length > 0) {
+       const alphaStr='abcdefghijklmnopqrstuvwxyz';
+        const hand = T.hand.slice().sort((a,b)=> a.num - b.num); // 昇順ベース
+        const ri = (Math.random()*hand.length)|0;
+        const chosen = hand.splice(ri,1)[0];
+        hand.push(chosen); // 右端へ
+        chosen.tokens = [ ...(chosen.tokens||[]), {type:'xmark', value:'✕', style:'yellowX'} ];
+        hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]); // α再付与
+      T.hand = hand;
+     await set(ref(db, `rooms/${code}/tables`), tbls);
       }
     }
-  }
+ }
   /* ここまで追加 */
   
   // #26：1〜12を3×4で配置（裏表トグル）
@@ -3820,12 +3772,8 @@ function missionInfo(id, opts={}){
           '隊長の手札のみ：ランダムで1枚を右端に移動。他は昇順。',
           '移動したカードに ✕（黄背景/黒文字）トークンを付ける。'
        ],
-    flags:{
-     m38_captainRightmostX:true,     // 既存：隊長だけ右端✕
-    m38_hideCaptainUntilSeated:true,// 追加：着席まで隊長・✕トークンを隠す
-      m38_secretRightmost:true        // 追加：右端カードの“特別表示/公開トグル”を有効化
-    }
-  };
+        flags:{ m38_captainRightmostX:true }
+      };
     }
       
       
