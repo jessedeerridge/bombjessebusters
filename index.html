@@ -2474,7 +2474,7 @@ function updateMenuButtons(){
   if (canReferInfoTable && !old){
     const b = document.createElement('button');
     b.className = 'btn'; b.id = id; b.textContent = '情報トークン（#22）';
-    b.onclick = ()=> showInfo22Panel(state.watching);
+　   b.onclick = ()=>{ window.m22_alreadyShown = false; showInfo22Panel(state.watching); };
     menuPop.insertBefore(b, menuPop.firstChild || null);
   }
 }
@@ -2595,6 +2595,7 @@ async function startGame(playerCount, missionId){
   if(globalReveal){ globalReveal.innerHTML=''; H(globalReveal,true); }
  // ★ #22：渡し済みガードのリセット
   state.m22GaveOnce = false;
+   window.m22_alreadyShown = false;
   // ★ #22：サーバ側メタも初期化（可視フラグ／渡し済み表）
   try{
     await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown:false, m22_given:null });
