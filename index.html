@@ -2603,11 +2603,20 @@ async function startGame(playerCount, missionId){
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
       m22_infoShown:false, m22_given:null,
       m27_row: [], m27_shown:false, m27_taken:null
-      m31_con: [], m34_con: []
+
     });
    }catch(_){}
   const code = state.roomCode;
-
+  try{
+    await update(ref(db, `rooms/${code}`), { m31_center: [], m34_center: [] });
+  }catch(_){}
+ // ★ #31/#34：各テーブルの手元conカードをクリア
+  for (let i = 0; i < playerCount; i++){
+    try{
+      await update(ref(db, `rooms/${code}/tables/${i}`), { m31Con: null, m34Con: null });
+    }catch(_){}
+  }
+  
 
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
