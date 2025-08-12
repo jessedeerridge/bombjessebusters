@@ -942,9 +942,19 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
- if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
-    btnSit.onclick();   // ← これが seatTabs の生成まで全部やってくれる
- }
+   // 自動で座席表を出す条件（再生成はしない）：
+   // 1) 未開始→開始（入室直後含む）：まだ座っていないときだけ開く
+   // 2) 開始→未開始（＝「やり直す」直後想定）：座っていても必ず開く
+   if (
+     seatPop.classList.contains('hidden') &&
+     (
+       (!state.seatedTable && v?.started && !state.gameStarted) || // 1)
+       ( state.gameStarted && !v?.started)                         // 2)
+     )
+   ) {
+     btnSit.onclick(); // ← seatTabs の生成まで実行
+   }
+
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 
