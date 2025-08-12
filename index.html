@@ -1127,7 +1127,8 @@ hostTool.onclick = ()=> alert('全体公開されている通常コードの枚�
 /* ===== Tables ===== */
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
-  document.body.setAttribute('data-seated', (state.seatedTable==null ? 'no' : 'yes'));
+    const seatedNow = (v?.tables||[]).some(T => T.playerId === state.userId);
+  document.body.setAttribute('data-seated', seatedNow ? 'yes' : 'no');
   
   if (!(v.meta?.m22_infoShown)) {
     const old = document.getElementById('info22');
@@ -1303,9 +1304,9 @@ content.appendChild(charCol);
       const card=document.createElement('div'); card.className='card';
  const isMine = ((c.ownerId ?? t.playerId) === state.userId);
 
-   const seated = (state.seatedTable != null);
+   const seated = (v?.tables||[]).some(T => T.playerId === state.userId);
       if (!seated) {
-        if (!c.open) card.classList.add('back');  // 数字は .back のCSSで非表示
+        if (!c.open) card.classList.add('back'); // 数字は .back CSS で隠れる
       } else {
         /* ▼▼ 着席後のみ #38 特別表示を適用 ▼▼ */
         const isM38 = ((state.watching?.mission?.id|0) === 38);
