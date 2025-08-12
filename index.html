@@ -626,6 +626,10 @@ function clearMissionOverlays(){
   document.querySelectorAll('.numlane').forEach(n => n.remove());
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
   document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
+    // ★ ミッション31,32,37：手札・制約カード・制約デッキを確実に削除
+  if ([31, 32, 37].includes(state.watching?.mission?.id|0)) {
+    document.querySelectorAll('.hand, .concard, .condeck').forEach(el => el.remove());
+  }
   // ★ ミッション22：情報トークン表を確実に消す
   const info22 = document.getElementById('info22');
   if (info22) info22.remove();
