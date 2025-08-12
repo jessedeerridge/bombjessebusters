@@ -1312,8 +1312,10 @@ content.appendChild(charCol);
             // 隊長本人：裏向き（黒背景＝back）
             card.classList.add('back');
           } else {
-            // 隊長以外：自分の非公開手札の見え方＝灰背景＋数字（＝backを付けない）
-            // 何もしない（デフォルトの .card #bbb をそのまま）
+            const numEl = document.createElement('div');
+            numEl.className = 'num';
+            numEl.textContent = String(c.num ?? '');
+            card.appendChild(numEl);
           }
         } else if (!isMine) {
           // 通常ルール：他人の非公開は裏面
