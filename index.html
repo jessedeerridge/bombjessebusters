@@ -2814,6 +2814,29 @@ try{
     const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
     const tbls = tablesSnap.val() || [];
     const alphaStr='abcdefghijklmnopqrstuvwxyz';
+
+    /* （#38：隊長テーブルのみ処理） */
+    if(v.mission?.flags?.m38_captainRightmostBlind){
+      const roomSnap = await get(ref(db, `rooms/${code}`));
+      const roomAll  = roomSnap.val() || {};
+      const capIdx   = (roomAll.captainTable|0);
+      if (Array.isArray(roomAll.tables) && roomAll.tables[capIdx]){
+       const T = roomAll.tables[capIdx];
+        const hand = (T.hand||[]).slice().sort((a,b)=> a.num - b.num); // 他は昇順
+        if (hand.length>0){
+        const ri = (Math.random()*hand.length)|0;
+          const chosen = hand.splice(ri,1)[0];
+         chosen.m38Special = true;          // 右端の対象
+          chosen.m38FaceUp  = false;         // 初期は裏（隊長視点）
+          hand.push(chosen);                 // 右端へ
+         const alphaStr='abcdefghijklmnopqrstuvwxyz';
+         hand.forEach((c,i)=> c.alpha = alphaStr[i%alphaStr.length]);
+          roomAll.tables[capIdx].hand = hand;
+         await set(ref(db, `rooms/${code}/tables/${capIdx}`), roomAll.tables[capIdx]);
+        }
+      }
+    }
+   
     tbls.forEach(T=>{
       const hand = (T.hand||[]).slice().sort((a,b)=> a.num - b.num); // 昇順ベース
       if(hand.length===0) return;
