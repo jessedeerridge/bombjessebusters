@@ -3169,44 +3169,52 @@ function buildDeckLaneP2(n=2){
   return lane;
 }
 
-/* ここから追加：#36 専用レーン（5枚＋左右ブランク） */
+/* ここから追加：#36 専用レーン（5枚の“列”の左右にだけブランク） */
 function buildM36Lane(){
-  const lane = document.createElement('div'); 
+  const lane = document.createElement('div');
   lane.className = 'numlane';
-  // 1..12 から5枚（重複なし）
+
+  // 左ブランク（横向きの空カード）
+  const leftBlank = document.createElement('div');
+  leftBlank.className = 'rulecard';
+  leftBlank.title = '押すと「right2」を表示';
+
+  // 5枚の数値カード
   const deck = MATERIALS.numbers.slice(); shuffle(deck);
   const picks = deck.slice(0, 5);
-
-  picks.forEach(n=>{
-    // 左ブランク（横向きの空 rulecard）
-    const left = document.createElement('div');
-   left.className = 'rulecard';
-    left.title = '押すと「右2」を表示';
-
-    // 数値カード
-   const num = document.createElement('div');
-    num.className = 'numcard';
-    num.style.backgroundImage = `url('${imgNumber(n)}')`;
-
-    // 右ブランク（横向きの空 rulecard）
-   const right = document.createElement('div');
-    right.className = 'rulecard';
-    right.title = '押すと「左2」を表示';
-
-    // 相互排他トグル
-    const clearLeft  = ()=>{ left.style.backgroundImage  = ''; };
-   const clearRight = ()=>{ right.style.backgroundImage = ''; };
-    left.onclick  = (ev)=>{ ev.stopPropagation(); left.style.backgroundImage  = `url('${imgRule('right2')}')`; clearRight(); };
-    right.onclick = (ev)=>{ ev.stopPropagation(); right.style.backgroundImage = `url('${imgRule('left2')}')`;  clearLeft();  };
-
-    // 並べる順（左ブランク, 数値, 右ブランク）
-   lane.appendChild(left);
-    lane.appendChild(num);
-    lane.appendChild(right);
+  const numNodes = picks.map(n=>{
+    const d = document.createElement('div');
+    d.className = 'numcard';
+    d.style.backgroundImage = `url('${imgNumber(n)}')`;
+    return d;
   });
+
+  // 右ブランク（横向きの空カード）
+  const rightBlank = document.createElement('div');
+ rightBlank.className = 'rulecard';
+  rightBlank.title = '押すと「left2」を表示';
+
+  // 相互排他（どちらか一方のみ表示）
+  const clearLeft  = ()=>{ leftBlank.style.backgroundImage  = ''; };
+  const clearRight = ()=>{ rightBlank.style.backgroundImage = ''; };
+
+  leftBlank.onclick  = (ev)=>{ ev.stopPropagation();
+    leftBlank.style.backgroundImage  = `url('${imgRule('right2')}')`; // →→（右向き）を左端に表示
+    clearRight(); // 右端はブランクへ
+  };
+  rightBlank.onclick = (ev)=>{ ev.stopPropagation();
+    rightBlank.style.backgroundImage = `url('${imgRule('left2')}')`;  // ←←（左向き）を右端に表示
+   clearLeft();  // 左端はブランクへ
+  };
+
+  // 並べ順：左ブランク → 5枚の数字 → 右ブランク
+  lane.appendChild(leftBlank);
+  numNodes.forEach(n=> lane.appendChild(n));
+  lane.appendChild(rightBlank);
 
   return lane;
 }
+
 
   
 /* パターン3：指定カードを固定並べ（必要時） */
