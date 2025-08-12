@@ -1048,39 +1048,17 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
         });
       }else{
-        // 未使用時：#15 の「表にする」を追加し、必要なら併記
-        const entries = [];
-
-        if(flags.itemsFaceDownStart && it.faceUp===false){
-          entries.push({
-            label:'表にする',
-            action: async ()=>{
-              await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), { faceUp:true });
-            }
+        // 未使用時：
+        // ① 裏なら拡大せず、その場で「表にする」を出す
+       if (flags.itemsFaceDownStart && it.faceUp===false){
+          openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), { faceUp:true });
           });
+          return;
         }
-
-        entries.push({
-          label:'使用する',
-          action: async ()=>{
-            await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
-            const path=`rooms/${state.roomCode}/meta/itemUses`;
-            const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
-            if(it.no===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
-            if(it.no===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
-            if(it.no===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
-            if(it.no===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
-
-            if(it.no===2){
-              await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
-            }
-            if(it.no===13){ await addTwoItemsFromDeck(); }
-            if(it.no===16){ await handleItem16(idx); }
-            if(it.no===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
-          }
-        });
-
-        openMenu(ev.clientX, ev.clientY, entries);
+        // ② 表なら拡大 → 拡大内で「使用する」
+        ev.stopPropagation();
+        openItemZoom(it, idx);
       }
     };
 
@@ -2055,6 +2033,65 @@ function openConstraintZoom(letter, myIdx){
 function closeConstraintZoom(){
   const ov = document.getElementById('conZoomOverlay');
   if (ov) ov.remove();
+}
+  +// ▼▼ ここから追加：アイテム拡大ポップ（表のみ） ▼▼
+function openItemZoom(item, idx){
+  try{
+    const old = document.getElementById('conZoomOverlay');
+    if (old) old.remove();
+
+    const ov = document.createElement('div');
+    ov.id = 'conZoomOverlay';
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'conzoom-wrap';
+
+    const big = document.createElement('div');
+    big.className = 'conzoom-card';
+    // 表のみで呼ばれる想定だが保険で画像を決定
+    const img = (item.faceUp===false) ? "./itemback.jpg" : `./item${item.no}.jpg`;
+    big.style.backgroundImage = `url('${img}')`;
+
+    big.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      let m = wrap.querySelector('.conzoom-menu');
+      if (m){ m.remove(); return; }
+      m = document.createElement('div');
+      m.className = 'conzoom-menu';
+      // 「使用する」だけ（裏→表は拡大前に処理する方針）
+      const btnUse = document.createElement('button');
+      btnUse.textContent = '使用する';
+      btnUse.onclick = async (ev)=>{
+        ev.stopPropagation();
+        await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), { used:true });
+        // 既存の使用回数カウント
+        const path=`rooms/${state.roomCode}/meta/itemUses`;
+        const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
+        if(item.no===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
+        if(item.no===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
+        if(item.no===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
+        if(item.no===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
+       // 既存の個別フロー
+        if(item.no===2){
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+        }
+       if(item.no===13){ await addTwoItemsFromDeck(); }
+        if(item.no===16){ await handleItem16(idx); }
+        if(item.no===18){
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} });
+        }
+        closeConstraintZoom();
+      };
+      m.appendChild(btnUse);
+
+      wrap.appendChild(m);
+    });
+
+    wrap.appendChild(big);
+    ov.appendChild(wrap);
+    document.body.appendChild(ov);
+  }catch(e){ console.error(e); }
 }
   
 /* === #22 用：数字トークンの使用数を集計 === */
