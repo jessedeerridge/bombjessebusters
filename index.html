@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Bさ</title>
+<title>BEすrS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -632,8 +632,6 @@ function clearMissionOverlays(){
     // ★ ミッション27：アイテム直下の行を確実に消す
   const m27 = document.getElementById('m27Row');
   if (m27) m27.remove();
-document.querySelectorAll('#m27Row, #m27-row, .m27-row').forEach(el => el.remove());
-  
   // ★追加：制約系UI（#31/#32/#37）を丸ごと掃除
   document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m31HandRow/m31CenterRow/m32ConRowはconlane
   ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
@@ -2524,13 +2522,8 @@ btnSit.onclick = ()=>{
 };
 btnSeatCancel.onclick=()=> H(seatPop,true);
 
- btnLeave.onclick = async ()=>{
-   /* ここから追加：退出直後に場の表示物を即時クリア */
-   clearMissionOverlays();
-   /* ここまで追加 */
-   await leaveSeatNow();
-   btnSit.onclick();
- };
+btnLeave.onclick = async ()=>{ await leaveSeatNow();btnSit.onclick(); };
+
 /* start / mission-pick */
 btnPickMission.onclick = ()=>{
   if(!state.isHost){ alert('ホストのみ操作可'); return; }
