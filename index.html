@@ -2522,8 +2522,13 @@ btnSit.onclick = ()=>{
 };
 btnSeatCancel.onclick=()=> H(seatPop,true);
 
-btnLeave.onclick = async ()=>{ await leaveSeatNow();btnSit.onclick(); };
-
+ btnLeave.onclick = async ()=>{
+   /* ここから追加：退出直後に場の表示物を即時クリア */
+   clearMissionOverlays();
+   /* ここまで追加 */
+   await leaveSeatNow();
+   btnSit.onclick();
+ };
 /* start / mission-pick */
 btnPickMission.onclick = ()=>{
   if(!state.isHost){ alert('ホストのみ操作可'); return; }
