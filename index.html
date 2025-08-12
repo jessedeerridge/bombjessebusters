@@ -2603,6 +2603,7 @@ async function startGame(playerCount, missionId){
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
       m22_infoShown:false, m22_given:null,
       m27_row: [], m27_shown:false, m27_taken:null
+      m31_con: [], m34_con: []
     });
    }catch(_){}
   const code = state.roomCode;
