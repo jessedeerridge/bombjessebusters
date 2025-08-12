@@ -942,7 +942,8 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
-
+ if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
+    btnSit.onclick();   // ← これが seatTabs の生成まで全部やってくれる
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 
@@ -2163,8 +2164,8 @@ async function consumeM22IfMatches(tableIdx, n){
 
 /* === #22 用：情報トークン表（3×4）：黒トークン + x0/x1/x2 を横並び表示 === */
 function showInfo22Panel(vNow){
-  if (window.m22_alreadyShown) return;  // ★ここから追加：一度だけ表示
-  window.m22_alreadyShown = true;   
+  const exist = document.getElementById('info22');
+  if (exist) return;
 
   const v = vNow || state.watching;
   if (!v) return;
