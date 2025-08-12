@@ -2519,7 +2519,7 @@ btnSit.onclick = ()=>{
 };
 btnSeatCancel.onclick=()=> H(seatPop,true);
 
-btnLeave.onclick = async ()=>{ await leaveSeatNow(); };
+btnLeave.onclick = async ()=>{ await leaveSeatNow();btnSit.onclick(); };
 
 /* start / mission-pick */
 btnPickMission.onclick = ()=>{
