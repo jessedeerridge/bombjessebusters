@@ -2757,7 +2757,8 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     if (old36) old36.remove();
 
     // ランダム5枚を横並びで生成して設置
-    const lane36 = buildDeckLaneP2(5);
+   // ここから変更：#36 専用レーン（左右ブランク付き）
+   const lane36 = buildM36Lane();   /* ← 専用ビルダーに変更 */
     lane36.id = 'm36NumRow';
     mountLaneUnderItemsBar(lane36);
   }
@@ -3168,6 +3169,46 @@ function buildDeckLaneP2(n=2){
   return lane;
 }
 
+/* ここから追加：#36 専用レーン（5枚＋左右ブランク） */
+function buildM36Lane(){
+  const lane = document.createElement('div'); 
+  lane.className = 'numlane';
+  // 1..12 から5枚（重複なし）
+  const deck = MATERIALS.numbers.slice(); shuffle(deck);
+  const picks = deck.slice(0, 5);
+
+  picks.forEach(n=>{
+    // 左ブランク（横向きの空 rulecard）
+    const left = document.createElement('div');
+   left.className = 'rulecard';
+    left.title = '押すと「右2」を表示';
+
+    // 数値カード
+   const num = document.createElement('div');
+    num.className = 'numcard';
+    num.style.backgroundImage = `url('${imgNumber(n)}')`;
+
+    // 右ブランク（横向きの空 rulecard）
+   const right = document.createElement('div');
+    right.className = 'rulecard';
+    right.title = '押すと「左2」を表示';
+
+    // 相互排他トグル
+    const clearLeft  = ()=>{ left.style.backgroundImage  = ''; };
+   const clearRight = ()=>{ right.style.backgroundImage = ''; };
+    left.onclick  = (ev)=>{ ev.stopPropagation(); left.style.backgroundImage  = `url('${imgRule('right2')}')`; clearRight(); };
+    right.onclick = (ev)=>{ ev.stopPropagation(); right.style.backgroundImage = `url('${imgRule('left2')}')`;  clearLeft();  };
+
+    // 並べる順（左ブランク, 数値, 右ブランク）
+   lane.appendChild(left);
+    lane.appendChild(num);
+    lane.appendChild(right);
+  });
+
+  return lane;
+}
+
+  
 /* パターン3：指定カードを固定並べ（必要時） */
 function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
