@@ -1303,30 +1303,10 @@ content.appendChild(charCol);
       }
       const wrap=document.createElement('div'); wrap.className='card-wrap';
       const card=document.createElement('div'); card.className='card';
-     const isMine = ((c.ownerId ?? t.playerId) === state.userId);
-      /* ▼▼ ここから追加：#38 特例（右端フラグ m38） ▼▼ */
-      let forceFace = false, forceBack = false;
-     if ((v.mission?.id|0) === 38 && c?.m38 === true) {
-        const cap = v.captainTable|0;
-       const seatedAny = (v.tables||[]).some(T => !!T.playerId);
-        if (!seatedAny) {
-          // 着席完了までは全員から裏
-          forceBack = true;
-        } else if (idx === cap) {
-          // 隊長席からは裏
-          forceBack = true;
-        } else {
-          // 隊長以外からは表
-          forceFace = true;
-        }
-     }
-      if (forceBack) {
-       card.classList.add('back');
-      } else {
-        if(!isMine && !c.open && !forceFace) card.classList.add('back');
-       if(c.open || forceFace) card.classList.add('open');
-      }
- 
+ const isMine = ((c.ownerId ?? t.playerId) === state.userId);
+      if(!isMine && !c.open) card.classList.add('back');
+      if(c.open) card.classList.add('open');
+
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
@@ -1384,12 +1364,9 @@ content.appendChild(charCol);
       const hasNum = (c.num != null && !Number.isNaN(Number(c.num)));
       if (hasNum) {
         num.textContent = String(c.num);
-        /* ▼▼ ここから追加：#38 の閲覧者別表示 ▼▼ */
-       const showNum = (c.open || isMine || (forceFace && !forceBack)) && !forceBack;
-        num.style.visibility = showNum ? 'visible' : 'hidden';
-       /* ▲▲ ここまで追加 ▼▼ */
-      } else {    
-      num.textContent = '';
+        num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
+      } else {
+        num.textContent = '';
         num.style.visibility = 'hidden';
         console.warn('[hand] card without visible num', { table: idx, ci, card: c });
       }
@@ -2691,42 +2668,9 @@ async function startGame(playerCount, missionId){
 
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
-  let p=0; 
-  while(p<deck.length){
-    for(let t=0; t<playerCount && p<deck.length; t++){
-      const c=deck[p++];
-      tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null});
-    }
-  }
-  /* ▼▼ ここから追加：#38 隊長だけ右端固定 ▼▼ */
- if (missionId === 38) {
-    const cap = captainIndex|0;
-   tables.forEach((T, idx)=>{
-      if (!Array.isArray(T.hand)) T.hand = [];
-      if (idx === cap && T.hand.length > 0) {
-        // 通常カード（kind==='normal'）の中からランダム1枚を右端へ
-        const normalIdxList = T.hand.map((c,i)=>({c,i})).filter(x=>x.c?.kind==='normal').map(x=>x.i);
-        const pickIdx = normalIdxList.length>0 ? normalIdxList[(Math.random()*normalIdxList.length)|0] : ((Math.random()*T.hand.length)|0);
-        const picked = T.hand.splice(pickIdx,1)[0];
-        // 残りを昇順
-        T.hand.sort((a,b)=> (a.num||0) - (b.num||0));
-        // 右端に挿入し、閲覧制御用フラグを付与
-        T.hand.push({...picked, m38:true});
-      } else {
-       // 非隊長は通常どおり昇順
-        T.hand.sort((a,b)=> (a.num||0) - (b.num||0));
-      }
-      // αを振る
-      T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; });
-    });
-  } else {
-   // 従来どおり：全員昇順 → α付与
-   tables.forEach(T=>{ 
-      T.hand.sort((a,b)=> (a.num||0) - (b.num||0)); 
-      T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); 
-    });
-  }
-  
+  let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
+  tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
+
 // アイテム（人数ぶん） — ミッション規則に合わせて山札を作る
 let pool = itemDeckNumbers(missionId);
 
