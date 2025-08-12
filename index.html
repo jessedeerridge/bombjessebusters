@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BEすrS</title>
+<title>BEまS</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -2601,6 +2601,10 @@ async function startGame(playerCount, missionId){
   // ★ #22：サーバ側メタも初期化（可視フラグ／渡し済み表）
   try{
     await update(ref(db, `rooms/${state.roomCode}/meta`), { m22_infoShown:false, m22_given:null });
+  }catch(_){}
+
+  try{
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m27_row: [], m27_shown:false, m27_taken:null });
   }catch(_){}
   
   const code = state.roomCode;
