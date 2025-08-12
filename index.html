@@ -2849,7 +2849,7 @@ if ((v.mission?.id|0) === 31 || (v.mission?.id|0) === 34) {
   }
   await update(ref(db, `rooms/${code}`), {
     tables,
-    m31_center: Array.isArray(vv.m31_center) ? vv.m31_center : []
+   m31_center: []
   });
 }
   function randNum(){ return MATERIALS.numbers[(Math.random()*12)|0]; }
