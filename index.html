@@ -623,20 +623,29 @@ const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
 
 /* === 前のゲームの表示物を全て掃除する === */
 function clearMissionOverlays(){
-  document.querySelectorAll('.numlane').forEach(n => n.remove());
-  document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
-  document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
-  // ★ ミッション22：情報トークン表を確実に消す
-  const info22 = document.getElementById('info22');
-  if (info22) info22.remove();
-    // ★ ミッション27：アイテム直下の行を確実に消す
-  const m27 = document.getElementById('m27Row');
-  if (m27) m27.remove();
+  /* ここから追加 */
+  // 数値カード系
+  document.querySelectorAll('.numlane, .num-under, .num-pin, .numcard-holder').forEach(el => el.remove());
   NUMCARD_REG.clear();
-}
- const m31h = document.getElementById('m31HandRow'); if (m31h) m31h.remove();
-  const m31c = document.getElementById('m31CenterRow'); if (m31c) m31c.remove();
 
+  // 制約カード/デッキ/拡大オーバーレイ
+  document.querySelectorAll('.conlane, .concard, .condeck, #conZoomOverlay').forEach(el => el.remove());
+
+  // 右2/左2/右4/左4 等の横長ルールカード帯
+  document.querySelectorAll('.rulecard').forEach(el => el.remove());
+
+  // 情報トークン表(#22)、#27行、#31行
+  const info22 = document.getElementById('info22'); if (info22) info22.remove();
+  const m27Row = document.getElementById('m27Row'); if (m27Row) m27Row.remove();
+  const m31h  = document.getElementById('m31HandRow');   if (m31h)  m31h.remove();
+  const m31c  = document.getElementById('m31CenterRow'); if (m31c)  m31c.remove();
+
+  // 画面下部のグローバル表示系（保険）
+  const gr = document.getElementById('globalReveal'); if (gr){ gr.innerHTML=''; gr.classList.add('hidden'); }
+
+  // #22の再表示ガード初期化（後述の再表示バグ対策）
+  window.m22_alreadyShown = false;
+  window.m22_hiddenOnce   = false;
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
   if (NUMCARD_REG.has(n)) {
