@@ -1128,6 +1128,49 @@ function renderTables(v){
     const old = document.getElementById('info22');
     if (old) old.remove();
   }
+
+  // ★ #39：左固定の数字が4枚全体公開されたら自動配布
+  if ((v?.mission?.id|0) === 39 && v?.mission?.flags?.m39_enable){
+    const X = v?.meta?.m39_first|0;
+    if (X){
+      if (state.isHost && !v?.meta?.m39_done){
+        const deck = Array.isArray(v?.meta?.m39_deck) ? v.meta.m39_deck : [];
+        const disc = Array.isArray(v?.meta?.m39_discards) ? v.meta.m39_discards : [];
+        const opened = openCountByNum[X]|0;
+        if (opened === 4){
+          const remain = [X].concat(deck.slice(disc.length)); // 捨て札になっていない数値カード
+          const tcount = v.tableCount|0, cap = v.captainTable|0;
+          const assigned = Array.from({length:tcount}, ()=>[]);
+          remain.forEach((n,i)=> assigned[(cap+i)%tcount].push(n));
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m39_assigned: assigned, m39_done:true });
+        }
+      }
+
+      // 表示（画面下部）
+      const footer = document.getElementById('missionFooter');
+      const old = document.getElementById('m39AssignRow'); if (old) old.remove();
+      if (Array.isArray(v?.meta?.m39_assigned)){
+        const row = document.createElement('div'); row.id='m39AssignRow'; row.className='numlane';
+        const cap = v.captainTable|0;
+        v.meta.m39_assigned.forEach((list, idx)=>{
+          const label = document.createElement('div'); label.className='numrest';
+          const name = (v.tables?.[idx]?.playerName) || String(idx+1);
+          label.textContent = (idx===cap ? '［隊長］' : '') + name;
+          row.appendChild(label);
+          list.forEach(n=>{
+            const c = document.createElement('div'); c.className='numcard';
+            c.style.backgroundImage = `url('${imgNumber(n)}')`;
+            row.appendChild(c);
+          });
+          const sep = document.createElement('div'); sep.style.width='8px'; row.appendChild(sep);
+        });
+        const title = document.getElementById('missionDetailTitle');
+        if (title && title.parentNode === footer) footer.insertBefore(row, title);
+      }
+    }
+  }
+
+
   
   /* ★ 全体公開中の通常コードの「数字別枚数」を集計 */
   const openCountByNum = {};
@@ -2850,10 +2893,18 @@ async function setupMissionOnStart(code){
     const snap2 = await get(ref(db, `rooms/${code}/meta`));
     const meta  = snap2.val() || {};
     if (!Array.isArray(meta.m13_header)) {
+      const is39 = ((v?.mission?.id|0) === 39);
       const tcount = v.tableCount|0;
-      const header = Array.from({length:tcount}, ()=> MATERIALS.numbers[(Math.random()*12)|0]);
+      const header = Array.from({length:tcount}, (_,ti)=>{
+        if(!is39) return MATERIALS.numbers[(Math.random()*12)|0];
+        const handNums = new Set(((v.tables?.[ti]?.hand)||[])
+          .filter(c=>c?.kind==='normal')
+          .map(c=> c.num|0));
+        const choices = MATERIALS.numbers.filter(n=> !handNums.has(n));
+        return (choices.length ? choices[(Math.random()*choices.length)|0] : MATERIALS.numbers[(Math.random()*12)|0]);
+      });
       await update(ref(db, `rooms/${code}/meta`), { m13_header: header });
-    }
+  }
   }
 
   
@@ -2878,7 +2929,56 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     mountLaneUnderItemsBar(lane36);
   }
   
+  if ((v.mission?.id|0) === 39 && v.mission?.flags?.m39_enable){
+    // メタ初期化（first: 左固定 / deck: 8枚 / discards: 表にした順）
+    const mref = ref(db, `rooms/${code}/meta`);
+    const msnap = await get(mref); const meta = msnap.val()||{};
+    if (meta.m39_first==null || !Array.isArray(meta.m39_deck)) {
+      const pool = MATERIALS.numbers.slice(); const first = pool.splice((Math.random()*pool.length)|0,1)[0];
+      shuffle(pool); const deck = pool.slice(0,8);
+      await update(mref, { m39_first:first, m39_deck:deck, m39_discards:[], m39_done:false, m39_assigned:null });
+    }
 
+    // 既存の行があれば除去
+    const old39 = document.getElementById('m39NumRow'); if (old39) old39.remove();
+
+    // 行を構築： [左固定1枚] [山札] [残数] [捨て札重ね]
+    const lane = document.createElement('div'); lane.id='m39NumRow'; lane.className='numlane';
+    const left = document.createElement('div'); left.className='numcard'; left.title='固定カード';
+    const deckBtn = document.createElement('div'); deckBtn.className='numdeck'; deckBtn.title='めくる';
+    const restLbl = document.createElement('div'); restLbl.className='numrest';
+    const pile = document.createElement('div'); pile.className='numcard-holder';
+    lane.append(left, deckBtn, restLbl, pile);
+
+    const refresh = async ()=>{
+      const s = await get(mref); const m = s.val()||{};
+      const d = Array.isArray(m.m39_deck)? m.m39_deck: [];
+      const disc = Array.isArray(m.m39_discards)? m.m39_discards: [];
+      const fx = m.m39_first|0;
+      if (fx) left.style.backgroundImage = `url('${imgNumber(fx)}')`;
+      restLbl.textContent = String(Math.max(0, d.length - disc.length));
+      pile.innerHTML='';
+      disc.forEach(n=>{
+        const c = document.createElement('div'); c.className='numcard overlay';
+        c.style.backgroundImage = `url('${imgNumber(n)}')`; pile.appendChild(c);
+      });
+    };
+
+    deckBtn.onclick = async ()=>{
+      try{
+        const s = await get(mref); const m = s.val()||{};
+        const d = Array.isArray(m.m39_deck)? m.m39_deck: [];
+        const disc = Array.isArray(m.m39_discards)? m.m39_discards: [];
+        const next = d[disc.length];
+        if (next==null) return; // 山札切れ
+        await update(mref, { m39_discards: disc.concat(next) });
+        await refresh();
+      }catch(e){ console.error(e); }
+    };
+
+    await refresh();
+    mountLaneUnderItemsBar(lane);
+  }
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
     const tcount = v.tableCount|0;
@@ -3939,7 +4039,7 @@ function missionInfo(id, opts={}){
          'その数字の情報トークンを実際に使用したら自動的に消える。'
        ],
        // #13 と同じ仕組みを再利用（表示＆自動消去）
-       flags:{ }
+       flags:{ m13_headerRandomInfoToken:true, m13_autoHideHeaderToken:true, m39_enable:true }
      };
    }
       
