@@ -1418,10 +1418,18 @@ if (m13HeaderNum != null) {
   charCol.appendChild(tok);
 }
 if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
-  const row = document.createElement('div');
-  row.className = 'm22-under';
-  t.m22Tokens.forEach(nn=>{                     // ← slice(0,3) を外す
+  // 既にある行を探す
+  let row = charCol.querySelector('.m22-under');
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'm22-under';
+    charCol.appendChild(row);
+  } else {
+    // 重複表示を防ぐため一旦中身をクリア
+    row.innerHTML = '';
+  }
 
+  t.m22Tokens.forEach(nn=>{
     const d = document.createElement('div');
     d.className = 'token black';
     d.textContent = String(nn);
@@ -1435,7 +1443,6 @@ if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
     }
     row.appendChild(d);
   });
-  charCol.appendChild(row);
 }
 content.appendChild(charCol);
 
