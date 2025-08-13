@@ -1227,7 +1227,6 @@ function renderM39(v){
                 if(hasNum && !hasTok) tok.push(n);
               });
               patch[`tables/${i}/m22Tokens`] = tok;
-              refreshInfo22({ tables: T }); // 黒トークン含めて再描画
             }
           }
           await update(ref(db, `rooms/${state.roomCode}`), patch);
@@ -1421,19 +1420,19 @@ if (m13HeaderNum != null) {
 if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
   const row = document.createElement('div');
   row.className = 'm22-under';
-  t.m22Tokens.slice(0,3).forEach(nn=>{
+  t.m22Tokens.forEach(nn=>{                     // ← slice(0,3) を外す
 
     const d = document.createElement('div');
     d.className = 'token black';
     d.textContent = String(nn);
-         if ((state.watching?.mission?.id|0) !== 27) {
-          d.title = 'クリックで消す';
-          d.onclick = async (ev)=>{
-             ev.stopPropagation();
-             const next = (t.m22Tokens || []).filter(x => x !== nn);
-             await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { m22Tokens: next });
-           };
-         }
+    if ((state.watching?.mission?.id|0) !== 27) {
+      d.title = 'クリックで消す';
+      d.onclick = async (ev)=>{
+        ev.stopPropagation();
+        const next = (t.m22Tokens || []).filter(x => x !== nn);
+        await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { m22Tokens: next });
+      };
+    }
     row.appendChild(d);
   });
   charCol.appendChild(row);
