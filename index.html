@@ -641,9 +641,6 @@ function clearMissionOverlays(){
     const el = document.getElementById(id); if (el) el.remove();
   });
   NUMCARD_REG.clear();
-    /*加：#39 のUIを確実に掃除 */
-  const m39 = document.getElementById('m39Lane');
-  if (m39) m39.remove();
 }
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
@@ -704,190 +701,6 @@ function distributeNumbersToItemsCentered(eachCount=1){
   });
 }
 
-  /** #39：ホストが一度だけ初期化（x決定・山札生成・捨て札空・未配布） */
-async function ensureM39Init(v){
-  if ((v?.mission?.id|0)!==39) return;
-  if (v?.meta?.m39) return;             // 既に初期化済み
-  if (!state.isHost) return;            // ホストのみが初期化
-
-  // x を1枚選ぶ
-  const pool = MATERIALS.numbers.slice();
-  shuffle(pool);
-  const x = pool.shift();               // 先頭＝x
-  // 残り11から 8 枚の山札
-  shuffle(pool);
-  const deck = pool.slice(0,8);
-
-  await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    m39: { x, deck, discards: [], dealt:false }
-  });
-}
-
-/** #39：全テーブルの「公開済み通常コード」の枚数を数えて x が4枚公開済みか判定 */
-function isM39AllFourOpen(v, x){
-  const openCount = (v?.tables||[]).reduce((acc, T)=>{
-    (T.hand||[]).forEach(c=>{
-      if(c?.kind==='normal' && c.open===true && (c.num|0)===x) acc++;
-    });
-    return acc;
-  }, 0);
-  return openCount>=4;
-}
-
-/** #39：配布の実行（山札=未捨て札カードを隊長→順番で1枚ずつ配る） */
-async function dealM39ToPlayers(v){
-  const m = v?.meta?.m39; if (!m) return;
-  if (m.dealt) return;
-
-  const rest = Array.isArray(m.deck) ? m.deck.slice() : [];
-  if (rest.length===0) {
-    // 何も配るものが無い場合は配布完了だけ刻む
-    await update(ref(db, `rooms/${state.roomCode}/meta/m39`), { dealt:true });
-    return;
-  }
-
-  const tables = Array.isArray(v.tables) ? v.tables.slice() : [];
-  if (tables.length===0) return;
-
-  const startIdx = v.captainTable|0;               // 隊長テーブルindex
-  // 着席者のインデックス（空席は除外）
-  const seatedIdx = tables.map((T,i)=> T.playerId ? i : -1).filter(i=>i>=0);
-  if (seatedIdx.length===0) return;
-
-  // ラウンドロビン配布
-  const giveMap = new Map(); // idx -> numbers[]
-  let turn = seatedIdx.indexOf(startIdx);
-  if (turn<0) turn = 0;
-  let p = turn;
-  rest.forEach(n=>{
-    const idx = seatedIdx[p];
-    const arr = giveMap.get(idx) || [];
-    arr.push(n); giveMap.set(idx, arr);
-    p = (p+1) % seatedIdx.length;
-  });
-
-  // 各テーブルに m29Hand として積む（下部表示の既存UIを流用）
-  const updates = {};
-  giveMap.forEach((nums, idx)=>{
-    const base = Array.isArray(v.tables[idx].m29Hand) ? v.tables[idx].m29Hand.slice() : [];
-    updates[`rooms/${state.roomCode}/tables/${idx}/m29Hand`] = base.concat(nums);
-  });
-  // メタ更新：deckを空にし配布済みフラグON
-  updates[`rooms/${state.roomCode}/meta/m39`] = { x:m.x, deck:[], discards:(m.discards||[]), dealt:true };
-
-  await update(ref(db, `/`), updates);
-
-  // 受け取った各プレイヤーに「条件を満たせば黒の数字トークンを1つ」付与
-  // 仕様：受け取った数（=numsの各n）について、
-  // その n と同じ数字の“自分の手札カード”が1枚以上あり、かつそのカード群に「数字情報トークン」が付いていない場合のみ、
-  // キャラ下（m22Tokens）に n を追加。
-  const v2 = (await get(ref(db, `rooms/${state.roomCode}`))).val();
-  for (const [idx, nums] of giveMap.entries()){
-    const hand = (v2?.tables?.[idx]?.hand)||[];
-    const curTok = Array.isArray(v2?.tables?.[idx]?.m22Tokens) ? v2.tables[idx].m22Tokens.slice() : [];
-    let changed = false;
-
-    // 手札側に既に “数字トークン（type:'num'）” が付いているかを数字別にチェック
-    const hasNumToken = new Set();
-    hand.forEach(c=>{
-      (c?.tokens||[]).forEach(tk=>{
-        if (String(tk?.type)==='num'){
-          const n = parseInt(tk?.value, 10);
-          if (Number.isInteger(n)) hasNumToken.add(n);
-        }
-      });
-    });
-
-    nums.forEach(n=>{
-      const hasSame = hand.some(c => c?.kind==='normal' && (c.num|0)===n);
-      const alreadyUnderChar = curTok.includes(n);
-      const blocked = hasNumToken.has(n);
-      if (hasSame && !alreadyUnderChar && !blocked){
-        curTok.push(n); changed = true;
-      }
-    });
-
-    if (changed){
-      await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { m22Tokens: curTok });
-    }
-  }
-}
-
-/** #39：デッキクリック時の挙動（めくる or 配る） */
-async function onM39DeckClick(ev, v){
-  const m = v?.meta?.m39; if (!m) return;
-  // 4枚公開が揃っていたら「配る」だけ出す
-  if (isM39AllFourOpen(v, m.x)){
-    openOneMini(ev.clientX, ev.clientY, '配る', async ()=>{ await dealM39ToPlayers(v); });
-    return;
-  }
-
-  // 通常めくり（= 1枚デッキ→捨て札へ）
-  const deck = Array.isArray(m.deck) ? m.deck.slice() : [];
-  if (deck.length===0) return;
-  const top = deck.shift();
-  const disc = Array.isArray(m.discards) ? m.discards.slice() : [];
-  disc.push(top);
-  await update(ref(db, `rooms/${state.roomCode}/meta/m39`), { x:m.x, deck, discards:disc, dealt:false });
-}
-
-/** #39：UI描画（アイテム列の直下に “x” と右に山札） */
-async function renderM39(v){
-  if ((v?.mission?.id|0)!==39) return;
-
-  // まず初期化（ホスト一回）
-  await ensureM39Init(v);
-  const m = v?.meta?.m39; if (!m) return;
-
-  // 既存UIを一度掃除して単一表示にする
-  const old = document.getElementById('m39Lane');
-  if (old) old.remove();
-
-  const itemsBar = document.getElementById('itemsBar');
-  if (!itemsBar || itemsBar.classList.contains('hidden')) return;
-
-  const lane = document.createElement('div');
-  lane.id = 'm39Lane';
-  lane.className = 'numlane';
-
-  // 左：x を固定表示
-  const left = document.createElement('div');
-  left.className = 'numcard';
-  left.style.backgroundImage = `url('${imgNumber(m.x)}')`;
-  lane.appendChild(left);
-
-  // 右：山札（残枚数つき）
-  const deck = document.createElement('div');
-  deck.className = 'numdeck';
-  deck.title = 'めくる / 条件成立で配布';
-  deck.onclick = (ev)=> onM39DeckClick(ev, state.watching);
-  lane.appendChild(deck);
-
-  // 残枚数表示（右に小さく）
-  const rest = document.createElement('div');
-  rest.className = 'numrest';
-  rest.textContent = `残：${(m.deck||[]).length}`;
-  lane.appendChild(rest);
-
-  // 捨て札の重ね表示（右側に薄く重ねる）
-  const holder = document.createElement('div');
-  holder.className = 'numcard-holder';
-  (m.discards||[]).slice(-3).forEach(n=>{
-    const c = document.createElement('div');
-    c.className = 'numcard overlay';
-    c.style.backgroundImage = `url('${imgNumber(n)}')`;
-    holder.appendChild(c);
-  });
-  lane.appendChild(holder);
-
-  // 条件成立時はデッキクリックで「配る」へ誘導（視覚的ヒントとしてタイトル書き換え）
-  if (isM39AllFourOpen(v, m.x)){
-    deck.title = '配る';
-  }
-
-  // アイテム列の直下に挿入
-  itemsBar.insertAdjacentElement('afterend', lane);
-}
 
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
 function pickK(arr, k){
@@ -1134,9 +947,7 @@ if (v) {
     if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
-}    
-    enderM39(v);
-
+}
  if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
    btnSit.onclick();
     }
@@ -1305,14 +1116,6 @@ function renderTables(v){
       }
     });
   });
-
-
-    /* ：#39 の視覚ヒント（条件成立時に m39 のデッキタイトル変更は renderM39 側で実施） */
-  if ((v?.mission?.id|0) === 39 && v?.meta?.m39){
-    const x = v.meta.m39.x|0;
-    // renderM39 内で毎回判定しているため、ここでは副作用なし
-    // （必要ならここで他のUI連動を書ける）
-  }
 
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
@@ -3017,25 +2820,6 @@ async function setupMissionOnStart(code){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
   }
 
-  // #39：数値Xと山札（8枚）を生成（未生成の時のみ）
-  if (flags.m39_use) {
-    const metaRef = ref(db, `rooms/${code}/meta`);
-    const snap = await get(metaRef);
-    const meta = snap.val() || {};
-    if (meta.m39_x == null || !Array.isArray(meta.m39_deck)) {
-      const all = Array.from({length:12}, (_,i)=> i+1);
-      const x = all[(Math.random()*12)|0];
-      const rest = all.filter(n=> n!==x);
-      // シャッフル
-      for (let i=rest.length-1; i>0; i--){
-        const j = (Math.random()*(i+1))|0; [rest[i],rest[j]] = [rest[j],rest[i]];
-      }
-      const deck = rest.slice(0,8); // 8枚だけ
-      await update(metaRef, { m39_x:x, m39_deck:deck, m39_discard:[], m39_dealt:false });
-    }
-  }
-
-  
   // #13/#39 共通：キャラ下に出すランダム情報トークンの初期化
   // （このフラグが立っていて、まだ meta.m13_header が無ければ人数ぶん作成）
   if (flags.m13_headerRandomInfoToken) {
@@ -4073,7 +3857,7 @@ function missionInfo(id, opts={}){
           '隊長の手札のみ：ランダムで1枚を右端に移動。他は昇順。',
           '移動したカードに ✕（黄背景/黒文字）トークンを付ける。'
        ],
-        flags:{ m38_captainRightmostX:true  }
+        flags:{ m38_captainRightmostX:true }
       };
     }
       case 39: {
@@ -4085,12 +3869,7 @@ function missionInfo(id, opts={}){
          'その数字の情報トークンを実際に使用したら自動的に消える。'
        ],
        // #13 と同じ仕組みを再利用（表示＆自動消去）
-       flags:{ m13_headerRandomInfoToken:true, 
-              m13_autoHideHeaderToken:true 
-             m39_use:true,              // #39 有効
-         m39_needsItemLane:true,    // アイテム下にレーンを出す（#36流用）
-         m39_lockOnFourX:true       // 4枚公開で山札ロック＆配布        
-             }
+       flags:{ m13_headerRandomInfoToken:true, m13_autoHideHeaderToken:true }
      };
    }
       
