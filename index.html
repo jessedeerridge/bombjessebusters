@@ -1227,6 +1227,7 @@ function renderM39(v){
                 if(hasNum && !hasTok) tok.push(n);
               });
               patch[`tables/${i}/m22Tokens`] = tok;
+              refreshInfo22({ tables: T }); // 黒トークン含めて再描画
             }
           }
           await update(ref(db, `rooms/${state.roomCode}`), patch);
