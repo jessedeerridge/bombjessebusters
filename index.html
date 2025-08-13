@@ -274,7 +274,7 @@
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
   .mini-pop{
     position:fixed;z-index:2147483647;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
-    display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;max-width:min(300vw,320px)
+    display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;max-width:min(90vw,320px)
   }
   .bottom-pop{left:50%;transform:translateX(-50%);bottom:10px;}
 
@@ -1047,13 +1047,42 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
         });
- 
       }else{
-        // 未使用時：初回クリック＝拡大（制約カードと同じ挙動）
-        const canFaceUp = !!(flags.itemsFaceDownStart && it.faceUp===false);
-        openItemZoom(it.no, idx, { canFaceUp });
+        // 未使用時：#15 の「表にする」を追加し、必要なら併記
+        const entries = [];
+
+        if(flags.itemsFaceDownStart && it.faceUp===false){
+          entries.push({
+            label:'表にする',
+            action: async ()=>{
+              await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), { faceUp:true });
+            }
+          });
+        }
+
+        entries.push({
+          label:'使用する',
+          action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
+            const path=`rooms/${state.roomCode}/meta/itemUses`;
+            const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
+            if(it.no===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
+            if(it.no===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
+            if(it.no===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
+            if(it.no===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
+
+            if(it.no===2){
+              await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+            }
+            if(it.no===13){ await addTwoItemsFromDeck(); }
+            if(it.no===16){ await handleItem16(idx); }
+            if(it.no===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
+          }
+        });
+
+        openMenu(ev.clientX, ev.clientY, entries);
       }
-   };
+    };
 
 
     itemsEl.appendChild(div);
@@ -2027,77 +2056,6 @@ function closeConstraintZoom(){
   const ov = document.getElementById('conZoomOverlay');
   if (ov) ov.remove();
 }
-
-/* ：アイテム拡大ポップ */
-function openItemZoom(itemNo, itemIdx, opt={}){
-  try{
-    const old = document.getElementById('conZoomOverlay');
-    if (old) old.remove();
-
-    const ov = document.createElement('div');
-    ov.id = 'conZoomOverlay';
-    ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
-
-    const wrap = document.createElement('div');
-    wrap.className = 'conzoom-wrap';
-
-    const big = document.createElement('div');
-    big.className = 'conzoom-card';
-    big.style.backgroundImage = `url('./item${itemNo}.jpg')`;
-
-    big.addEventListener('click', async (e)=>{
-      e.stopPropagation();
-      let m = wrap.querySelector('.conzoom-menu');
-      if (m){ m.remove(); return; }
-      m = document.createElement('div');
-      m.className = 'conzoom-menu';
-
-      // ①（任意）裏なら「表にする」
-      if (opt?.canFaceUp) {
-        const btnFace = document.createElement('button');
-        btnFace.textContent = '表にする';
-        btnFace.onclick = async (ev)=>{
-          ev.stopPropagation();
-          await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { faceUp:true });
-          closeConstraintZoom();
-        };
-        m.appendChild(btnFace);
-      }
-
-      // ②「使う」：従来の '使用する' と同等の処理
-      const btnUse = document.createElement('button');
-      btnUse.textContent = '使う';
-      btnUse.onclick = async (ev)=>{
-        ev.stopPropagation();
-        await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { used:true });
-        const path=`rooms/${state.roomCode}/meta/itemUses`;
-        const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
-        if(itemNo===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
-        if(itemNo===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
-        if(itemNo===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
-        if(itemNo===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
-
-        if(itemNo===2){
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
-        }
-        if(itemNo===13){ await addTwoItemsFromDeck(); }
-        if(itemNo===16){ await handleItem16(itemIdx); }
-        if(itemNo===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
-
-        closeConstraintZoom();
-      };
-      m.appendChild(btnUse);
-
-      wrap.appendChild(m);
-    });
-
-    wrap.appendChild(big);
-    ov.appendChild(wrap);
-    document.body.appendChild(ov);
-  }catch(e){ console.error(e); }
-}
-
-
   
 /* === #22 用：数字トークンの使用数を集計 === */
 function countNumTokenUsage(n, v){
