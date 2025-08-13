@@ -3074,8 +3074,8 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
         const have = new Set((t?.hand||[]).map(c=>c?.num).filter(n=>Number.isInteger(n)));
         const none = MATERIALS.numbers.filter(n=>!have.has(n));
         if (!Array.isArray(t?.m39Tokens)) {
-          upd[String(idx) + '/m39Tokens'] = none;
-        }
+  const pick = none.length ? none[Math.floor(Math.random() * none.length)] : null;
+  upd[String(idx) + '/m39Tokens'] = pick != null ? [pick] : [];        }
       });
       if (Object.keys(upd).length) { await update(tablesRef, upd); }
     }
