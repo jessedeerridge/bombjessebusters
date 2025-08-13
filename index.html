@@ -840,6 +840,8 @@ function buildMixPlan(missionId){
   {type:'redChoose', from:3, take:1},
   {type:'yellowPick', k:4},
 ],
+
+
     
 };
 return plans[missionId] || [];
@@ -969,7 +971,6 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
-      renderM39(v);
  if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
    btnSit.onclick();
     }
@@ -1283,20 +1284,6 @@ if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
   });
   charCol.appendChild(row);
 }
-  // #39：キャラ下（同じ段）に m39Tokens を表示（表示専用・消去なし）
-  if (Array.isArray(t.m39Tokens) && t.m39Tokens.length>0) {
-    const row2 = document.createElement('div');
-    row2.className = 'm22-under'; // スタイル流用
-    t.m39Tokens.forEach(nn=>{
-      const d = document.createElement('div');
-      d.className = 'token black';
-      d.textContent = String(nn);
-      // クリックで消さない（配布記録行）
-      row2.appendChild(d);
-    });
-    charCol.appendChild(row2);
-  }
-    
 content.appendChild(charCol);
 
 
@@ -1940,189 +1927,7 @@ function renderM29(v){
 }
 
 
-/* ：#39 描画・操作ロジック ▼▼ */
-function renderM39(v){
-  const isM39 = (v?.mission?.id|0) === 39;
-  // 既存行の掃除（アイテム下の行／フッターの自分手札）
-  const oldRow = document.getElementById('m39Row');
-  if (oldRow) oldRow.remove();
-  const oldHand = document.getElementById('m39HandRow');
-  if (!isM39){ if (oldHand) oldHand.remove(); return; }
 
-  const x = v?.meta?.m39_x;
-  let deck = v?.meta?.m39_deck || [];
-  const disc = v?.meta?.m39_discards || [];
-  const done = !!v?.meta?.m39_done;
-
-  // -------- task3：xの通常カードが4枚全体公開なら配布 --------
-  if (!done && Number.isInteger(x)) {
-    let openCnt = 0;
-    (v.tables||[]).forEach(T=>{
-      (T.hand||[]).forEach(c=>{
-        if (c && c.open && Number.isInteger(c.num) && c.num === x) openCnt++;
-      });
-    });
-    if (openCnt >= 4) {
-      doM39Distribute(v);
-      return; // onValueで再描画
-    }
-  }
-
-  // -------- アイテム列の下：左= x 表 / 中=山札 / 右=捨て札 --------
-  if (!done){
-    const bar = document.getElementById('itemsBar');
-    if (bar){
-      const lane = document.createElement('div');
-      lane.id = 'm39Row';
-      lane.className = 'numlane';
-
-      // 左：task1 の表カード x
-      if (Number.isInteger(x)){
-        const left = document.createElement('div');
-        left.className = 'numcard';
-        left.style.backgroundImage = `url('${imgNumber(x)}')`;
-        left.style.backgroundSize = 'cover';
-        left.style.backgroundPosition = 'center';
-        lane.appendChild(left);
-      }
-
-      // 中：山札（P1相当のシンプル版）
-      const deckBtn = document.createElement('div');
-      deckBtn.className = 'numdeck';
-      const rest = document.createElement('span'); rest.className='numrest';
-      const holder = document.createElement('div'); holder.className='numcard-holder';
-      const restText = ()=>{ rest.textContent = `残:${(v?.meta?.m39_deck||[]).length}`; };
-      restText();
-      deckBtn.title = 'めくる';
-      deckBtn.onclick = async ()=>{
-        try{
-          const rRef = ref(db, `rooms/${state.roomCode}/meta`);
-          const snap = await get(rRef);
-          const cur  = snap.val() || {};
-          const d = Array.isArray(cur.m39_deck) ? cur.m39_deck.slice() : [];
-          const disc = Array.isArray(cur.m39_discards) ? cur.m39_discards.slice() : [];
-          if (d.length<=0) return;
-          const n = d.shift();             // 先頭から1枚
-          disc.push(n);                    // 右の捨て札へ
-          await update(rRef, { m39_deck:d, m39_discards:disc });
-        }catch(e){ console.error(e); }
-      };
-      lane.appendChild(deckBtn);
-      lane.appendChild(rest);
-
-      // 右：捨て札（重ね）
-      const pile = document.createElement('div');
-      pile.className = 'numcard-holder';
-      pile.style.position = 'relative';
-
-ここから追加
-      // P1 と同じ積み方：2pxずらし + 高さ/余白調整
-      const already = disc.length;
-      disc.forEach((n, i)=>{
-        const node = document.createElement('div');
-        node.className = 'numcard';
-        node.style.backgroundImage    = `url('${imgNumber(n)}')`;
-        node.style.backgroundSize     = 'cover';
-        node.style.backgroundPosition = 'center';
-        if(i>0){
-          const off = i * 2;             // 2px刻み
-          node.style.position = 'absolute';
-          node.style.left = off + 'px';
-          node.style.top  = off + 'px';
-        }
-        pile.appendChild(node);
-      });
-      // 見切れ防止：P1と同等の調整
-      const extraH = Math.max(0, (already-1) * 2);
-      pile.style.height = (48 + extraH) + 'px';  // 48=カード高
-      lane.style.marginBottom = extraH + 'px';
-ここまで追加
-
-      lane.appendChild(pile);
-
-      // 反映のために一度 afterend に置く
-      const insertAfter = (el, node)=> el.parentNode.insertBefore(node, el.nextSibling);
-      insertAfter(bar, lane);
-    }
-  }
-
-  // -------- 自分の m39Hand を画面下部に表示 --------
-  const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
-  const myHand = (myIdx>=0) ? (v.tables[myIdx]?.m39Hand||[]) : [];
-  const footer = document.getElementById('missionFooter');
-  if (footer){
-    const ex = document.getElementById('m39HandRow'); if (ex) ex.remove();
-    if (myIdx>=0 && myHand.length>0){
-      const row = document.createElement('div');
-      row.id = 'm39HandRow';
-      row.className = 'numlane';
-      row.style.marginTop = '4px';
-      myHand.forEach(n=>{
-        const c = document.createElement('div');
-        c.className = 'numcard';
-        c.style.backgroundImage = `url('${imgNumber(n)}')`;
-        c.style.backgroundSize = 'cover';
-        c.style.backgroundPosition = 'center';
-        row.appendChild(c);
-      });
-      footer.insertBefore(row, footer.firstChild);
-    }
-  }
-}
-
-// 配布本体（task4 + task5）
-async function doM39Distribute(vNow){
-  try{
-    const v = vNow || state.watching; if (!v) return;
-    const metaRef = ref(db, `rooms/${state.roomCode}/meta`);
-    const snapM = await get(metaRef);
-    const meta  = snapM.val() || {};
-    const rest = Array.isArray(meta.m39_deck) ? meta.m39_deck.slice() : [];
-    if (rest.length <= 0){ await update(metaRef, { m39_done:true, m39_deck:[] }); return; }
-
-    const tcount = v.tableCount|0;
-    const cap = v.captainTable|0;
-    const tablesRef = ref(db, `rooms/${state.roomCode}/tables`);
-    const snapT = await get(tablesRef);
-    const T = snapT.val() || [];
-
-    // 配布：隊長→順に 1枚ずつ
-    const nextTables = (T||[]).map(t=>({...t}));
-    rest.forEach((n,i)=>{
-      const idx = (cap + i) % tcount;
-      const arr = Array.isArray(nextTables[idx].m39Hand) ? nextTables[idx].m39Hand.slice() : [];
-      arr.push(n);
-      nextTables[idx].m39Hand = arr;
-    });
-
-    // task5：配布された数字 n について、手札に n があり「numトークン無しのカード」が1枚以上あれば m39Tokens に 1つ付与
-    nextTables.forEach((t, idx)=>{
-      const add = new Set();
-      (t.m39Hand||[]).forEach(n=>{
-        const matches = (t.hand||[]).filter(c=>Number.isInteger(c?.num) && c.num===n);
-        if (matches.length>0){
-          const someNoNum = matches.some(c=>!Array.isArray(c.tokens) || !c.tokens.some(tk=>String(tk.type)==='num'));
-          if (someNoNum) add.add(n);
-        }
-      });
-      if (add.size>0){
-        const base = Array.isArray(t.m39Tokens) ? t.m39Tokens.slice() : [];
-        add.forEach(n=>{ if (!base.includes(n)) base.push(n); });
-        nextTables[idx].m39Tokens = base;
-      }
-    });
-
-    // 一括更新
-    const upd = {};
-    nextTables.forEach((t, idx)=>{
-      upd[String(idx)] = { m39Hand: t.m39Hand || [], m39Tokens: t.m39Tokens || T[idx]?.m39Tokens || [] };
-    });
-    await Promise.all([
-      update(tablesRef, upd),
-      update(metaRef, { m39_done:true, m39_deck:[] })
-    ]);
-  }catch(e){ console.error('doM39Distribute', e); }
-}
   
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
@@ -3072,31 +2877,7 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     lane36.id = 'm36NumRow';
     mountLaneUnderItemsBar(lane36);
   }
-      // ===== #39 初期化（最初の1回だけ） =====
-    if ((v.mission?.id|0) === 39){
-      const metaRef = ref(db, `rooms/${code}/meta`);
-      const metaSnap = await get(metaRef);
-      const meta = metaSnap.val() || {};
-      if (meta.m39_x == null || !Array.isArray(meta.m39_deck)) {
-        const all = MATERIALS.numbers.slice(); shuffle(all);
-        const x = all.shift();                  // task1：左の表カード
-        const deck8 = all.slice(0,8);           // task2：8枚山札
-        await update(metaRef, { m39_x:x, m39_deck:deck8, m39_discards:[], m39_done:false });
-      }
-      // task-first：各テーブルに「手札にない数字」をキャラ下の行（m39Tokens）へ
-      const tablesRef = ref(db, `rooms/${code}/tables`);
-      const tSnap = await get(tablesRef);
-      const T = tSnap.val() || [];
-      const upd = {};
-      (T||[]).forEach((t, idx)=>{
-        const have = new Set((t?.hand||[]).map(c=>c?.num).filter(n=>Number.isInteger(n)));
-        const none = MATERIALS.numbers.filter(n=>!have.has(n));
-        if (!Array.isArray(t?.m39Tokens)) {
-  const pick = none.length ? none[Math.floor(Math.random() * none.length)] : null;
-  upd[String(idx) + '/m39Tokens'] = pick != null ? [pick] : [];        }
-      });
-      if (Object.keys(upd).length) { await update(tablesRef, upd); }
-    }
+  
 
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
@@ -4158,7 +3939,7 @@ function missionInfo(id, opts={}){
          'その数字の情報トークンを実際に使用したら自動的に消える。'
        ],
        // #13 と同じ仕組みを再利用（表示＆自動消去）
-       flags:{}
+       flags:{ }
      };
    }
       
