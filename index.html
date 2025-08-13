@@ -943,7 +943,7 @@ if (v) {
     return;
   }
 }    
-    renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
+     renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderM39(v);  renderTables(v);  /* ここから追加／ここまで追加 */
     if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
@@ -1906,7 +1906,7 @@ function renderM29(v){
 
 
   
-/* ここから追加：#31 描画・操作ロジック */
+/* #31 描画・操作ロジック */
 function renderM31(v){
   const isM31 = ((v?.mission?.id|0) === 31) || ((v?.mission?.id|0) === 34);
 
@@ -2833,7 +2833,35 @@ async function setupMissionOnStart(code){
     }
   }
 
-  
+   /* #39 初期化（X／山札8枚／捨て札・フェーズ・各テーブル手札行） */
+  if ((v?.mission?.id|0) === 39) {
+    const metaRef = ref(db, `rooms/${code}/meta`);
+    const metaSnap = await get(metaRef);
+    const metaNow  = metaSnap.val() || {};
+
+    // まだ未初期化なら一度だけ作成
+    if (!metaNow.m39_x) {
+      const nums  = Array.from({length:12}, (_,i)=> i+1);
+      const x     = nums[(Math.random()*12)|0];
+      const rest  = nums.filter(n => n !== x);
+      shuffle(rest);                          // 既存の shuffle を流用
+      const deck8 = rest.slice(0,8);          // 山札8枚
+
+      const writes = [
+        update(metaRef, { m39_x: x, m39_deck: deck8, m39_discards: [], m39_phase: 'draw' })
+      ];
+
+      // 各テーブルに m39Hand を用意（なければ空配列で作成）
+      const tcount = v.tableCount|0;
+      for (let i=0;i<tcount;i++){
+        const Ti = v.tables?.[i];
+        if (!Array.isArray(Ti?.m39Hand)) {
+          writes.push(update(ref(db, `rooms/${code}/tables/${i}`), { m39Hand: [] }));
+        }
+      }
+      await Promise.all(writes);
+    }
+  }
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
 if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
@@ -3916,7 +3944,7 @@ function missionInfo(id, opts={}){
          'その数字の情報トークンを実際に使用したら自動的に消える。'
        ],
        // #13 と同じ仕組みを再利用（表示＆自動消去）
-       flags:{ m13_headerRandomInfoToken:true, m13_autoHideHeaderToken:true }
+       flags:{ m39:true, m13_headerRandomInfoToken:true, m13_autoHideHeaderToken:true }
      };
    }
       
