@@ -2871,7 +2871,7 @@ async function setupMissionOnStart(code){
   // #13/#39 共通：キャラ下に出すランダム情報トークンの初期化
   // （このフラグが立っていて、まだ meta.m13_header が無ければ人数ぶん作成）
   if (flags.m13_headerRandomInfoToken) {
-    const snap2 = await get(ref(db, `rooms/${code}/meta`));
+    const snap2 = await get(ref(db, `rooms/${state.roomCode}/meta`));
     const meta  = snap2.val() || {};
 
     // ▼ #39 は「各テーブルの手札に無い数字」から1つずつ選ぶ
