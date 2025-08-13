@@ -2011,15 +2011,33 @@ function renderM39(v){
       lane.appendChild(rest);
 
       // 右：捨て札（重ね）
-      const pile = document.createElement('div'); pile.className='numcard-holder';
-      disc.forEach(n=>{
-        const c = document.createElement('div');
-        c.className='numcard overlay';
-        c.style.backgroundImage = `url('${imgNumber(n)}')`;
-        c.style.backgroundSize = 'cover';
-        c.style.backgroundPosition = 'center';
-        pile.appendChild(c);
+      const pile = document.createElement('div');
+      pile.className = 'numcard-holder';
+      pile.style.position = 'relative';
+
+ここから追加
+      // P1 と同じ積み方：2pxずらし + 高さ/余白調整
+      const already = disc.length;
+      disc.forEach((n, i)=>{
+        const node = document.createElement('div');
+        node.className = 'numcard';
+        node.style.backgroundImage    = `url('${imgNumber(n)}')`;
+        node.style.backgroundSize     = 'cover';
+        node.style.backgroundPosition = 'center';
+        if(i>0){
+          const off = i * 2;             // 2px刻み
+          node.style.position = 'absolute';
+          node.style.left = off + 'px';
+          node.style.top  = off + 'px';
+        }
+        pile.appendChild(node);
       });
+      // 見切れ防止：P1と同等の調整
+      const extraH = Math.max(0, (already-1) * 2);
+      pile.style.height = (48 + extraH) + 'px';  // 48=カード高
+      lane.style.marginBottom = extraH + 'px';
+ここまで追加
+
       lane.appendChild(pile);
 
       // 反映のために一度 afterend に置く
