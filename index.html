@@ -3023,7 +3023,7 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     if (old36) old36.remove();
 
     // ランダム5枚を横並びで生成して設置
-    const lane36 = buildDeckLaneP2(5);
+    const lane36 = buildM36Lane();   /* ← 専用ビルダーに変更 */
     lane36.id = 'm36NumRow';
     mountLaneUnderItemsBar(lane36);
   }
