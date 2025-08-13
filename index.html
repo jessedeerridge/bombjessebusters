@@ -948,6 +948,7 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
+    renderM39(v);
  if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
    btnSit.onclick();
     }
@@ -1095,6 +1096,178 @@ function renderHostTool(v){
 }
 hostTool.onclick = ()=> alert('全体公開されている通常コードの枚数に奇数が含まれています。');
 
+
+// 初期化：X と山札（8枚）と捨て札
+async function ensureM39MetaInit(vNow){
+  const v = vNow || state.watching;
+  if(!v) return;
+  if (Array.isArray(v?.meta?.m39_deck)) return;         // 既に初期化済み
+  if (v?.hostId !== state.userId) return;               // ホストだけが初期化
+
+  const all = MATERIALS.numbers.slice();                // 1..12
+  const x   = all[(Math.random()*all.length)|0];        // ランダム1枚 = X
+  const rest= all.filter(n=> n!==x);
+  shuffle(rest);
+  const deck = rest.slice(0,8);                         // 残り11枚から8枚の山札
+
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    m39_x: x, m39_deck: deck, m39_discards: [], m39_dealt: false
+  });
+}
+
+// 描画・操作本体
+function renderM39(v){
+  const isM39 = (v?.mission?.id|0) === 39;
+
+  // 既存DOM掃除
+  const oldLane = document.getElementById('m39LaneRow');
+  if (oldLane) oldLane.remove();
+  const oldHand = document.getElementById('m39HandRow');
+  if (oldHand) oldHand.remove();
+  if (!isM39) return;
+
+  // 初期化（未初期化ならホストが一度だけ）
+  if (!Array.isArray(v?.meta?.m39_deck)) { ensureM39MetaInit(v); return; }
+
+  const x      = v?.meta?.m39_x|0;
+  const deck   = v?.meta?.m39_deck||[];
+  const disc   = v?.meta?.m39_discards||[];
+  const dealt  = !!v?.meta?.m39_dealt;
+
+  // ---- アイテム列の直下に：X（左）＋ 山札（中央）＋ 捨て札（右重ね） ----
+  const bar = document.getElementById('itemsBar');
+  if (bar){
+    const lane = document.createElement('div');
+    lane.className = 'numlane';
+    lane.id = 'm39LaneRow';
+
+    // 左：X の数値カード
+    const xCard = document.createElement('div');
+    xCard.className = 'numcard';
+    xCard.style.backgroundImage = `url('${imgNumber(x)}')`;
+    xCard.title = `X = ${x}`;
+    lane.appendChild(xCard);
+
+    // 山札ボタン & 残枚数
+    const deckBtn = document.createElement('div');
+    deckBtn.className = 'numdeck';
+    deckBtn.title = 'めくる';
+    const restLbl = document.createElement('span');
+    restLbl.className = 'numrest';
+
+    const remain = deck.filter(n => !disc.includes(n));
+    restLbl.textContent = `残:${remain.length}`;
+    lane.appendChild(deckBtn);
+    lane.appendChild(restLbl);
+
+    // 右：捨て札重ね
+    const pile = document.createElement('div');
+    pile.className='numcard-holder';
+    disc.forEach(n=>{
+      const c=document.createElement('div');
+      c.className='numcard overlay';
+      c.style.backgroundImage = `url('${imgNumber(n)}')`;
+      pile.appendChild(c);
+    });
+    lane.appendChild(pile);
+
+    // クリック動作
+    deckBtn.onclick = async (ev)=>{
+      const vv  = state.watching || v;
+      const xN  = vv?.meta?.m39_x|0;
+      const d   = vv?.meta?.m39_discards||[];
+      const dk  = vv?.meta?.m39_deck||[];
+      const rm  = dk.filter(n=> !d.includes(n));
+      const alreadyDealt = !!vv?.meta?.m39_dealt;
+
+      // 「X と同じ数字の通常コードが 4枚 全体公開」判定（グローバル）
+      // ※ open 集計は renderTables にもありますが、ここでは都度再計算します
+      //    （通常コード open 集計の例：:contentReference[oaicite:3]{index=3}）
+      let open = 0;
+      (vv.tables||[]).forEach(T=>{
+        (T.hand||[]).forEach(c=>{
+          if(c?.kind==='normal' && c.open===true && ((c.num|0)===xN)) open++;
+        });
+      });
+
+      if (open>=4 && !alreadyDealt){
+        // ▼ 山札はめくらず、「配る」ポップのみ表示
+        openOneMini(ev.clientX, ev.clientY, '配る', async ()=>{
+          const snap = await get(ref(db, `rooms/${state.roomCode}`));
+          const R = snap.val()||{};
+          const T = Array.isArray(R.tables) ? R.tables.slice() : [];
+          const P = T.length|0;
+          const start = R.captainTable|0;               // 隊長から配る
+          const dk0 = R?.meta?.m39_deck || [];
+          const d0  = R?.meta?.m39_discards || [];
+          const left = dk0.filter(n=> !d0.includes(n)); // 「捨て札にならなかった」＝未めくり
+
+          // 席順に 1枚ずつ配布（例：4人で 9枚なら隊長だけ+1、10枚なら隊長と次が+1）
+          const addByTable = Array.from({length:P}, ()=>[]);
+          for(let i=0;i<left.length;i++){
+            const idx = (start + i) % P;
+            addByTable[idx].push(left[i]);
+          }
+
+          // まとめて Multi-path Update
+          const patch = { 'meta/m39_dealt': true };
+          for(let i=0;i<P;i++){
+            if(addByTable[i].length){
+              const cur = Array.isArray(T[i].m39Hand) ? T[i].m39Hand.slice() : [];
+              const next= cur.concat(addByTable[i]);
+              patch[`tables/${i}/m39Hand`] = next;
+
+              // ⑤ 数字トークン自動配布（キャラ下に表示：m22Tokens を流用）
+              //   条件：配られた数字 n を「手札に1枚以上」持ち、かつ「まだその数字トークンを保持していない」
+              const hand = Array.isArray(T[i].hand) ? T[i].hand : [];
+              let tok = Array.isArray(T[i].m22Tokens) ? T[i].m22Tokens.slice() : [];
+              addByTable[i].forEach(n=>{
+                const hasNum = hand.some(c=> Number.isInteger(c?.num) && ((c.num|0)===n));
+                const hasTok = tok.includes(n);
+                if(hasNum && !hasTok) tok.push(n);
+              });
+              patch[`tables/${i}/m22Tokens`] = tok;
+            }
+          }
+          await update(ref(db, `rooms/${state.roomCode}`), patch);
+        });
+        return; // 山札はめくらない
+      }
+
+      // 通常時：めくる（山札 → 捨て札）
+      if (rm.length<=0) return;                                     // もう無い
+      const next = dk.find(n=> !d.includes(n));                     // 既定順で1枚
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { 
+        m39_discards: d.concat(next)
+      });
+    };
+
+    // 取り付け
+    bar.insertAdjacentElement('afterend', lane);
+  }
+
+  // ---- 画面下部：自分に配られた #39 数値カードを表示（m29 と同様の帯） ----
+  const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+  if (myIdx>=0){
+    const my = v.tables[myIdx]?.m39Hand || [];
+    if (my.length>0){
+      const row = document.createElement('div');
+      row.id = 'm39HandRow';
+      row.className = 'numlane';
+      row.style.marginTop = '4px';
+      my.forEach(n=>{
+        const c=document.createElement('div');
+        c.className='numcard';
+        c.style.backgroundImage = `url('${imgNumber(n)}')`;
+        row.appendChild(c);
+      });
+      // m29 と同じ位置（ミッション詳細タイトルの直前）に出す
+      missionDetailTitle.insertAdjacentElement('beforebegin', row);
+    }
+  }
+}
+
+  
 /* ===== Tables ===== */
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
@@ -1105,6 +1278,9 @@ function renderTables(v){
     const old = document.getElementById('info22');
     if (old) old.remove();
   }
+
+
+
   
   /* ★ 全体公開中の通常コードの「数字別枚数」を集計 */
   const openCountByNum = {};
