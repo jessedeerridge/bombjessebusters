@@ -274,7 +274,7 @@
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
   .mini-pop{
     position:fixed;z-index:2147483647;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
-    display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;max-width:min(90vw,320px)
+    display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;max-width:min(300vw,320px)
   }
   .bottom-pop{left:50%;transform:translateX(-50%);bottom:10px;}
 
@@ -948,6 +948,7 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
+        renderM39(v);
  if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
    btnSit.onclick();
     }
@@ -1047,42 +1048,13 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
         });
+ 
       }else{
-        // 未使用時：#15 の「表にする」を追加し、必要なら併記
-        const entries = [];
-
-        if(flags.itemsFaceDownStart && it.faceUp===false){
-          entries.push({
-            label:'表にする',
-            action: async ()=>{
-              await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), { faceUp:true });
-            }
-          });
-        }
-
-        entries.push({
-          label:'使用する',
-          action: async ()=>{
-            await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:true});
-            const path=`rooms/${state.roomCode}/meta/itemUses`;
-            const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
-            if(it.no===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
-            if(it.no===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
-            if(it.no===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
-            if(it.no===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
-
-            if(it.no===2){
-              await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
-            }
-            if(it.no===13){ await addTwoItemsFromDeck(); }
-            if(it.no===16){ await handleItem16(idx); }
-            if(it.no===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
-          }
-        });
-
-        openMenu(ev.clientX, ev.clientY, entries);
+        // 未使用時：初回クリック＝拡大（制約カードと同じ挙動）
+        const canFaceUp = !!(flags.itemsFaceDownStart && it.faceUp===false);
+        openItemZoom(it.no, idx, { canFaceUp });
       }
-    };
+   };
 
 
     itemsEl.appendChild(div);
@@ -1999,6 +1971,179 @@ function renderM31(v){
   }
 }
 
+/* ：#39 描画・操作ロジック */
+function renderM39(v){
+  const isM39 = (v?.mission?.id|0) === 39;
+  // 既存行の掃除
+  const oldLane = document.getElementById('m39Row');
+  const oldHand = document.getElementById('m39HandRow');
+  if (!isM39){ if(oldLane) oldLane.remove(); if(oldHand) oldHand.remove(); return; }
+
+  const meta = v?.meta || {};
+  const x = meta.m39_x|0;
+  const deck = Array.isArray(meta.m39_deck)? meta.m39_deck.slice(): [];
+  const discards = Array.isArray(meta.m39_discard)? meta.m39_discard.slice(): [];
+  const dealt = !!meta.m39_dealt;
+
+  // ---- アイテム列の直下にレーンを描画 ----
+  const bar = document.getElementById('itemsBar');
+  if (bar){
+    if (oldLane) oldLane.remove();
+
+    const lane = document.createElement('div');
+    lane.id = 'm39Row';
+    lane.className = 'numlane';
+
+    // 左端：固定の x カード
+    const fixed = document.createElement('div');
+    fixed.className = 'numcard';
+    fixed.style.backgroundImage = `url('${imgNumber(x)}')`;
+    fixed.style.backgroundSize = 'cover';
+    fixed.style.backgroundPosition = 'center';
+    lane.appendChild(fixed);
+
+    // 山札ボタン＋残表示
+    const deckBtn = document.createElement('div');
+    deckBtn.className = 'numdeck';
+    deckBtn.title = 'めくる / 配る';
+    const restLbl = document.createElement('span');
+    restLbl.className = 'numrest';
+    const refreshRest = ()=>{
+      const remain = deck.filter(n=>!discards.includes(n)).length;
+      restLbl.textContent = `残:${remain}`;
+    };
+    refreshRest();
+    lane.appendChild(deckBtn);
+    lane.appendChild(restLbl);
+
+    // 右側：捨て札の積み重ね（表）
+    const pile = document.createElement('div');
+    pile.className = 'numcard-holder';
+    pile.style.position = 'relative';
+    lane.appendChild(pile);
+
+    const redrawPile = ()=>{
+      pile.innerHTML = '';
+      discards.forEach((n, i)=>{
+        const c = document.createElement('div');
+        c.className = 'numcard';
+        c.style.backgroundImage = `url('${imgNumber(n)}')`;
+        c.style.backgroundSize = 'cover';
+        c.style.backgroundPosition = 'center';
+        if(i>0){
+          const off = i*2;
+          c.style.position = 'absolute';
+          c.style.left = off+'px';
+          c.style.top  = off+'px';
+        }
+        pile.appendChild(c);
+      });
+      const extraH = Math.max(0, (discards.length-1)*2);
+      pile.style.height = (48 + extraH) + 'px';
+      lane.style.marginBottom = extraH + 'px';
+    };
+    redrawPile();
+
+    // デッキ操作：4枚公開ロック →「配る」ポップ / それ以外は通常めくり
+    deckBtn.onclick = async (ev)=>{
+      const vv = state.watching; if(!vv) return;
+
+      // 全体公開中の通常コード枚数（数字別）を再集計
+      const openByNum = {};
+      (vv.tables||[]).forEach(T=>{
+        (T.hand||[]).forEach(c=>{
+          if(c?.kind==='normal' && c.open===true){
+            const nn = c.num|0;
+            openByNum[nn] = (openByNum[nn]||0)+1;
+          }
+        });
+      });
+
+      const locked = ((openByNum[x]||0) >= 4);
+      const remainList = deck.filter(n=>!discards.includes(n));
+
+      if (locked && !dealt){
+        openOneMini(ev.clientX, ev.clientY, '配る', async ()=>{
+          try{
+            const rRef = ref(db, `rooms/${state.roomCode}`);
+            const rSnap = await get(rRef);
+            const R = rSnap.val()||{};
+            const TABS = (R.tables||[]).map(t=> ({...t}));
+
+            const cap = (R.captainTable|0) || 0;
+            const tblN = (R.tableCount|0) || TABS.length;
+            const left = (R.meta?.m39_deck||[]).filter(n=>!(R.meta?.m39_discard||[]).includes(n));
+
+            // ラウンドロビンで配る（隊長→時計回り）
+            left.forEach((n, k)=>{
+              const toIdx = (cap + k) % tblN;
+              const hand = Array.isArray(TABS[toIdx].m39Hand) ? TABS[toIdx].m39Hand.slice() : [];
+              hand.push(n);
+              TABS[toIdx].m39Hand = hand;
+
+              // 【条件付き】数字情報トークン（黒）をキャラ下に配布
+              const hasInHand = (TABS[toIdx].hand||[]).some(c=> c?.kind==='normal' && (c.num|0)===n);
+              // そのカードに既に数字情報トークン（type:'num', value:n）が付いているか？
+              const alreadyOnCard = (TABS[toIdx].hand||[]).some(c=>{
+                if(!(c?.kind==='normal' && (c.num|0)===n)) return false;
+                return Array.isArray(c.tokens) && c.tokens.some(tk=> String(tk?.type)==='num' && (tk?.value|0)===n);
+              });
+              if (hasInHand && !alreadyOnCard){
+                const under = Array.isArray(TABS[toIdx].m22Tokens) ? TABS[toIdx].m22Tokens.slice() : [];
+                if (!under.includes(n)) under.push(n);
+                TABS[toIdx].m22Tokens = under;
+              }
+            });
+
+            await update(rRef, { 
+              tables: TABS,
+              meta: { 
+                ...(R.meta||{}),
+                m39_dealt: true
+              }
+            });
+          }catch(e){ console.error(e); }
+        });
+        return;
+      }
+
+      // 通常めくり：残があれば1枚めくって捨て札へ
+      if(remainList.length>0){
+        const take = remainList[0];
+        const nextDiscards = discards.concat(take);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m39_discard: nextDiscards });
+      }
+    };
+
+    // 取り付け
+    bar.insertAdjacentElement('afterend', lane);
+  }
+
+  // ---- 自分の下部に配られた m39Hand を表示 ----
+  const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+  const myHandNums = (myIdx>=0) ? (v.tables[myIdx]?.m39Hand||[]) : [];
+  const footer = document.getElementById('missionFooter');
+  if (footer){
+    if (oldHand) oldHand.remove();
+    if (myIdx>=0 && myHandNums.length>0){
+      const row = document.createElement('div');
+      row.id = 'm39HandRow';
+      row.className = 'numlane';
+      row.style.marginTop = '4px';
+      myHandNums.forEach(n=>{
+        const c = document.createElement('div');
+        c.className = 'numcard';
+        c.style.backgroundImage = `url('${imgNumber(n)}')`;
+        c.style.backgroundSize = 'cover';
+        c.style.backgroundPosition = 'center';
+        row.appendChild(c);
+      });
+      const title = document.getElementById('missionDetailTitle');
+      if (title && title.parentNode === footer) footer.insertBefore(row, title);
+      else footer.appendChild(row);
+    }
+  }
+}
 
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
@@ -2056,6 +2201,77 @@ function closeConstraintZoom(){
   const ov = document.getElementById('conZoomOverlay');
   if (ov) ov.remove();
 }
+
+/* ：アイテム拡大ポップ */
+function openItemZoom(itemNo, itemIdx, opt={}){
+  try{
+    const old = document.getElementById('conZoomOverlay');
+    if (old) old.remove();
+
+    const ov = document.createElement('div');
+    ov.id = 'conZoomOverlay';
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'conzoom-wrap';
+
+    const big = document.createElement('div');
+    big.className = 'conzoom-card';
+    big.style.backgroundImage = `url('./item${itemNo}.jpg')`;
+
+    big.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      let m = wrap.querySelector('.conzoom-menu');
+      if (m){ m.remove(); return; }
+      m = document.createElement('div');
+      m.className = 'conzoom-menu';
+
+      // ①（任意）裏なら「表にする」
+      if (opt?.canFaceUp) {
+        const btnFace = document.createElement('button');
+        btnFace.textContent = '表にする';
+        btnFace.onclick = async (ev)=>{
+          ev.stopPropagation();
+          await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { faceUp:true });
+          closeConstraintZoom();
+        };
+        m.appendChild(btnFace);
+      }
+
+      // ②「使う」：従来の '使用する' と同等の処理
+      const btnUse = document.createElement('button');
+      btnUse.textContent = '使う';
+      btnUse.onclick = async (ev)=>{
+        ev.stopPropagation();
+        await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { used:true });
+        const path=`rooms/${state.roomCode}/meta/itemUses`;
+        const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
+        if(itemNo===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
+        if(itemNo===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
+        if(itemNo===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
+        if(itemNo===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
+
+        if(itemNo===2){
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+        }
+        if(itemNo===13){ await addTwoItemsFromDeck(); }
+        if(itemNo===16){ await handleItem16(itemIdx); }
+        if(itemNo===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
+
+        closeConstraintZoom();
+      };
+      m.appendChild(btnUse);
+
+      wrap.appendChild(m);
+    });
+
+    wrap.appendChild(big);
+    ov.appendChild(wrap);
+    document.body.appendChild(ov);
+  }catch(e){ console.error(e); }
+}
+
+
   
 /* === #22 用：数字トークンの使用数を集計 === */
 function countNumTokenUsage(n, v){
@@ -2778,6 +2994,19 @@ async function setupMissionOnStart(code){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
   }
 
+  // #13/#39 共通：キャラ下に出すランダム情報トークンの初期化
+  // （このフラグが立っていて、まだ meta.m13_header が無ければ人数ぶん作成）
+  if (flags.m13_headerRandomInfoToken) {
+    const snap2 = await get(ref(db, `rooms/${code}/meta`));
+    const meta  = snap2.val() || {};
+    if (!Array.isArray(meta.m13_header)) {
+      const tcount = v.tableCount|0;
+      const header = Array.from({length:tcount}, ()=> MATERIALS.numbers[(Math.random()*12)|0]);
+      await update(ref(db, `rooms/${code}/meta`), { m13_header: header });
+    }
+  }
+
+  
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
 if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
@@ -3228,6 +3457,52 @@ function buildDeckLaneP2(n=2){
   return lane;
 }
 
+/* ここから追加：#36 専用レーン（5枚の“列”の左右にだけブランク） */
+function buildM36Lane(){
+  const lane = document.createElement('div');
+  lane.className = 'numlane';
+
+  // 左ブランク（横向きの空カード）
+  const leftBlank = document.createElement('div');
+  leftBlank.className = 'rulecard';
+  leftBlank.title = '押すと「right2」を表示';
+
+  // 5枚の数値カード
+  const deck = MATERIALS.numbers.slice(); shuffle(deck);
+  const picks = deck.slice(0, 5);
+  const numNodes = picks.map(n=>{
+    const d = document.createElement('div');
+    d.className = 'numcard';
+    d.style.backgroundImage = `url('${imgNumber(n)}')`;
+    return d;
+  });
+
+  // 右ブランク（横向きの空カード）
+  const rightBlank = document.createElement('div');
+  rightBlank.className = 'rulecard';
+  rightBlank.title = '押すと「left2」を表示';
+
+  // 相互排他（どちらか一方のみ表示）
+  const clearLeft  = ()=>{ leftBlank.style.backgroundImage  = ''; };
+  const clearRight = ()=>{ rightBlank.style.backgroundImage = ''; };
+
+  leftBlank.onclick  = (ev)=>{ ev.stopPropagation();
+    leftBlank.style.backgroundImage  = `url('${imgRule('right2')}')`; // →→（右向き）を左端に表示
+    clearRight(); // 右端はブランクへ
+  };
+  rightBlank.onclick = (ev)=>{ ev.stopPropagation();
+    rightBlank.style.backgroundImage = `url('${imgRule('left2')}')`;  // ←←（左向き）を右端に表示
+    clearLeft();  // 左端はブランクへ
+  };
+
+  // 並べ順：左ブランク → 5枚の数字 → 右ブランク
+  lane.appendChild(leftBlank);
+  numNodes.forEach(n=> lane.appendChild(n));
+  lane.appendChild(rightBlank);
+
+  return lane;
+}
+  
 /* パターン3：指定カードを固定並べ（必要時） */
 function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
@@ -3779,7 +4054,21 @@ function missionInfo(id, opts={}){
       };
     }
 
-
+    case 37: {
+      return {
+        id:34, name:'#37', desc:'',
+        display:[
+          '#37',
+          'このミッションではキャラクターカードは自分にしか見えない（他テーブルはブランク表示）。',
+          'A〜Eの制約カードを全員に1枚ずつ配り、アイテム下に表示。',
+          '「隊長カードの持ち主はウィーケスト・リンク。彼のみ制約適用」',
+          '「制約により行動できなければ宣言し、起爆ダイヤル+2」',
+          '「誰かがプレイヤーと制約の両方を指摘できたら解除。どちらかでも誤りなら起爆ダイヤル+1」'
+        ],
+        // ※今回：表示のみ。秘匿/推理UIは後続PRで
+        flags:{}
+      };
+    }
     case 38: {
      return {
         id:38, name:'#38', desc:'',
@@ -3791,7 +4080,18 @@ function missionInfo(id, opts={}){
         flags:{ m38_captainRightmostX:true }
       };
     }
-      
+      case 39: {
+     return {
+       id:39, name:'#39', desc:'',
+       display:[
+         '#39',
+         '各プレイヤーに情報トークンをランダムで1枚ずつ配布し、キャラカードの下に表示（全員に見える）。',
+         'その数字の情報トークンを実際に使用したら自動的に消える。'
+       ],
+       // #13 と同じ仕組みを再利用（表示＆自動消去）
+       flags:{ m13_headerRandomInfoToken:true, m13_autoHideHeaderToken:true }
+     };
+   }
       
     case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
