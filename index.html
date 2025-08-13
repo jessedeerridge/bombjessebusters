@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>bomb busters</title>
+<title>つら</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -237,10 +237,7 @@
   }
   .m27-row .cap{ font-size:12px; opacity:.75; margin-right:6px; }
   .m27-row .token{ cursor:pointer; }
-.m39-under{
-  display:flex; gap:2px; margin-top:2px;
-}
-.m39-under .token{ width:20px; height:20px; }
+
 
 /* ★ #22：情報トークン表（3×4）— 黒トークン + 右に x0/x1/x2 */
 .info22{
@@ -634,7 +631,6 @@ function clearMissionOverlays(){
   document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
   // ★ ミッション22：情報トークン表を確実に消す
   const info22 = document.getElementById('info22');
-  ction clearMissionOverlays()
   if (info22) info22.remove();
     // ★ ミッション27：アイテム直下の行を確実に消す
   const m27 = document.getElementById('m27Row');
@@ -1245,22 +1241,6 @@ if (m13HeaderNum != null) {
   tok.textContent = String(m13HeaderNum);
   charCol.appendChild(tok);
 }
-    
-{
-  const arr = Array.isArray(v.meta?.m39_tokens) ? v.meta.m39_tokens[idx] : null;
-  if (Array.isArray(arr) && arr.length>0){
-    const row = document.createElement('div');
-    row.className = 'm39-under';
-    arr.forEach(nn=>{
-      const d = document.createElement('div');
-      d.className = 'token black';
-      d.textContent = String(nn);
-      row.appendChild(d);
-    });
-    charCol.appendChild(row);
-  }
-}
-    
 if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
   const row = document.createElement('div');
   row.className = 'm22-under';
@@ -1641,25 +1621,6 @@ if(!suppressNumberPop && canNum){
       hand.appendChild(wrap);
     });
     content.appendChild(hand);
-
-{
-  const arr = Array.isArray(t.m39Recv) ? t.m39Recv : [];
-  if (arr.length>0){
-    const row = document.createElement('div');
-    row.className = 'numlane';
-    row.style.marginTop = '4px';
-    arr.forEach(n=>{
-      const c = document.createElement('div');
-      c.className = 'numcard';
-      c.style.backgroundImage = `url('${imgNumber(n)}')`;
-      c.style.backgroundSize = 'cover';
-      c.style.backgroundPosition = 'center';
-      row.appendChild(c);
-    });
-    content.appendChild(row);
-  }
-}
-    
     box.appendChild(content);
 
     const hasToken = (t.hand||[]).some(c=> (c.tokens||[]).length>0);
@@ -2829,25 +2790,6 @@ async function setupMissionOnStart(code){
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
 
-/* #39 初期セットアップ */
-  if ((v.mission?.id|0) === 39) {
-    const x = MATERIALS.numbers[(Math.random()*MATERIALS.numbers.length)|0];
-    const pool = MATERIALS.numbers.filter(n => n !== x); shuffle(pool);
-    const deck8 = pool.slice(0, 8);
-
-    // 各テーブル：手札に「存在しない数字」からランダム1つを、キャラ下トークン初期値として付与
-    const m39_tokens = (v.tables||[]).map(T=>{
-      const have = new Set((T.hand||[]).filter(c=>c?.kind==='normal').map(c=> c.num|0));
-      const cands = MATERIALS.numbers.filter(n=> !have.has(n));
-      shuffle(cands);
-      return [ cands[0] ?? (((x%12)+1)|0) ];
-    });
-
-    await update(ref(db, `rooms/${code}/meta`), {
-      m39_x: x, m39_deck: deck8, m39_discards: [], m39_dealt:false, m39_tokens
-    });
-  }
-  
   // #9：右2 + ランダム数値2枚
   if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
     const lane = buildNumLaneDOM([
@@ -2879,11 +2821,6 @@ async function setupMissionOnStart(code){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
   }
 
-/* #39 レーン設置・同期 */
-  if (v.mission?.flags?.m39) {
-    attachOrSyncM39Lane(v);
-  }
-  
   // #13/#39 共通：キャラ下に出すランダム情報トークンの初期化
   // （このフラグが立っていて、まだ meta.m13_header が無ければ人数ぶん作成）
   if (flags.m13_headerRandomInfoToken) {
@@ -3557,142 +3494,6 @@ function mountM26GridUnderItems(){
     };
   });
 }
-
-/* ここから追加：#39 レーン＆配布ロジック */
-function attachOrSyncM39Lane(v){
-  const bar = document.getElementById('itemsBar');
-  if (!bar) return;
-
-  let lane = document.getElementById('m39Lane');
-  if (!lane) {
-    lane = document.createElement('div');
-    lane.id = 'm39Lane';
-    lane.className = 'numlane';
-
-    // 左：固定の表X（placeNumberCardで重ね制御を統一）
-    const left = document.createElement('div');
-    left.id = 'm39Left';
-    left.className = 'numlane';
-    lane.appendChild(left);
-
-    // 中央：山札ボタン＋残枚数
-    const deckBtn = document.createElement('div');
-    deckBtn.id = 'm39DeckBtn';
-    deckBtn.className = 'numdeck';
-    deckBtn.textContent = 'めくる';
-    lane.appendChild(deckBtn);
-
-    const restLbl = document.createElement('div');
-    restLbl.id = 'm39Rest';
-    restLbl.className = 'rest';
-    restLbl.textContent = '0';
-    lane.appendChild(restLbl);
-
-    // 右：捨て札積み（表）
-    const pile = document.createElement('div');
-    pile.id = 'm39Pile';
-    pile.className = 'numlane';
-    pile.style.alignItems = 'center';
-    lane.appendChild(pile);
-
-    bar.insertAdjacentElement('afterend', lane);
-
-    // クリック（山札）
-    deckBtn.onclick = async (ev)=>{
-      try{
-        const snap = await get(ref(db, `rooms/${state.roomCode}`));
-        const R = snap.val()||{}; if((R?.mission?.id|0)!==39) return;
-        const meta = R.meta||{};
-        // 左の数字が4枚全体公開なら自動配布に切替
-        const open = {};
-        (R.tables||[]).forEach(T=>(T.hand||[]).forEach(c=>{
-          if(c?.kind==='normal' && c.open===true){ const n=c.num|0; open[n]=(open[n]||0)+1; }
-        }));
-        if ((open[meta.m39_x|0]||0)===4){ await dealM39(R); return; }
-
-        const deckArr = (meta.m39_deck||[]).slice();
-        if (deckArr.length<=0) return;
-        const top = deckArr.shift();
-        const disc = (meta.m39_discards||[]).concat(top);
-        await update(ref(db, `rooms/${state.roomCode}/meta`), { m39_deck: deckArr, m39_discards: disc });
-      }catch(e){ console.error(e); }
-    };
-  }
-
-  // 同期（X・残枚数・捨て札）
-  const x = v.meta?.m39_x|0;
-  const left = document.getElementById('m39Left');
-  if (left){ placeNumberCard(x, left); }
-  const rest = v.meta?.m39_deck?.length|0;
-  const restLbl = document.getElementById('m39Rest');
-  if (restLbl) restLbl.textContent = String(rest);
-  const pile = document.getElementById('m39Pile');
-  if (pile){
-    pile.innerHTML = '';
-    (v.meta?.m39_discards||[]).forEach(n=> placeNumberCard(n, pile));
-  }
-
-  // 自動配布：左の数字が4枚全体公開 && 未配布
-  if (v.meta?.m39_dealt!==true) {
-    const open = {};
-    (v.tables||[]).forEach(T=>(T.hand||[]).forEach(c=>{
-      if(c?.kind==='normal' && c.open===true){ const n=c.num|0; open[n]=(open[n]||0)+1; }
-    }));
-    if ((open[x]||0)===4){
-      dealM39(v).catch(console.error);
-    }
-  }
-}
-
-// 山札の残りを隊長から順番に配る＋条件を満たす数字トークンをキャラ下に付与
-async function dealM39(R){
-  try{
-    if ((R?.mission?.id|0)!==39) return;
-    const meta = R.meta||{};
-    if (meta.m39_dealt===true) return;
-
-    const remain = (meta.m39_deck||[]).slice();
-    const tables = (R.tables||[]);
-    if (remain.length<=0){
-      await update(ref(db, `rooms/${state.roomCode}/meta`), { m39_dealt:true });
-      return;
-    }
-
-    // 受け取り配列
-    const recv = tables.map(T=> Array.isArray(T.m39Recv) ? T.m39Recv.slice() : []);
-    let ti = (R.captainTable|0);
-
-    remain.forEach(n=>{
-      recv[ti].push(n);
-      ti = (ti+1) % tables.length;
-    });
-
-    // キャラ下トークン（条件：同数字の通常カードを1枚以上所持、かつその中に num トークン未付与が少なくとも1枚）
-    const tokRows = Array.isArray(meta.m39_tokens)
-      ? meta.m39_tokens.map(a => Array.isArray(a)? a.slice(): [])
-      : tables.map(()=>[]);
-    recv.forEach((arr, idx)=>{
-      arr.forEach(n=>{
-        const handSame = (tables[idx].hand||[]).filter(c=> c?.kind==='normal' && (c.num|0)===n);
-        if (handSame.length>0){
-          const existsUnmarked = handSame.some(c => !(Array.isArray(c.tokens) && c.tokens.some(tk=> tk?.type==='num')));
-          if (existsUnmarked && !tokRows[idx].includes(n)){
-            tokRows[idx].push(n);
-          }
-        }
-      });
-    });
-
-    // 書き戻し
-    const tasks = [];
-    recv.forEach((arr, i)=>{
-      tasks.push( update(ref(db, `rooms/${state.roomCode}/tables/${i}`), { m39Recv: arr }) );
-    });
-    tasks.push( update(ref(db, `rooms/${state.roomCode}/meta`), { m39_dealt:true, m39_deck:[], m39_tokens: tokRows }) );
-    await Promise.all(tasks);
-  }catch(e){ console.error(e); }
-}
-  
   
 function missionInfo(id, opts={}){
   const mixLines = opts.mixLines || [];     // 例: ['赤[1.5]', '黄[2.1][5.1]']
