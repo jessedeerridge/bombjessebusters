@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>bomb busters</title>
+<title>つら</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -841,7 +841,6 @@ function buildMixPlan(missionId){
   {type:'yellowPick', k:4},
 ],
 
-
     
 };
 return plans[missionId] || [];
@@ -1128,49 +1127,6 @@ function renderTables(v){
     const old = document.getElementById('info22');
     if (old) old.remove();
   }
-
-  // ★ #39：左固定の数字が4枚全体公開されたら自動配布
-  if ((v?.mission?.id|0) === 39 && v?.mission?.flags?.m39_enable){
-    const X = v?.meta?.m39_first|0;
-    if (X){
-      if (state.isHost && !v?.meta?.m39_done){
-        const deck = Array.isArray(v?.meta?.m39_deck) ? v.meta.m39_deck : [];
-        const disc = Array.isArray(v?.meta?.m39_discards) ? v.meta.m39_discards : [];
-        const opened = openCountByNum[X]|0;
-        if (opened === 4){
-          const remain = [X].concat(deck.slice(disc.length)); // 捨て札になっていない数値カード
-          const tcount = v.tableCount|0, cap = v.captainTable|0;
-          const assigned = Array.from({length:tcount}, ()=>[]);
-          remain.forEach((n,i)=> assigned[(cap+i)%tcount].push(n));
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { m39_assigned: assigned, m39_done:true });
-        }
-      }
-
-      // 表示（画面下部）
-      const footer = document.getElementById('missionFooter');
-      const old = document.getElementById('m39AssignRow'); if (old) old.remove();
-      if (Array.isArray(v?.meta?.m39_assigned)){
-        const row = document.createElement('div'); row.id='m39AssignRow'; row.className='numlane';
-        const cap = v.captainTable|0;
-        v.meta.m39_assigned.forEach((list, idx)=>{
-          const label = document.createElement('div'); label.className='numrest';
-          const name = (v.tables?.[idx]?.playerName) || String(idx+1);
-          label.textContent = (idx===cap ? '［隊長］' : '') + name;
-          row.appendChild(label);
-          list.forEach(n=>{
-            const c = document.createElement('div'); c.className='numcard';
-            c.style.backgroundImage = `url('${imgNumber(n)}')`;
-            row.appendChild(c);
-          });
-          const sep = document.createElement('div'); sep.style.width='8px'; row.appendChild(sep);
-        });
-        const title = document.getElementById('missionDetailTitle');
-        if (title && title.parentNode === footer) footer.insertBefore(row, title);
-      }
-    }
-  }
-
-
   
   /* ★ 全体公開中の通常コードの「数字別枚数」を集計 */
   const openCountByNum = {};
@@ -2037,7 +1993,6 @@ function renderM31(v){
 }
 
 
-
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
   try{
@@ -2887,27 +2842,6 @@ async function setupMissionOnStart(code){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
   }
 
-  // #13/#39 共通：キャラ下に出すランダム情報トークンの初期化
-  // （このフラグが立っていて、まだ meta.m13_header が無ければ人数ぶん作成）
-  if (flags.m13_headerRandomInfoToken) {
-    const snap2 = await get(ref(db, `rooms/${code}/meta`));
-    const meta  = snap2.val() || {};
-    if (!Array.isArray(meta.m13_header)) {
-      const is39 = ((v?.mission?.id|0) === 39);
-      const tcount = v.tableCount|0;
-      const header = Array.from({length:tcount}, (_,ti)=>{
-        if(!is39) return MATERIALS.numbers[(Math.random()*12)|0];
-        const handNums = new Set(((v.tables?.[ti]?.hand)||[])
-          .filter(c=>c?.kind==='normal')
-          .map(c=> c.num|0));
-        const choices = MATERIALS.numbers.filter(n=> !handNums.has(n));
-        return (choices.length ? choices[(Math.random()*choices.length)|0] : MATERIALS.numbers[(Math.random()*12)|0]);
-      });
-      await update(ref(db, `rooms/${code}/meta`), { m13_header: header });
-  }
-  
-
-  
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
 if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
@@ -2924,61 +2858,12 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     if (old36) old36.remove();
 
     // ランダム5枚を横並びで生成して設置
-    const lane36 = buildM36Lane();   /* ← 専用ビルダーに変更 */
+    const lane36 = buildDeckLaneP2(5);
     lane36.id = 'm36NumRow';
     mountLaneUnderItemsBar(lane36);
   }
   
-  if ((v.mission?.id|0) === 39 && v.mission?.flags?.m39_enable){
-    // メタ初期化（first: 左固定 / deck: 8枚 / discards: 表にした順）
-    const mref = ref(db, `rooms/${code}/meta`);
-    const msnap = await get(mref); const meta = msnap.val()||{};
-    if (meta.m39_first==null || !Array.isArray(meta.m39_deck)) {
-      const pool = MATERIALS.numbers.slice(); const first = pool.splice((Math.random()*pool.length)|0,1)[0];
-      shuffle(pool); const deck = pool.slice(0,8);
-      await update(mref, { m39_first:first, m39_deck:deck, m39_discards:[], m39_done:false, m39_assigned:null });
-    }
 
-    // 既存の行があれば除去
-    const old39 = document.getElementById('m39NumRow'); if (old39) old39.remove();
-
-    // 行を構築： [左固定1枚] [山札] [残数] [捨て札重ね]
-    const lane = document.createElement('div'); lane.id='m39NumRow'; lane.className='numlane';
-    const left = document.createElement('div'); left.className='numcard'; left.title='固定カード';
-    const deckBtn = document.createElement('div'); deckBtn.className='numdeck'; deckBtn.title='めくる';
-    const restLbl = document.createElement('div'); restLbl.className='numrest';
-    const pile = document.createElement('div'); pile.className='numcard-holder';
-    lane.append(left, deckBtn, restLbl, pile);
-
-    const refresh = async ()=>{
-      const s = await get(mref); const m = s.val()||{};
-      const d = Array.isArray(m.m39_deck)? m.m39_deck: [];
-      const disc = Array.isArray(m.m39_discards)? m.m39_discards: [];
-      const fx = m.m39_first|0;
-      if (fx) left.style.backgroundImage = `url('${imgNumber(fx)}')`;
-      restLbl.textContent = String(Math.max(0, d.length - disc.length));
-      pile.innerHTML='';
-      disc.forEach(n=>{
-        const c = document.createElement('div'); c.className='numcard overlay';
-        c.style.backgroundImage = `url('${imgNumber(n)}')`; pile.appendChild(c);
-      });
-    };
-
-    deckBtn.onclick = async ()=>{
-      try{
-        const s = await get(mref); const m = s.val()||{};
-        const d = Array.isArray(m.m39_deck)? m.m39_deck: [];
-        const disc = Array.isArray(m.m39_discards)? m.m39_discards: [];
-        const next = d[disc.length];
-        if (next==null) return; // 山札切れ
-        await update(mref, { m39_discards: disc.concat(next) });
-        await refresh();
-      }catch(e){ console.error(e); }
-    };
-
-    await refresh();
-    mountLaneUnderItemsBar(lane);
-  }
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
     const tcount = v.tableCount|0;
@@ -3407,52 +3292,6 @@ function buildDeckLaneP2(n=2){
   return lane;
 }
 
-/* ここから追加：#36 専用レーン（5枚の“列”の左右にだけブランク） */
-function buildM36Lane(){
-  const lane = document.createElement('div');
-  lane.className = 'numlane';
-
-  // 左ブランク（横向きの空カード）
-  const leftBlank = document.createElement('div');
-  leftBlank.className = 'rulecard';
-  leftBlank.title = '押すと「right2」を表示';
-
-  // 5枚の数値カード
-  const deck = MATERIALS.numbers.slice(); shuffle(deck);
-  const picks = deck.slice(0, 5);
-  const numNodes = picks.map(n=>{
-    const d = document.createElement('div');
-    d.className = 'numcard';
-    d.style.backgroundImage = `url('${imgNumber(n)}')`;
-    return d;
-  });
-
-  // 右ブランク（横向きの空カード）
-  const rightBlank = document.createElement('div');
-  rightBlank.className = 'rulecard';
-  rightBlank.title = '押すと「left2」を表示';
-
-  // 相互排他（どちらか一方のみ表示）
-  const clearLeft  = ()=>{ leftBlank.style.backgroundImage  = ''; };
-  const clearRight = ()=>{ rightBlank.style.backgroundImage = ''; };
-
-  leftBlank.onclick  = (ev)=>{ ev.stopPropagation();
-    leftBlank.style.backgroundImage  = `url('${imgRule('right2')}')`; // →→（右向き）を左端に表示
-    clearRight(); // 右端はブランクへ
-  };
-  rightBlank.onclick = (ev)=>{ ev.stopPropagation();
-    rightBlank.style.backgroundImage = `url('${imgRule('left2')}')`;  // ←←（左向き）を右端に表示
-    clearLeft();  // 左端はブランクへ
-  };
-
-  // 並べ順：左ブランク → 5枚の数字 → 右ブランク
-  lane.appendChild(leftBlank);
-  numNodes.forEach(n=> lane.appendChild(n));
-  lane.appendChild(rightBlank);
-
-  return lane;
-}
-  
 /* パターン3：指定カードを固定並べ（必要時） */
 function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
@@ -4006,19 +3845,17 @@ function missionInfo(id, opts={}){
 
     case 37: {
       return {
-        id:34, name:'#37', desc:'',
+        id:36, name:'#37', desc:'',
         display:[
           '#37',
-          'このミッションではキャラクターカードは自分にしか見えない（他テーブルはブランク表示）。',
-          'A〜Eの制約カードを全員に1枚ずつ配り、アイテム下に表示。',
-          '「隊長カードの持ち主はウィーケスト・リンク。彼のみ制約適用」',
-          '「制約により行動できなければ宣言し、起爆ダイヤル+2」',
-          '「誰かがプレイヤーと制約の両方を指摘できたら解除。どちらかでも誤りなら起爆ダイヤル+1」'
+          '数値1〜12からランダム5枚を横並び。左右にブランク枠を付ける。',
+          '左ブランクを押すと「右側の2枚」を表示。右ブランクを押すと「左側の2枚」を表示。',
+          '「隊長が解除する順番（向き）を決める。」「対象2本を切断するたび、相談なしで新しい向きを置き直せる」「それ以外の数値は切断可能」'
         ],
-        // ※今回：表示のみ。秘匿/推理UIは後続PRで
-        flags:{}
+        flags:{ }
       };
     }
+
     case 38: {
      return {
         id:38, name:'#38', desc:'',
@@ -4030,18 +3867,18 @@ function missionInfo(id, opts={}){
         flags:{ m38_captainRightmostX:true }
       };
     }
-      case 39: {
+      
+    case 39: {
      return {
-       id:39, name:'#39', desc:'',
-       display:[
-         '#39',
-         '各プレイヤーに情報トークンをランダムで1枚ずつ配布し、キャラカードの下に表示（全員に見える）。',
-         'その数字の情報トークンを実際に使用したら自動的に消える。'
+        id:39, name:'#39', desc:'',
+        display:[
+          '#39',
+          '隊長の手札のみ：ランダムで1枚を右端に移動。他は昇順。',
+          '移動したカードに ✕（黄背景/黒文字）トークンを付ける。'
        ],
-       // #13 と同じ仕組みを再利用（表示＆自動消去）
-       flags:{ m13_headerRandomInfoToken:true, m13_autoHideHeaderToken:true, m39_enable:true }
-     };
-   }
+        flags:{  }
+      };
+    }
       
     case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
