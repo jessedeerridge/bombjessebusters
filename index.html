@@ -964,7 +964,7 @@ if (v) {
     return;
   }
 }    
-    renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
+    renderItemsAndDi(v);  renderM29(v); renderM31(v); renderM39(v); renderTables(v);
     if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
@@ -1925,7 +1925,32 @@ function renderM29(v){
 }
 
 
+/* ：#39 描画（配られた数値カードを画面下部へ） */
+function renderM39(v){
+  const isM39 = (v?.mission?.id|0) === 39;
+  const old = document.getElementById('m39HandRow'); if (old) old.remove();
+  if(!isM39) return;
 
+  const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+  const arr = (myIdx>=0) ? (v.tables[myIdx]?.m39Hand||[]) : [];
+  const footer = document.getElementById('missionFooter');
+  if (!footer || myIdx<0 || arr.length===0) return;
+
+  const row = document.createElement('div');
+  row.id = 'm39HandRow';
+  row.className = 'numlane';
+  row.style.marginTop = '4px';
+
+  arr.forEach(n=>{
+    const c = document.createElement('div');
+    c.className = 'numcard';
+    c.style.backgroundImage = `url('${imgNumber(n)}')`; // 画像表現に統一
+    row.appendChild(c);
+  });
+
+  const title = document.getElementById('missionDetailTitle');
+  if (title && title.parentNode === footer) footer.insertBefore(row, title);
+  else footer.appendChild(row);
   
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
@@ -1989,6 +2014,7 @@ function renderM31(v){
     });
     bar.insertAdjacentElement('afterend', row);
   }
+}
 }
 
 
@@ -2847,6 +2873,29 @@ async function setupMissionOnStart(code){
   if (flags.m13_headerRandomInfoToken) {
     const snap2 = await get(ref(db, `rooms/${code}/meta`));
     const meta  = snap2.val() || {};
+
+    // ▼ #39 は「各テーブルの手札に無い数字」から1つずつ選ぶ
+    //   （#13 など他ミッションは従来どおり完全ランダム）
+    if (!Array.isArray(meta.m13_header)) {
+      const snapRoom = await get(ref(db, `rooms/${code}`));
+      const room = snapRoom.val() || {};
+      const isM39 = ((room?.mission?.id|0) === 39);
+      const tcount = room.tableCount|0;
+      const tables = room.tables || [];
+      const header = isM39
+        ? tables.map(T=>{
+            const have = new Set((T.hand||[])
+              .map(c=> (Number.isInteger(c?.num) ? (c.num|0) : null))
+              .filter(n=> Number.isInteger(n)));
+            const pool = MATERIALS.numbers.filter(n=> !have.has(n));
+            return (pool.length>0)
+              ? pool[(Math.random()*pool.length)|0]
+              : MATERIALS.numbers[(Math.random()*12)|0];
+          })
+        : Array.from({length:tcount}, ()=> MATERIALS.numbers[(Math.random()*12)|0]);
+      await update(ref(db, `rooms/${code}/meta`), { m13_header: header });
+    }
+    
     if (!Array.isArray(meta.m13_header)) {
       const tcount = v.tableCount|0;
       const header = Array.from({length:tcount}, ()=> MATERIALS.numbers[(Math.random()*12)|0]);
@@ -2869,7 +2918,6 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // 既存があれば一度除去（再実行対策）
     const old36 = document.getElementById('m36NumRow');
     if (old36) old36.remove();
-
     // ランダム5枚を横並びで生成して設置
     const lane36 = buildM36Lane();   /* ← 専用ビルダーに変更 */
     lane36.id = 'm36NumRow';
@@ -2877,6 +2925,29 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
   }
   
 
+  // ▼▼ #39：x を左、右に（x を除く）8枚山（P1風UI）＋ 4本公開で自動配布 ▼▼
+  if ((v.mission?.id|0) === 39){
+    const old39 = document.getElementById('m39NumRow'); if (old39) old39.remove();
+    await ensureM39MetaInit();
+    mountLaneUnderItemsBar(buildM39Lane());
+
+    // 4本公開 → 自動で配る（多重実行防止のためホストのみ）
+    if (state.isHost) {
+      const x = v?.meta?.m39_x|0;
+      if (x) {
+        let open = 0;
+        (v.tables||[]).forEach(T=>(T.hand||[]).forEach(c=>{
+          if(c?.kind==='normal' && c.open===true && (c.num|0)===x) open++;
+        }));
+        if (open>=4 && v?.meta?.m39_dealt!==true) {
+          await doM39Deal();
+        }
+      }
+    }
+    }
+
+
+  
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
     const tcount = v.tableCount|0;
@@ -3464,6 +3535,140 @@ function attachM23DeckUI(lane){
 
 }
 
+/* 初期化：x を1枚、残りから8枚の山を用意（メタへ保存） */
+async function ensureM39MetaInit(){
+  const v = state.watching; if(!v) return;
+  const meta = v.meta || {};
+  if (Number.isInteger(meta.m39_x) && Array.isArray(meta.m39_deck)) return;
+  const x = MATERIALS.numbers[(Math.random()*12)|0];
+  const rest = MATERIALS.numbers.filter(n=> n!==x);
+  shuffle(rest);
+  const deck = rest.slice(0,8);
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    m39_x: x, m39_deck: deck, m39_discards: [], m39_dealt: false
+  });
+}
+
+/* レーン構築：左に x、中央に山札、右に捨て札積み（P1風） */
+function buildM39Lane(){
+  const lane = document.createElement('div');
+  lane.className = 'numlane';
+  lane.id = 'm39NumRow';
+
+  const v = state.watching, meta=v?.meta||{};
+  const x = meta.m39_x|0;
+  const disc = (meta.m39_discards||[]);
+  const deck = (meta.m39_deck||[]);
+  const remain = deck.filter(n=> !disc.includes(n));
+
+  // 左：x（表）
+  const xCard = document.createElement('div');
+  xCard.className='numcard';
+  xCard.style.backgroundImage = `url('${imgNumber(x)}')`;
+  lane.appendChild(xCard);
+
+  // 中：山札ボタン + 残
+  const deckBtn = document.createElement('div');
+  deckBtn.className='numdeck';
+  deckBtn.title='めくる / 配る';
+  lane.appendChild(deckBtn);
+
+  const restLbl = document.createElement('span');
+  restLbl.className='numrest';
+  restLbl.textContent = `残:${remain.length}`;
+  lane.appendChild(restLbl);
+
+  // 右：捨て札積み
+  const pile = document.createElement('div');
+  pile.className='numcard-holder';
+  pile.style.position='relative';
+  disc.forEach((n,i)=>{
+    const node=document.createElement('div');
+    node.className='numcard';
+    node.style.backgroundImage=`url('${imgNumber(n)}')`;
+    if(i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; }
+    pile.appendChild(node);
+  });
+  lane.appendChild(pile);
+
+  // クリック：4本公開なら「配る」、未達なら1枚めくって捨て札へ
+  deckBtn.onclick = async (ev)=>{
+    try{
+      const v = state.watching; if(!v) return;
+      const meta = v.meta||{};
+      const x = meta.m39_x|0;
+
+      // 4本公開チェック
+      let open = 0;
+      (v.tables||[]).forEach(T=>(T.hand||[]).forEach(c=>{
+        if(c?.kind==='normal' && c.open===true && (c.num|0)===x) open++;
+      }));
+      if (open>=4){
+        openBottomMenu([{label:'配る', action: async ()=>{ await doM39Deal(); }}]);
+        return;
+      }
+
+      // めくる（=捨て札へ）
+      const deck = (meta.m39_deck||[]);
+      const disc = (meta.m39_discards||[]);
+      const remain = deck.filter(n=>!disc.includes(n));
+      if (remain.length<=0) return;
+      const n = remain[remain.length-1]; // 末尾から1枚
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m39_discards: disc.concat(n) });
+    }catch(e){ console.error(e); }
+  };
+
+  return lane;
+}
+
+/* 配布本体：残り札を「隊長テーブルから順番」に総配り（task4, task5） */
+async function doM39Deal(){
+  const v = state.watching; if(!v) return;
+  const meta = v.meta||{};
+  if (meta.m39_dealt===true) return;
+
+  const deck = (meta.m39_deck||[]);
+  const disc = (meta.m39_discards||[]);
+  const remain = deck.filter(n=>!disc.includes(n)); // = 捨て札にならなかった札
+  const tcount = v.tableCount|0;
+
+  if (remain.length===0){
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m39_dealt:true });
+    return;
+  }
+
+  const start = (v.captainTable|0) % (tcount||1);
+  const order = Array.from({length:tcount}, (_,i)=>(start+i)%tcount);
+  const give = Array.from({length:tcount}, ()=>[]);
+  for (let i=0;i<remain.length;i++) give[order[i%tcount]].push(remain[i]);
+
+  const updates = [];
+  for (let ti=0; ti<tcount; ti++){
+    const tRef = ref(db, `rooms/${state.roomCode}/tables/${ti}`);
+    const T = (v.tables||[])[ti] || {};
+    const cur = Array.isArray(T.m39Hand) ? T.m39Hand.slice() : [];
+    const nextHand = cur.concat(give[ti]);
+
+    // task5：配った数字 n と同じ数字の手札が1枚以上あり、
+    //        その中に「numトークン」が付いていないカードが少なくとも1つある場合のみ、
+    //        黒の数字トークン（= m22Tokensの1つ）を1個配布
+    const tokens = Array.isArray(T.m22Tokens) ? T.m22Tokens.slice() : [];
+    const tokenSet = new Set(tokens);
+    give[ti].forEach(n=>{
+      const have = (T.hand||[]).filter(c=> c?.kind==='normal' && (c.num|0)===n);
+      if (have.length>0){
+        const someNoNum = have.some(c=> !(Array.isArray(c.tokens) && c.tokens.some(tk=>tk.type==='num')));
+        if (someNoNum && !tokenSet.has(n)) { tokens.push(n); tokenSet.add(n); }
+      }
+    });
+
+    updates.push(update(tRef, { m39Hand: nextHand, m22Tokens: tokens }));
+  }
+  updates.push(update(ref(db, `rooms/${state.roomCode}/meta`), { m39_dealt:true }));
+  await Promise.all(updates);
+}
+
+  
 /* ===== ★ #26：1〜12 を 3×4 で並べ、裏表をトグル ===== */
 function mountM26GridUnderItems(){
   const bar = document.getElementById('itemsBar');
