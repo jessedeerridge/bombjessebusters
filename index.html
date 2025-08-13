@@ -820,6 +820,27 @@ function buildMixPlan(missionId){
     {type:'redChoose',  from:3, take:1},
     {type:'yellowPick', k:2},
   ],
+37: [  // 赤2
+  {type:'redPick', k:2},
+],
+38: [  // 赤2
+  {type:'redPick', k:2},
+],
+39: [  // 赤3-2 黄4
+  {type:'redChoose', from:3, take:2},
+  {type:'yellowPick', k:4},
+],
+40: [  // 赤3
+  {type:'redPick', k:3},
+],
+41: [  // 赤3-1
+  {type:'redChoose', from:3, take:1},
+],
+42: [  // 赤3-1 黄4
+  {type:'redChoose', from:3, take:1},
+  {type:'yellowPick', k:4},
+],
+    
 };
 return plans[missionId] || [];
 
