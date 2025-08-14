@@ -1503,6 +1503,8 @@ if(flags.useParityToken){
 }
 // ▼ ミッション40専用：隊長からの順番によって使えるトークンを制限
 if ((state.watching?.mission?.id|0) === 40) {
+    if (typeof flags === 'object' && flags) flags.useNumberToken = false;
+
   const captainIdx = state.watching?.captainTable ?? 0; // 隊長テーブルindex
   const playerOrder = (idx - captainIdx + (state.watching?.tables?.length||0)) % (state.watching?.tables?.length||0) + 1;
 
@@ -1540,6 +1542,15 @@ if ((state.watching?.mission?.id|0) === 40) {
         await update(ref(db, cardPath), { tokens: updated });
         box.classList.add('elevated');
       }});
+    }
+  }
+
+    /* ここから追加：#40 の安全弁（もし先に数字ボタンが混ざっていてもメニューから除去） */
+  if (Array.isArray(entries)) {
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (typeof entries[i]?.label === 'string' && /^\d+$/.test(entries[i].label)) {
+        entries.splice(i, 1);
+      }
     }
   }
 }
