@@ -4076,7 +4076,17 @@ function missionInfo(id, opts={}){
         flags:{  }
       };
     }
-      
+    case 40: {
+     return {
+        id:40, name:'#40', desc:'',
+        display:[
+          '#40',
+          '隊長の手札のみ：ランダムで1枚を右端に移動。他は昇順。',
+          '移動したカードに ✕（黄背景/黒文字）トークンを付ける。'
+       ],
+        flags:{  allowedTokens: ['odd', 'even', 'x1', 'x2', 'x3', 'yellow'] }
+      };
+    }
     case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
     default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
