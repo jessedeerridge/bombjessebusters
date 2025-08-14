@@ -1464,6 +1464,35 @@ const countSame = myHand.filter(cc => cc.num===c.num).length;
  // x系許可：1,3,5番手／ 偶奇許可：2,4番手／ それ以外（6番手など）はどちらも不可
  const USE_X      = (!!flags.useXTokens)   || (_m40 && [1,3,5].includes(order));
  const USE_PARITY = (!!flags.useParityToken)|| (_m40 && [2,4].includes(order));
+// 赤コード・黄コードには x1／偶数／奇数 トークン禁止
+const isRedOrYellow = (c.kind === 'red' || c.kind === 'yellow');
+
+// x1
+if (!isRedOrYellow && USE_X && canX1) {
+  entries.push({label:'x1', action: async ()=>{
+    const updated=[...(tokens), {type:'x1', value:'x1', style:'x1'}];
+    await update(ref(db, cardPath), { tokens: updated });
+    box.classList.add('elevated');
+  }});
+}
+
+// 偶数
+if (!isRedOrYellow && USE_PARITY && c.num % 2 === 0) {
+  entries.push({label:'2/4', action: async ()=>{
+    const updated=[...(tokens), {type:'even', value:'2/4', style:'even'}];
+    await update(ref(db, cardPath), { tokens: updated });
+    box.classList.add('elevated');
+  }});
+}
+
+// 奇数
+if (!isRedOrYellow && USE_PARITY && c.num % 2 === 1) {
+  entries.push({label:'1/3', action: async ()=>{
+    const updated=[...(tokens), {type:'odd', value:'1/3', style:'odd'}];
+    await update(ref(db, cardPath), { tokens: updated });
+    box.classList.add('elevated');
+  }});
+}
 
           // 黄コードトークン（▧）
 if(flags.useYellowToken || c.kind === 'yellow'){
