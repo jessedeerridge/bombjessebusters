@@ -1447,8 +1447,10 @@ content.appendChild(charCol);
           const canEqual = !has('equal') && (counts.equal < caps.equal);
           const canNoteq = !has('noteq') && (counts.noteq < caps.noteq);
           const canNum   = !has('num');
-          const canX1    = !has('x1') && (counts.x1 < caps.x1);
-
+  // ★追加：色コード判定（赤 or 黄）
+  const isColorCode = (c.kind === 'red' || c.kind === 'yellow');
+  // ★変更：色コードは x1 不可
+  const canX1    = !has('x1') && (counts.x1 < caps.x1) && !isColorCode;
          const entries = [];
 
 // ▼ ミッション専用：フラグ取得
@@ -1461,10 +1463,13 @@ const countSame = myHand.filter(cc => cc.num===c.num).length;
  const cap   = state.watching?.captainTable ?? 0;
  const total = (state.watching?.tables?.length||0);
  const order = ((idx - cap + total) % total) + 1; // 1始まり
- // x系許可：1,3,5番手／ 偶奇許可：2,4番手／ それ以外（6番手など）はどちらも不可
- const USE_X      = (!!flags.useXTokens)   || (_m40 && [1,3,5].includes(order));
- const USE_PARITY = (!!flags.useParityToken)|| (_m40 && [2,4].includes(order));
-
+  // ★追加：色コード判定（赤 or 黄）
+  const isColorCode = (c.kind === 'red' || c.kind === 'yellow');
+  // x系許可：1,3,5番手／ 偶奇許可：2,4番手（色コードは付与不可）
+  const USE_X_BASE      = (!!flags.useXTokens)    || (_m40 && [1,3,5].includes(order));
+  const USE_PARITY_BASE = (!!flags.useParityToken) || (_m40 && [2,4].includes(order));
+  const USE_X      = USE_X_BASE      && !isColorCode;
+  const USE_PARITY = USE_PARITY_BASE && !isColorCode;
           // 黄コードトークン（▧）
 if(flags.useYellowToken || c.kind === 'yellow'){
   entries.push({label:'▧', action: async ()=>{
