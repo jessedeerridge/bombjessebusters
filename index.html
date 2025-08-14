@@ -2830,6 +2830,49 @@ async function setupMissionOnStart(code){
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
 
+
+  /* ここから追加：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
+  if ((v.mission?.id|0) === 41) {
+    const tcount = v.tableCount|0;
+    const cap    = v.captainTable|0;
+
+    // 受け取り先：4人→全員 / 5人→隊長以外 / その他→先頭から最大4人
+    const recipients =
+      (tcount === 5)
+        ? Array.from({length:tcount}, (_,i)=>i).filter(i => i !== cap)
+        : (tcount === 4)
+            ? [0,1,2,3]
+            : Array.from({length: Math.min(4, tcount)}, (_,i)=>i);
+
+    // 黄コード4枚を抽選（受け取り人数ぶんだけ使用）
+    const yList = MATERIALS.yellowCodes.slice(); shuffle(yList);
+    const pick  = yList.slice(0, recipients.length);
+
+    // テーブルに直接配布（手札へ追加→昇順→α再採番）
+    const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
+    const tbls = tablesSnap.val() || [];
+    const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
+
+    recipients.forEach((ti, idx)=>{
+      const hand = tbls[ti]?.hand || [];
+      hand.push({
+        id: crypto.randomUUID(),
+        num: pick[idx],
+        kind: 'yellow',
+        open: false,
+        ownerId: tbls[ti]?.playerId || null,
+        tokens: []
+      });
+      hand.sort((a,b)=> a.num - b.num);
+      realpha(hand);
+      tbls[ti].hand = hand;
+    });
+
+    await set(ref(db, `rooms/${code}/tables`), tbls);
+  }
+
+
+  
   // #9：右2 + ランダム数値2枚
   if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
     const lane = buildNumLaneDOM([
