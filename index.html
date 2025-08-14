@@ -1503,6 +1503,29 @@ if(flags.useParityToken){
   }
 }
 
+
+          // --- #40 席順別の使用可トークンフィルタ ---
+          if (flags.m40_bySeat === true) {
+            const v = state.watching || {};
+            const total = (v.tables || []).length|0;
+            const cap   = (v.captainTable|0);
+            const seatNo = ((idx - cap + total) % Math.max(1,total)) + 1; // 隊長=1番手
+
+            // 1/3/5 → x1,x2,x3 のみ、2/4 → 奇数/偶数 のみ。▧ は常に許可（黄コード時）。
+            const allowLabels = new Set(
+              (seatNo===1 || seatNo===3 || seatNo===5)
+                ? ['x1','x2','x3','▧']
+                : ['2/4','1/3','▧']
+            );
+
+            // ここまでで組んだ entries を席順でふるいに掛ける
+            //（数値トークンはこのメニュー経由では出さない設計のため、特に禁止処理は不要）
+            entries = entries.filter(ent => allowLabels.has(ent.label));
+          }
+
+
+          
+
 const suppressNumberPop = (c.kind !== 'normal') || !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
 
 // ▼ 数字ポップの出し方（通常 or #17 隊長用）
@@ -4086,7 +4109,7 @@ function missionInfo(id, opts={}){
           '',
           ''
        ],
-        flags:{  }
+        flags: { m40_bySeat:true }
       };
     }
       
