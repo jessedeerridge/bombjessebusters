@@ -976,6 +976,7 @@ if (v) {
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
+renderM39(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1138,7 +1139,14 @@ function renderTables(v){
       }
     });
   });
-
+// #39：X が 4枚全体公開 → 自動配布（ホストのみ・一度だけ）
+if ((v.mission?.id|0) === 39) {
+  const X = v?.meta?.m39_x|0;
+  const done = v?.meta?.m39_dealt === true;
+  if (X && !done && (openCountByNum[X]||0) === 4 && state.isHost) {
+    performM39Deal();
+  }
+}
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
@@ -2961,7 +2969,43 @@ try{
     }
  }
   /* ここまで追加 */
-  
+  // #39：初期化（task1〜3）
+if ((v.mission?.id|0) === 39) {
+  // 1) 各テーブル：手札にない数字からランダム1つを m22Tokens に付与
+  const tblRef = ref(db, `rooms/${code}/tables`);
+  const tblSnap = await get(tblRef);
+  const tbls    = tblSnap.val() || [];
+  const allNums = MATERIALS.numbers.slice();
+
+  tbls.forEach(T=>{
+    const handNums = (T.hand||[])
+      .filter(c=>c?.kind==='normal')
+      .map(c=> c.num|0);
+    const cands = allNums.filter(n=> !handNums.includes(n));
+    if (cands.length>0){
+      const tok = cands[(Math.random()*cands.length)|0];
+      const row = Array.isArray(T.m22Tokens) ? T.m22Tokens.slice() : [];
+      if (!row.includes(tok)) row.push(tok); // 1つだけ追加（既存は保持）
+      T.m22Tokens = row;
+    }
+  });
+
+  // 2) X を決定、3) X を除く 11 枚から 8 枚の山札
+  const X    = allNums[(Math.random()*allNums.length)|0];
+  const rest = allNums.filter(n=> n!==X); shuffle(rest);
+  const deck8 = rest.slice(0,8);
+
+  await Promise.all([
+    set(tblRef, tbls),
+    update(ref(db, `rooms/${code}/meta`), {
+      m39_x: X,
+      m39_deck: deck8,
+      m39_discards: [],
+      m39_dealt: false
+    })
+  ]);
+}
+
   // #26：1〜12を3×4で配置（裏表トグル）
   if (flags.m26_grid12) {
     mountM26GridUnderItems();
@@ -3312,6 +3356,161 @@ async function ensureM23MetaInit(){
     m23_drawnNumbers: []    // 数値山で表になった数値
   });
 }
+/* ===== #39：左に X、右に数値P1山＋公開札、下に自分の受け取り数値 ===== */
+function renderM39(v){
+  const isM39 = ((v?.mission?.id|0) === 39);
+  const old = document.getElementById('m39Row');
+  if (!isM39){ if (old) old.remove(); return; }
+
+  if (old) old.remove();
+  const lane = document.createElement('div');
+  lane.id = 'm39Row';
+  lane.className = 'numlane';
+
+  // 左：X（固定表示）
+  const X = v?.meta?.m39_x|0;
+  if (X){
+    const xNode = document.createElement('div');
+    xNode.className = 'numcard';
+    xNode.style.backgroundImage = `url('${imgNumber(X)}')`;
+    lane.appendChild(xNode);
+  }
+
+  // 中央：P1風の山札（残表示）
+  const deckBtn = document.createElement('div');
+  deckBtn.className = 'numdeck';
+  deckBtn.title = 'めくる';
+
+  const restLbl = document.createElement('span');
+  restLbl.className = 'numrest';
+
+  // 右：公開札積み重ね
+  const pile = document.createElement('div');
+  pile.className = 'numcard-holder';
+  pile.style.position = 'relative';
+
+  lane.appendChild(deckBtn);
+  lane.appendChild(restLbl);
+  lane.appendChild(pile);
+
+  // 既存公開札の再描画 & 残表示
+  const refresh = ()=>{
+    const d = (v?.meta?.m39_deck||[]);
+    const x = (v?.meta?.m39_discards||[]);
+    const remain = d.filter(n=>!x.includes(n)).length;
+    restLbl.textContent = `残:${remain}`;
+
+    pile.innerHTML = '';
+    x.forEach((n, i)=>{
+      const node = document.createElement('div');
+      node.className = 'numcard';
+      node.style.backgroundImage = `url('${imgNumber(n)}')`;
+      if (i>0){
+        const off = i*2;
+        node.style.position='absolute';
+        node.style.left = off+'px';
+        node.style.top  = off+'px';
+      }
+      pile.appendChild(node);
+      const extra = i*2;
+      pile.style.height = (48+extra)+'px';
+      lane.style.marginBottom = extra+'px';
+    });
+  };
+  refresh();
+
+  deckBtn.onclick = async ()=>{
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const mSnap = await get(mRef);
+      const meta  = mSnap.val()||{};
+      if (meta.m39_dealt) return; // 配布後は止める
+      const D = Array.isArray(meta.m39_deck) ? meta.m39_deck.slice() : [];
+      const Xs = Array.isArray(meta.m39_discards) ? meta.m39_discards.slice() : [];
+      const next = D.find(n=> !Xs.includes(n)); // 山札順で次
+      if (next==null) return;
+      Xs.push(next);
+      await update(mRef, { m39_discards: Xs });
+    }catch(e){ console.error(e); }
+  };
+
+  mountLaneUnderItemsBar(lane);
+
+  // 自分の受け取り数値（m39Hand）をミッション詳細の直上に表示
+  const rowId = 'm39HandRow';
+  const oldRow = document.getElementById(rowId);
+  if (oldRow) oldRow.remove();
+
+  const myIdx = (v?.tables||[]).findIndex(T => T.playerId === state.userId);
+  const myT   = myIdx>=0 ? v.tables[myIdx] : null;
+  const row = document.createElement('div');
+  row.id = rowId;
+  row.style.display = 'flex';
+  row.style.gap = '6px';
+  row.style.margin = '6px 0';
+  (myT?.m39Hand||[]).forEach(n=>{
+    const nc = document.createElement('div');
+    nc.className = 'numcard';
+    nc.style.backgroundImage = `url('${imgNumber(n)}')`;
+    row.appendChild(nc);
+  });
+  missionFooter.insertAdjacentElement('beforebegin', row);
+}
+
+  async function performM39Deal(){
+  try{
+    const rRef = ref(db, `rooms/${state.roomCode}`);
+    const [rSnap, tSnap] = await Promise.all([
+      get(rRef),
+      get(ref(db, `rooms/${state.roomCode}/tables`))
+    ]);
+    const R = rSnap.val()||{};
+    const meta = R.meta||{};
+    if (meta.m39_dealt) return;
+
+    const deck = Array.isArray(meta.m39_deck) ? meta.m39_deck.slice() : [];
+    const disc = Array.isArray(meta.m39_discards) ? meta.m39_discards.slice() : [];
+    const rest = deck.filter(n => !disc.includes(n)); // ←“捨て札にならなかった”カード
+
+    const tables = Array.isArray(tSnap.val()) ? tSnap.val().map(T=>({...T})) : [];
+    const tCount = R.tableCount|0;
+    const start  = R.captainTable|0;
+
+    // ラウンドロビン配布
+    rest.forEach((n, i)=>{
+      const to = (start + i) % tCount;
+      const T  = tables[to] || (tables[to]={});
+      const arr = Array.isArray(T.m39Hand) ? T.m39Hand.slice() : [];
+      arr.push(n);
+      T.m39Hand = arr;
+    });
+
+    // 条件付き：情報トークンをキャラ下行に1つ配布
+    tables.forEach(T=>{
+      const got = Array.isArray(T.m39Hand) ? T.m39Hand : [];
+      const hand = Array.isArray(T.hand) ? T.hand : [];
+      const row  = Array.isArray(T.m22Tokens) ? T.m22Tokens.slice() : [];
+      got.forEach(n=>{
+        const hasSameNum = hand.some(c => c?.kind==='normal' && (c.num|0)===(n|0));
+        const someNoNumToken = hand.some(c =>
+          c?.kind==='normal' && (c.num|0)===(n|0) &&
+          !(Array.isArray(c.tokens) && c.tokens.some(tk => String(tk.type)==='num' && (tk.value|0)===(n|0)))
+        );
+        if (hasSameNum && someNoNumToken && !row.includes(n)){
+          row.push(n);
+        }
+      });
+      T.m22Tokens = row;
+    });
+
+    await Promise.all([
+      set(ref(db, `rooms/${state.roomCode}/tables`), tables),
+      update(ref(db, `rooms/${state.roomCode}/meta`), { m39_dealt: true })
+    ]);
+  }catch(e){ console.error('performM39Deal', e); }
+}
+
+  
 function attachM23DeckUI(lane){
   const deckBtn = document.createElement('div');
  deckBtn.className = 'numdeck';
