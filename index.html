@@ -1139,7 +1139,14 @@ function renderTables(v){
       }
     });
   });
-
+// #39：X が 4枚全体公開 → 自動配布（ホストのみ・一度だけ）
+if ((v.mission?.id|0) === 39) {
+  const X = v?.meta?.m39_x|0;
+  const done = v?.meta?.m39_dealt === true;
+  if (X && !done && (openCountByNum[X]||0) === 4 && state.isHost) {
+    performM39Deal();
+  }
+}
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
@@ -3496,10 +3503,8 @@ function renderM39(v){
       T.m22Tokens = row;
     });
 
-    await Promise.all([
-      set(ref(db, `rooms/${state.roomCode}/tables`), tables),
-      update(ref(db, `rooms/${state.roomCode}/meta`), { m39_dealt: true })
-    ]);
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m39_dealt: true });
+    await set(ref(db, `rooms/${state.roomCode}/tables`), tables);
   }catch(e){ console.error('performM39Deal', e); }
 }
 
