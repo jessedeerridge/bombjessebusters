@@ -833,6 +833,11 @@ function buildMixPlan(missionId){
 40: [  // 赤3
   {type:'redPick', k:3},
 ],
+    if (missionId === 40) {
+  mission.flags = {
+    allowedTokens: ['odd', 'even', 'x1', 'x2', 'x3', 'yellow']
+  };
+}
 41: [  // 赤3-1
   {type:'redChoose', from:3, take:1},
 ],
