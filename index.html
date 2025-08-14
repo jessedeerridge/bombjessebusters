@@ -1455,8 +1455,17 @@ content.appendChild(charCol);
 const flags = state.watching?.mission?.flags || {};
 const myHand = (t.hand||[]).filter(cc => cc.ownerId===state.userId);
 const countSame = myHand.filter(cc => cc.num===c.num).length;
+ // ここから追加：#40 番手別の使用許可（x系 or 偶奇）
+ // 番手＝隊長テーブルを1番手として時計回りに 1,2,3,…
+ const _m40 = ((state.watching?.mission?.id|0) === 40);
+ const cap   = state.watching?.captainTable ?? 0;
+ const total = (state.watching?.tables?.length||0);
+ const order = ((idx - cap + total) % total) + 1; // 1始まり
+ // x系許可：1,3,5番手／ 偶奇許可：2,4番手／ それ以外（6番手など）はどちらも不可
+ const USE_X      = (!!flags.useXTokens)   || (_m40 && [1,3,5].includes(order));
+ const USE_PARITY = (!!flags.useParityToken)|| (_m40 && [2,4].includes(order));
 
-// 黄コードトークン（▧）
+          // 黄コードトークン（▧）
 if(flags.useYellowToken || c.kind === 'yellow'){
   entries.push({label:'▧', action: async ()=>{
     const updated=[...(tokens), {type:'yellow', value:'▧', style:'yellow'}];
@@ -1466,7 +1475,7 @@ if(flags.useYellowToken || c.kind === 'yellow'){
 }
 
 // x1/x2/x3（数字ポップを出さないミッション用）
-if(flags.useXTokens){
+ if(USE_X){
   if(countSame===1) entries.push({label:'x1', action: async ()=>{
     const updated=[...(tokens), {type:'x1', value:'x1', style:'x1'}];
     await update(ref(db, cardPath), { tokens: updated });
@@ -1485,7 +1494,7 @@ if(flags.useXTokens){
 }
 
 // 偶数/奇数（数字ポップを出さないミッション用）
-if(flags.useParityToken){
+ if(USE_PARITY){
   const isEven = (c.num % 2)===0;
   if(isEven){
     entries.push({label:'2/4', action: async ()=>{
@@ -1503,10 +1512,11 @@ if(flags.useParityToken){
 }
 
 const suppressNumberPop = (c.kind !== 'normal') || !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
-
+ const m40 = ((state.watching?.mission?.id|0) === 40);
+ const suppressNumberPop_m40 = suppressNumberPop || m40;
 // ▼ 数字ポップの出し方（通常 or #17 隊長用）
 const isCaptain = (state.watching?.captainTable|0) === idx;
-if(!suppressNumberPop && canNum){
+ if(!suppressNumberPop_m40 && canNum){
   if(v.mission?.flags?.m17_captainInverseNumberPop && isCaptain){
     // 隊長は「自分のカード数値 以外」の 1..12 を候補にする
     for(let nn=1; nn<=12; nn++){
