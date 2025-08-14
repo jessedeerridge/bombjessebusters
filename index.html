@@ -1465,6 +1465,50 @@ if(flags.useYellowToken || c.kind === 'yellow'){
   }});
 }
 
+ // ▼▼ ミッション40：番手で出せるトークンを限定（x1/x2/x3 か 奇数/偶数）
+ if (flags.m40_tokenByOrder) {
+   const captainIdx = state.watching?.captainTable ?? 0;           // 隊長のテーブルindex
+   const total      = (state.watching?.tables?.length || 0);
+   const order      = ((idx - captainIdx + total) % total) + 1;    // 1..N（隊長から数えた順）
+
+   // 1,3,5番手 → x1/x2/x3 のみ（同数カウントで段階表示）
+   if ([1,3,5].includes(order)) {
+     if (countSame === 1) entries.push({label:'x1', action: async ()=>{
+       const updated=[...(tokens), {type:'x1', value:'x1', style:'x1'}];
+       await update(ref(db, cardPath), { tokens: updated });
+       box.classList.add('elevated');
+     }});
+     if (countSame === 2) entries.push({label:'x2', action: async ()=>{
+       const updated=[...(tokens), {type:'x2', value:'x2', style:'x2'}];
+       await update(ref(db, cardPath), { tokens: updated });
+       box.classList.add('elevated');
+     }});
+     if (countSame === 3) entries.push({label:'x3', action: async ()=>{
+       const updated=[...(tokens), {type:'x3', value:'x3', style:'x3'}];
+       await update(ref(db, cardPath), { tokens: updated });
+       box.classList.add('elevated');
+     }});
+   }
+
+   // 2,4番手 → 奇数/偶数 のみ（カード実数に応じて 1/3 or 2/4）
+   if ([2,4].includes(order)) {
+     const isEven = (c.num % 2) === 0;
+     if (isEven) {
+       entries.push({label:'2/4', action: async ()=>{
+         const updated=[...(tokens), {type:'even', value:'2/4', style:'even'}];
+         await update(ref(db, cardPath), { tokens: updated });
+         box.classList.add('elevated');
+       }});
+     } else {
+       entries.push({label:'1/3', action: async ()=>{
+         const updated=[...(tokens), {type:'odd', value:'1/3', style:'odd'}];
+         await update(ref(db, cardPath), { tokens: updated });
+         box.classList.add('elevated');
+       }});
+     }
+   }
+ }
+          
 // x1/x2/x3（数字ポップを出さないミッション用）
 if(flags.useXTokens){
   if(countSame===1) entries.push({label:'x1', action: async ()=>{
@@ -1501,62 +1545,12 @@ if(flags.useParityToken){
     }});
   }
 }
-// ▼ ミッション40専用：隊長からの順番によって使えるトークンを制限
-if ((state.watching?.mission?.id|0) === 40) {
-    if (typeof flags === 'object' && flags) flags.useNumberToken = false;
-
-  const captainIdx = state.watching?.captainTable ?? 0; // 隊長テーブルindex
-  const playerOrder = (idx - captainIdx + (state.watching?.tables?.length||0)) % (state.watching?.tables?.length||0) + 1;
-
-  // 1,3,5番手 → x1,x2,x3 のみ
-  if ([1,3,5].includes(playerOrder)) {
-    if (countSame===1) entries.push({label:'x1', action: async ()=>{
-      const updated=[...(tokens), {type:'x1', value:'x1', style:'x1'}];
-      await update(ref(db, cardPath), { tokens: updated });
-      box.classList.add('elevated');
-    }});
-    if (countSame===2) entries.push({label:'x2', action: async ()=>{
-      const updated=[...(tokens), {type:'x2', value:'x2', style:'x2'}];
-      await update(ref(db, cardPath), { tokens: updated });
-      box.classList.add('elevated');
-    }});
-    if (countSame===3) entries.push({label:'x3', action: async ()=>{
-      const updated=[...(tokens), {type:'x3', value:'x3', style:'x3'}];
-      await update(ref(db, cardPath), { tokens: updated });
-      box.classList.add('elevated');
-    }});
-  }
-
-  // 2,4番手 → 奇数/偶数トークンのみ
-  if ([2,4].includes(playerOrder)) {
-    const isEven = (c.num % 2)===0;
-    if(isEven){
-      entries.push({label:'2/4', action: async ()=>{
-        const updated=[...(tokens), {type:'even', value:'2/4', style:'even'}];
-        await update(ref(db, cardPath), { tokens: updated });
-        box.classList.add('elevated');
-      }});
-    }else{
-      entries.push({label:'1/3', action: async ()=>{
-        const updated=[...(tokens), {type:'odd', value:'1/3', style:'odd'}];
-        await update(ref(db, cardPath), { tokens: updated });
-        box.classList.add('elevated');
-      }});
-    }
-  }
-
-    /* ここから追加：#40 の安全弁（もし先に数字ボタンが混ざっていてもメニューから除去） */
-  if (Array.isArray(entries)) {
-    for (let i = entries.length - 1; i >= 0; i--) {
-      if (typeof entries[i]?.label === 'string' && /^\d+$/.test(entries[i].label)) {
-        entries.splice(i, 1);
-      }
-    }
-  }
-}
 
 const suppressNumberPop = (c.kind !== 'normal') || !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
-
+ // #40 は数字を出さない
+ const suppressNumberPop = (c.kind !== 'normal')
+   || !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken
+   || !!flags.m40_tokenByOrder;
 // ▼ 数字ポップの出し方（通常 or #17 隊長用）
 const isCaptain = (state.watching?.captainTable|0) === idx;
 if(!suppressNumberPop && canNum){
@@ -4137,7 +4131,7 @@ function missionInfo(id, opts={}){
           '隊長の手札のみ：ランダムで1枚を右端に移動。他は昇順。',
           '移動したカードに ✕（黄背景/黒文字）トークンを付ける。'
        ],
-        flags:{  }
+     flags:{ m40_tokenByOrder:true }  // ← ミッション40：番手別トークン制限フラグ
       };
     }
     case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
