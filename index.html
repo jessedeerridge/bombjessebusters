@@ -1464,6 +1464,7 @@ const countSame = myHand.filter(cc => cc.num===c.num).length;
  // x系許可：1,3,5番手／ 偶奇許可：2,4番手／ それ以外（6番手など）はどちらも不可
  const USE_X      = (!!flags.useXTokens)   || (_m40 && [1,3,5].includes(order));
  const USE_PARITY = (!!flags.useParityToken)|| (_m40 && [2,4].includes(order));
+const isColorCode = (c.kind === 'red' || c.kind === 'yellow');
 
           // 黄コードトークン（▧）
 if(flags.useYellowToken || c.kind === 'yellow'){
@@ -1475,7 +1476,7 @@ if(flags.useYellowToken || c.kind === 'yellow'){
 }
 
 // x1/x2/x3（数字ポップを出さないミッション用）
- if(USE_X){
+if (USE_X && !isColorCode){
   if(countSame===1) entries.push({label:'x1', action: async ()=>{
     const updated=[...(tokens), {type:'x1', value:'x1', style:'x1'}];
     await update(ref(db, cardPath), { tokens: updated });
@@ -1494,7 +1495,7 @@ if(flags.useYellowToken || c.kind === 'yellow'){
 }
 
 // 偶数/奇数（数字ポップを出さないミッション用）
- if(USE_PARITY){
+if (USE_PARITY && !isColorCode){
   const isEven = (c.num % 2)===0;
   if(isEven){
     entries.push({label:'2/4', action: async ()=>{
@@ -1605,7 +1606,7 @@ const isCaptain = (state.watching?.captainTable|0) === idx;
             });
           }
 
-          if(canX1){
+if (canX1 && c.kind === 'normal'){
             entries.push({label:'x1', action: async ()=>{
               const updated=[...(tokens), {type:'x1', value:c.num, style:'x1'}];
               await update(ref(db, cardPath), { tokens: updated });
