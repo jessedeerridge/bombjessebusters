@@ -1501,48 +1501,6 @@ if(flags.useParityToken){
     }});
   }
 }
-/* ▼ ミッション40専用：隊長からの順番で使用トークン制限 */
-if ((state.watching?.mission?.id|0) === 40) {
-  const captainIdx = state.watching?.captainTable ?? 0; // 隊長のテーブル index
-  const playerOrder = (idx - captainIdx + (state.watching?.tables?.length||0)) % (state.watching?.tables?.length||0) + 1;
-
-  // 1,3,5番手 → x1,x2,x3 のみ
-  if ([1,3,5].includes(playerOrder)) {
-    if (countSame===1) entries.push({label:'x1', action: async ()=>{
-      const updated=[...(tokens), {type:'x1', value:'x1', style:'x1'}];
-      await update(ref(db, cardPath), { tokens: updated });
-      box.classList.add('elevated');
-    }});
-    if (countSame===2) entries.push({label:'x2', action: async ()=>{
-      const updated=[...(tokens), {type:'x2', value:'x2', style:'x2'}];
-      await update(ref(db, cardPath), { tokens: updated });
-      box.classList.add('elevated');
-    }});
-    if (countSame===3) entries.push({label:'x3', action: async ()=>{
-      const updated=[...(tokens), {type:'x3', value:'x3', style:'x3'}];
-      await update(ref(db, cardPath), { tokens: updated });
-      box.classList.add('elevated');
-    }});
-  }
-
-  // 2,4番手 → 奇数 / 偶数 のみ
-  if ([2,4].includes(playerOrder)) {
-    const isEven = (c.num % 2)===0;
-    if (isEven) {
-      entries.push({label:'2/4', action: async ()=>{
-        const updated=[...(tokens), {type:'even', value:'2/4', style:'even'}];
-        await update(ref(db, cardPath), { tokens: updated });
-        box.classList.add('elevated');
-      }});
-    } else {
-      entries.push({label:'1/3', action: async ()=>{
-        const updated=[...(tokens), {type:'odd', value:'1/3', style:'odd'}];
-        await update(ref(db, cardPath), { tokens: updated });
-        box.classList.add('elevated');
-      }});
-    }
-  }
-}
 
 const suppressNumberPop = (c.kind !== 'normal') || !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
 
