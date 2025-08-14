@@ -833,7 +833,6 @@ function buildMixPlan(missionId){
 40: [  // 赤3
   {type:'redPick', k:3},
 ],
-
 41: [  // 赤3-1
   {type:'redChoose', from:3, take:1},
 ],
@@ -1502,29 +1501,48 @@ if(flags.useParityToken){
     }});
   }
 }
+// ▼ ミッション40専用：隊長からの順番によって使えるトークンを制限
+if ((state.watching?.mission?.id|0) === 40) {
+  const captainIdx = state.watching?.captainTable ?? 0; // 隊長テーブルindex
+  const playerOrder = (idx - captainIdx + (state.watching?.tables?.length||0)) % (state.watching?.tables?.length||0) + 1;
 
+  // 1,3,5番手 → x1,x2,x3 のみ
+  if ([1,3,5].includes(playerOrder)) {
+    if (countSame===1) entries.push({label:'x1', action: async ()=>{
+      const updated=[...(tokens), {type:'x1', value:'x1', style:'x1'}];
+      await update(ref(db, cardPath), { tokens: updated });
+      box.classList.add('elevated');
+    }});
+    if (countSame===2) entries.push({label:'x2', action: async ()=>{
+      const updated=[...(tokens), {type:'x2', value:'x2', style:'x2'}];
+      await update(ref(db, cardPath), { tokens: updated });
+      box.classList.add('elevated');
+    }});
+    if (countSame===3) entries.push({label:'x3', action: async ()=>{
+      const updated=[...(tokens), {type:'x3', value:'x3', style:'x3'}];
+      await update(ref(db, cardPath), { tokens: updated });
+      box.classList.add('elevated');
+    }});
+  }
 
-          // --- #40 席順別の使用可トークンフィルタ ---
-          if (flags.m40_bySeat === true) {
-            const v = state.watching || {};
-            const total = (v.tables || []).length|0;
-            const cap   = (v.captainTable|0);
-            const seatNo = ((idx - cap + total) % Math.max(1,total)) + 1; // 隊長=1番手
-
-            // 1/3/5 → x1,x2,x3 のみ、2/4 → 奇数/偶数 のみ。▧ は常に許可（黄コード時）。
-            const allowLabels = new Set(
-              (seatNo===1 || seatNo===3 || seatNo===5)
-                ? ['x1','x2','x3','▧']
-                : ['2/4','1/3','▧']
-            );
-
-            // ここまでで組んだ entries を席順でふるいに掛ける
-            //（数値トークンはこのメニュー経由では出さない設計のため、特に禁止処理は不要）
-            entries = entries.filter(ent => allowLabels.has(ent.label));
-          }
-
-
-          
+  // 2,4番手 → 奇数/偶数トークンのみ
+  if ([2,4].includes(playerOrder)) {
+    const isEven = (c.num % 2)===0;
+    if(isEven){
+      entries.push({label:'2/4', action: async ()=>{
+        const updated=[...(tokens), {type:'even', value:'2/4', style:'even'}];
+        await update(ref(db, cardPath), { tokens: updated });
+        box.classList.add('elevated');
+      }});
+    }else{
+      entries.push({label:'1/3', action: async ()=>{
+        const updated=[...(tokens), {type:'odd', value:'1/3', style:'odd'}];
+        await update(ref(db, cardPath), { tokens: updated });
+        box.classList.add('elevated');
+      }});
+    }
+  }
+}
 
 const suppressNumberPop = (c.kind !== 'normal') || !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
 
@@ -4100,19 +4118,17 @@ function missionInfo(id, opts={}){
         flags:{  }
       };
     }
-      
-    case 40: {
+       case 40: {
      return {
         id:40, name:'#40', desc:'',
         display:[
           '#40',
-          '',
-          ''
+          '隊長の手札のみ：ランダムで1枚を右端に移動。他は昇順。',
+          '移動したカードに ✕（黄背景/黒文字）トークンを付ける。'
        ],
-        flags: { m40_bySeat:true }
+        flags:{  }
       };
     }
-      
     case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
     case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
     default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
