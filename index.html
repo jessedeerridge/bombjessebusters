@@ -2848,6 +2848,15 @@ async function setupMissionOnStart(code){
     const yList = MATERIALS.yellowCodes.slice(); shuffle(yList);
     const pick  = yList.slice(0, recipients.length);
 
+    // ▼ ミッション詳細に表示（先頭タイトルの直後に ▧行を差し込む）
+    try{
+      const dispSnap = await get(ref(db, `rooms/${code}/mission/display`));
+      const disp = dispSnap.val() || [];
+      const yellowLine = '<span style="color:gold;">▧</span>' + pick.map(n => `[${n}]`).join('');
+      await update(ref(db, `rooms/${code}/mission`), { display: [disp[0] || '#41', yellowLine, ...disp.slice(1)] });
+    }catch(_){}
+
+    
     // テーブルに直接配布（手札へ追加→昇順→α再採番）
     const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
     const tbls = tablesSnap.val() || [];
