@@ -1446,7 +1446,7 @@ if (showM42M2 && m42m2.selB && m42m2.selB.cardId===c.id && m42m2.selB.table===id
         };
       }else{
          card.onclick = async ()=>{
-           if (state.watching?.meta?.m42_on || state.watching?.meta?.m42Swap?.on) return;
+   if (state.watching?.meta?.m42_on || state.watching?.meta?.m42Swap?.on || state.watching?.meta?.m42M2?.on) return;
           if(isMine){
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
@@ -4494,9 +4494,11 @@ function missionInfo(id, opts={}){
         id:36, name:'#36', desc:'',
         display:[
           '#36',
-          '数値1〜12からランダム5枚を横並び。左右にブランク枠を付ける。',
-          '左ブランクを押すと「右側の2枚」を表示。右ブランクを押すと「左側の2枚」を表示。',
-          '「隊長が解除する順番（向き）を決める。」「対象2本を切断するたび、相談なしで新しい向きを置き直せる」「それ以外の数値は切断可能」'
+          '数値カードを5枚並べる。',
+          '最初に隊長はどちらの方向から切断できるか決める。',
+          '数値カード上のコードはこの順で2本切断しなければならない。',
+          'カード上の2本を切断するたびに、相談せずに、切断したプレイヤーがどちらの方向から切断できるか決め直してよい。',
+          'それ以外の数値は自由に切断できる。'
         ],
         flags:{ m36_directionRow:true }
       };
@@ -4507,7 +4509,7 @@ function missionInfo(id, opts={}){
         id:36, name:'#37', desc:'',
         display:[
           '#37',
-          '数値1〜12からランダム5枚を横並び。左右にブランク枠を付ける。',
+          '数値カードの1〜12からランダム5枚を横並び。左右にブランク枠を付ける。',
           '左ブランクを押すと「右側の2枚」を表示。右ブランクを押すと「左側の2枚」を表示。',
           '「隊長が解除する順番（向き）を決める。」「対象2本を切断するたび、相談なしで新しい向きを置き直せる」「それ以外の数値は切断可能」'
         ],
