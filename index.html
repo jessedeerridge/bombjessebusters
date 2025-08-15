@@ -2226,7 +2226,7 @@ function renderM42(v){
               await Promise.all([
                 set(ref(db, `rooms/${state.roomCode}/tables/${selA.table}/hand`), A.hand),
                 set(ref(db, `rooms/${state.roomCode}/tables/${selB.table}/hand`), B.hand),
-                update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null} })
+               update(mRef, { m42Swap: null })
               ]);
             }},
             {label:'やり直す', action: async ()=>{
