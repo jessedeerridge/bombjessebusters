@@ -1309,7 +1309,10 @@ content.appendChild(charCol);
       }
       const wrap=document.createElement('div'); wrap.className='card-wrap';
       const card=document.createElement('div'); card.className='card';
-if (c.gone === true){
+wrap.dataset.table = String(idx);
+wrap.dataset.cardId = String(c.id||'');
+      
+      if (c.gone === true){
   wrap.classList.add('m42-gone');     // ★ 数字・トークンなど別レイヤもまとめて不可視
 }
      // 既に消滅済なら見えない空枠として保持（幅は保つ）
@@ -1393,6 +1396,9 @@ if (c.gone === true){
 
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+    const m42s = state.watching?.meta?.m42Swap;
+if (m42s?.selA && m42s.selA.cardId===c.id && m42s.selA.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+if (m42s?.selB && m42s.selB.cardId===c.id && m42s.selB.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if(c.markUntil && now()<c.markUntil){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
 
@@ -1433,8 +1439,8 @@ if (c.gone === true){
           ]);
         };
       }else{
-        card.onclick = async ()=>{
-                    if (state.watching?.meta?.m42_on) return;
+         card.onclick = async ()=>{
+           if (state.watching?.meta?.m42_on || state.watching?.meta?.m42Swap?.on) return;
           if(isMine){
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
@@ -2065,26 +2071,35 @@ function renderM31(v){
   }
 }
 
-/* ここから追加：#42 描画・操作ロジック（ひとかたまり） */
+/* ここから追加：#42 描画・操作ロジック（⇅入れ替えモードをひとかたまりで実装） */
 function renderM42(v){
   const isM42 = ((v?.mission?.id|0) === 42);
- if (!document.getElementById('m42GoneStyle')) {
+
+  // 1) 一度だけ仕込む補助CSS
+  if (!document.getElementById('m42ExtraStyle')) {
     const st = document.createElement('style');
-    st.id = 'm42GoneStyle';
+    st.id = 'm42ExtraStyle';
     st.textContent = `
-      /* ラッパーごと不可視化（幅は保持） */
+      /* 消滅済み枠（既存維持） */
       .m42-gone, .m42-gone * { visibility: hidden !important; pointer-events: none !important; }
+      /* ⇅モード時：全体公開カードを青枠表示（既存の i2-selectable 風） */
+      body[data-m42swap="on"] .card.open { outline:2px dashed #38bdf8; outline-offset:-3px; }
     `;
     document.head.appendChild(st);
   }
-  
-  // 既存UIの掃除
+
+  // 既存UIの掃除（バー/箱）。☝（m42_on）は前コード互換として残す
   const oldBar = document.getElementById('m42HostBar'); if (oldBar) oldBar.remove();
   const oldBox = document.getElementById('m42Box');     if (oldBox && !v?.meta?.m42_on) oldBox.remove();
 
-  if (!isM42){ return; }
+  if (!isM42){
+    // ミッション外：⇅用ハンドラと表示フラグを落とす
+    document.body.removeAttribute('data-m42swap');
+    if (state._m42swapClick) { document.removeEventListener('click', state._m42swapClick, true); state._m42swapClick=null; }
+    return;
+  }
 
-  // --- ホスト下部バー（固定・常駐） ---
+  // 2) ホスト下部バー
   if (state.isHost){
     const bar = document.createElement('div');
     bar.id = 'm42HostBar';
@@ -2095,18 +2110,27 @@ function renderM42(v){
       boxShadow:'0 10px 24px rgba(0,0,0,.08)'
     });
     const btn = (txt, on)=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=txt; b.onclick=on; return b; };
-    const toggle = async ()=>{
+
+    // ☝トグル（既存維持）
+    const toggleBox = async ()=>{
       const on = !!v?.meta?.m42_on;
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_on: !on });
     };
-    bar.appendChild(btn('-2', ()=>{})); // ダミー
-    bar.appendChild(btn('⇅', ()=>{})); 
-    bar.appendChild(btn('☝', toggle));
-    bar.appendChild(btn('あ', ()=>{})); // ダミー
+
+    // ⇅トグル：入れ替えモード on/off と選択状態のリセット
+    const toggleSwap = async ()=>{
+      const on = !!v?.meta?.m42Swap?.on;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m42Swap: on ? null : { on:true, usingBy:null, selA:null, selB:null } });
+    };
+
+    bar.appendChild(btn('-2', ()=>{}));           // ダミー
+    bar.appendChild(btn('⇅', toggleSwap));        // ← 今回の本体
+    bar.appendChild(btn('☝', toggleBox));        // 互換
+    bar.appendChild(btn('あ', ()=>{}));           // ダミー
     document.body.appendChild(bar);
   }
 
-  // --- ☝ON中：箱をアイテム列の直下へ ---
+  // 3) ☝ONなら箱を出す（既存互換）
   if (v?.meta?.m42_on){
     const bar = document.getElementById('itemsBar');
     if (bar && !document.getElementById('m42Box')){
@@ -2120,7 +2144,107 @@ function renderM42(v){
       bar.insertAdjacentElement('afterend', box);
     }
   }
+
+  // 4) ⇅入れ替えモード：青枠＋クリック選択（▼表示は renderTables 側の2行で描画）
+  const swapOn = !!v?.meta?.m42Swap?.on;
+  if (swapOn){
+    document.body.setAttribute('data-m42swap','on');
+    // 既存カードの裏表トグルonclickより前に捕捉して止める＆選択処理へ
+    if (!state._m42swapClick){
+      state._m42swapClick = async (ev)=>{
+        // クリック捕捉（気泡化前）。カード以外は無視
+        const wrap = ev.target.closest?.('.card-wrap');
+        if (!wrap) return;
+        // 非公開は対象外：.open が付いているか見る
+        const cardEl = wrap.querySelector('.card');
+        if (!cardEl || !cardEl.classList.contains('open')) return;
+
+        // ここで既存のカードflip onclickを止める
+        ev.stopPropagation();
+
+        // DOMに付けたdata属性から table / cardId を取得（下の最小追記で付与）
+        const table = parseInt(wrap.dataset.table,10);
+        const cardId = wrap.dataset.cardId;
+        if (!Number.isInteger(table) || !cardId) return;
+
+        const me = state.userId;
+        const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+        const mSnap = await get(mRef);
+        const meta  = mSnap.val() || {};
+        const flow  = meta.m42Swap && meta.m42Swap.on ? meta.m42Swap : {on:true, usingBy:null, selA:null, selB:null};
+
+        // 他人が選びかけていても、自分が触れば乗っ取り（Aさん→Bさんでキャンセル要求を満たす）
+        if (flow.usingBy && flow.usingBy !== me){
+          await update(mRef, { m42Swap:{on:true, usingBy:me, selA:{table, cardId}, selB:null} });
+          return;
+        }
+
+        // 自分のフローとして進行
+        if (!flow.selA){
+          await update(mRef, { m42Swap:{on:true, usingBy:me, selA:{table, cardId}, selB:null} });
+          return;
+        }
+        if (flow.selA && !flow.selB){
+          // 2枚目選択
+          const selA = flow.selA, selB = {table, cardId};
+
+          // 2枚が同じ数字ならキャンセル
+          const tSnap = await get(ref(db, `rooms/${state.roomCode}/tables`));
+          const tables = tSnap.val() || [];
+          const findNum = ({table, cardId})=>{
+            const hand = (tables[table]?.hand)||[];
+            const c = hand.find(x=> x?.id===cardId);
+            return c ? (c.num|0) : null;
+          };
+          const na = findNum(selA), nb = findNum(selB);
+          if (na!=null && nb!=null && na===nb){
+            alert('同じ数字です'); // シンプルポップ
+            await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null} });
+            return;
+          }
+
+          // 2枚揃った：下ポップで「交換する／やり直す」
+          await update(mRef, { m42Swap:{on:true, usingBy:me, selA, selB} });
+          openBottomMenu([
+            {label:'交換する', action: async ()=>{
+              // 昇順に並べ替えず、その場で入れ替える
+              const ts = (await get(ref(db, `rooms/${state.roomCode}/tables`))).val() || [];
+              const pick = (ti, id)=>{ const hand=(ts[ti]?.hand)||[]; const idx=hand.findIndex(c=> c?.id===id); return {hand, idx, card: idx>=0?hand[idx]:null}; };
+              const A = pick(selA.table, selA.cardId);
+              const B = pick(selB.table, selB.cardId);
+              if (!A.card || !B.card) { await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null} }); return; }
+
+              const toA = {...B.card, ownerId: (ts[selA.table]?.playerId)||null, markUntil: (now()+6000)};
+              const toB = {...A.card, ownerId: (ts[selB.table]?.playerId)||null, markUntil: (now()+6000)};
+              A.hand[A.idx] = toA;
+              B.hand[B.idx] = toB;
+
+              // アルファの振り直し（既存慣例）
+              const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
+              realpha(A.hand); realpha(B.hand);
+
+              await Promise.all([
+                set(ref(db, `rooms/${state.roomCode}/tables/${selA.table}/hand`), A.hand),
+                set(ref(db, `rooms/${state.roomCode}/tables/${selB.table}/hand`), B.hand),
+                update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null} })
+              ]);
+            }},
+            {label:'やり直す', action: async ()=>{
+              await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null} });
+            }}
+          ]);
+        }
+      };
+      document.addEventListener('click', state._m42swapClick, true);
+    }
+  }else{
+    // ⇅オフ：フラグ/ハンドラ解除
+    document.body.removeAttribute('data-m42swap');
+    if (state._m42swapClick) { document.removeEventListener('click', state._m42swapClick, true); state._m42swapClick=null; }
+  }
 }
+/* ここまで追加：#42 */
+
 
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
