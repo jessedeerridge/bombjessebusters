@@ -969,7 +969,7 @@ if (v) {
     return;
   }
 }    
-   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
+  renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); renderStageCommon(v);
      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
@@ -3780,6 +3780,95 @@ function buildConDeckLaneP1(){
   return lane;
 }
 
+/* ▼▼ ステージ共通レンダラ（ホスト以外にも数値レーン／右左カードを表示） ▼▼ */
+function renderStageCommon(v){
+  if (!v?.mission) return;
+  const flags = v.mission.flags || {};
+
+  // まず既存の汎用レーンを掃除（#39・#36など専用IDは残す）
+  document.querySelectorAll('.numlane:not(#m39Row):not(#m36NumRow)').forEach(n=>n.remove());
+  // 制約レーン（#32/#37）は専用ID
+  const oldCon = document.getElementById('m32ConRow'); if (oldCon) oldCon.remove();
+
+  // #9：右2＋ランダム数値2
+  if (flags.needsRuleRow && flags.rule?.type === 'R2with2'){
+    const lane = buildNumLaneDOM([
+      {kind:'rule', img: imgRule('right2')},
+      {kind:'num',  img: imgNumber(((Math.random()*12)|0)+1)},
+      {kind:'num',  img: imgNumber(((Math.random()*12)|0)+1)}
+    ]);
+    mountLaneUnderItemsBar(lane);
+  }
+
+  // #11：P1（山札→めくる）
+  if (flags.needsNumberLane && flags.pattern === 'P1'){
+    const lane = buildDeckLaneP1();
+    mountLaneUnderItemsBar(lane);
+    // #23 の右側アイテム山（メタに依存）も全端末で反映
+    if (flags.m23_itemDeck7){
+      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
+    }
+  }
+
+  // #30：P1-pop123（山札→1/2/3ポップ）
+  if (flags.needsNumberLane && flags.pattern === 'P1-pop123'){
+    const lane = buildDeckLaneP1Pop123();
+    mountLaneUnderItemsBar(lane);
+  }
+
+  // #12：P2-eachItem（各アイテムの中央下に1枚固定配置）
+  if (flags.needsNumberLane && flags.pattern === 'P2-eachItem'){
+    distributeNumbersToItemsCentered(1);
+  }
+
+  // #32 / #37：制約カード12の山札（制約レーン）
+  if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
+    const lane = buildConDeckLaneP1();  // m32ConRow を生成
+    mountLaneUnderItemsBar(lane);
+  }
+
+  // #36：中央5枚＋左右ブランク（既にあるなら再生成しない）
+  if ((v.mission?.id|0) === 36 && !document.getElementById('m36NumRow')){
+    const lane = document.createElement('div');
+    lane.className = 'numlane';
+    lane.id = 'm36NumRow';
+
+    const leftBlank  = document.createElement('div');
+    leftBlank.className = 'rulecard';
+    leftBlank.id = 'm36LeftBlank';
+
+    const picks = pickUnusedNumbers(5);
+    picks.forEach(n=>{
+      const c = document.createElement('div');
+      c.className = 'numcard';
+      c.style.backgroundImage = `url('${imgNumber(n)}')`;
+      lane.appendChild(c);
+    });
+
+    const rightBlank = document.createElement('div');
+    rightBlank.className = 'rulecard';
+    rightBlank.id = 'm36RightBlank';
+
+    lane.prepend(leftBlank);
+    lane.appendChild(rightBlank);
+
+    // クリック動作（右/左2の相互排他）
+    rightBlank.onclick = ()=>{
+      rightBlank.style.backgroundImage = `url('${imgRule('left2')}')`;
+      leftBlank.style.backgroundImage  = '';
+    };
+    leftBlank.onclick = ()=>{
+      leftBlank.style.backgroundImage  = `url('${imgRule('right2')}')`;
+      rightBlank.style.backgroundImage = '';
+    };
+
+    mountLaneUnderItemsBar(lane);
+  }
+}
+/* ▲▲ ステージ共通レンダラ ▲▲ */
+
+
+  
 /* パターン1拡張：山札→1/2/3のポップ
    1=“いつも通り”右に積む（既存P1）
    2=横エリアは常に最大2枚、3=横エリアは常に最大3枚 */
