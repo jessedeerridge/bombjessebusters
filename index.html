@@ -668,51 +668,38 @@ function pickUnusedNumbers(count){
 }
 
 /* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ === */
-/* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ（全員共通） === */
-async function distributeNumbersToItemsCentered(eachCount=1){
+function distributeNumbersToItemsCentered(eachCount=1){
   const itemsBar = document.getElementById('itemsBar');
   const items    = document.querySelectorAll('#items .item');
   if(!itemsBar || items.length===0) return;
 
-  // 既存を掃除（再実行時の二重生成防止）
+  // 既存を掃除（ミッションやり直し時の二重生成防止）
   const old = document.querySelector('.num-under');
   if(old) old.remove();
-
-  const code  = state.roomCode;
-  const slots = items.length;
-
-  // meta.numUnder = [ [..eachCount], [..], ... ] を使用
-  let picks2d = (state.watching?.meta?.numUnder);
-  const valid = Array.isArray(picks2d) && picks2d.length===slots && picks2d.every(a=>Array.isArray(a));
-
-  // 未設定ならホストが初期化
-  if(!valid && state.isHost){
-    const pool = MATERIALS.numbers.slice(); shuffle(pool);
-    picks2d = Array.from({length: slots}, ()=> {
-      const slot = [];
-      for(let k=0; k<eachCount; k++){ const x = pool.pop(); if(x!=null) slot.push(x); }
-      return slot;
-    });
-    await update(ref(db, `rooms/${code}/meta`), { numUnder: picks2d });
-  }
-
-  // ホスト以外は、onValueでmetaが来るまで待つ（＝ここでは描かない）
-  if(!Array.isArray(picks2d)) return;
 
   // レーンを作成してアイテム列の直下に挿入
   const under = document.createElement('div');
   under.className = 'num-under';
   itemsBar.insertAdjacentElement('afterend', under);
 
-  // スロットごとに中央配置。placeNumberCardで重複表示は回避
-  picks2d.forEach(slotNums=>{
+  // 未使用数字から必要枚数ぶん抽選
+  const need  = items.length * eachCount;
+  const picks = pickUnusedNumbers(need);
+
+  // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
+  let p = 0;
+  items.forEach(()=> {
     const slot = document.createElement('div');
     slot.className = 'slot';
     under.appendChild(slot);
-    slotNums.forEach(n => placeNumberCard(n, slot));
+
+    for(let k=0; k<eachCount; k++){
+      const n = picks[p++]; if(n==null) break;
+      // placeNumberCard は holder を作って mountParent に追加する
+      placeNumberCard(n, slot);
+    }
   });
 }
-
 
 
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
@@ -982,7 +969,7 @@ if (v) {
     return;
   }
 }    
-  renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); renderStageCommon(v);
+   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
@@ -3317,15 +3304,7 @@ async function setupMissionOnStart(code){
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
 
-// ▼ P1（山札→めくる）を使うミッションなら、開始時に共有デッキを用意
-if (flags.needsNumberLane && flags.pattern === 'P1') {
-  const deck = MATERIALS.numbers.slice(); shuffle(deck);
-  await update(ref(db, `rooms/${code}/meta`), {
-    numP1_deck: deck,
-    numP1_discards: []
-  });
-}
-  
+
   /* ここから追加：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
   if ((v.mission?.id|0) === 41) {
     const tcount = v.tableCount|0;
@@ -3647,26 +3626,26 @@ function mountLaneUnderItemsBar(lane){
   bar.insertAdjacentElement('afterend', lane);
 }
 
-/* パターン1：山札→めくる（全員共通：meta.numP1_* を使用） */
+/* パターン1：山札→めくる */
 function buildDeckLaneP1(){
-  // 既存を一度除去（再描画時の二重生成防止）
-  const old = document.getElementById('numP1Row');
-  if (old) old.remove();
+  const lane = document.createElement('div'); 
+  lane.className='numlane';
 
-  const v = state.watching || {};
-  const code = state.roomCode;
-  const lane = document.createElement('div');
-  lane.className = 'numlane';
-  lane.id = 'numP1Row';
+  // 1..12 のみ・重複なしの山札
+  const deck = MATERIALS.numbers.slice(); 
+  shuffle(deck);
+  let rest = deck.length;
 
-  // UI部品
+  // 山札ボタンと残表示
   const deckBtn = document.createElement('div');
-  deckBtn.className = 'numdeck';
-  deckBtn.title = 'めくる';
+  deckBtn.className='numdeck';
+  deckBtn.title='めくる';
 
   const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
+  restLbl.className='numrest';
+  restLbl.textContent=`残:${rest}`;
 
+  // ★ 右側に公開札積み重ね用ホルダー
   const pile = document.createElement('div');
   pile.className = 'numcard-holder';
   pile.style.position = 'relative';
@@ -3675,89 +3654,66 @@ function buildDeckLaneP1(){
   lane.appendChild(restLbl);
   lane.appendChild(pile);
 
-  // 描画更新
-  const refresh = ()=>{
-    const d  = (state.watching?.meta?.numP1_deck || []);
-    const xs = (state.watching?.meta?.numP1_discards || []);
-    const remain = d.filter(n => !xs.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
+  // 積み重ね追加
+  function addToPile(n){
+    const already = pile.querySelectorAll('.numcard').length;
+    const node = document.createElement('div');
+    node.className = 'numcard';
+    node.style.backgroundImage = `url('${imgNumber(n)}')`;
 
-    pile.innerHTML = '';
-    xs.forEach((n, i)=>{
-      const node = document.createElement('div');
-      node.className = 'numcard';
-      node.style.backgroundImage = `url('${imgNumber(n)}')`;
-      if (i>0){
-        const off = i*2;
-        node.style.position='absolute';
-        node.style.left = off+'px';
-        node.style.top  = off+'px';
-      }
-      pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
-    });
+    if(already>0){
+      const off = already * 2; // 2px刻み
+      node.style.position = 'absolute';
+      node.style.left = off + 'px';
+      node.style.top  = off + 'px';
+    }
+    pile.appendChild(node);
 
-    if (remain===0){
+    // ★ 高さ調整（見切れ防止）
+    const extraH = already * 2; // 下方向へのズレ分
+    pile.style.height = (48 + extraH) + 'px'; // 48pxはカード高さ
+    lane.style.marginBottom = extraH + 'px'; // テーブルを少し下げる
+  }
+
+  deckBtn.onclick = (ev)=>{
+    if(rest<=0){
+      openOneMini(ev.clientX, ev.clientY, '山札を作る', async ()=>{
+        deck.splice(0, deck.length, ...MATERIALS.numbers.slice()); 
+        shuffle(deck);
+        rest = deck.length;
+        restLbl.textContent = `残:${rest}`;
+        deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
+        deckBtn.style.background = '';
+        deckBtn.title = 'めくる';
+        pile.innerHTML = '';
+        pile.style.height = '48px';
+        lane.style.marginBottom = '0px';
+        NUMCARD_REG.clear();
+      });
+      return;
+    }
+
+    const n = deck.pop();
+    rest--;
+    restLbl.textContent = `残:${rest}`;
+    addToPile(n);
+
+    // ★ #23：表になった数値をメタに記録（重複は追加しない）
+     try{
+       const cur = (state.watching?.meta?.m23_drawnNumbers) || [];
+      if (!cur.includes(n)) {
+         update(ref(db, `rooms/${state.roomCode}/meta`), { m23_drawnNumbers: cur.concat(n) });
+       }
+     }catch(_){}
+   
+    if(rest===0){
       deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
-      deckBtn.title = '山札を作る';
-    }else{
-      deckBtn.style.background = ""; // 既定のCSSに任せる
-      deckBtn.title = 'めくる';
+      deckBtn.title='山札を作る';
     }
-  };
-  refresh();
-
-  // 初期化（ホストのみ）
-  (async ()=>{
-    if (!Array.isArray(v?.meta?.numP1_deck) && state.isHost){
-      const deck = MATERIALS.numbers.slice(); shuffle(deck);
-      await update(ref(db, `rooms/${code}/meta`), { numP1_deck: deck, numP1_discards: [] });
-    }
-  })();
-
-  // クリック：1枚公開 or 再構築
-  deckBtn.onclick = async (ev)=>{
-    try{
-      const mRef  = ref(db, `rooms/${state.roomCode}/meta`);
-      const mSnap = await get(mRef);
-      const meta  = mSnap.val() || {};
-      const D  = Array.isArray(meta.numP1_deck)      ? meta.numP1_deck.slice()      : [];
-      const Xs = Array.isArray(meta.numP1_discards)  ? meta.numP1_discards.slice()  : [];
-
-      // 残が無ければ再構築
-      const remain = D.filter(n=>!Xs.includes(n)).length;
-      if (remain<=0){
-        openOneMini(ev.clientX, ev.clientY, '山札を作る', async ()=>{
-          const nd = MATERIALS.numbers.slice(); shuffle(nd);
-          await update(mRef, { numP1_deck: nd, numP1_discards: [] });
-        });
-        return;
-      }
-
-      // 次の1枚（山札順で未捨ての最初）を公開
-      const next = D.find(n => !Xs.includes(n));
-      if (next==null) return;
-      Xs.push(next);
-      await update(mRef, { numP1_discards: Xs });
-
-      // （#23 連携）公開された数値も記録しておく ※重複追加なし
-      try{
-        const cur = Array.isArray(meta.m23_drawnNumbers) ? meta.m23_drawnNumbers.slice() : [];
-        if (!cur.includes(next)){
-          await update(mRef, { m23_drawnNumbers: cur.concat(next) });
-        }
-      }catch(_){}
-    }catch(e){ console.error(e); }
-
-    // ローカルも即時更新（次の onValue でも再描画される）
-    refresh();
   };
 
   return lane;
 }
-
 /* 制約カード版：P1（山札→めくる）*/
 function buildConDeckLaneP1(){
   // ミッション31と同じ見た目サイズにするため、帯は conlane、カードは concard を使う
@@ -3824,95 +3780,6 @@ function buildConDeckLaneP1(){
   return lane;
 }
 
-/* ▼▼ ステージ共通レンダラ（ホスト以外にも数値レーン／右左カードを表示） ▼▼ */
-function renderStageCommon(v){
-  if (!v?.mission) return;
-  const flags = v.mission.flags || {};
-
-  // まず既存の汎用レーンを掃除（#39・#36など専用IDは残す）
-  document.querySelectorAll('.numlane:not(#m39Row):not(#m36NumRow)').forEach(n=>n.remove());
-  // 制約レーン（#32/#37）は専用ID
-  const oldCon = document.getElementById('m32ConRow'); if (oldCon) oldCon.remove();
-
-  // #9：右2＋ランダム数値2
-  if (flags.needsRuleRow && flags.rule?.type === 'R2with2'){
-    const lane = buildNumLaneDOM([
-      {kind:'rule', img: imgRule('right2')},
-      {kind:'num',  img: imgNumber(((Math.random()*12)|0)+1)},
-      {kind:'num',  img: imgNumber(((Math.random()*12)|0)+1)}
-    ]);
-    mountLaneUnderItemsBar(lane);
-  }
-
-  // #11：P1（山札→めくる）
-  if (flags.needsNumberLane && flags.pattern === 'P1'){
-    const lane = buildDeckLaneP1();
-    mountLaneUnderItemsBar(lane);
-    // #23 の右側アイテム山（メタに依存）も全端末で反映
-    if (flags.m23_itemDeck7){
-      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
-    }
-  }
-
-  // #30：P1-pop123（山札→1/2/3ポップ）
-  if (flags.needsNumberLane && flags.pattern === 'P1-pop123'){
-    const lane = buildDeckLaneP1Pop123();
-    mountLaneUnderItemsBar(lane);
-  }
-
-  // #12：P2-eachItem（各アイテムの中央下に1枚固定配置）
-  if (flags.needsNumberLane && flags.pattern === 'P2-eachItem'){
-    distributeNumbersToItemsCentered(1);
-  }
-
-  // #32 / #37：制約カード12の山札（制約レーン）
-  if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
-    const lane = buildConDeckLaneP1();  // m32ConRow を生成
-    mountLaneUnderItemsBar(lane);
-  }
-
-  // #36：中央5枚＋左右ブランク（既にあるなら再生成しない）
-  if ((v.mission?.id|0) === 36 && !document.getElementById('m36NumRow')){
-    const lane = document.createElement('div');
-    lane.className = 'numlane';
-    lane.id = 'm36NumRow';
-
-    const leftBlank  = document.createElement('div');
-    leftBlank.className = 'rulecard';
-    leftBlank.id = 'm36LeftBlank';
-
-    const picks = pickUnusedNumbers(5);
-    picks.forEach(n=>{
-      const c = document.createElement('div');
-      c.className = 'numcard';
-      c.style.backgroundImage = `url('${imgNumber(n)}')`;
-      lane.appendChild(c);
-    });
-
-    const rightBlank = document.createElement('div');
-    rightBlank.className = 'rulecard';
-    rightBlank.id = 'm36RightBlank';
-
-    lane.prepend(leftBlank);
-    lane.appendChild(rightBlank);
-
-    // クリック動作（右/左2の相互排他）
-    rightBlank.onclick = ()=>{
-      rightBlank.style.backgroundImage = `url('${imgRule('left2')}')`;
-      leftBlank.style.backgroundImage  = '';
-    };
-    leftBlank.onclick = ()=>{
-      leftBlank.style.backgroundImage  = `url('${imgRule('right2')}')`;
-      rightBlank.style.backgroundImage = '';
-    };
-
-    mountLaneUnderItemsBar(lane);
-  }
-}
-/* ▲▲ ステージ共通レンダラ ▲▲ */
-
-
-  
 /* パターン1拡張：山札→1/2/3のポップ
    1=“いつも通り”右に積む（既存P1）
    2=横エリアは常に最大2枚、3=横エリアは常に最大3枚 */
