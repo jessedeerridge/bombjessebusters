@@ -1399,6 +1399,9 @@ wrap.dataset.cardId = String(c.id||'');
     const m42s = state.watching?.meta?.m42Swap;
 if (m42s?.selA && m42s.selA.cardId===c.id && m42s.selA.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
 if (m42s?.selB && m42s.selB.cardId===c.id && m42s.selB.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+      const m42m2 = state.watching?.meta?.m42M2;
+      if (m42m2?.selA && m42m2.selA.cardId===c.id && m42m2.selA.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+      if (m42m2?.selB && m42m2.selB.cardId===c.id && m42m2.selB.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }  
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if(c.markUntil && now()<c.markUntil){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
 
@@ -2082,8 +2085,9 @@ function renderM42(v){
     st.textContent = `
       /* 消滅済み枠（既存維持） */
       .m42-gone, .m42-gone * { visibility: hidden !important; pointer-events: none !important; }
-      /* ⇅モード時：全体公開カードを青枠表示（既存の i2-selectable 風） */
-      body[data-m42swap="on"] .card.open { outline:2px dashed #38bdf8; outline-offset:-3px; }
+      /* ⇅ / -2 モード時：全体公開カードを青枠表示（既存の i2-selectable 風） */
+      body[data-m42swap="on"] .card.open,
+      body[data-m42m2="on"]   .card.open { outline:2px dashed #38bdf8; outline-offset:-3px; }
     `;
     document.head.appendChild(st);
   }
@@ -2093,9 +2097,11 @@ function renderM42(v){
   const oldBox = document.getElementById('m42Box');     if (oldBox && !v?.meta?.m42_on) oldBox.remove();
 
   if (!isM42){
-    // ミッション外：⇅用ハンドラと表示フラグを落とす
+    // ミッション外：⇅ / -2 のハンドラと表示フラグを落とす
     document.body.removeAttribute('data-m42swap');
-    if (state._m42swapClick) { document.removeEventListener('click', state._m42swapClick, true); state._m42swapClick=null; }
+    document.body.removeAttribute('data-m42m2');
+    if (state._m42swapClick){ document.removeEventListener('click', state._m42swapClick, true); state._m42swapClick=null; }
+    if (state._m42m2Click)  { document.removeEventListener('click', state._m42m2Click,   true); state._m42m2Click=null; }
     return;
   }
 
@@ -2122,8 +2128,13 @@ function renderM42(v){
       const on = !!v?.meta?.m42Swap?.on;
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m42Swap: on ? null : { on:true, usingBy:null, selA:null, selB:null } });
     };
+    // -2トグル：2枚同数を選んで「裏に戻す」
+    const toggleMinus2 = async ()=>{
+      const on = !!v?.meta?.m42M2?.on;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m42M2: on ? null : { on:true, usingBy:null, selA:null, selB:null } });
+    };
 
-    bar.appendChild(btn('-2', ()=>{}));           // ダミー
+    bar.appendChild(btn('-2', toggleMinus2));     // 追加：-2トグル
     bar.appendChild(btn('⇅', toggleSwap));        // ← 今回の本体
     bar.appendChild(btn('☝', toggleBox));        // 互換
     bar.appendChild(btn('あ', ()=>{}));           // ダミー
@@ -2241,6 +2252,82 @@ function renderM42(v){
     // ⇅オフ：フラグ/ハンドラ解除
     document.body.removeAttribute('data-m42swap');
     if (state._m42swapClick) { document.removeEventListener('click', state._m42swapClick, true); state._m42swapClick=null; }
+  }
+  // 5) -2モード：青枠＋クリック選択→同数なら「元に戻す（裏に）」/「やり直す」
+  const m2On = !!v?.meta?.m42M2?.on;
+  if (m2On){
+    document.body.setAttribute('data-m42m2','on');
+   if (!state._m42m2Click){
+      state._m42m2Click = async (ev)=>{
+        const wrap = ev.target.closest?.('.card-wrap'); if (!wrap) return;
+        const cardEl = wrap.querySelector('.card');      if (!cardEl || !cardEl.classList.contains('open')) return; // 公開のみ
+        ev.stopPropagation(); // 既存flip阻止
+        const table = parseInt(wrap.dataset.table,10);
+        const cardId = wrap.dataset.cardId;
+        if (!Number.isInteger(table) || !cardId) return;
+
+       const me = state.userId;
+        const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+        const mSnap = await get(mRef);
+        const meta  = mSnap.val() || {};
+        const flow  = meta.m42M2 && meta.m42M2.on ? meta.m42M2 : {on:true, usingBy:null, selA:null, selB:null};
+
+        // 乗っ取り（A→BでAの選択をキャンセル）
+        if (flow.usingBy && flow.usingBy !== me){
+          await update(mRef, { m42M2:{on:true, usingBy:me, selA:{table, cardId}, selB:null} });
+          return;
+        }
+        // 自分のフロー
+        if (!flow.selA){
+          await update(mRef, { m42M2:{on:true, usingBy:me, selA:{table, cardId}, selB:null} });
+          return;
+      }
+        if (flow.selA && !flow.selB){
+          const selA = flow.selA, selB = {table, cardId};
+          // 数字チェック（同数のみ許可）
+          const ts = (await get(ref(db, `rooms/${state.roomCode}/tables`))).val() || [];
+          const pickNum = ({table, cardId})=>{
+            const hand=(ts[table]?.hand)||[]; const c=hand.find(x=> x?.id===cardId);
+           return (c && typeof c.num==='number') ? (c.num|0) : null;
+          };
+          const na = pickNum(selA), nb = pickNum(selB);
+          if (na==null || nb==null || na!==nb){
+            alert('違う数字です');
+            await update(mRef, { m42M2:{on:true, usingBy:me, selA:null, selB:null} });
+           return;
+          }
+          // 2枚揃い：下ポップ
+          await update(mRef, { m42M2:{on:true, usingBy:me, selA, selB} });
+          openBottomMenu([
+           {label:'元に戻す', action: async ()=>{
+              // 2枚とも「裏」にする（open:false）
+              const ts2 = (await get(ref(db, `rooms/${state.roomCode}/tables`))).val() || [];
+              const locate = ({table, cardId})=>{
+                const hand=(ts2[table]?.hand)||[]; const idx=hand.findIndex(c=> c?.id===cardId);
+                return {hand, idx};
+              };
+              const A = locate(selA), B = locate(selB);
+              if (A.idx<0 || B.idx<0){ await update(mRef, { m42M2:{on:true, usingBy:me, selA:null, selB:null} }); return; }
+              if (A.hand[A.idx]) A.hand[A.idx] = {...A.hand[A.idx], open:false};
+              if (B.hand[B.idx]) B.hand[B.idx] = {...B.hand[B.idx], open:false};
+              await Promise.all([
+                set(ref(db, `rooms/${state.roomCode}/tables/${selA.table}/hand`), A.hand),
+                set(ref(db, `rooms/${state.roomCode}/tables/${selB.table}/hand`), B.hand),
+               update(mRef, { m42M2:{on:true, usingBy:null, selA:null, selB:null} })
+              ]);
+            }},
+            {label:'やり直す', action: async ()=>{
+              await update(mRef, { m42M2:{on:true, usingBy:me, selA:null, selB:null} });
+           }}
+          ]);
+        }
+      };
+      document.addEventListener('click', state._m42m2Click, true); // キャプチャでflip阻止
+    }
+  }else{
+    // -2オフ
+   document.body.removeAttribute('data-m42m2');
+    if (state._m42m2Click){ document.removeEventListener('click', state._m42m2Click, true); state._m42m2Click=null; }
   }
 }
 /* ここまで追加：#42 */
