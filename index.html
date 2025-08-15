@@ -713,6 +713,10 @@ function pickK(arr, k){
  */
 function buildMixPlan(missionId){
   const plans = {
+    8:  [
+    {type:'redChoose', from:2, take:1},
+    {type:'yellowChoose', from:3, take:2},
+    ],    
     9:  [
       {type:'redPick',    k:1},
       {type:'yellowPick', k:2},
