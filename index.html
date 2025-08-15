@@ -170,7 +170,7 @@
   .card.open{background:#000}
   /* ★ アイテム2：選択可能カードの青枠 */
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
-
+.card.m42-blue{  outline: 2px solid #38bdf8;  outline-offset: -1px;}
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center}
 
@@ -978,6 +978,7 @@ if (v) {
     renderM42Buttons(v);
     state.gameStarted=!!v?.started;
 renderM39(v);
+renderM42(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -2024,6 +2025,165 @@ function renderM29(v){
   }
 }
 
+function renderM42(v){
+  const isM42 = (v?.mission?.id|0) === 42;
+  // 既存のパネルがあれば掃除
+  let panel = document.getElementById('m42HostPanel');
+  if (!isM42 || !state.isHost){
+    if(panel) panel.remove();
+  }
+  if (!isM42) return;
+
+  // パネルが無ければ作成
+  if (!panel && state.isHost){
+    panel = document.createElement('div');
+    panel.id = 'm42HostPanel';
+    panel.style.position = 'fixed';
+    panel.style.left = '12px';
+    panel.style.bottom = '12px';
+    panel.style.zIndex = '2147483602';
+    panel.style.display = 'flex';
+    panel.style.gap = '6px';
+    panel.style.background = '#fff';
+    panel.style.border = '1px solid #eee';
+    panel.style.borderRadius = '10px';
+    panel.style.padding = '6px 8px';
+    // ボタン生成
+    const mkBtn = (label, onClick)=>{
+      const b = document.createElement('button');
+      b.className = 'btn small';
+      b.textContent = label;
+      b.onclick = onClick;
+      return b;
+    };
+
+    const btnM2 = mkBtn('-2', ()=>{});      // 仕様未定：ダミー
+    const btnChair = mkBtn('椅子', ()=>{}); // 仕様未定：ダミー
+    const btnPoint = mkBtn('☝', async ()=>{
+      const on = !!v?.meta?.m42_on;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_on: !on });
+    });
+    const btnA = mkBtn('あ', ()=>{});       // 仕様未定：ダミー
+
+    panel.appendChild(btnM2);
+    panel.appendChild(btnChair);
+    panel.appendChild(btnPoint);
+    panel.appendChild(btnA);
+    document.body.appendChild(panel);
+  }
+
+  // 箱モードの描画（ON のみ）
+  const on = !!v?.meta?.m42_on;
+  // box.jpg の設置
+  const existingBox = document.getElementById('m42Box');
+  if (!on){
+    if (existingBox) existingBox.remove();
+    removeM42Effects();
+    return;
+  }
+
+  if (!existingBox){
+    const lane = document.createElement('div');
+    lane.id = 'm42Box';
+    lane.className = 'numlane'; // 同じ帯CSSを流用
+    lane.style.position = 'relative';
+    lane.style.height = '82px';
+    const box = document.createElement('div');
+    box.style.width = '120px';
+    box.style.height = '80px';
+    box.style.border = '1px dashed #999';
+    box.style.borderRadius = '8px';
+    box.style.background = `#fff url('./box.jpg') center/contain no-repeat`;
+    box.style.position = 'relative';
+    // ドロップ判定のため中心座標を得やすくする
+    box.dataset.m42box = '1';
+    lane.appendChild(box);
+    // アイテム列の直下に設置
+    mountLaneUnderItemsBar(lane);
+  }
+
+  // 青枠＆クリック抑止＆ドラッグ可の適用
+  applyM42Effects();
+}
+
+function applyM42Effects(){
+  // ① 全体公開カードに青枠クラス＋クリック不可
+  document.querySelectorAll('.card.open').forEach(card=>{
+    card.classList.add('m42-blue');
+    card.dataset.m42Locked = '1';
+    // 既存onclickを退避しない（抑止）
+    card.onclick = (ev)=>{ ev.stopPropagation(); }; 
+    // ② ドラッグ可（簡易ドラッグ）
+    enableM42Drag(card);
+  });
+}
+
+function removeM42Effects(){
+  document.querySelectorAll('.card.m42-blue').forEach(card=>{
+    card.classList.remove('m42-blue');
+    if (card.dataset) delete card.dataset.m42Locked;
+    // onclick は他所で再バインドされるためここでは触らない
+    disableM42Drag(card);
+  });
+}
+
+/* 簡易ドラッグ：table内で position を動的にずらす */
+function enableM42Drag(card){
+  if (card.dataset.m42Drag === '1') return;
+  card.dataset.m42Drag = '1';
+  let sx=0, sy=0, ox=0, oy=0, moving=false;
+
+  const down=(e)=>{
+    if (!card.classList.contains('m42-blue')) return;
+    moving=true;
+    const r = card.getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+    card.style.transition = 'none';
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up, { once:true });
+  };
+  const move=(e)=>{
+    if(!moving) return;
+    const dx = e.clientX - sx;
+    const dy = e.clientY - sy;
+    card.style.position = 'fixed';
+    card.style.left = (ox + dx) + 'px';
+    card.style.top  = (oy + dy) + 'px';
+  };
+  const up=(e)=>{
+    moving=false;
+    document.removeEventListener('mousemove', move);
+    // 箱の近傍なら消す
+    const box = document.querySelector('#m42Box [data-m42box="1"]');
+    if (box){
+      const br = box.getBoundingClientRect();
+      const cr = card.getBoundingClientRect();
+      const near = (cr.right > br.left-6 && cr.left < br.right+6 && cr.bottom > br.top-6 && cr.top < br.bottom+6);
+      if (near){
+        // このカードを“場から消す”＝ノード除去だけ（他は不変）
+        const wrap = card.closest('.card-wrap');
+        if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        return;
+      }
+    }
+    // 近くないなら元に戻す（固定化解除）
+    card.style.position = '';
+    card.style.left = '';
+    card.style.top  = '';
+    card.style.transition = '';
+  };
+
+  card.addEventListener('mousedown', down);
+  card._m42down = down;
+}
+
+function disableM42Drag(card){
+  if (card._m42down){
+    card.removeEventListener('mousedown', card._m42down);
+    delete card._m42down;
+  }
+  card.dataset.m42Drag = '';
+}
 
 
   
@@ -4230,8 +4390,21 @@ function missionInfo(id, opts={}){
         flags:{  }
       };
     }
-    case 42:{ return {id:42, name:'#42', desc:'', display:['#42', ...linesForMix, '特殊なし']}; }
-    case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
+     case 42: {
+       return {
+         id:42, name:'#42', desc:'',
+         display:[
+           '#42',
+           'ホスト下部に[-2][椅子][☝][あ]ボタン。',
+           '☝で「箱モード」ON/OFF：アイテム下にbox.jpg表示、全体公開カードを青枠＆クリック不可化、ドラッグ移動→箱付近でドロップすると消滅。'
+         ],
+         flags:{
+           m42_hasHostButtons:true,   // ホストに専用ボタンを出す
+           m42_toggleBoxMode:true     // ☝で箱モードをトグル
+         }
+       };
+     }
+   case 43:{ return {id:43, name:'#43', desc:'', display:['#43', ...linesForMix, '特殊なし']}; }
     default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
   }
 }
