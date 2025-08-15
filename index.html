@@ -1304,7 +1304,9 @@ content.appendChild(charCol);
       }
       const wrap=document.createElement('div'); wrap.className='card-wrap';
       const card=document.createElement('div'); card.className='card';
-
+if (c.gone === true){
+  wrap.classList.add('m42-gone');     // ★ 数字・トークンなど別レイヤもまとめて不可視
+}
      // 既に消滅済なら見えない空枠として保持（幅は保つ）
       if (c.gone === true){
         card.style.visibility = 'hidden';
@@ -2061,6 +2063,16 @@ function renderM31(v){
 /* ここから追加：#42 描画・操作ロジック（ひとかたまり） */
 function renderM42(v){
   const isM42 = ((v?.mission?.id|0) === 42);
+ if (!document.getElementById('m42GoneStyle')) {
+    const st = document.createElement('style');
+    st.id = 'm42GoneStyle';
+    st.textContent = `
+      /* ラッパーごと不可視化（幅は保持） */
+      .m42-gone, .m42-gone * { visibility: hidden !important; pointer-events: none !important; }
+    `;
+    document.head.appendChild(st);
+  }
+  
   // 既存UIの掃除
   const oldBar = document.getElementById('m42HostBar'); if (oldBar) oldBar.remove();
   const oldBox = document.getElementById('m42Box');     if (oldBox && !v?.meta?.m42_on) oldBox.remove();
