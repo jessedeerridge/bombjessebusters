@@ -1005,18 +1005,37 @@ renderM39(v);
 
   // フッターのホスト専用ボタン（-2 / 椅子 / ☝ / あ）
   (function ensureButtons(){
-    const id='m42Buttons';
-    let wrap=document.getElementById(id);
-    if(!is42 || !state.isHost){ if(wrap) wrap.remove(); return; }
-    if(!wrap){
-      wrap=document.createElement('div'); wrap.id=id;
-      wrap.style.display='flex'; wrap.style.gap='6px'; wrap.style.marginTop='6px';
-      const mk=(t)=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=t; return b; };
-      const b1=mk('-2'), b2=mk('椅子'), b3=mk('☝'), b4=mk('あ');
-      b1.disabled=b2.disabled=b4.disabled=true; // 指示外はダミー
-      b3.onclick=async()=>{ await update(ref(db, metaPath), { m42Active: !active }); };
-      missionFooter.append(b1,b2,b3,b4);
+  // 即時クリーンアップ（青枠/箱/クリック封鎖を除去）
+  const m42Clean = ()=>{
+    document.querySelectorAll('.m42-freeze').forEach(n=> n.classList.remove('m42-freeze'));
+    const bx=document.getElementById('m42Box'); if(bx) bx.remove();
+    if(window._m42_clickBlocker){
+      document.removeEventListener('click', window._m42_clickBlocker, true);
+      window._m42_clickBlocker=null;
     }
+  };
+
+  (function ensureButtons(){
+    // まず既存のパネルを**全て**消してから作る → 常に4つだけ
+    document.querySelectorAll('#m42Buttons').forEach(n=> n.remove());
+
+    if(!is42 || !state.isHost) return;
+
+    const wrap=document.createElement('div'); wrap.id='m42Buttons';
+    wrap.style.display='flex'; wrap.style.gap='6px'; wrap.style.marginTop='6px';
+    const mk=(t)=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=t; return b; };
+    const b1=mk('-2'), b2=mk('椅子'), b3=mk('☝'), b4=mk('あ');
+    b1.disabled=b2.disabled=b4.disabled=true; // このミッションではダミー表示のみ
+
+    b3.onclick=async()=>{
+      const newActive = !active;
+      await update(ref(db, metaPath), { m42Active: newActive });
+      // 押した瞬間の体感を良くするため、オフなら即ローカル掃除
+      if(!newActive) m42Clean();
+    };
+
+    missionFooter.appendChild(wrap);
+    wrap.append(b1,b2,b3,b4);
   })();
 
   // Box の表示/消去（アイテム列の直下）
@@ -1086,8 +1105,8 @@ renderM39(v);
           })();
           if(hit){
             // 直ちに穴表示（前詰め防止）
-            card.classList.add('m42-hole'); card.classList.remove('m42-freeze');
-            card.onclick=(ev)=>{ ev?.preventDefault?.(); ev?.stopPropagation?.(); };
+            card.classList.add('m42-hole');
+            card.classList.remove('m42-freeze');
             await update(ref(db, cardPath), { m42_deleted:true, tokens:[] });
           }
         };
@@ -1117,7 +1136,7 @@ renderM39(v);
       hand.forEach((c,ci)=>{
         if(c && c.m42_deleted){
           const card = wraps[ci]?.querySelector('.card');
-          if(card){ card.classList.add('m42-hole'); card.onclick=(ev)=>{ ev?.preventDefault?.(); ev?.stopPropagation?.(); }; }
+          if(card){ card.classList.add('m42-hole'); }
         }
       });
     });
@@ -1127,6 +1146,10 @@ renderM39(v);
   if(!is42 || !active){
     document.querySelectorAll('.m42-freeze').forEach(n=> n.classList.remove('m42-freeze'));
     const bx=document.getElementById('m42Box'); if(bx) bx.remove();
+    if(window._m42_clickBlocker){
+      document.removeEventListener('click', window._m42_clickBlocker, true);
+      window._m42_clickBlocker=null;
+    }
   }
 })();
 
