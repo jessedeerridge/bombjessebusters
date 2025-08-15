@@ -965,8 +965,9 @@ if (v) {
     return;
   }
 }    
-    renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
-    if (v?.meta?.m22_infoShown === true) {
+   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
+     // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
+     if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
@@ -2722,17 +2723,20 @@ async function leaveSeatNow(){
   state.seatedTable=null; updateMenuButtons();
 }
 
-btnSit.onclick = ()=>{
-  if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
-  const v=state.watching; if(!v?.started){ return; }
+ // ▼ 席選択タブの描画を関数化：開いている間も再描画で同期
+function renderSeatTabs(v){
+  if(!v?.started) return;
   seatTabs.innerHTML='';
   (v.tables||[]).forEach((t,i)=>{
-    const tab=document.createElement('div'); tab.className='tab';
+    const tab=document.createElement('div'); 
+    tab.className='tab';
     tab.textContent = t.playerName ? `${i+1}（使用中）` : `${i+1}`;
     if(t.playerId) tab.classList.add('disabled');
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
-      await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {playerId:state.userId, playerName:state.userName});
+      await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {
+        playerId:state.userId, playerName:state.userName
+      });
       const hRef = ref(db, `rooms/${state.roomCode}/tables/${i}/hand`);
       const hSnap = await get(hRef);
       const hand = hSnap.val() || [];
@@ -2743,8 +2747,14 @@ btnSit.onclick = ()=>{
     };
     seatTabs.appendChild(tab);
   });
+}
+
+btnSit.onclick = ()=>{
+  if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
+  const v=state.watching; if(!v?.started){ return; }
+  renderSeatTabs(v);
   H(seatPop,false);
-};
+ };
 btnSeatCancel.onclick=()=> H(seatPop,true);
 
 btnLeave.onclick = async ()=>{ await leaveSeatNow();btnSit.onclick(); };
