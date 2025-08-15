@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ss</title>
+<title>sあs</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -975,6 +975,7 @@ if (v) {
     }
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
+    renderM42Buttons(v);
     state.gameStarted=!!v?.started;
 renderM39(v);
 
@@ -1100,7 +1101,48 @@ function renderGlobalReveal(v){
   globalReveal.innerHTML='';
   H(globalReveal,true);
 }
+// ここから追加（M42 ボタンUI）
+function renderM42Buttons(v){
+  // 既存を掃除
+  const old = document.getElementById('m42Buttons');
+  if (old) old.remove();
 
+  // ホスト かつ ミッション42 のときだけ表示
+  if (((v?.mission?.id|0) !== 42) || !state.isHost) return;
+
+  const wrap = document.createElement('div');
+  wrap.id = 'm42Buttons';
+  wrap.style.position = 'fixed';
+  wrap.style.left = '50%';
+  wrap.style.bottom = '10px';
+  wrap.style.transform = 'translateX(-50%)';
+  wrap.style.display = 'flex';
+  wrap.style.gap = '6px';
+  wrap.style.zIndex = '2147483602';
+
+  ['☝','','あ','え'].forEach(label=>{
+    const b = document.createElement('button');
+    b.className = 'btn big';
+    b.textContent = label;
+    wrap.appendChild(b);
+
+    if(label === '☝'){
+      b.title = '全体公開カードの青枠＆ドラッグ消去をON/OFF';
+      b.onclick = async ()=>{
+        const nowActive = !!(state.watching?.meta?.m42Active);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m42Active: !nowActive });
+      };
+    }else{
+      // 仕様未定：必要なら後で実装
+      b.onclick = ()=>{};
+    }
+  });
+
+  document.body.appendChild(wrap);
+}
+// ここまで追加（M42 ボタンUI）
+
+  
 /* ===== Host tool (odd-open normal codes) ===== */
 function renderHostTool(v){
   if(!v?.tables){ H(hostTool,true); return; }
@@ -1337,6 +1379,44 @@ content.appendChild(charCol);
       }
 
       if (c.open) card.classList.add('open');
+      // ここから追加（M42：青枠＆ドラッグで消去）
+if ((state.watching?.mission?.id|0) === 42 && (state.watching?.meta?.m42Active === true)) {
+  // 全体公開かつ通常コードのみ対象
+  if (c?.kind === 'normal' && c.open === true) {
+    // 青枠（既存スタイルを流用）
+    card.classList.add('i2-selectable');
+
+    let _sx = null, _sy = null;
+    card.addEventListener('mousedown', (e)=>{
+      _sx = e.clientX; _sy = e.clientY;
+    });
+    card.addEventListener('mouseup', async (e)=>{
+      if (_sx==null || _sy==null) return;
+      const dx = e.clientX - _sx, dy = e.clientY - _sy;
+      _sx = _sy = null;
+
+      // 数px以上の移動で「ドラッグ」と判定
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        // 見た目を少しだけ動かしてから消す
+        try{
+          card.style.transition = 'transform .12s ease';
+          const stepX = (dx>0?1:-1) * 6, stepY = (dy>0?1:-1) * 6;
+          card.style.transform = `translate(${stepX}px, ${stepY}px)`;
+        }catch{}
+
+        setTimeout(async ()=>{
+          // このカード(ci)のみを配列から除去（他のカード位置は維持）
+          const next = (t.hand || []).filter((_, j)=> j !== ci);
+          await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { hand: next });
+        }, 120);
+      }
+    });
+    // マウスが外に出たらドラッグ判定をリセット
+    card.addEventListener('mouseleave', ()=>{ _sx = _sy = null; });
+  }
+}
+// ここまで追加（M42：青枠＆ドラッグで消去）
+
 
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
