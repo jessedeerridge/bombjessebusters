@@ -45,7 +45,7 @@
   /* ★ ホスト左下の工具ボタン */
   .host-tool{position:fixed;left:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:10}
 
-  .items-bar{display:flex;align-items:center;gap:8px;margin-top:0; margin-bottom:60px;}
+  .items-bar{display:flex;align-items:center;gap:8px;margin-top:0}
   .items{display:flex;gap:6px;align-items:center;overflow-x:auto}
   .item{
     position:relative; width:var(--item-w);height:var(--item-h);
@@ -270,17 +270,7 @@
   background:rgba(34,197,94,.35);
   pointer-events:none;
 }
-  /* ▼ ミッション43：checklist の枠の“上”に出す nano 画像 */
-.nano-img{
-  position:absolute;
-  left:50%;
-  bottom:calc(100% + 4px);   /* 枠の“上”に出す */
-  transform:translateX(-50%);
-  width:80px; height:50px;   /* 画像の見え方はここで微調整 */
-  background:center/contain no-repeat;
-  pointer-events:auto;       /* クリックで回収タブを開けるように */
-  z-index:5;
-}
+  
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
   .mini-pop{
     position:fixed;z-index:2147483647;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
@@ -993,7 +983,6 @@ if (v) {
     state.gameStarted=!!v?.started;
 renderM39(v);
     renderM42(v);
-    renderM43(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1177,25 +1166,6 @@ if ((v.mission?.id|0) === 39) {
       cl.appendChild(cell);
     }
     tablesEl.appendChild(cl); // ← 直後にテーブル1が来るので「真上」になる
-
-    /* ▼▼ #43：checklist の数字クリックで m43 メタを更新（どの枠の上に出すか） ▼▼ */
-    const cells = Array.from(cl.querySelectorAll('.check-item'));
-    cells.forEach((cell, i)=>{
-      cell.style.cursor = 'pointer';
-      cell.onclick = async (ev)=>{
-        try{
-          const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-          const mSnap = await get(mRef);
-          const meta = mSnap.val() || {};
-          const m43  = meta.m43 || { n:1, level:3, left:false };
-          const prev = m43.n|0;
-          const now  = (i+1);
-          const goingLeft = (prev && now < prev); // 数字が下がった → left
-          await update(mRef, { m43: { n: now, level: (m43.level|0)||3, left: !!goingLeft } });
-        }catch(e){ console.error(e); }
-      };
-    });
-    
   }
 
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
@@ -2488,65 +2458,7 @@ await Promise.all([
   }
 }
 /* ここまで追加：#42 */
-/* ここから追加：#43 描画・操作ロジック（checklist 上の nano 表示 & 回収） */
-function renderM43(v){
-  const isM43 = ((v?.mission?.id|0) === 43);
-  // 既存の nano 表示を一掃（再描画のたびに出し直す）
-  document.querySelectorAll('.nano-img').forEach(n => n.remove());
-  if (!isM43) return;
 
-  // 初期化：参加人数で開始レベルを分岐（ホストのみ一度）
-  if (state.isHost && !v?.meta?.m43){
-    // 参加人数の推定（プロジェクトの構造に合わせて、存在するフィールドから取得）
-    const pc =
-      (v?.players && typeof v.players === 'object')
-       ? Object.values(v.players).filter(p => p).length
-        : (v?.seats && typeof v.seats === 'object')
-          ? Object.values(v.seats).filter(s => s && s.uid).length
-          : (v?.playerCount|0);
-    // 5,6人 → nano3 / 3,4人 → nano4
-   const initLevel = (pc >= 5 ? 3 : 4);
-    update(ref(db, `rooms/${state.roomCode}/meta`), { m43: { n: 1, level: initLevel, left: false } });
-    return;
-  }
-
-  const m = v?.meta?.m43;
-  if (!m) return;
-
-  // 対象の checklist セルの「上」に nano を置く
-  const cl = document.querySelector('.checklist');
-  if (!cl) return;
-  const cells = cl.querySelectorAll('.check-item');
-  const target = cells[(m.n|0) - 1];
-  if (!target) return;
-
-  const nano = document.createElement('div');
-  nano.className = 'nano-img';
-  const suffix = m.left ? 'left' : '';
-  const lev = Math.max(0, (m.level|0)); // 0..3
-  nano.style.backgroundImage = `url('./nano${lev}${suffix}.png')`;
-
-  // nano をクリックすると「回収」タブ（下部ミニメニュー）を出す → クリック毎に段階を1つ下げる
-  nano.onclick = (ev)=>{
-    openBottomMenu([
-      {
-        label:'回収',
-        action: async ()=>{
-          try{
-            const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-           const mSnap = await get(mRef);
-            const meta = mSnap.val() || {};
-            const cur  = meta.m43 || m;
-            const nextLevel = Math.max(0, (cur.level|0) - 1); // nano3→nano2→...→nano0
-            await update(mRef, { m43: { n: cur.n, level: nextLevel, left: cur.left } });
-          }catch(e){ console.error(e); }
-        }
-      }
-    ]);
-  };
-
-  target.appendChild(nano);
-}
 
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
