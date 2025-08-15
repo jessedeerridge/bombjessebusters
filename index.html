@@ -1392,6 +1392,12 @@ if (c.gone === true){
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if(c.markUntil && now()<c.markUntil){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
 
+      // ：⇅モードの選択A/Bに▼を出す
+      const m42s = v?.meta?.m42_swap;
+      if (m42s?.selA && m42s.selA.cardId===c.id && m42s.selA.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+      if (m42s?.selB && m42s.selB.cardId===c.id && m42s.selB.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+
+                         
       const isI2Actor = i2All && i2All.usingBy===state.userId;
       const canPickSelf  = isI2Actor && i2All?.phase==='pickSelf'  && t.playerId===state.userId;
       const canPickOther = isI2Actor && i2All?.phase==='pickOther' && t.playerId!==state.userId;
@@ -1399,6 +1405,71 @@ if (c.gone === true){
       const isI18Actor = i18All && i18All.usingBy===state.userId;
       const canI18Pick = isI18Actor && i18All?.phase==='pickOther' && t.playerId!==state.userId;
 
+      // ここから追加：⇅モード（公開カードのみ選択→2枚目でポップ）
+      const m42SwapMeta = v?.meta?.m42_swap;
+      if (m42SwapMeta?.on && c.open===true){
+       card.classList.add('i2-selectable'); // 既存の青枠クラス
+        card.onclick = async (ev)=>{
+          ev.stopPropagation();
+          const flowRef = ref(db, `rooms/${state.roomCode}/meta/m42_swap`);
+         const s = (await get(flowRef)).val() || { on:true, usingBy:null, selA:null, selB:null };
+          const me = state.userId;
+          const cur = { table:idx, index:ci, cardId:c.id, num:(c.num|0) };
+
+          // 他人の1枚目選択をタップで奪取（先行選択キャンセル）
+          if (s.selA && !s.selB && s.usingBy && s.usingBy!==me){
+            await update(flowRef, { usingBy:me, selA:cur, selB:null });
+            return;
+          }
+          // 1枚目セット
+          if (!s.selA){
+            await update(flowRef, { usingBy:me, selA:cur, selB:null });
+            return;
+          }
+         // 同一カード再クリックは無視
+          if (s.selA.cardId===cur.cardId && s.selA.table===cur.table) return;
+
+        // 同じ数字 → キャンセル＋通知
+          if ((s.selA.num|0)===(cur.num|0)){
+            openOneMini(ev.clientX, ev.clientY, '同じ数字です', ()=>{});
+            await update(flowRef, { on:true, usingBy:null, selA:null, selB:null });
+            return;
+          }
+
+          // 2枚目 → ポップ
+          await update(flowRef, { selB:cur, usingBy:me });
+          openBottomMenu([
+            {label:'入れ替える', action: async ()=>{
+              const F = (await get(flowRef)).val();
+              if(!(F?.selA && F?.selB)) return;
+              const tSnap = await get(ref(db, `rooms/${state.roomCode}/tables`));
+              const tables = tSnap.val() || [];
+              const A=F.selA, B=F.selB;
+              if (A.table === B.table){
+                const hand = (tables[A.table]?.hand)||[];
+                const a=hand[A.index], b=hand[B.index]; if(!a||!b) return;
+                hand[A.index]=b; hand[B.index]=a;
+                await set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), hand);
+              }else{
+               const hA=(tables[A.table]?.hand)||[], hB=(tables[B.table]?.hand)||[];
+                const a=hA[A.index], b=hB[B.index]; if(!a||!b) return;
+                hA[A.index]=b; hB[B.index]=a;
+                await Promise.all([
+                  set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), hA),
+                  set(ref(db, `rooms/${state.roomCode}/tables/${B.table}/hand`), hB)
+                ]);
+              }
+              // 継続：モードは維持し、選択をクリア
+              await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_swap:{ on:true, usingBy:null, selA:null, selB:null } });
+            }},
+           {label:'やり直す', action: async ()=>{
+              await update(flowRef, { on:true, usingBy:null, selA:null, selB:null });
+            }}
+          ]);
+       };
+        return; // ⇅処理を行ったので以降の分岐はスキップ
+      }
+      
       if(isI2Actor && (canPickSelf || canPickOther)){
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
@@ -1431,6 +1502,9 @@ if (c.gone === true){
       }else{
         card.onclick = async ()=>{
                     if (state.watching?.meta?.m42_on) return;
+        card.onclick = async ()=>{
+         // ☝ または ⇅ 中は裏表禁止
+          
           if(isMine){
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
@@ -2095,125 +2169,19 @@ function renderM42(v){
       const on = !!v?.meta?.m42_on;
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_on: !on });
     };
+    // ここから追加：⇅モードのトグルと状態器
+   const swapPath = `rooms/${state.roomCode}/meta/m42_swap`;
+    const toggleSwap = async ()=>{
+      const s = (await get(ref(db, swapPath))).val() || {};
+      const next = s.on ? { on:false, usingBy:null, selA:null, selB:null }
+                        : { on:true,  usingBy:null, selA:null, selB:null };
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_swap: next });
+    };
+    
     bar.appendChild(btn('-2', ()=>{})); // ダミー
-    bar.appendChild(btn('⇅', ()=>{})); 
+    bar.appendChild(btn('⇅', toggleSwap)); 
     bar.appendChild(btn('☝', toggle));
     bar.appendChild(btn('あ', ()=>{})); // ダミー
-
-    // ⇅ の実体：オン/オフ切替（オフ時は選択状態も消去）
-    const toggleSwap = async ()=>{
-      const metaRef = ref(db, `rooms/${state.roomCode}/meta`);
-      const on = !!(v?.meta?.m42_swapOn);
-      await update(metaRef, on
-        ? { m42_swapOn:false, m42_swapFlow:null }
-        : { m42_swapOn:true,  m42_swapFlow:null });
-    };
-
-    // 既に描画済みのバー内「⇅」ボタン（2番目）に実処理を割り当て
-    const _bar = document.getElementById('m42HostBar');
-    const _btns = _bar?.querySelectorAll('button');
-    if (_btns && _btns[1]) _btns[1].onclick = toggleSwap;
-
-    // 交換実処理：位置は昇順にせず、選んだ2枚のその場を入れ替える
-    async function doM42Swap(selA, selB){
-      try{
-        const rRef = ref(db, `rooms/${state.roomCode}`);
-        const snap = await get(rRef); const R = snap.val() || {};
-        const TA = (R.tables||[])[selA.table]; const TB = (R.tables||[])[selB.table];
-        if (!TA || !TB) return;
-        const aIdx = (TA.hand||[]).findIndex(cc => cc && cc.id === selA.cardId);
-        const bIdx = (TB.hand||[]).findIndex(cc => cc && cc.id === selB.cardId);
-        if (aIdx<0 || bIdx<0) return;
-        const aCard = TA.hand[aIdx], bCard = TB.hand[bIdx];
-        await Promise.all([
-          update(ref(db, `rooms/${state.roomCode}/tables/${selA.table}/hand/${aIdx}`), bCard),
-          update(ref(db, `rooms/${state.roomCode}/tables/${selB.table}/hand/${bIdx}`), aCard),
-          update(ref(db, `rooms/${state.roomCode}/meta`), { m42_swapFlow:null })
-        ]);
-      }catch(e){ console.error(e); }
-    }
-
-    // ⇅ON中：全体公開カードだけ青枠化＋選択UI（クリックは裏表トグルを抑止）
-    if (v?.meta?.m42_swapOn){
-      const tables = v.tables||[];
-      const tableNodes = Array.from(document.querySelectorAll('.table'));
-
-      tables.forEach((T, ti)=>{
-        const handNode = tableNodes[ti]?.querySelector('.hand');
-        if (!handNode) return;
-        (T.hand||[]).forEach((c, ci)=>{
-          if (!c || c.gone===true) return;
-          if (c.open===true){
-            const wrap = handNode.children[ci]; if(!wrap) return;
-            const card = wrap.querySelector('.card'); if(!card) return;
-
-            // 青枠
-            card.classList.add('i2-selectable');
-
-            // 既存のクリック（裏表トグル等）を抑止して、選択ハンドラに差し替え
-            card.addEventListener('click', async (ev)=>{
-              ev.stopPropagation(); ev.stopImmediatePropagation();
-
-              const metaRef = ref(db, `rooms/${state.roomCode}/meta`);
-              const cur = (await get(metaRef)).val() || {};
-              const flow = cur.m42_swapFlow;
-              const me = state.userId;
-
-              // 他人が selA を持っているときに別の人がタップ → その選択をキャンセル
-              if (flow && flow.selA && flow.by && flow.by !== me){
-                await update(metaRef, { m42_swapFlow:null });
-                return;
-              }
-
-              // 1枚目の選択
-              if (!flow || !flow.selA){
-                await update(metaRef, { m42_swapFlow: { by: me, selA:{ table:ti, cardId:c.id, num:(c.num|0)||null } } });
-                return;
-              }
-
-              // 2枚目の選択（同じカードをもう一度押したらキャンセル）
-              if (flow.selA && !flow.selB){
-                if (flow.selA.table===ti && flow.selA.cardId===c.id){
-                  await update(metaRef, { m42_swapFlow:null });
-                  return;
-                }
-                // 同じ数字チェック
-                const same = ((flow.selA.num|0) === ((c.num|0)||0));
-                if (same){
-                  openOneMini(ev.clientX, ev.clientY, '同じ数字です');
-                  await update(metaRef, { m42_swapFlow:null });
-                  return;
-                }
-
-                // 2枚目を確定してポップ
-                await update(metaRef, { m42_swapFlow: { by: (flow.by||me), selA:flow.selA, selB:{ table:ti, cardId:c.id, num:(c.num|0)||null } } });
-                openBottomMenu([
-                  { label:'入れ替える', action: async ()=>{
-                      const meta = (await get(metaRef)).val() || {};
-                      const f = meta.m42_swapFlow;
-                      if (f?.selA && f?.selB) await doM42Swap(f.selA, f.selB);
-                    }},
-                  { label:'やり直す', action: async ()=>{ await update(metaRef, { m42_swapFlow:null }); } }
-                ]);
-              }
-            }, {capture:true});
-
-            // ▼マーカー（selA/selB のどちらでも ▼ を1つ表示）
-            const flowNow = v?.meta?.m42_swapFlow;
-            const mark = (flowNow?.selA && flowNow.selA.table===ti && flowNow.selA.cardId===c.id)
-                       || (flowNow?.selB && flowNow.selB.table===ti && flowNow.selB.cardId===c.id);
-            let mk = wrap.querySelector('.marker.m42');
-            if (mark){
-              if (!mk){ mk = document.createElement('div'); mk.className='marker m42'; mk.textContent='▼'; wrap.appendChild(mk); }
-            }else{
-              if (mk) mk.remove();
-            }
-          }
-        });
-      });
-    }
-
-    
     document.body.appendChild(bar);
   }
 
