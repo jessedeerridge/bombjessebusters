@@ -2220,8 +2220,14 @@ function renderM42(v){
 
     
     const onRotate = (ev)=>{
-      openBottomMenu([
-        { label:'左', action: async ()=>{
+       // 選択タブを画面下部に出すため、openBottomMenu用の位置を一時変更
+      const menuStyle = document.getElementById('bottomMenu')?.style;
+       if(menuStyle){
+         menuStyle.top = '';
+         menuStyle.bottom = '10px';
+       }
+       openBottomMenu([
+  { label:'左', action: async ()=>{
             // 画像表示を全員に同期：metaへ発火（3秒）
             await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_ex:{ img:'exleft.jpg', at: Date.now() } });
             await rotateAllSeats(+1);    // 全員を次テーブルへ（既存維持）
