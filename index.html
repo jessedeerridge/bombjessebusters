@@ -2142,19 +2142,17 @@ function renderM42(v){
     bar.appendChild(btn('☝', toggleBox));        // 互換
   /* ここから追加：#42 ↻（左/右タブ → 画像 → 循環席移動） */
     const flashEx = (img) => {
-      // itemsBar の直後に一時表示
-      const barEl = document.getElementById('itemsBar');
-      if (!barEl) return null;
       let ex = document.getElementById('m42Ex');
       if (ex) ex.remove();
       ex = document.createElement('div');
-      ex.id = 'm42Ex';
+     ex.id = 'm42Ex';
       Object.assign(ex.style, {
-        width:'140px', height:'90px', marginTop:'6px', marginLeft:'4px',
-        background:`url('./${img}') center/cover no-repeat`,
-        border:'2px dashed #38bdf8', borderRadius:'10px'
+       position:'fixed', left:'50%', bottom:'10px', transform:'translateX(-50%)',
+        width:'140px', height:'90px',
+        background:`url('./${img}') center/contain no-repeat`,
+        zIndex:2147483647, pointerEvents:'none'
       });
-      barEl.insertAdjacentElement('afterend', ex);
+      popLayer.appendChild(ex); // 画面最前のオーバーレイ層へ
       return ex;
     };
     const clearEx = ()=>{ const ex=document.getElementById('m42Ex'); if(ex) ex.remove(); };
@@ -4482,8 +4480,9 @@ function missionInfo(id, opts={}){
         id:35, name:'#35', desc:'',
         display:[
           '#35',
-          '各テーブル：手札からランダムで1枚を一番右へ移動し、そのカードに ✕（黄背景/黒文字）トークンを付ける。他は昇順。',
-          '「スタンド右側にランダムのコード」「このコードにアイテムは使用不可」「黄コードを全て解除しないと✕コードを解除できない」'
+          'ランダムで一枚選び、自分のスタンドの一番右に置く。',
+          'このコードは黄コードを全て切断しないと、切断できない。',
+          'このコードを切断するのにアイテムは使用できない。'
         ],
         // #20 と同じ右端✕処理を流用
         flags:{ m20_rightmostX:true }
