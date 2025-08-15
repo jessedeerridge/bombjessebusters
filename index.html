@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>abbba</title>
+<title>abbｈｈba</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -2091,6 +2091,10 @@ function renderM42(v){
       /* ⇅ / -2 モード時：全体公開カードを青枠表示（既存の i2-selectable 風） */
       body[data-m42swap="on"] .card.open,
       body[data-m42m2="on"]   .card.open { outline:2px dashed #38bdf8; outline-offset:-3px; }
+        /* exright/exleft の表示は常に画面中央に固定（保険） */
+        #m42Ex{ position:fixed!important; left:50%!important; top:50%!important; transform:translate(-50%,-50%)!important; }
+
+      
     `;
     document.head.appendChild(st);
   }
@@ -2113,7 +2117,7 @@ function renderM42(v){
     const bar = document.createElement('div');
     bar.id = 'm42HostBar';
     Object.assign(bar.style, {
-         position:'fixed', left:'50%', top:'50%', transform:'translate(-50%, -50%)',
+      position:'fixed', left:'50%', bottom:'10px', transform:'translateX(-50%)',
       display:'flex', gap:'6px', zIndex:2147483600, background:'#fff',
       border:'1px solid #eee', borderRadius:'12px', padding:'6px 8px',
       boxShadow:'0 10px 24px rgba(0,0,0,.08)'
@@ -2220,12 +2224,6 @@ function renderM42(v){
 
     
     const onRotate = (ev)=>{
-       // 選択タブを画面下部に出すため、openBottomMenu用の位置を一時変更
-      const menuStyle = document.getElementById('bottomMenu')?.style;
-       if(menuStyle){
-         menuStyle.top = '';
-         menuStyle.bottom = '10px';
-       }
        openBottomMenu([
   { label:'左', action: async ()=>{
             // 画像表示を全員に同期：metaへ発火（3秒）
