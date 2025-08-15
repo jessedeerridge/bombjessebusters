@@ -2193,16 +2193,16 @@ function renderM42(v){
 
     const onRotate = (ev)=>{
       openBottomMenu([
-        { label:'左', action: async ()=>{
-            flashEx('exleft.jpg');     // 表示
-            await moveSeatCyclic(+1);  // 次テーブルへ
-            clearEx();                 // 消す
-        }},
-        { label:'右', action: async ()=>{
-            flashEx('exright.jpg');    // 表示
-            await moveSeatCyclic(-1);  // 前テーブルへ
-            clearEx();                 // 消す
-        }},
+{ label:'左', action: async ()=>{
+    flashEx('exleft.jpg');       // 表示
+    await moveSeatCyclic(+1);    // 次テーブルへ
+    setTimeout(clearEx, 7000);   // 7秒後に消す
+}},
+{ label:'右', action: async ()=>{
+    flashEx('exright.jpg');      // 表示
+    await moveSeatCyclic(-1);    // 前テーブルへ
+    setTimeout(clearEx, 7000);   // 7秒後に消す
+}},
       ]);
     };
     bar.appendChild(btn('↻', onRotate));
@@ -4439,8 +4439,10 @@ function missionInfo(id, opts={}){
         id:32, name:'#32', desc:'',
         display:[
           '#32',
-          '制約カードの山札をアイテム下に表示。クリックで「めくる」→右に表で並べる（全員に適用）。',
-          '「隊長の手番で引き直し可」「制約が適用できないプレイヤーは手番を飛ばす」'
+          '制約カードの山札から1枚引いて、表にする。',
+          'プレイヤー全員はこの制約を守らなければならない。',
+          '隊長の手番になると、制約カードを引き直すことができる。',
+          '制約を守れないプレイヤーは手番を飛ばす。'
         ],
         // ※今回：説明表示のみ。山札UIは次の差分で追加予定
         flags:{}
