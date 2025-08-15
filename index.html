@@ -999,6 +999,7 @@ renderM39(v);
                  border-radius:8px; }
         .m42-ghost{ position:fixed; z-index:2147483600; pointer-events:none; opacity:.9; }
         `;
+                .m42-placeholder{ display:inline-block; border-radius:8px; background:transparent; }
         document.head.appendChild(st);
       }
 
@@ -1075,35 +1076,52 @@ renderM39(v);
           // ゴースト生成
           const r = card.getBoundingClientRect();
           const ghost = card.cloneNode(true);
-          ghost.classList.add('m42-ghost','m42-freeze');
+              ghost.classList.add('m42-ghost','m42-freeze');
           ghost.style.width = r.width+'px'; ghost.style.height=r.height+'px';
           document.body.appendChild(ghost);
 
           const offX = ev.clientX - r.left, offY = ev.clientY - r.top;
           const move = (e)=>{ ghost.style.left=(e.clientX-offX)+'px'; ghost.style.top=(e.clientY-offY)+'px'; };
+
+          // ★ このカードの正しいDBパスを厳密に推定
+          const cardWrap = card.closest('.card-wrap');
+          const handWrap = cardWrap?.parentElement;               // 各プレイヤーの手札コンテナ
+          const tableEl  = handWrap?.closest('.table');
+          const allTables = Array.from(document.querySelectorAll('.tables .table'));
+          const ti = allTables.indexOf(tableEl);
+          const siblings = handWrap ? Array.from(handWrap.querySelectorAll(':scope > .card-wrap')) : [];
+          const ci = siblings.indexOf(cardWrap);
+          // 失敗したらキャンセル
+          const cardPath = (ti>=0 && ci>=0) ? `rooms/${state.roomCode}/tables/${ti}/hand/${ci}` : null;
+
           const up = async (e)=>{
             window.removeEventListener('pointermove', move, true);
             window.removeEventListener('pointerup', up, true);
-            // box 命中判定（内側＋数px）
             const bx = document.getElementById('m42Box');
-            const ok = (()=>{
+            const hit = (()=>{
               if(!bx) return false;
               const br = bx.getBoundingClientRect();
               const x = e.clientX, y = e.clientY, pad=4;
               return (x>=br.left-pad && x<=br.right+pad && y>=br.top-pad && y<=br.bottom+pad);
             })();
             ghost.remove();
-            if(ok){
-              // DOMからテーブル/カードindexを推定してDB削除
-              const wrap = card.closest('.card-wrap');
-              const hand = wrap?.parentElement;
-              const tableEl = hand?.closest('.table');
-              const tables = Array.from(document.querySelectorAll('.tables .table'));
-              const ti = tables.indexOf(tableEl);
-              const ci = Array.from(hand?.querySelectorAll('.card-wrap')||[]).indexOf(wrap);
-              if(ti>=0 && ci>=0){
-                await remove(ref(db, `rooms/${state.roomCode}/tables/${ti}/hand/${ci}`));
-              }
+
+            if(!cardPath) return; // パス不明なら何もしない
+
+            if(hit){
+              // ▼ 見た目の穴を即時反映（前詰め防止）
+              const ph = document.createElement('div');
+              ph.className = 'm42-placeholder';
+              ph.style.width = r.width+'px';
+              ph.style.height = r.height+'px';
+              ph.style.border = '1px dashed transparent';
+              cardWrap.replaceChild(ph, card);
+
+              // ▼ DB上は削除せず「空スロット化」して前詰めを防止
+              await update(ref(db, cardPath), {
+                m42_deleted: true,
+                tokens: [],
+              });
             }
           };
           window.addEventListener('pointermove', move, true);
