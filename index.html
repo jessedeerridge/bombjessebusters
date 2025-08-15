@@ -2495,9 +2495,18 @@ function renderM43(v){
   document.querySelectorAll('.nano-img').forEach(n => n.remove());
   if (!isM43) return;
 
-  // 初期化：ミッション開始直後は nano3.png を出す（ホストのみ一度）
+  // 初期化：参加人数で開始レベルを分岐（ホストのみ一度）
   if (state.isHost && !v?.meta?.m43){
-    update(ref(db, `rooms/${state.roomCode}/meta`), { m43: { n: 1, level: 3, left: false } });
+    // 参加人数の推定（プロジェクトの構造に合わせて、存在するフィールドから取得）
+    const pc =
+      (v?.players && typeof v.players === 'object')
+       ? Object.values(v.players).filter(p => p).length
+        : (v?.seats && typeof v.seats === 'object')
+          ? Object.values(v.seats).filter(s => s && s.uid).length
+          : (v?.playerCount|0);
+    // 5,6人 → nano3 / 3,4人 → nano4
+   const initLevel = (pc >= 5 ? 3 : 4);
+    update(ref(db, `rooms/${state.roomCode}/meta`), { m43: { n: 1, level: initLevel, left: false } });
     return;
   }
 
