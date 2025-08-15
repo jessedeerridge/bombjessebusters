@@ -2140,40 +2140,99 @@ function renderM42(v){
     bar.appendChild(btn('-2', toggleMinus2));     // 追加：-2トグル
     bar.appendChild(btn('⇅', toggleSwap));        // ← 今回の本体
     bar.appendChild(btn('☝', toggleBox));        // 互換
-   /* ここから変更：#42 ↻（画像表示をDBブロードキャスト→全員表示 & 3秒） */
-     // 全員へ画像表示をブロードキャスト（3秒後に自動クリア）
-     const broadcastEx = async (img) => {
-       const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-       // 未サポート環境対策：randomUUID が無ければ時刻+乱数で代用
-       const key  = (globalThis.crypto && typeof crypto.randomUUID === 'function')
-         ? crypto.randomUUID()
-         : (Date.now() + '_' + Math.random().toString(36).slice(2));       const until= Date.now() + 3000; // 約3秒
-       await update(mRef, { m42Ex: { img, key, until } });
-       // 3秒後にホスト側でクリア（存在チェック付き）
-       setTimeout(async ()=>{
-         try{
-           const snap = await get(mRef);
-           const cur  = snap.val() || {};
-           if (cur.m42Ex?.key === key) {
-             await update(mRef, { m42Ex: null });
-           }
-         }catch(_){}
-       }, 3000);
-   };
+  /* ここから追加：#42 ↻（左/右タブ → 画像 → 循環席移動） */
+    const flashEx = (img) => {
+      let ex = document.getElementById('m42Ex');
+      if (ex) ex.remove();
+      ex = document.createElement('div');
+     ex.id = 'm42Ex';
+      Object.assign(ex.style, {
+       position:'fixed', left:'50%', bottom:'10px', transform:'translateX(-50%)',
+        width:'140px', height:'90px',
+        background:`url('./${img}') center/contain no-repeat`,
+        zIndex:2147483647, pointerEvents:'none'
+      });
+      popLayer.appendChild(ex); // 画面最前のオーバーレイ層へ
+      return ex;
+    };
+    const clearEx = ()=>{ const ex=document.getElementById('m42Ex'); if(ex) ex.remove(); };
 
-     const onRotate = (ev)=>{
-       openBottomMenu([
-         { label:'左', action: async ()=>{
-             await moveSeatCyclic(+1);        // 先に確実に席を動かす
-             // 画像通知は失敗しても無視（席移動は阻害しない）
-             broadcastEx('exleft.jpg').catch(()=>{});
-         }},
-         { label:'右', action: async ()=>{
-             await moveSeatCyclic(-1);        // 先に確実に席を動かす
-             broadcastEx('exright.jpg').catch(()=>{});
-         }},
-       ]);
+    const findMySeat = (vv)=>{
+      if (state.seatedTable!=null) return state.seatedTable|0;
+      const i = (vv?.tables||[]).findIndex(t=> t?.playerId===state.userId);
+      return (i>=0? i : null);
+    };
+
+    const seatTo = async (newIdx)=>{
+      // 現席を離席 → 新しい席に着席＆手札の ownerId を自分に
+      await leaveSeatNow();
+      await update(ref(db, `rooms/${state.roomCode}/tables/${newIdx}`), {
+        playerId: state.userId, playerName: state.userName
+      });
+      const hRef = ref(db, `rooms/${state.roomCode}/tables/${newIdx}/hand`);
+      const hSnap = await get(hRef);
+      const hand = hSnap.val() || [];
+      await Promise.all(hand.map((_,idx)=>
+        update(ref(db, `rooms/${state.roomCode}/tables/${newIdx}/hand/${idx}`), { ownerId: state.userId })
+      ));
+      state.seatedTable = newIdx;
+      updateMenuButtons();
+    };
+
+    const moveSeatCyclic = async (dir)=>{
+      const vv = state.watching || v;
+      const n  = (vv?.tableCount|0) || (vv?.tables?.length|0);
+      if (!n) return;
+      const cur = findMySeat(vv);
+      if (cur==null){ alert('席に座っていません'); return; }
+      const next = ( (cur + (dir>0? +1 : -1)) % n + n ) % n; // 循環
+      await seatTo(next);
+    };
+
+   // ★ 全員の座席を循環移動：dir=+1（左/次テーブル）, -1（右/前テーブル）
+     const rotateAllSeats = async (dir)=>{
+       const vv = state.watching || v;
+       const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
+       const tbls = snap.val() || [];
+       const n = tbls.length|0; if(!n) return;
+       const nextPlayers = Array.from({length:n}, ()=>({id:null, name:null}));
+       for(let i=0;i<n;i++){
+         const pid  = tbls[i]?.playerId || null;
+         const name = tbls[i]?.playerName || null;
+         if(pid){
+           const j = ((i + (dir>0? +1 : -1)) % n + n) % n;
+           nextPlayers[j] = {id:pid, name};
+         }
+       }
+       const out = tbls.map((T,i)=>{
+         const np = nextPlayers[i];
+         const hand = Array.isArray(T?.hand) ? T.hand.map(c => ({...c, ownerId: np.id||null})) : [];
+         return {...T, playerId: np.id||null, playerName: np.name||null, hand};
+       });
+       await set(ref(db, `rooms/${state.roomCode}/tables`), out);
+       // ローカルの自席インデックスも更新（UIズレ防止）
+      const cur = (vv?.tables||[]).findIndex(t=> t?.playerId===state.userId);
+       if (cur>=0){
+         const next = ((cur + (dir>0? +1 : -1)) % n + n) % n;
+         state.seatedTable = next; updateMenuButtons();
+       }
      };
+
+    
+    const onRotate = (ev)=>{
+      openBottomMenu([
+ { label:'左', action: async ()=>{
+     flashEx('exleft.jpg');       // 表示
+     await rotateAllSeats(+1);    // 全員を次テーブルへ
+     setTimeout(clearEx, 7000);   // 7秒後に消す
+ }},
+{ label:'右', action: async ()=>{
+    flashEx('exright.jpg');      // 表示
+     await rotateAllSeats(-1);    // 全員を前テーブルへ
+    setTimeout(clearEx, 7000);   // 7秒後に消す
+}},
+      ]);
+    };
     bar.appendChild(btn('↻', onRotate));
     document.body.appendChild(bar);
   }
@@ -2193,33 +2252,6 @@ function renderM42(v){
     }
   }
 
-// --- 追加：全員側 画像オーバーレイ（中央表示 / 約3秒） ---
-  (function renderM42Ex(){
-    const info = v?.meta?.m42Ex;
-    let ex = document.getElementById('m42Ex');
-    if (!info) { if (ex) ex.remove(); return; }
-
-    // 新しい通知キーなら作り直す
-    if (!ex || ex.dataset.key !== String(info.key||'')) {
-      if (ex) ex.remove();
-      ex = document.createElement('div');
-      ex.id = 'm42Ex';
-      ex.dataset.key = String(info.key||'');
-      Object.assign(ex.style, {
-        position:'fixed',
-        left:'50%', top:'50%', transform:'translate(-50%, -50%)', // 画面中央
-        width:'200px', height:'130px',
-        background:`url('./${info.img}') center/contain no-repeat`,
-        zIndex:2147483647, pointerEvents:'none'
-      });
-      document.body.appendChild(ex);
-    }
-
-    // 期限を過ぎていたらローカルでも消す（保険）
-    if (info.until && Date.now() > info.until) { if (ex) ex.remove(); }
-  })();
-
-  
   // 4) ⇅入れ替えモード：青枠＋クリック選択（▼表示は renderTables 側の2行で描画）
   const swapOn = !!v?.meta?.m42Swap?.on;
   if (swapOn){
