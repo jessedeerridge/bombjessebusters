@@ -45,7 +45,7 @@
   /* ★ ホスト左下の工具ボタン */
   .host-tool{position:fixed;left:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:10}
 
-  .items-bar{display:flex;align-items:center;gap:8px;margin-top:0}
+  .items-bar{display:flex;align-items:center;gap:8px;margin-top:0; margin-bottom:60px;}
   .items{display:flex;gap:6px;align-items:center;overflow-x:auto}
   .item{
     position:relative; width:var(--item-w);height:var(--item-h);
@@ -269,16 +269,6 @@
   width:18px; height:18px; border-radius:50%;
   background:rgba(34,197,94,.35);
   pointer-events:none;
-}
-/* ▼ M43: 透明ボタン＆nano表示用 */
-.check-btn{
-  position:absolute; inset:0; border:none; background:transparent; cursor:pointer;
-}
-.nano-img{
-  position:absolute; inset:auto auto 100% 50%; /* マスの上側中央に出す */
-  transform:translate(-50%,-6px);
-  width:56px; height:auto; pointer-events:auto;   /* クリック可（回収メニュー用） */
-  z-index:5;
 }
   
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
@@ -644,6 +634,9 @@ function clearMissionOverlays(){
   if (info22) info22.remove();
     // ★ ミッション27：アイテム直下の行を確実に消す
   const m27 = document.getElementById('m27Row');
+    // ★ ミッション43：nanoオーバーレイを確実に消す
+    const m43 = document.getElementById('m43Nano');
+    if (m43) m43.remove();
   if (m27) m27.remove();
   // ★追加：制約系UI（#31/#32/#37）を丸ごと掃除
   document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m31HandRow/m31CenterRow/m32ConRowはconlane
@@ -928,6 +921,54 @@ function openBottomMenu(entries){
   popLayer.appendChild(div);
 }
 
+/* ===== #43：nano オーバーレイ（1枚だけ） ===== */
+function m43EnsureOverlay(){
+  let el = document.getElementById('m43Nano');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'm43Nano';
+  Object.assign(el.style, {
+    position:'fixed', width:'120px', height:'120px',
+    backgroundSize:'contain', backgroundRepeat:'no-repeat', backgroundPosition:'center',
+    zIndex: 2147483647, pointerEvents:'auto'
+  });
+  // クリックで「回収」タブ
+  el.onclick = (ev)=>{
+    ev.stopPropagation();
+    openBottomMenu([
+      { label:'回収', action: async ()=>{
+          const v = state.watching;
+          const lv = Math.max(0, ((v?.meta?.m43_level|0) - 1));
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m43_level: lv });
+        // 画像の数字を更新（向きは回収では考慮せず、通常版を使用）
+          const img = `nano${lv}.jpg`;
+          const box = document.getElementById('m43Nano');
+          if (box) box.style.backgroundImage = `url('./${img}')`;
+        } }
+    ]);
+  };
+  document.body.appendChild(el);
+  return el;
+}
+
+/** cell(=check-item) の真上に、directionに応じた画像を表示
++ * direction: 'up'|'down' （down のとき *left.jpg）
++ */
+function m43ShowOver(cell, direction){
+  const v  = state.watching;
+  const lv = (v?.meta?.m43_level|0) ?? 3; // 0..3
+  const base = `nano${lv}${direction==='down' ? 'left' : ''}.jpg`;
+  const el = m43EnsureOverlay();
+  // 位置計算（数字枠の直上）
+  const r = cell.getBoundingClientRect();
+  const w = 120, h = 120, gap = 6;
+  el.style.left = (r.left + r.width/2 - w/2) + 'px';
+ el.style.top  = (r.top - h - gap) + 'px';
+  el.style.width = w + 'px';
+  el.style.height= h + 'px';
+  el.style.backgroundImage = `url('./${base}')`;
+}
+  
 /* enter */
 btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); };
 btnJoin.onclick   = ()=>{
@@ -993,7 +1034,6 @@ if (v) {
     state.gameStarted=!!v?.started;
 renderM39(v);
     renderM42(v);
-    renderM43(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1170,35 +1210,37 @@ if ((v.mission?.id|0) === 39) {
     for(let n=1; n<=12; n++){
       const cell = document.createElement('div'); cell.className='check-item';
       cell.textContent = String(n);
+      // #43 のときだけクリック可能に
+     if ((v?.mission?.id|0) === 43) {
+        cell.dataset.n = String(n);
+        cell.style.cursor = 'pointer';
+        cell.onclick = async (ev)=>{
+         const prev = (state.watching?.meta?.m43_last|0) || 3;
+          const nowN = n|0;
+         const dir  = (nowN < prev) ? 'down' : 'up'; // down=数字が下がった → left画像
+          m43ShowOver(cell, dir);
+          try{
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m43_last: nowN });
+          }catch(_){}
+        };
+      }
+      
       if((openCountByNum[n]||0) === 4){ // 同じ数字が4本全体公開
         const mk = document.createElement('div'); mk.className='check-mark';
         cell.appendChild(mk);
       }
-      /* ▼ M43: 透明ボタンを重ねる（クリックで m43_* を更新） */
-      const btn = document.createElement('button');
-      btn.className = 'check-btn';
-      btn.title = `#${n}`;
-      btn.onclick = async (ev)=>{
-        ev.stopPropagation();
-        /* 現メタ値を読む */
-        const last = (state.watching?.meta?.m43_lastNum|0) || null;
-        const level = (state.watching?.meta?.m43_level ?? null);
-        const dir = (last!=null && n < last) ? 'left' : '';  // ↓ならleft、↑/初回は通常
-        const nextLevel = (level==null) ? 3 : level;         // 初回は 3 から
-        await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          m43_cell: n,             // どのマスに出すか
-          m43_lastNum: n,          // 今回を “過去値” として保存
-          m43_dir: dir,            // 'left' or ''
-          m43_level: nextLevel,    // 0..3（初回は3）
-          m43_at: Date.now()
-        });
-      };
-      cell.appendChild(btn);
       cl.appendChild(cell);
-
-      
     }
     tablesEl.appendChild(cl); // ← 直後にテーブル1が来るので「真上」になる
+
+    // #43 初期表示：nano3.jpg を「3」の上に出す
+    if ((v?.mission?.id|0) === 43) {
+      const third = [...cl.children].find(c => c?.dataset?.n === '3') || cl.children[2];
+      if (third) {
+        m43ShowOver(third, 'up');  // 初期は通常向き（leftなし）
+      }
+    }
+  
   }
 
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
@@ -2492,67 +2534,6 @@ await Promise.all([
 }
 /* ここまで追加：#42 */
 
-/* ===== MISSION 43 ===== */
-/* checklist の該当マスに nano 画像を1つだけ表示（他は消す） */
-function renderM43(v){
-  if ((v?.mission?.id|0) !== 43) {
-    // 43以外なら掃除して終わり
-    document.querySelectorAll('.check-item .nano-img').forEach(img => img.remove());
-    return;
-  }
-
-  // 初期化（ホストのみ一度）：レベル未設定なら 3 をセット & 方向は通常
-  if (state.isHost && v?.meta?.m43_level == null){
-    update(ref(db, `rooms/${state.roomCode}/meta`), {
-      m43_level: 3, m43_dir: '', m43_cell: null, m43_lastNum: null, m43_at: Date.now()
-    });
-  }
-
-  // DOMがまだ無ければ何もしない
-  const cl = document.querySelector('.checklist');
-  if (!cl) return;
-
-  // いったん既存の表示を全消し
-  document.querySelectorAll('.check-item .nano-img').forEach(img => img.remove());
-
-  const cellNum = v?.meta?.m43_cell|0;
-  const level = (v?.meta?.m43_level ?? 3);
-  const dir = String(v?.meta?.m43_dir||'');
-  if (!cellNum) return; // まだ置く場所が未選択
-
-  // 画像ファイル名を決定
-  const L = Math.max(0, Math.min(3, level));
-  const fname = dir==='left' ? `nano${L}left.png` : `nano${L}.png`;
-
-  // 対象セルを探して設置
-  const cells = cl.querySelectorAll('.check-item');
-  const target = cells[cellNum-1];
-  if (!target) return;
-
-  const img = document.createElement('img');
-  img.className = 'nano-img';
-  img.src = `./${fname}`;
-  img.alt = fname;
-
-  // 画像クリック → 回収メニュー
-  img.onclick = (ev)=>{
-    ev.stopPropagation();
-    openBottomMenu([
-      { label:'回収', action: async ()=>{
-          const curLevel = (state.watching?.meta?.m43_level ?? 3);
-          const next = Math.max(0, curLevel - 1);
-          await update(ref(db, `rooms/${state.roomCode}/meta`), {
-            m43_level: next, m43_at: Date.now()
-          });
-        } 
-      }
-    ]);
-  };
-
-  target.appendChild(img);
-}
-
-  
 
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
@@ -3431,7 +3412,12 @@ async function setupMissionOnStart(code){
     await set(ref(db, `rooms/${code}/tables`), tbls);
   }
 
-
+    if ((v.mission?.id|0) === 43) {
+      try{
+        await update(ref(db, `rooms/${code}/meta`), { m43_level: 3, m43_last: 3 });
+      }catch(_){}
+    }
+    /* ここまで追加：#43 初期状態 */
   
   // #9：右2 + ランダム数値2枚
   if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
