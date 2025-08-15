@@ -1001,7 +1001,8 @@ renderM39(v);
     updateHeaderInfo();
     // ★ 自分の席がDB上で消えていたらローカルもクリア（やり直し直後の残留防止）
     const myIdxNow = (v?.tables||[]).findIndex(T => T.playerId === state.userId);
-    if (myIdxNow < 0) state.seatedTable = null;
+    state.seatedTable = (myIdxNow >= 0) ? myIdxNow : null;
+    updateMenuButtons?.();
   });
 }
 
@@ -2189,18 +2190,54 @@ function renderM42(v){
       await seatTo(next);
     };
 
-    const onRotate = (ev)=>{
++    // ★★★ 全員の席を循環シフトする（dir>0: 左=次テーブル / dir<0: 右=前テーブル） ★★★
++    const rotateAllSeats = async (dir)=>{
++      const rRef = ref(db, `rooms/${state.roomCode}`);
++      const rSnap = await get(rRef);
++      const R = rSnap.val() || {};
++      const tables = Array.isArray(R.tables) ? R.tables : [];
++      const n = tables.length|0; if (n <= 1) return;
++      const shift = (dir>0 ? +1 : -1);
++      const from = (i)=> ((i - shift) % n + n) % n; // iの新入居者は「一つ前/後」の旧入居者
++
++      const updates = {};
++      for (let i=0; i<n; i++){
++        const src = tables[from(i)] || {};
++        const pid = src.playerId ?? null;
++        const pname = src.playerName ?? null;
++        updates[`tables/${i}/playerId`]   = pid;
++        updates[`tables/${i}/playerName`] = pname;
++        // 各テーブルの手札の ownerId も“新しい着席者”に合わせる
++        const hand = Array.isArray(tables[i]?.hand) ? tables[i].hand : [];
++        for (let h=0; h<hand.length; h++){
++          updates[`tables/${i}/hand/${h}/ownerId`] = pid;
++        }
++      }
++      await update(rRef, updates);
++
++      // ローカル（自端末）の座席インデックスも同期（UIボタン表示ずれ防止）
++      const myOld = tables.findIndex(t=> t?.playerId === state.userId);
++      if (myOld >= 0){
++        const myNew = ((myOld + shift) % n + n) % n;
++        state.seatedTable = myNew;
++        updateMenuButtons?.();
++      }
++    };
+
+
+    
+   const onRotate = (ev)=>{
       openBottomMenu([
-{ label:'左', action: async ()=>{
-    flashEx('exleft.jpg');       // 表示
-    await moveSeatCyclic(+1);    // 次テーブルへ
-    setTimeout(clearEx, 7000);   // 7秒後に消す
-}},
-{ label:'右', action: async ()=>{
-    flashEx('exright.jpg');      // 表示
-    await moveSeatCyclic(-1);    // 前テーブルへ
-    setTimeout(clearEx, 7000);   // 7秒後に消す
-}},
+        { label:'左', action: async ()=>{
+        flashEx('exleft.jpg');                    // 表示
+          await rotateAllSeats(+1);                 // ★ 全員を次テーブルへ（循環）
+          setTimeout(clearEx, 7000);                // 7秒後に消す
+        }},
+        { label:'右', action: async ()=>{
+          flashEx('exright.jpg');                   // 表示
+        await rotateAllSeats(-1);                 // ★ 全員を前テーブルへ（循環）
+          setTimeout(clearEx, 7000);                // 7秒後に消す
+        }},
       ]);
     };
     bar.appendChild(btn('↻', onRotate));
