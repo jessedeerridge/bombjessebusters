@@ -2529,7 +2529,7 @@ function renderM43(v){
             const meta = mSnap.val() || {};
             const cur  = meta.m43 || m;
             const nextLevel = Math.max(0, (cur.level|0) - 1); // nano3→nano2→...→nano0
-           await update(mRef, { m43: { n: cur.n, level: nextLevel, left: !!cur.left } });
+            await update(mRef, { m43: { n: cur.n, level: nextLevel, left: cur.left } });
           }catch(e){ console.error(e); }
         }
       }
