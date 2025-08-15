@@ -1387,19 +1387,6 @@ if (c.gone === true){
       if (c.open) card.classList.add('open');
 
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
-           // #42 ⇅ ON中：全体公開カードは青枠化、選択中なら▼表示
-      if (state.watching?.meta?.m42_swap?.on && c.open===true){
-        card.classList.add('i2-selectable'); // 既存の青点線スタイルを流用
-      }
-      const s42 = state.watching?.meta?.m42_swap;
-      if (s42?.selA && s42.selA.cardId===c.id && s42.selA.table===idx){
-        const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m);
-      }
-      if (s42?.selB && s42.selB.cardId===c.id && s42.selB.table===idx){
-        const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m);
-      }
-
-      
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if(c.markUntil && now()<c.markUntil){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
@@ -1443,52 +1430,6 @@ if (c.gone === true){
       }else{
         card.onclick = async ()=>{
                     if (state.watching?.meta?.m42_on) return;
-
-          // #42 ⇅ ON中：表裏禁止＋選択処理
-          const s42now = state.watching?.meta?.m42_swap;
-          if (s42now?.on === true){
-            if (c.open === true){
-              try{
-                const mRef = ref(db, `rooms/${state.roomCode}/meta/m42_swap`);
-                const snap = await get(mRef);
-                const S = snap.val() || {};
-                let by=S.by, selA=S.selA, selB=S.selB;
-
-                // 他人が選択中なら奪取＝自分の単独選択で再スタート
-                if (by && by !== state.userId){ by=state.userId; selA={table:idx, cardId:c.id}; selB=null; }
-                else if (!selA){ by=state.userId; selA={table:idx, cardId:c.id}; }
-                else if (!selB){ selB={table:idx, cardId:c.id}; }
-
-                await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_swap:{ on:true, by, selA, selB } });
-
-                // 2枚そろったら：同数チェック→OKならポップ
-                if (by===state.userId && selA && selB){
-                  const tSnap = await get(ref(db, `rooms/${state.roomCode}/tables`));
-                  const tables = tSnap.val()||[];
-                  const numAt = (sel)=>{ const h=(tables[sel.table]?.hand)||[]; const k=h.find(x=>x?.id===sel.cardId); return k?.num; };
-                  const n1 = numAt(selA)|0, n2 = numAt(selB)|0;
-
-                  if (n1 === n2){
-                    alert('同じ数字です');
-                    await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_swap:{ on:true, by:null, selA:null, selB:null } });
-                  }else{
-                    openBottomMenu([
-                      {label:'入れ替える', action: async ()=>{
-                        await doM42Swap(selA, selB);
-                        await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_swap:{ on:true, by:null, selA:null, selB:null } });
-                      }},
-                      {label:'やり直す', action: async ()=>{
-                        await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_swap:{ on:true, by:state.userId, selA:null, selB:null } });
-                      }}
-                    ]);
-                  }
-                }
-              }catch(e){ console.error(e); }
-            }
-            return; // ⇅中は表裏トグルを行わない
-          }
-
-          
           if(isMine){
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
@@ -1496,9 +1437,6 @@ if (c.gone === true){
             await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open});
           }
         };
-
-
-        
       }
 
       const num=document.createElement('div'); num.className='num';
@@ -2156,20 +2094,6 @@ function renderM42(v){
       const on = !!v?.meta?.m42_on;
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_on: !on });
     };
-
-    // ⇅：入れ替えモードのON/OFF
-    const swapToggle = async ()=>{
-      const cur = (v?.meta?.m42_swap?.on === true);
-      // OFF->ON：by/選択を空で開始、ON->OFF：全クリア
-      await update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m42_swap: cur ? null : { on:true, by:null, selA:null, selB:null }
-      });
-    };
-    // 既存の「⇅」ボタンの空ハンドラ行は置き換えてOK
-    // bar.appendChild(btn('⇅', ()=>{})); ←この1行を下行に差し替え
-    bar.appendChild(btn('⇅', swapToggle));
-
-            
     bar.appendChild(btn('-2', ()=>{})); // ダミー
     bar.appendChild(btn('⇅', ()=>{})); 
     bar.appendChild(btn('☝', toggle));
@@ -2616,7 +2540,6 @@ async function doItem2Swap(A, B){
     return {hand, index:i, card: i>=0 ? hand[i] : null};
   };
 
-  
   const a = pickCard(A.table, A.cardId);
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
@@ -2668,49 +2591,6 @@ async function doItem18Take(sel){
     set(ref(db, `rooms/${state.roomCode}/tables/${myTable}/hand`), dstHand),
     update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:null })
   ]);
-}
-// ===== #42：位置入れ替え（昇順にせず、その場でスワップ） =====
-async function doM42Swap(A, B){
-  try{
-    if(!A || !B) return;
-    const tRef = ref(db, `rooms/${state.roomCode}/tables`);
-    const snap = await get(tRef);
-    const tables = snap.val() || [];
-
-    const pick = (ti, id)=>{
-      const hand = (tables[ti]?.hand)||[];
-      const idx = hand.findIndex(c=> c?.id===id);
-      return {hand, index:idx, card: idx>=0 ? hand[idx] : null};
-    };
-
-    const a = pick(A.table, A.cardId);
-    const b = pick(B.table, B.cardId);
-    if(!a.card || !b.card) return;
-
-    const mark = now()+10000; // 10秒 ▼マーカー
-    const toA = {...b.card, ownerId: tables[A.table]?.playerId || null, markUntil: mark};
-    const toB = {...a.card, ownerId: tables[B.table]?.playerId || null, markUntil: mark};
-
-    // “元の位置”に差し戻してスワップ（昇順にしない）
-    a.hand.splice(a.index, 1);
-    b.hand.splice(b.index, 1);
-    a.hand.splice(a.index, 0, toA);
-    b.hand.splice(b.index, 0, toB);
-
-    // 左→右のalphaを振り直し（見た目の整合）
-    const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
-
-    if (A.table === B.table){
-      realpha(a.hand);
-      await set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand);
-    }else{
-      realpha(a.hand); realpha(b.hand);
-      await Promise.all([
-        set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand),
-        set(ref(db, `rooms/${state.roomCode}/tables/${B.table}/hand`), b.hand)
-      ]);
-    }
-  }catch(e){ console.error(e); }
 }
 
 /* ==== アイテムデッキ制御（ミッション別） ==== */
