@@ -3382,7 +3382,7 @@ async function setupMissionOnStart(code){
 
 // #31：P1（山札→めくる：同期版）
 if(flags.needsNumberLane && flags.pattern==='P1'){
-  await ensureP1Meta(v);                      // ← ホストが未初期化なら1回だけ作る
+  ensureP1Meta(v).then(()=>{                 // ← await ではなく then
   const lane = buildDeckLaneP1(v);            // ← meta から描画
   mountLaneUnderItemsBar(lane);
   // ★ #23：アイテム1〜13からランダム7枚の山札...
@@ -3399,7 +3399,7 @@ if(flags.needsNumberLane && flags.pattern==='P1'){
   
 // #12：各アイテムの中央下に「1枚ずつ」固定配置（同期版）
 if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
-  await ensureM12Under(v, 1);          // ← ホストが配列を用意
+  ensureM12Under(v, 1).then(()=>{             // ← then に変更
   distributeNumbersToItemsCentered(1); // ← meta から描画
 }
 
@@ -3407,7 +3407,7 @@ if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
 if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
   const old = document.getElementById('m32ConRow');
   if (old) old.remove();
-  await ensureConP1Meta(v);            // ← ホスト初期化
+  ensureConP1Meta(v).then(()=>{               // ← then に変更
   const lane = buildConDeckLaneP1(v);  // ← meta から描画
   mountLaneUnderItemsBar(lane);
 }
