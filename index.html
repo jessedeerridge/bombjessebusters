@@ -668,6 +668,21 @@ function pickUnusedNumbers(count){
 }
 
 /* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ === */
+/* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ（同期版） === */
+async function ensureM12Under(v, eachCount=1){
+  if (!state.isHost) return;
+  const items = document.querySelectorAll('#items .item'); if(items.length===0) return;
+  const need = items.length * eachCount;
+  const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+  const snap = await get(mRef);
+  const meta = snap.val()||{};
+  if (!Array.isArray(meta.m12_under) || meta.m12_under.length !== need){
+    const picks = MATERIALS.numbers.slice(); shuffle(picks);
+    const chosen = picks.slice(0, need);
+    await update(mRef, { m12_under: chosen });
+  }
+}
+
 function distributeNumbersToItemsCentered(eachCount=1){
   const itemsBar = document.getElementById('itemsBar');
   const items    = document.querySelectorAll('#items .item');
@@ -677,29 +692,28 @@ function distributeNumbersToItemsCentered(eachCount=1){
   const old = document.querySelector('.num-under');
   if(old) old.remove();
 
-  // レーンを作成してアイテム列の直下に挿入
   const under = document.createElement('div');
   under.className = 'num-under';
   itemsBar.insertAdjacentElement('afterend', under);
 
-  // 未使用数字から必要枚数ぶん抽選
-  const need  = items.length * eachCount;
-  const picks = pickUnusedNumbers(need);
+  const arr = Array.isArray(state.watching?.meta?.m12_under) ? state.watching.meta.m12_under.slice() : [];
+  if (arr.length < items.length*eachCount) {
+    // まだホスト未初期化の可能性があるため、描画は一旦スキップ
+    return;
+  }
 
-  // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
   let p = 0;
   items.forEach(()=> {
     const slot = document.createElement('div');
     slot.className = 'slot';
     under.appendChild(slot);
-
     for(let k=0; k<eachCount; k++){
-      const n = picks[p++]; if(n==null) break;
-      // placeNumberCard は holder を作って mountParent に追加する
+      const n = arr[p++]; if(n==null) break;
       placeNumberCard(n, slot);
     }
   });
 }
+
 
 
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
@@ -1030,13 +1044,13 @@ function renderItemsAndDi(v){
   {
     const flags = v?.mission?.flags || {};
     const hide = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
-    H(itemsBar, hide ? true : false);
-    if (hide) return; // ここで終了（数値帯や#23のデッキUIは別途表示）
+    // アイテム本体は隠すが、帯UI（数値デッキ・制約デッキ等）はこの後も描画する
+    H(itemsBar, hide);
+    // ※ return しない（帯はこの後の分岐で生成・同期描画）
   }
 
   itemsEl.innerHTML='';
   const itemNodes = []; // ★ ノード参照を保持
-
   (v.items||[]).forEach((it, idx)=>{
     const flags = v?.mission?.flags || {};
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
@@ -3366,15 +3380,16 @@ async function setupMissionOnStart(code){
     mountLaneUnderItemsBar(lane);
   }
 
-  // #11：パターン1（山札→めくる）
-  if(flags.needsNumberLane && flags.pattern==='P1'){
-    const lane = buildDeckLaneP1();
-    mountLaneUnderItemsBar(lane);
-        // ★ #23：アイテム1〜13からランダム7枚の山札を作り、数値山の右側に表示
-    if (flags.m23_itemDeck7) {
-      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
-    }
+// #31：P1（山札→めくる：同期版）
+if(flags.needsNumberLane && flags.pattern==='P1'){
+  await ensureP1Meta(v);                      // ← ホストが未初期化なら1回だけ作る
+  const lane = buildDeckLaneP1(v);            // ← meta から描画
+  mountLaneUnderItemsBar(lane);
+  // ★ #23：アイテム1〜13からランダム7枚の山札...
+  if (flags.m23_itemDeck7) {
+    ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
   }
+}
 
   // #30：P1-pop123（山札→1/2/3ポップ／横並びは上限リセット）
   if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
@@ -3382,19 +3397,20 @@ async function setupMissionOnStart(code){
     mountLaneUnderItemsBar(lane);
   }
   
-  // #12：各アイテムの中央下に「1枚ずつ」固定配置
-  if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
-    distributeNumbersToItemsCentered(1); // 一枚ずつ
-  }
+// #12：各アイテムの中央下に「1枚ずつ」固定配置（同期版）
+if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
+  await ensureM12Under(v, 1);          // ← ホストが配列を用意
+  distributeNumbersToItemsCentered(1); // ← meta から描画
+}
 
-  // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
+// #32：制約カード12枚の山札（P1相当：同期版）をアイテム列の直下に表示
 if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
-    // 既存があれば一度除去（再実行対策）
-    const old = document.getElementById('m32ConRow');
-    if (old) old.remove();
-    const lane = buildConDeckLaneP1();
-    mountLaneUnderItemsBar(lane);
-  }
+  const old = document.getElementById('m32ConRow');
+  if (old) old.remove();
+  await ensureConP1Meta(v);            // ← ホスト初期化
+  const lane = buildConDeckLaneP1(v);  // ← meta から描画
+  mountLaneUnderItemsBar(lane);
+}
 
   /* ▼▼ （#36：数値5枚を横一列） ▼▼ */
 // ここから追加（置換）
@@ -3627,25 +3643,27 @@ function mountLaneUnderItemsBar(lane){
 }
 
 /* パターン1：山札→めくる */
-function buildDeckLaneP1(){
+async function ensureP1Meta(v){
+  if (!state.isHost || !v?.mission?.flags?.needsNumberLane || v?.mission?.flags?.pattern!=='P1') return;
+  const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+  const snap = await get(mRef);
+  const meta = snap.val()||{};
+  if (!Array.isArray(meta.mP1_deck) || !Array.isArray(meta.mP1_discards)) {
+    const deck = MATERIALS.numbers.slice(); shuffle(deck);
+    await update(mRef, { mP1_deck: deck, mP1_discards: [] });
+  }
+}
+
+function buildDeckLaneP1(v){
   const lane = document.createElement('div'); 
   lane.className='numlane';
 
-  // 1..12 のみ・重複なしの山札
-  const deck = MATERIALS.numbers.slice(); 
-  shuffle(deck);
-  let rest = deck.length;
-
-  // 山札ボタンと残表示
   const deckBtn = document.createElement('div');
   deckBtn.className='numdeck';
   deckBtn.title='めくる';
-
   const restLbl = document.createElement('span');
   restLbl.className='numrest';
-  restLbl.textContent=`残:${rest}`;
 
-  // ★ 右側に公開札積み重ね用ホルダー
   const pile = document.createElement('div');
   pile.className = 'numcard-holder';
   pile.style.position = 'relative';
@@ -3654,88 +3672,65 @@ function buildDeckLaneP1(){
   lane.appendChild(restLbl);
   lane.appendChild(pile);
 
-  // 積み重ね追加
-  function addToPile(n){
-    const already = pile.querySelectorAll('.numcard').length;
-    const node = document.createElement('div');
-    node.className = 'numcard';
-    node.style.backgroundImage = `url('${imgNumber(n)}')`;
+  const refresh = ()=>{
+    const D = Array.isArray(state.watching?.meta?.mP1_deck) ? state.watching.meta.mP1_deck : [];
+    const X = Array.isArray(state.watching?.meta?.mP1_discards) ? state.watching.meta.mP1_discards : [];
+    const remain = D.filter(n=>!X.includes(n)).length;
+    restLbl.textContent = `残:${remain}`;
 
-    if(already>0){
-      const off = already * 2; // 2px刻み
-      node.style.position = 'absolute';
-      node.style.left = off + 'px';
-      node.style.top  = off + 'px';
-    }
-    pile.appendChild(node);
+    pile.innerHTML='';
+    X.forEach((n,i)=>{
+      const node = document.createElement('div');
+      node.className='numcard';
+      node.style.backgroundImage = `url('${imgNumber(n)}')`;
+      if(i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; }
+      pile.appendChild(node);
+      const extra=i*2; pile.style.height=(48+extra)+'px'; lane.style.marginBottom=extra+'px';
+    });
+  };
+  refresh();
 
-    // ★ 高さ調整（見切れ防止）
-    const extraH = already * 2; // 下方向へのズレ分
-    pile.style.height = (48 + extraH) + 'px'; // 48pxはカード高さ
-    lane.style.marginBottom = extraH + 'px'; // テーブルを少し下げる
-  }
-
-  deckBtn.onclick = (ev)=>{
-    if(rest<=0){
-      openOneMini(ev.clientX, ev.clientY, '山札を作る', async ()=>{
-        deck.splice(0, deck.length, ...MATERIALS.numbers.slice()); 
-        shuffle(deck);
-        rest = deck.length;
-        restLbl.textContent = `残:${rest}`;
-        deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
-        deckBtn.style.background = '';
-        deckBtn.title = 'めくる';
-        pile.innerHTML = '';
-        pile.style.height = '48px';
-        lane.style.marginBottom = '0px';
-        NUMCARD_REG.clear();
-      });
-      return;
-    }
-
-    const n = deck.pop();
-    rest--;
-    restLbl.textContent = `残:${rest}`;
-    addToPile(n);
-
-    // ★ #23：表になった数値をメタに記録（重複は追加しない）
-     try{
-       const cur = (state.watching?.meta?.m23_drawnNumbers) || [];
-      if (!cur.includes(n)) {
-         update(ref(db, `rooms/${state.roomCode}/meta`), { m23_drawnNumbers: cur.concat(n) });
-       }
-     }catch(_){}
-   
-    if(rest===0){
-      deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
-      deckBtn.title='山札を作る';
-    }
+  deckBtn.onclick = async ()=>{
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const mSnap = await get(mRef);
+      const meta = mSnap.val()||{};
+      const D = Array.isArray(meta.mP1_deck) ? meta.mP1_deck : [];
+      const X = Array.isArray(meta.mP1_discards) ? meta.mP1_discards : [];
+      const next = D.find(n=> !X.includes(n));
+      if (next==null) return;
+      X.push(next);
+      await update(mRef, { mP1_discards: X });
+    }catch(e){ console.error(e); }
   };
 
   return lane;
 }
 /* 制約カード版：P1（山札→めくる）*/
-function buildConDeckLaneP1(){
-  // ミッション31と同じ見た目サイズにするため、帯は conlane、カードは concard を使う
+async function ensureConP1Meta(v){
+  if (!state.isHost) return;
+  if (!((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37)) return;
+  const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+  const snap = await get(mRef);
+  const meta = snap.val()||{};
+  if (!Array.isArray(meta.m32_deck) || !Array.isArray(meta.m32_discards)) {
+    const deck = 'ABCDEFGHIJKL'.split(''); shuffle(deck);
+    await update(mRef, { m32_deck: deck, m32_discards: [] });
+  }
+}
+
+function buildConDeckLaneP1(v){
   const lane = document.createElement('div');
   lane.className = 'conlane';
-  lane.id = 'm32ConRow'; // 念のため一意ID
+  lane.id = 'm32ConRow';
 
-  // 制約カード12枚（A〜L）
-  const deck = 'ABCDEFGHIJKL'.split('');
-  shuffle(deck);
-  let rest = deck.length;
-
-  // 山札ボタンと残表示（数値P1と同じUI部品を流用）
   const deckBtn = document.createElement('div');
-  deckBtn.className = 'numdeck';   // 見た目は共通のデッキボタンでOK
+  deckBtn.className = 'numdeck';
   deckBtn.title = 'めくる';
- deckBtn.style.background = "#fff url('./conback.jpg') center/70% no-repeat"; 
+  deckBtn.style.background = "#fff url('./conback.jpg') center/70% no-repeat";
   const restLbl = document.createElement('span');
   restLbl.className = 'numrest';
-  restLbl.textContent = `残:${rest}`;
 
-  // 右側に公開札の積み重ね置き場（制約カードは concard で積む）
   const pile = document.createElement('div');
   pile.className = 'numcard-holder';
   pile.style.position = 'relative';
@@ -3744,41 +3739,45 @@ function buildConDeckLaneP1(){
   lane.appendChild(restLbl);
   lane.appendChild(pile);
 
-    // 1枚めくって公開札（右側）に積む：挙動は数値P1と同じ
-    const addToPile = (ch)=>{
+  const refresh = ()=>{
+    const D = Array.isArray(state.watching?.meta?.m32_deck) ? state.watching.meta.m32_deck : [];
+    const X = Array.isArray(state.watching?.meta?.m32_discards) ? state.watching.meta.m32_discards : [];
+    const remain = D.filter(ch=>!X.includes(ch)).length;
+    restLbl.textContent = `残:${remain}`;
+
+    pile.innerHTML='';
+    X.forEach((ch,i)=>{
       const node = document.createElement('div');
       node.className = 'concard';
       node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
-
-      const already = pile.querySelectorAll('.concard').length;
-      const off = already * 2;
-
-      if (already > 0){
-        node.style.position = 'absolute';
-        node.style.left = off + 'px';
-        node.style.top  = off + 'px';
-      }
-   node.title = '拡大';
-　　node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
+      if(i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; }
+      node.title='拡大';
+      node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
       pile.appendChild(node);
+      const extra=i*2; const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
+      pile.style.height = (baseH + extra) + 'px';
+      lane.style.marginBottom = extra + 'px';
+    });
+  };
+  refresh();
 
-      // ★ ここから変更：1枚目でも必ず高さ/余白を更新する
-      const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
-      // ★ ここまで変更
-    };
-
-  deckBtn.onclick = ()=>{
-    if (rest <= 0) return;
-    const ch = deck.pop(); // 末尾から1枚
-    rest -= 1;
-    restLbl.textContent = `残:${rest}`;
-    addToPile(ch);
+  deckBtn.onclick = async ()=>{
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const mSnap = await get(mRef);
+      const meta  = mSnap.val()||{};
+      const D = Array.isArray(meta.m32_deck) ? meta.m32_deck : [];
+      const X = Array.isArray(meta.m32_discards) ? meta.m32_discards : [];
+      const next = D.find(ch=> !X.includes(ch));
+      if (next==null) return;
+      X.push(next);
+      await update(mRef, { m32_discards: X });
+    }catch(e){ console.error(e); }
   };
 
   return lane;
 }
+
 
 /* パターン1拡張：山札→1/2/3のポップ
    1=“いつも通り”右に積む（既存P1）
