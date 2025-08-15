@@ -1000,8 +1000,8 @@ renderM39(v);
     // ▼ 追加：ホストなら開始前後いつでもクイックピッカーを使える
     updateHeaderInfo();
     // ★ 自分の席がDB上で消えていたらローカルもクリア（やり直し直後の残留防止）
-const myIdxNow = (v?.tables||[]).findIndex(T => T.playerId === state.userId);
-state.seatedTable = (myIdxNow >= 0) ? myIdxNow : null;
+    const myIdxNow = (v?.tables||[]).findIndex(T => T.playerId === state.userId);
+    if (myIdxNow < 0) state.seatedTable = null;
   });
 }
 
@@ -2192,58 +2192,15 @@ function renderM42(v){
     const onRotate = (ev)=>{
       openBottomMenu([
 { label:'左', action: async ()=>{
-  flashEx('exleft.jpg');
-  await moveSeatCyclic(+1);
-  setTimeout(clearEx, 7000);
+    flashEx('exleft.jpg');       // 表示
+    await moveSeatCyclic(+1);    // 次テーブルへ
+    setTimeout(clearEx, 7000);   // 7秒後に消す
 }},
 { label:'右', action: async ()=>{
-  flashEx('exright.jpg');
-  await moveSeatCyclic(-1);
-  setTimeout(clearEx, 7000);
+    flashEx('exright.jpg');      // 表示
+    await moveSeatCyclic(-1);    // 前テーブルへ
+    setTimeout(clearEx, 7000);   // 7秒後に消す
 }},
-// 全員の着席を循環回転（dir>0: 次へ / dir<0: 前へ）
-const rotateAllSeats = async (dir)=>{
-  const code   = state.roomCode;
-  const tblRef = ref(db, `rooms/${code}/tables`);
-  const snap   = await get(tblRef);
-  const tables = snap.val() || [];
-  const n = tables.length|0;
-  if (!n) return;
-
-  const step = (dir>0) ? +1 : -1;
-
-  // 次状態（浅コピー）
-  const next = tables.map(T => ({ ...T }));
-
-  // いったん席情報をクリア
-  next.forEach(T => { T.playerId = null; T.playerName = null; });
-
-  // i番の人を (i+step) 番に移す
-  for (let i=0; i<n; i++){
-    const to = (i + step + n) % n;
-    next[to].playerId   = tables[i]?.playerId ?? null;
-    next[to].playerName = tables[i]?.playerName ?? null;
-  }
-
-  // 手札所有者(ownerId)を新しい着席者に合わせる
-  for (let i=0; i<n; i++){
-    const pid = next[i]?.playerId ?? null;
-    if (Array.isArray(next[i].hand)){
-      next[i].hand = next[i].hand.map(c => ({ ...c, ownerId: pid }));
-    }
-  }
-
-  // DBへ一括反映
-  await set(tblRef, next);
-
-  // 自端末ローカルの座席番号も即時同期
-  const myIdx = next.findIndex(T => T?.playerId === state.userId);
-  state.seatedTable = (myIdx >= 0) ? myIdx : null;
-  updateMenuButtons?.();
-};
-
-
-        
       ]);
     };
     bar.appendChild(btn('↻', onRotate));
