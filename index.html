@@ -2144,8 +2144,10 @@ function renderM42(v){
      // 全員へ画像表示をブロードキャスト（3秒後に自動クリア）
      const broadcastEx = async (img) => {
        const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-      const key  = crypto.randomUUID();
-       const until= Date.now() + 3000; // 約3秒
+       // 未サポート環境対策：randomUUID が無ければ時刻+乱数で代用
+       const key  = (globalThis.crypto && typeof crypto.randomUUID === 'function')
+         ? crypto.randomUUID()
+         : (Date.now() + '_' + Math.random().toString(36).slice(2));       const until= Date.now() + 3000; // 約3秒
        await update(mRef, { m42Ex: { img, key, until } });
        // 3秒後にホスト側でクリア（存在チェック付き）
        setTimeout(async ()=>{
@@ -2162,12 +2164,13 @@ function renderM42(v){
      const onRotate = (ev)=>{
        openBottomMenu([
          { label:'左', action: async ()=>{
-             await broadcastEx('exleft.jpg'); // 全員に表示
-             await moveSeatCyclic(+1);        // 次テーブルへ
+             await moveSeatCyclic(+1);        // 先に確実に席を動かす
+             // 画像通知は失敗しても無視（席移動は阻害しない）
+             broadcastEx('exleft.jpg').catch(()=>{});
          }},
          { label:'右', action: async ()=>{
-             await broadcastEx('exright.jpg'); // 全員に表示
-             await moveSeatCyclic(-1);         // 前テーブルへ
+             await moveSeatCyclic(-1);        // 先に確実に席を動かす
+             broadcastEx('exright.jpg').catch(()=>{});
          }},
        ]);
      };
