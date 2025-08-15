@@ -1207,7 +1207,15 @@ if ((v.mission?.id|0) === 29) {
     
 header.appendChild(title); 
 
-
+  /* ここから追加：ホストだけ名前クリックで「キック」 */
+  if (state.isHost && t.playerId){
+    title.style.cursor = 'pointer';
+    title.onclick = (ev)=>{
+      openMenu(ev.clientX, ev.clientY, [
+        { label:'キック', action: async ()=>{ await kickSeatAt(idx); } }
+      ]);
+    };
+  }
 
     
 // #13：初期情報トークン（数値）—— 表示はキャラ下、ここでは値と auto-hide だけ扱う
@@ -3065,6 +3073,15 @@ async function leaveSeatNow(){
   state.seatedTable=null; updateMenuButtons();
 }
 
+async function kickSeatAt(idx){
+  const hRef = ref(db, `rooms/${state.roomCode}/tables/${idx}/hand`);
+  const hSnap = await get(hRef);
+  const hand = hSnap.val() || [];
+  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), { playerId:null, playerName:null });
+  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), { ownerId:null })));
+}
+
+  
  // ▼ 席選択タブの描画を関数化：開いている間も再描画で同期
 function renderSeatTabs(v){
   if(!v?.started) return;
