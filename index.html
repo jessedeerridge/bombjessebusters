@@ -1396,12 +1396,15 @@ wrap.dataset.cardId = String(c.id||'');
 
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
-    const m42s = state.watching?.meta?.m42Swap;
-if (m42s?.selA && m42s.selA.cardId===c.id && m42s.selA.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
-if (m42s?.selB && m42s.selB.cardId===c.id && m42s.selB.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
-      const m42m2 = state.watching?.meta?.m42M2;
-      if (m42m2?.selA && m42m2.selA.cardId===c.id && m42m2.selA.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
-      if (m42m2?.selB && m42m2.selB.cardId===c.id && m42m2.selB.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }  
+   const m42s = state.watching?.meta?.m42Swap;
+const showM42Swap = !!(m42s && m42s.usingBy === state.userId);
+if (showM42Swap && m42s.selA && m42s.selA.cardId===c.id && m42s.selA.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+if (showM42Swap && m42s.selB && m42s.selB.cardId===c.id && m42s.selB.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+
+const m42m2 = state.watching?.meta?.m42M2;
+const showM42M2 = !!(m42m2 && m42m2.usingBy === state.userId);
+if (showM42M2 && m42m2.selA && m42m2.selA.cardId===c.id && m42m2.selA.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
+if (showM42M2 && m42m2.selB && m42m2.selB.cardId===c.id && m42m2.selB.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if(c.markUntil && now()<c.markUntil){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
 
@@ -2310,11 +2313,11 @@ function renderM42(v){
               if (A.idx<0 || B.idx<0){ await update(mRef, { m42M2:{on:true, usingBy:me, selA:null, selB:null} }); return; }
               if (A.hand[A.idx]) A.hand[A.idx] = {...A.hand[A.idx], open:false};
               if (B.hand[B.idx]) B.hand[B.idx] = {...B.hand[B.idx], open:false};
-              await Promise.all([
-                set(ref(db, `rooms/${state.roomCode}/tables/${selA.table}/hand`), A.hand),
-                set(ref(db, `rooms/${state.roomCode}/tables/${selB.table}/hand`), B.hand),
-               update(mRef, { m42M2:{on:true, usingBy:null, selA:null, selB:null} })
-              ]);
+await Promise.all([
+  set(ref(db, `rooms/${state.roomCode}/tables/${selA.table}/hand`), A.hand),
+  set(ref(db, `rooms/${state.roomCode}/tables/${selB.table}/hand`), B.hand),
+  update(mRef, { m42M2: null })
+]);
             }},
             {label:'やり直す', action: async ()=>{
               await update(mRef, { m42M2:{on:true, usingBy:me, selA:null, selB:null} });
