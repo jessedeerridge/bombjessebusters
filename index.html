@@ -3359,14 +3359,14 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
     // ふるまい：
     // 右ブランクをクリック → 左端に「left2」を置く。右側の表示（right2）は消す（ブランクに戻す）。
   rightBlank.onclick = ()=>{
-    leftBlank.style.backgroundImage = `url('${imgRule('left2')}')`;
-    rightBlank.style.backgroundImage = '';
+    rightBlank.style.backgroundImage = `url('${imgRule('left2')}')`;
+    leftBlank.style.backgroundImage = '';
   };
 
     // 左ブランクをクリック → 右端に「right2」を置く。左側の表示（left2）は消す（ブランクに戻す）。
   leftBlank.onclick = ()=>{
-    rightBlank.style.backgroundImage = `url('${imgRule('right2')}')`;
-    leftBlank.style.backgroundImage = '';
+    leftBlank.style.backgroundImage = `url('${imgRule('right2')}')`;
+    rightBlank.style.backgroundImage = '';
   };
 
     // 画面（アイテム列の直下）へ設置
