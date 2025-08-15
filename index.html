@@ -2113,7 +2113,7 @@ function renderM42(v){
     const bar = document.createElement('div');
     bar.id = 'm42HostBar';
     Object.assign(bar.style, {
-      position:'fixed', left:'50%', bottom:'10px', transform:'translateX(-50%)',
+         position:'fixed', left:'50%', top:'50%', transform:'translate(-50%, -50%)',
       display:'flex', gap:'6px', zIndex:2147483600, background:'#fff',
       border:'1px solid #eee', borderRadius:'12px', padding:'6px 8px',
       boxShadow:'0 10px 24px rgba(0,0,0,.08)'
@@ -2221,22 +2221,49 @@ function renderM42(v){
     
     const onRotate = (ev)=>{
       openBottomMenu([
- { label:'左', action: async ()=>{
-     flashEx('exleft.jpg');       // 表示
-     await rotateAllSeats(+1);    // 全員を次テーブルへ
-     setTimeout(clearEx, 7000);   // 7秒後に消す
- }},
-{ label:'右', action: async ()=>{
-    flashEx('exright.jpg');      // 表示
-     await rotateAllSeats(-1);    // 全員を前テーブルへ
-    setTimeout(clearEx, 7000);   // 7秒後に消す
-}},
+        { label:'左', action: async ()=>{
+            // 画像表示を全員に同期：metaへ発火（3秒）
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_ex:{ img:'exleft.jpg', at: Date.now() } });
+            await rotateAllSeats(+1);    // 全員を次テーブルへ（既存維持）
+            setTimeout(async ()=>{
+              // ホスト側でmetaをクリア（ローカル保険は③で実装）
+              await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_ex: null });
+            }, 3000);
+        }},
+        { label:'右', action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_ex:{ img:'exright.jpg', at: Date.now() } });
+            await rotateAllSeats(-1);    // 全員を前テーブルへ（既存維持）
+            setTimeout(async ()=>{
+              await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_ex: null });
+            }, 3000);
+        }},
       ]);
     };
     bar.appendChild(btn('↻', onRotate));
     document.body.appendChild(bar);
   }
 
+  /* ▼ 追加：全員向けのex画像（m42_ex）表示ロジック：metaを見て中央に3秒表示 */
+  {
+   const ex = v?.meta?.m42_ex;
+    const exist = document.getElementById('m42Ex');
+    if (ex && !exist){
+      const div = document.createElement('div');
+      div.id = 'm42Ex';
+      Object.assign(div.style, {
+        position:'fixed', left:'50%', top:'50%', transform:'translate(-50%, -50%)',
+        width:'140px', height:'90px',
+        background:`url('./${ex.img}') center/contain no-repeat`,
+        zIndex:2147483647, pointerEvents:'none'
+     });
+      popLayer.appendChild(div);
+      // ローカル保険：3秒で自動消去（ホストは②でmetaもnullにします）
+      setTimeout(()=>{ if(div.isConnected) div.remove(); }, 3000);
+    }
+    if (!ex && exist){ exist.remove(); }
+  }
+
+  
   // 3) ☝ONなら箱を出す（既存互換）
   if (v?.meta?.m42_on){
     const bar = document.getElementById('itemsBar');
