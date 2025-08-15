@@ -941,7 +941,7 @@ function m43EnsureOverlay(){
           const lv = Math.max(0, ((v?.meta?.m43_level|0) - 1));
           await update(ref(db, `rooms/${state.roomCode}/meta`), { m43_level: lv });
         // 画像の数字を更新（向きは回収では考慮せず、通常版を使用）
-          const img = `nano${lv}.jpg`;
+          const img = `nano${lv}.png`;
           const box = document.getElementById('m43Nano');
           if (box) box.style.backgroundImage = `url('./${img}')`;
         } }
@@ -952,12 +952,12 @@ function m43EnsureOverlay(){
 }
 
 /** cell(=check-item) の真上に、directionに応じた画像を表示
-+ * direction: 'up'|'down' （down のとき *left.jpg）
++ * direction: 'up'|'down' （down のとき *left.png）
 + */
 function m43ShowOver(cell, direction){
   const v  = state.watching;
   const lv = (v?.meta?.m43_level|0) ?? 3; // 0..3
-  const base = `nano${lv}${direction==='down' ? 'left' : ''}.jpg`;
+  const base = `nano${lv}${direction==='down' ? 'left' : ''}.png`;
   const el = m43EnsureOverlay();
   // 位置計算（数字枠の直上）
   const r = cell.getBoundingClientRect();
