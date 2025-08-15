@@ -977,186 +977,14 @@ if (v) {
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 renderM39(v);
+    renderM42(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
 
-/* ▼▼ Mission 42（単一ブロック） ▼▼ */
-(function m42(){
-  const is42 = ((v?.mission?.id|0) === 42);
-  const active = !!(v?.meta?.m42Active);
-  const metaPath = `rooms/${state.roomCode}/meta`;
-
-  // スタイル（1回だけ）
-  if (!document.getElementById('m42-style')) {
-    const st = document.createElement('style'); st.id = 'm42-style';
-    st.textContent = `
-      .m42-freeze{ outline:2px dotted #38bdf8; outline-offset:-1px; }
-      .m42-hole{ background:transparent !important; border:1px dashed #d1d5db !important;
-                 pointer-events:none !important; }
-      .m42-hole *{ display:none !important; }
-      #m42Box{ width:88px; height:64px; margin:6px 0 0 4px;
-               background:url("./box.jpg") center/cover no-repeat;
-               border:1px dashed #60a5fa; border-radius:8px; }
-      .m42-ghost{ position:fixed; z-index:2147483600; pointer-events:none; opacity:.9; }
-    `;
-    document.head.appendChild(st);
-  }
-
-  // フッターのホスト専用ボタン（-2 / 椅子 / ☝ / あ）
-  (function ensureButtons(){
-  // 即時クリーンアップ（青枠/箱/クリック封鎖を除去）
-  const m42Clean = ()=>{
-    document.querySelectorAll('.m42-freeze').forEach(n=> n.classList.remove('m42-freeze'));
-    const bx=document.getElementById('m42Box'); if(bx) bx.remove();
-    if(window._m42_clickBlocker){
-      document.removeEventListener('click', window._m42_clickBlocker, true);
-      window._m42_clickBlocker=null;
-    }
-  };
-
-  (function ensureButtons(){
-    // まず既存のパネルを**全て**消してから作る → 常に4つだけ
-    document.querySelectorAll('#m42Buttons').forEach(n=> n.remove());
-
-    if(!is42 || !state.isHost) return;
-
-    const wrap=document.createElement('div'); wrap.id='m42Buttons';
-    wrap.style.display='flex'; wrap.style.gap='6px'; wrap.style.marginTop='6px';
-    const mk=(t)=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=t; return b; };
-    const b1=mk('-2'), b2=mk('椅子'), b3=mk('☝'), b4=mk('あ');
-    b1.disabled=b2.disabled=b4.disabled=true; // このミッションではダミー表示のみ
-
-    b3.onclick=async()=>{
-      const newActive = !active;
-      await update(ref(db, metaPath), { m42Active: newActive });
-      // 押した瞬間の体感を良くするため、オフなら即ローカル掃除
-      if(!newActive) m42Clean();
-    };
-
-    missionFooter.appendChild(wrap);
-    wrap.append(b1,b2,b3,b4);
-  })();
-
-  // Box の表示/消去（アイテム列の直下）
-  (function syncBox(){
-    const id='m42Box';
-    const need = is42 && active;
-    let bx=document.getElementById(id);
-    if(!need){ if(bx) bx.remove(); return; }
-    if(!bx){
-      const bar=document.getElementById('itemsBar');
-      if(bar){ bx=document.createElement('div'); bx.id=id; bar.insertAdjacentElement('afterend', bx); }
-    }
-  })();
-
-  // クリックでの裏表禁止（キャプチャで遮断）
-  (function lockFlip(){
-    if(!window._m42_clickBlocker){
-      window._m42_clickBlocker = (e)=>{
-        if(((state.watching?.mission?.id|0)===42) && (state.watching?.meta?.m42Active)){
-          const card = e.target.closest?.('.card');
-          if(card){ e.stopPropagation(); e.preventDefault(); }
-        }
-      };
-      document.addEventListener('click', window._m42_clickBlocker, true);
-    }
-    if(!active || !is42){ document.removeEventListener('click', window._m42_clickBlocker, true); window._m42_clickBlocker=null; }
-  })();
-
-  // 公開カードを青枠＋誰でもドラッグ → box にドロップで消滅（穴を残す）
-  (function bindDrag(){
-    if(!is42) return;
-    const tableEls = Array.from(document.querySelectorAll('.tables .table'));
-    document.querySelectorAll('.tables .card').forEach(card=>{
-      if(card._m42Bound) return;
-      card._m42Bound = true;
-      card.addEventListener('pointerdown', (ev)=>{
-        // 有効時のみ / 公開カードのみ
-        if(!active || !card.classList.contains('open')) return;
-        ev.preventDefault(); ev.stopPropagation();
-
-        // 対象 index を厳密特定
-        const wrap = card.closest('.card-wrap');
-        const hand = wrap?.parentElement;
-        const tableEl = card.closest('.table');
-        const ti = tableEls.indexOf(tableEl);
-        const wraps = hand ? Array.from(hand.querySelectorAll(':scope > .card-wrap')) : [];
-        const ci = wraps.indexOf(wrap);
-        if(ti<0 || ci<0) return;
-        const cardPath = `rooms/${state.roomCode}/tables/${ti}/hand/${ci}`;
-
-        // ゴースト
-        const r = card.getBoundingClientRect();
-        const ghost = card.cloneNode(true);
-        ghost.classList.add('m42-ghost','m42-freeze');
-        ghost.style.width=r.width+'px'; ghost.style.height=r.height+'px';
-        document.body.appendChild(ghost);
-        const offX = ev.clientX - r.left, offY = ev.clientY - r.top;
-        const move = (e)=>{ ghost.style.left=(e.clientX-offX)+'px'; ghost.style.top=(e.clientY-offY)+'px'; };
-        const up = async (e)=>{
-          window.removeEventListener('pointermove', move, true);
-          window.removeEventListener('pointerup', up, true);
-          const bx=document.getElementById('m42Box'); ghost.remove();
-          const hit = (()=>{
-            if(!bx) return false;
-            const br=bx.getBoundingClientRect(), x=e.clientX, y=e.clientY, pad=4;
-            return (x>=br.left-pad && x<=br.right+pad && y>=br.top-pad && y<=br.bottom+pad);
-          })();
-          if(hit){
-            // 直ちに穴表示（前詰め防止）
-            card.classList.add('m42-hole');
-            card.classList.remove('m42-freeze');
-            await update(ref(db, cardPath), { m42_deleted:true, tokens:[] });
-          }
-        };
-        window.addEventListener('pointermove', move, true);
-        window.addEventListener('pointerup', up, true);
-      }, true);
-    });
-
-    // 枠付与／削除
-    document.querySelectorAll('.tables .card').forEach(card=>{
-      if(active && card.classList.contains('open')) card.classList.add('m42-freeze');
-      else card.classList.remove('m42-freeze');
-    });
-  })();
-
-  // 既に削除済みスロットを「穴」として描画（DOM後処理：分散回避のためここで）
-  (function paintHoles(){
-    if(!is42) return;
-    const tables = v?.tables||[];
-    const tableEls = Array.from(document.querySelectorAll('.tables .table'));
-    tables.forEach((T,ti)=>{
-      const hand = (T?.hand)||[];
-      const tableEl = tableEls[ti];
-      const handEl = tableEl?.querySelector('.hand');
-      if(!handEl) return;
-      const wraps = Array.from(handEl.querySelectorAll(':scope > .card-wrap'));
-      hand.forEach((c,ci)=>{
-        if(c && c.m42_deleted){
-          const card = wraps[ci]?.querySelector('.card');
-          if(card){ card.classList.add('m42-hole'); }
-        }
-      });
-    });
-  })();
-
-  // 解除時の掃除
-  if(!is42 || !active){
-    document.querySelectorAll('.m42-freeze').forEach(n=> n.classList.remove('m42-freeze'));
-    const bx=document.getElementById('m42Box'); if(bx) bx.remove();
-    if(window._m42_clickBlocker){
-      document.removeEventListener('click', window._m42_clickBlocker, true);
-      window._m42_clickBlocker=null;
-    }
-  }
-})();
 
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
-
-
 // 条件：ホスト && 未開始 && まだミッション未選択 && まだ未実行
     // v.started は false、v.mission は null で入ってくる
     /* ここから追加 */
@@ -1476,6 +1304,51 @@ content.appendChild(charCol);
       }
       const wrap=document.createElement('div'); wrap.className='card-wrap';
       const card=document.createElement('div'); card.className='card';
+
+     // 既に消滅済なら見えない空枠として保持（幅は保つ）
+      if (c.gone === true){
+        card.style.visibility = 'hidden';
+        card.style.pointerEvents = 'none';
+      }
+
+      // ☝ON中かつ全体公開カードは青枠＋自由ドラッグ可
+      if ((state.watching?.meta?.m42_on) && c.open===true){
+        card.classList.add('i2-selectable'); // 既存青点線
+
+        card.addEventListener('pointerdown', (ev)=>{
+          // ゴースト生成（実カードは固定のまま）
+          const r = card.getBoundingClientRect();
+          const ghost = card.cloneNode(true);
+          ghost.style.position='fixed';
+          ghost.style.left = r.left+'px'; ghost.style.top = r.top+'px';
+          ghost.style.width=r.width+'px'; ghost.style.height=r.height+'px';
+          ghost.style.opacity='0.9'; ghost.style.cursor='grabbing';
+          ghost.style.zIndex='2147483647';
+          document.body.appendChild(ghost);
+
+          const offX = ev.clientX - r.left, offY = ev.clientY - r.top;
+          const move = (e)=>{ ghost.style.left=(e.clientX-offX)+'px'; ghost.style.top=(e.clientY-offY)+'px'; };
+          const up = async (e)=>{
+            window.removeEventListener('pointermove', move, true);
+            window.removeEventListener('pointerup', up, true);
+            const bx = document.getElementById('m42Box');
+            ghost.remove();
+            // 箱ヒット判定（数ピクセルの猶予）
+            const hit = (()=>{
+              if(!bx) return false;
+              const br=bx.getBoundingClientRect(), x=e.clientX, y=e.clientY, pad=4;
+              return (x>=br.left-pad && x<=br.right+pad && y>=br.top-pad && y<=br.bottom+pad);
+            })();
+            if(hit){
+              // 消滅：このカードに gone:true を立てる（見えない空枠となる）
+              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { gone:true });
+            }
+          };
+          window.addEventListener('pointermove', move, true);
+          window.addEventListener('pointerup', up, true);
+        }, {capture:true});
+      }
+      
  const isMine = ((c.ownerId ?? t.playerId) === state.userId);
 
    const seated = (v?.tables||[]).some(T => T.playerId === state.userId);
@@ -1554,6 +1427,7 @@ content.appendChild(charCol);
         };
       }else{
         card.onclick = async ()=>{
+                    if (state.watching?.meta?.m42_on) return;
           if(isMine){
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
@@ -2184,6 +2058,52 @@ function renderM31(v){
   }
 }
 
+/* ここから追加：#42 描画・操作ロジック（ひとかたまり） */
+function renderM42(v){
+  const isM42 = ((v?.mission?.id|0) === 42);
+  // 既存UIの掃除
+  const oldBar = document.getElementById('m42HostBar'); if (oldBar) oldBar.remove();
+  const oldBox = document.getElementById('m42Box');     if (oldBox && !v?.meta?.m42_on) oldBox.remove();
+
+  if (!isM42){ return; }
+
+  // --- ホスト下部バー（固定・常駐） ---
+  if (state.isHost){
+    const bar = document.createElement('div');
+    bar.id = 'm42HostBar';
+    Object.assign(bar.style, {
+      position:'fixed', left:'50%', bottom:'10px', transform:'translateX(-50%)',
+      display:'flex', gap:'6px', zIndex:2147483600, background:'#fff',
+      border:'1px solid #eee', borderRadius:'12px', padding:'6px 8px',
+      boxShadow:'0 10px 24px rgba(0,0,0,.08)'
+    });
+    const btn = (txt, on)=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=txt; b.onclick=on; return b; };
+    const toggle = async ()=>{
+      const on = !!v?.meta?.m42_on;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_on: !on });
+    };
+    bar.appendChild(btn('-2', ()=>{})); // ダミー
+    bar.appendChild(btn('椅子', ()=>{})); // ダミー
+    bar.appendChild(btn('☝', toggle));
+    bar.appendChild(btn('あ', ()=>{})); // ダミー
+    document.body.appendChild(bar);
+  }
+
+  // --- ☝ON中：箱をアイテム列の直下へ ---
+  if (v?.meta?.m42_on){
+    const bar = document.getElementById('itemsBar');
+    if (bar && !document.getElementById('m42Box')){
+      const box = document.createElement('div');
+      box.id = 'm42Box';
+      Object.assign(box.style, {
+        width:'140px', height:'90px', marginTop:'6px', marginLeft:'4px',
+        background:`url('./box.jpg') center/cover no-repeat`,
+        border:'2px dashed #38bdf8', borderRadius:'10px'
+      });
+      bar.insertAdjacentElement('afterend', box);
+    }
+  }
+}
 
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
