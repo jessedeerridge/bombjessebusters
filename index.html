@@ -3065,6 +3065,19 @@ async function leaveSeatNow(){
   state.seatedTable=null; updateMenuButtons();
 }
 
+  /* ★ 追加：ホスト用—任意テーブルをキック（離席化） */
+  async function kickSeatAt(tableIdx){
+    const v = state.watching;
+    if(!state.isHost || !v?.tables || tableIdx==null) return;
+    const T = v.tables[tableIdx] || {};
+   if(!T.playerId) return; // 空席は何もしない
+    const hand = Array.isArray(T.hand) ? T.hand : [];
+    await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { playerId:null, playerName:null });
+    await Promise.all(hand.map((_,i)=>
+      update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${i}`), { ownerId:null })
+    ));
+  }
+
  // ▼ 席選択タブの描画を関数化：開いている間も再描画で同期
 function renderSeatTabs(v){
   if(!v?.started) return;
