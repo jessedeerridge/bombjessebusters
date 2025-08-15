@@ -2140,7 +2140,72 @@ function renderM42(v){
     bar.appendChild(btn('-2', toggleMinus2));     // 追加：-2トグル
     bar.appendChild(btn('⇅', toggleSwap));        // ← 今回の本体
     bar.appendChild(btn('☝', toggleBox));        // 互換
-    bar.appendChild(btn('あ', ()=>{}));           // ダミー
+  /* ここから追加：#42 ↻（左/右タブ → 画像 → 循環席移動） */
+    const flashEx = (img) => {
+      // itemsBar の直後に一時表示
+      const barEl = document.getElementById('itemsBar');
+      if (!barEl) return null;
+      let ex = document.getElementById('m42Ex');
+      if (ex) ex.remove();
+      ex = document.createElement('div');
+      ex.id = 'm42Ex';
+      Object.assign(ex.style, {
+        width:'140px', height:'90px', marginTop:'6px', marginLeft:'4px',
+        background:`url('./${img}') center/cover no-repeat`,
+        border:'2px dashed #38bdf8', borderRadius:'10px'
+      });
+      barEl.insertAdjacentElement('afterend', ex);
+      return ex;
+    };
+    const clearEx = ()=>{ const ex=document.getElementById('m42Ex'); if(ex) ex.remove(); };
+
+    const findMySeat = (vv)=>{
+      if (state.seatedTable!=null) return state.seatedTable|0;
+      const i = (vv?.tables||[]).findIndex(t=> t?.playerId===state.userId);
+      return (i>=0? i : null);
+    };
+
+    const seatTo = async (newIdx)=>{
+      // 現席を離席 → 新しい席に着席＆手札の ownerId を自分に
+      await leaveSeatNow();
+      await update(ref(db, `rooms/${state.roomCode}/tables/${newIdx}`), {
+        playerId: state.userId, playerName: state.userName
+      });
+      const hRef = ref(db, `rooms/${state.roomCode}/tables/${newIdx}/hand`);
+      const hSnap = await get(hRef);
+      const hand = hSnap.val() || [];
+      await Promise.all(hand.map((_,idx)=>
+        update(ref(db, `rooms/${state.roomCode}/tables/${newIdx}/hand/${idx}`), { ownerId: state.userId })
+      ));
+      state.seatedTable = newIdx;
+      updateMenuButtons();
+    };
+
+    const moveSeatCyclic = async (dir)=>{
+      const vv = state.watching || v;
+      const n  = (vv?.tableCount|0) || (vv?.tables?.length|0);
+      if (!n) return;
+      const cur = findMySeat(vv);
+      if (cur==null){ alert('席に座っていません'); return; }
+      const next = ( (cur + (dir>0? +1 : -1)) % n + n ) % n; // 循環
+      await seatTo(next);
+    };
+
+    const onRotate = (ev)=>{
+      openBottomMenu([
+        { label:'左', action: async ()=>{
+            flashEx('exleft.jpg');     // 表示
+            await moveSeatCyclic(+1);  // 次テーブルへ
+            clearEx();                 // 消す
+        }},
+        { label:'右', action: async ()=>{
+            flashEx('exright.jpg');    // 表示
+            await moveSeatCyclic(-1);  // 前テーブルへ
+            clearEx();                 // 消す
+        }},
+      ]);
+    };
+    bar.appendChild(btn('↻', onRotate));
     document.body.appendChild(bar);
   }
 
@@ -4336,7 +4401,7 @@ function missionInfo(id, opts={}){
           '数値カードをシャッフルして、全員に2枚ずつ配る。',
           '隊長の前の数字のプレイヤーには3枚配る。',
           '①手番プレイヤーの前のプレイヤーは数値カードを選んで裏向きで出す。',
-          '手番プレイヤーが切断を行った後、場の数値カードを公開して、同じ数字だった場合、起爆ダイヤルが1進。',
+          '手番プレイヤーが切断を行った後、場の数値カードを公開して、同じ数字だった場合、起爆ダイヤルが1進む。',
           '手番の後、手番プレイヤーはそのカードを取る。'
         ],
         // ※UIは段階導入。初回は説明のみ（今後のPRでアクション実装予定）
@@ -4360,9 +4425,9 @@ function missionInfo(id, opts={}){
         id:31, name:'#31', desc:'',
         display:[
           '#31',
-          '制約カード（A〜E）はアイテムカードと同サイズで表示。',
-          '各プレイヤーにA〜Eをシャッフルして1枚ずつ非公開で配布し、押すと「出す」で場（アイテム下）に横並び表示。「戻す」で自分の下に戻せる。',
-          '「プレイヤーは常にこの制約を適用」「適用できなくなったとき、公開して通常通りプレイ」'
+          '各プレイヤーに制約カードを1枚ずつ配る',
+          '各プレイヤーはこれを守らなければならない。',
+          '自分のコードを見て、制約を守れなくなった時は制約カードを公開して通常通りプレイする。'
         ],
         // ※表示・配布UIは今後追加予定（今回の差分は説明表示のみ）
         flags:{}
