@@ -4382,19 +4382,19 @@ function renderM16(v){
   lane.id = 'm16Row';
   lane.className = 'numlane';
 
-  // 左：数値カード3枚（静的表示・操作なし）
+  // 左端：右4カード（横向き）
+ const rule = document.createElement('div');
+  rule.className = 'rulecard';
+ rule.style.backgroundImage = `url('${imgRule('right4')}')`;
+  lane.appendChild(rule);
+
+  // 右側：数値カード3枚（静的表示・操作なし）
   nums.forEach(n=>{
    const node = document.createElement('div');
-   node.className = 'numcard';
+    node.className = 'numcard';
     node.style.backgroundImage = `url('${imgNumber(n)}')`;
     lane.appendChild(node);
   });
-
-  // 右端：右4カード（横向き）
-  const rule = document.createElement('div');
- rule.className = 'rulecard';
-  rule.style.backgroundImage = `url('${imgRule('right4')}')`;
-  lane.appendChild(rule);
 
   // アイテム列の直下に敷く（#39と同じ置き方）
  mountLaneUnderItemsBar(lane);
