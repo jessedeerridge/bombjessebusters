@@ -1066,6 +1066,8 @@ if (v) {
     renderM15(v);
     renderM16(v);
     renderM30(v);
+    renderM32(v);
+    renderM37(v);
     renderM23(v);
     renderM26(v);
     renderM42(v);
@@ -2219,6 +2221,120 @@ function renderM31(v){
   }
 }
 
+/* ここから追加：#32/#37 制約カードの山札（同期表示） */
+// 共有：meta 初期化（ミッションIDごと）
+async function ensureConDeckMetaInit(vNow, mid){
+  const v = vNow || state.watching; if (!v) return;
+  if ((v?.mission?.id|0) !== mid) return;
+  const keyDeck = `m${mid}_deck`;
+  const keyDisc = `m${mid}_discards`;
+  if (Array.isArray(v?.meta?.[keyDeck])) return;   // 既に初期化済み
+  if (!state.isHost) return;                        // 初期化はホストのみ
+
+  // 制約カード A〜L をシャッフルして山札に
+  const deck = 'ABCDEFGHIJKL'.split(''); shuffle(deck);
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    [keyDeck]: deck,
+    [keyDisc]: []
+  });
+}
+
+// 共有：描画（mid=32/37 を切替）
+function renderConDeckSync(v, mid){
+  const isTarget = ((v?.mission?.id|0) === mid);
+  const rowId = `m${mid}ConRow`;
+  const old = document.getElementById(rowId);
+  if (!isTarget){ if (old) old.remove(); return; }
+
+  const keyDeck = `m${mid}_deck`;
+  const keyDisc = `m${mid}_discards`;
+
+  // 初回：ホストが meta を用意（未用意なら一旦抜けて次の onValue で描画）
+  if (!Array.isArray(v?.meta?.[keyDeck])){ ensureConDeckMetaInit(v, mid); if (old) old.remove(); return; }
+
+  if (old) old.remove();
+  const lane = document.createElement('div');
+  lane.id = rowId;
+  lane.className = 'conlane';  // 制約カード帯（既存CSS）
+
+  // 山札ボタン（制約カード裏面）＋残表示
+  const deckBtn = document.createElement('div');
+  deckBtn.className = 'numdeck';                        // 使い回し
+  deckBtn.title = 'めくる';
+  deckBtn.style.background = "#fff url('./conback.jpg') center/70% no-repeat";
+
+  const restLbl = document.createElement('span');
+  restLbl.className = 'numrest';
+
+  // 右側：公開札（積み重ね）
+  const pile = document.createElement('div');
+  pile.className = 'numcard-holder';
+  pile.style.position = 'relative';
+
+  lane.appendChild(deckBtn);
+  lane.appendChild(restLbl);
+  lane.appendChild(pile);
+
+  // 再描画
+  const refresh = ()=>{
+    const d = (v?.meta?.[keyDeck]||[]);
+    const x = (v?.meta?.[keyDisc]||[]);
+    const remain = d.filter(ch => !x.includes(ch)).length;
+    restLbl.textContent = `残:${remain}`;
+    pile.innerHTML = '';
+
+    // discards を積み重ね表示（2px オフセット）
+    x.forEach((ch, i)=>{
+      const node = document.createElement('div');
+      node.className = 'concard';
+      node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+      node.title = '拡大';
+      node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
+      if (i>0){
+        const off = i*2;
+        node.style.position = 'absolute';
+        node.style.left = off + 'px';
+        node.style.top  = off + 'px';
+      }
+      pile.appendChild(node);
+      const extra = i*2;
+      // 制約カードのサイズは CSS 変数に追従（既存CSS：--con-h / --item-h）
+      const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
+      pile.style.height = (baseH + extra) + 'px';
+      lane.style.marginBottom = extra + 'px';
+    });
+  };
+  refresh();
+
+  // 1枚めくる：山札順で未使用の1枚を discards に積む（全員へ同期）
+  deckBtn.onclick = async ()=>{
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const mSnap = await get(mRef);
+      const meta = mSnap.val() || {};
+      const D  = Array.isArray(meta[keyDeck]) ? meta[keyDeck].slice() : [];
+      const Xs = Array.isArray(meta[keyDisc]) ? meta[keyDisc].slice() : [];
+      const next = D.find(ch => !Xs.includes(ch));
+      if (next == null){
+        // すべて使い切ったら再生成メニュー（#30 などと同様の運用にするならここで再構築しても可）
+        return;
+      }
+      Xs.push(next);
+      await update(mRef, { [keyDisc]: Xs });
+    }catch(e){ console.error(e); }
+  };
+
+  // DOM：アイテム列の直下
+  mountLaneUnderItemsBar(lane);
+}
+
+// エイリアス（ミッションごと）
+function renderM32(v){ renderConDeckSync(v, 32); }
+function renderM37(v){ renderConDeckSync(v, 37); }
+/* ここまで追加 */
+
+  
+  
 /* ここから追加：#42 描画・操作ロジック（⇅入れ替えモードをひとかたまりで実装） */
 function renderM42(v){
   const isM42 = ((v?.mission?.id|0) === 42);
