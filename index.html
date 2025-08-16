@@ -17,7 +17,16 @@
     --content-extra: 18px;
     --font-card:16px; --font-weight:bold;
   }
-
+/* ★ 追加：ホスト用—任意テーブルをキック（離席化） */
+async function kickSeatAt(tableIdx){
+  const v = state.watching;
+  if(!state.isHost || !v?.tables || tableIdx==null) return;
+ const T = v.tables[tableIdx] || {};
+  if(!T.playerId) return; // 空席は何もしない
+  const hand = Array.isArray(T.hand) ? T.hand : [];
+  await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { playerId:null, playerName:null });
+  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${i}`), { ownerId:null })));
+}
   *,*::before,*::after{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fff;color:#111}
   header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eee}
@@ -1207,7 +1216,17 @@ if ((v.mission?.id|0) === 29) {
     
 header.appendChild(title); 
 
-
+/* ★ 追加：ホストだけ—テーブル名クリックで「キック」 */
+if (state.isHost){
+  title.style.cursor = 'pointer';
+  title.title = 'クリックして操作';
+  title.onclick = (ev)=>{
+    if(!t.playerId) return; // 空席はメニュー無し
+    openMenu(ev.clientX, ev.clientY, [
+      { label:'キック', action: async ()=>{ await kickSeatAt(idx); } }
+    ]);
+  };
+}
 
     
 // #13：初期情報トークン（数値）—— 表示はキャラ下、ここでは値と auto-hide だけ扱う
