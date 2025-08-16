@@ -3629,15 +3629,6 @@ async function setupMissionOnStart(code){
     await set(ref(db, `rooms/${code}/tables`), tbls);
   }
 
-  // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
-if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
-    // 既存があれば一度除去（再実行対策）
-    const old = document.getElementById('m32ConRow');
-    if (old) old.remove();
-    const lane = buildConDeckLaneP1();
-    mountLaneUnderItemsBar(lane);
-  }
-
   /* ▼▼ （#36：数値5枚を横一列） ▼▼ */
 // ここから追加（置換）
   /* ▼▼ （#36：両端ブランク＋クリックで反対側に 2カードを出す） ▼▼ */
