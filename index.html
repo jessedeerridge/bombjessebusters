@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>bombｓbusters</title>
+<title>bomb busters</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -509,6 +509,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getDatabase, ref, get, set, update, remove, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
+// ★ 追加：ルーム保持時間（3時間）
+const ROOM_KEEP_MS = 3 * 60 * 60 * 1000;
+
+
 /* Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
@@ -524,7 +528,7 @@ const db  = getDatabase(app);
 
 /* State */
 const state = {
-  roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
+  roomCode:null, userId:(()=>{let id=localStorage.getItem('bb_uid');if(!id){id=crypto.randomUUID();localStorage.setItem('bb_uid',id);}return id;})(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
   m22GaveOnce:false  // ★ #22：自分が渡した一回ガード（即時連打対策）
 };
@@ -838,8 +842,8 @@ function distributeNumbersToItemsCentered(eachCount=1){
     grid.push(slotNums);
   });
   try{ writeLane('numUnder', {type:'numUnder', grid}); }catch(_){} 
-};
 }
+
 
 /* pop positioning */
 function placeInsideViewport(div, x, y){
@@ -873,7 +877,7 @@ function openBottomMenu(entries){
 }
 
 /* enter */
-btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); };
+btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); btnJoin.onclick(); };
 btnJoin.onclick   = ()=>{
   const nm = (inputName?.value || '').trim();
   // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
@@ -883,6 +887,8 @@ btnJoin.onclick   = ()=>{
 
 
 async function enter(mode){
+  /*__ENTER_TRY_INSERTED__*/ try {
+
   const code=(inputCode.value||"").trim();
   if(!code){ alert('コードを入力してください'); return; }
   state.roomCode = code; state.mode=mode;
@@ -897,6 +903,14 @@ async function enter(mode){
   listenRoom(code);
 
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
+
+  /*__ENTER_CATCH_INSERTED__*/ 
+} catch (e) {
+  console.error('enter() failed:', e);
+  alert('入室に失敗しました。権限や通信状態を確認してください。\n' + (e && e.message ? e.message : 'unknown error'));
+  return;
+}
+
 }
 
                         
@@ -906,6 +920,8 @@ function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード�
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
     players:{}, spectators:{},
+    expiresAt: Date.now() + ROOM_KEEP_MS, // ★ 追加：ルーム期限
+
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null , lanes:{} } };
 }
 
@@ -992,9 +1008,7 @@ function renderItemsAndDi(v){
   const itemNodes = []; // ★ ノード参照を保持
 
   (v.items||[]).forEach((it, idx)=>{
-    const flags = v?.mission?.flags || {
-  try{ renderSyncedLanes(state.watching); }catch(_){}
-};
+    const flags = v?.mission?.flags || {};
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
     if(!it.used){
       // #15: 最初は裏向き表示（使用可だが faceUp===false の間は裏面アートを表示）
