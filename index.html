@@ -4427,14 +4427,12 @@ function attachM23DeckUI(lane){
 
     if (!meta.m23_spread && ready){
       openOneMini(ev.clientX, ev.clientY, '広げる', async ()=>{
-        const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
- await Promise.all([
-  set(ref(db, `rooms/${state.roomCode}/items`), list),
-   update(ref(db, `rooms/${state.roomCode}/meta`), { 
-     m23_spread: true,
-     m23_spreadRest: remain
-   })
- ]);
+const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
+await update(ref(db, `rooms/${state.roomCode}`), {
+  'items': list,
+  'meta/m23_spread': true,
+  'meta/m23_spreadRest': [] // 追加描画を使わない/保険として空で固定
+});
         // 展開後は右側積みはクリア
         pile.innerHTML = '';
         pile.style.height = cssNum('--item-h') + 'px';
