@@ -627,7 +627,6 @@ const now=()=>Date.now();
 function buildRoomLink(){
   const url = new URL(location.href);
   url.searchParams.set('room', state.roomCode || '');
-  if (state.userName) url.searchParams.set('name', state.userName);
   return url.toString();
 }
 async function copyText(text){
