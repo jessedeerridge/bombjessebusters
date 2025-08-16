@@ -709,59 +709,7 @@ function distributeNumbersToItemsCentered(eachCount=1){
   });
 }
 
-/* ===== M12：各アイテムの真下に「数値カードを1枚ずつ」同期表示 ===== */
-async function renderM12(v){
-  // ミッション12以外では帯を掃除して終了
-  if (!v?.started || ((v?.mission?.id|0) !== 12)) {
-    const old = document.querySelector('.num-under'); if (old) old.remove();
-    return;
-  }
-  const itemsBar = document.getElementById('itemsBar');
-  const itemsElList = document.querySelectorAll('#items .item');
-  if (!itemsBar || itemsElList.length === 0) return;
 
-  // 既存を掃除（やり直し・再描画での重複防止）
-  const old = document.querySelector('.num-under'); if (old) old.remove();
-
-  // DB上の確定マップを参照（キー=アイテム番号 it.no）
-  let m = v?.meta?.m12_map || null;
-
-  // 未確定ならホストが一度だけ確定して保存（“クライアント差”を排除）
-  if (!m && state.isHost) {
-    const itemList = Array.isArray(v.items) ? v.items.slice() : [];
-    const count = Math.min(itemList.length, MATERIALS.numbers.length);
-    const pool = MATERIALS.numbers.slice();
-    shuffle(pool);
-    m = {};
-    for (let i=0; i<count; i++){
-      const it = itemList[i];
-      const key = (it && it.no != null) ? String(it.no) : String(i);
-      m[key] = pool[i];
-    }
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { m12_map: m });
-  }
-  // 非ホストは確定前は待つ
-  if (!m) return;
-
-  // 帯DOMを生成して、アイテム列のすぐ下に配置
-  const under = document.createElement('div');
-  under.className = 'num-under';
-  itemsBar.insertAdjacentElement('afterend', under);
-
-  // v.items の順にスロットを作り、対応する it.no の数字があれば置く
-  const list = Array.isArray(v.items) ? v.items : [];
-  list.forEach((it, idx)=>{
-    const slot = document.createElement('div');
-    slot.className = 'slot';
-    under.appendChild(slot);
-    const key = (it && it.no != null) ? String(it.no) : String(idx);
-    const n = m[key];
-    if (Number.isInteger(n)) placeNumberCard(n, slot);
-  });
-}
-
-
-  
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
 function pickK(arr, k){
   const a = arr.slice(); shuffle(a);
@@ -984,6 +932,12 @@ btnJoin.onclick   = ()=>{
   const nm = (inputName?.value || '').trim();
   // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
   state.userName = nm ? nm.slice(0,4) : hiragana(4);
+
+  // ★ルームコード未入力なら0225にする
+  if (!inputCode.value.trim()) {
+    inputCode.value = '0225';
+  }
+
   enter('player');
 };
 
@@ -1038,7 +992,7 @@ if (v) {
     }
   }
 }    
-  renderItemsAndDi(v);  renderM12(v); renderM29(v); renderM31(v);  renderTables(v); 
+   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
@@ -1198,8 +1152,6 @@ function renderHostTool(v){
 }
 hostTool.onclick = ()=> alert('全体公開されている通常コードの枚数に奇数が含まれています。');
 
-
-  
 /* ===== Tables ===== */
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
