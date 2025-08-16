@@ -1205,7 +1205,11 @@ if ((v.mission?.id|0) === 23) {
   const X = v?.meta?.m23_number|0;
   const done = v?.meta?.m23_spread === true;
   if (X && !done && (openCountByNum[X]||0) === 4 && state.isHost) {
-    performM23Spread();
+    // 山札に残っているカードだけを抽出
+    const deck   = Array.isArray(v.meta?.m23_deck)     ? v.meta.m23_deck     : [];
+    const opened = Array.isArray(v.meta?.m23_discards) ? v.meta.m23_discards : [];
+    const rest   = deck.filter(no => !opened.includes(no));
+    performM23Spread(rest);  
   }
 }
 
