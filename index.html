@@ -53,6 +53,14 @@
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
+  /* ★ M12：アイテムの下に付ける小型数値バッジ */
+  .num-badge{
+    position:absolute; left:50%; transform:translateX(-50%);
+   bottom:-14px; min-width:18px; height:18px; padding:0 4px;
+    border-radius:9px; border:1px solid #ddd; background:#fff;
+    font-size:12px; line-height:18px; text-align:center;
+   box-shadow:0 2px 6px rgba(0,0,0,.12); pointer-events:none;
+  }
 
 
  .di{ margin-left:auto;width:var(--di-w);height:var(--di-h);border-radius:10px;　border:none;　background:#fff;
@@ -3381,17 +3389,6 @@ async function setupMissionOnStart(code){
     await set(ref(db, `rooms/${code}/tables`), tbls);
   }
 
-
-  
-  // #9：右2 + ランダム数値2枚
-  if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
-    const lane = buildNumLaneDOM([
-      {kind:'rule', img: imgRule('right2')},
-      {kind:'num',  img: imgNumber(randNum())},
-      {kind:'num',  img: imgNumber(randNum())}
-    ]);
-    mountLaneUnderItemsBar(lane);
-  }
 
   // #11：パターン1（山札→めくる）
   if(flags.needsNumberLane && flags.pattern==='P1'){
