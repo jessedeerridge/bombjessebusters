@@ -1121,6 +1121,20 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   });
 
 
+  // ★ 追加：#23 の残り山札アイテムをアイテム欄へ並べる
+  if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true) {
+    const rest = Array.isArray(v?.meta?.m23_spreadRest) ? v.meta.m23_spreadRest : [];
+   for (const no of rest) {
+      const div2 = document.createElement('div');
+     div2.className = 'item m23-spread';
+      div2.style.backgroundImage = `url("./item${no}.jpg")`;
+      // 表示のみ（拡大は可）。ゲーム状態は変更しない
+     div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true });
+      itemsEl.appendChild(div2);
+      itemNodes.push(div2);
+   }
+  }
+  
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
@@ -1184,6 +1198,18 @@ if ((v.mission?.id|0) === 39) {
     performM39Deal();
   }
 }
+
+// #23：表示中の“数値カード（m23_number）”と同じ数字が4枚全体公開
+// → 山札に残っているアイテムカードをアイテム欄に並べる（ホストのみ・一回）
+if ((v.mission?.id|0) === 23) {
+  const X = v?.meta?.m23_number|0;
+  const done = v?.meta?.m23_spread === true;
+  if (X && !done && (openCountByNum[X]||0) === 4 && state.isHost) {
+    performM23Spread();
+  }
+}
+
+  
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
@@ -4301,6 +4327,31 @@ function renderM39(v){
   }catch(e){ console.error('performM39Deal', e); }
 }
 
+// #23：残りのアイテム山札を“アイテム欄”に並べる（メタへ確定保存）
+async function performM23Spread(){
+  try{
+    const rRef   = ref(db, `rooms/${state.roomCode}`);
+    const rSnap  = await get(rRef);
+    const R      = rSnap.val() || {};
+    const meta   = R.meta || {};
+
+    // すでに実行済みなら何もしない
+    if (meta.m23_spread === true) return;
+
+    // 残っているアイテム（＝山札 - 捨て札）
+    const deck = Array.isArray(meta.m23_deck)     ? meta.m23_deck.slice()     : [];
+    const disc = Array.isArray(meta.m23_discards) ? meta.m23_discards.slice() : [];
+    const rest = deck.filter(n => !disc.includes(n));
+
+    // メタに確定（表示制御と、クライアント側で描画に使う配列）
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m23_spread: true,
+      m23_spreadRest: rest
+    });
+  }catch(e){
+    console.error('performM23Spread', e);
+  }
+}
   
 function attachM23DeckUI(lane){
   const deckBtn = document.createElement('div');
