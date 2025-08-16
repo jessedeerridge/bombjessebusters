@@ -634,7 +634,9 @@ const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
 
 /* === 前のゲームの表示物を全て掃除する === */
 function clearMissionOverlays(){
-  document.querySelectorAll('.numlane').forEach(n => n.remove());
+document.querySelectorAll('.numlane').forEach(n => {
+  if (n.id !== 'm11Row') n.remove();  // m11Rowは残す
+});
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
   document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
   // ★ ミッション22：情報トークン表を確実に消す
@@ -653,8 +655,10 @@ function clearMissionOverlays(){
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
-  if (NUMCARD_REG.has(n)) {
-    // ★ 既に場にあるので何もしない（“同じカードは存在しない”）
+  const existing = NUMCARD_REG.get(n);
+  if (existing) {
+   // ★ 既存ホルダーを新しい親へ“移動”する（DOM外でもOK）
+    mountParent.appendChild(existing);
     return;
   }
   const holder = document.createElement('div');
@@ -662,7 +666,7 @@ function placeNumberCard(n, mountParent){
   const base = document.createElement('div');
   base.className = 'numcard';
   base.style.backgroundImage = `url('${imgNumber(n)}')`;
-  holder.appendChild(base);
+ holder.appendChild(base);
   mountParent.appendChild(holder);
   NUMCARD_REG.set(n, holder);
 }
