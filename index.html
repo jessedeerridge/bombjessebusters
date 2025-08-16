@@ -4485,6 +4485,8 @@ function renderM36(v){
   const leftSlot = mkCard(null);
   leftSlot.classList.add('m36-slot','m36-left');
   leftSlot.title = 'クリックで右2を表示';
+  leftSlot.classList.remove('numcard');
+  leftSlot.classList.add('rulecard');
   leftSlot.onclick = async (ev)=>{
     ev.stopPropagation();
     await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_side: 'L' });
@@ -4501,6 +4503,8 @@ function renderM36(v){
   const rightSlot = mkCard(null);
   rightSlot.classList.add('m36-slot','m36-right');
   rightSlot.title = 'クリックで左2を表示';
+ rightSlot.classList.remove('numcard');
+ rightSlot.classList.add('rulecard');
   rightSlot.onclick = async (ev)=>{
     ev.stopPropagation();
     await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_side: 'R' });
