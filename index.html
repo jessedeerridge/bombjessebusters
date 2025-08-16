@@ -990,7 +990,8 @@ if (v) {
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
-renderM39(v);
+    renderM39(v);
+renderM9(v);
     renderM42(v);
 
     // ▼ ホスト判定を最新化
@@ -3321,7 +3322,15 @@ async function setupMissionOnStart(code){
   const snap = await get(ref(db, `rooms/${code}`));
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
-
+  /* #9：右2 + 異なる数値2枚を決定して meta に保存（ホストのみ実行） */
+  if ((v.mission?.id|0) === 9) {
+   const pool = MATERIALS.numbers.slice(); shuffle(pool);
+    const picks = pool.slice(0,2);            // 異なる2枚
+   await update(ref(db, `rooms/${code}/meta`), {
+      m9_numbers: picks,
+     m9_rule: 'right2'
+    });
+  }
 
   /* ここから追加：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
   if ((v.mission?.id|0) === 41) {
@@ -3941,6 +3950,27 @@ function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
 }
 
+  /* ===== #9：右2 + 異なる数値2枚（同期表示） ===== */
+  function renderM9(v){
+    const isM9 = ((v?.mission?.id|0) === 9);
+   const old = document.getElementById('m9Row');
+    if (!isM9){ if(old) old.remove(); return; }
+    // メタ（ホストが開始時に保存）
+    const nums = Array.isArray(v?.meta?.m9_numbers) ? v.meta.m9_numbers : null;
+    const rule = v?.meta?.m9_rule || 'right2';
+    if (!nums || nums.length < 2) return; // 未準備なら何もしない（次のonValueで描画）
+   if (old) old.remove();
+    // [右2][数][数] をアイテム列の直下に表示
+    const lane = buildNumLaneDOM([
+      {kind:'rule', img: imgRule(rule)},
+      {kind:'num',  img: imgNumber(nums[0])},
+      {kind:'num',  img: imgNumber(nums[1])},
+    ]);
+    lane.id = 'm9Row';
+    mountLaneUnderItemsBar(lane);
+  }
+
+  
  
 /* ===== ★ #23：アイテム山（7枚）を数値山レーンの右側に表示 ===== */
 async function ensureM23MetaInit(){
