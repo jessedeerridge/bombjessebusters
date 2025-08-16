@@ -4070,9 +4070,10 @@ function renderM23(v){
     lane.appendChild(nc);
   }
 
-  // 右：アイテム山札UI（既存のattachM23DeckUIを再利用）
-  attachM23DeckUI(lane);
-
+  // 右：アイテム山札UI（※広げ済みは表示しない）
+  if (!(v?.meta?.m23_spread)) {
+    attachM23DeckUI(lane);
+  }
   // アイテム列の直下に設置（#39等と同じユーティリティ）
  mountLaneUnderItemsBar(lane);
 }  
@@ -4416,10 +4417,13 @@ function attachM23DeckUI(lane){
     if (!meta.m23_spread && ready){
       openOneMini(ev.clientX, ev.clientY, '広げる', async ()=>{
         const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
-        await Promise.all([
-          set(ref(db, `rooms/${state.roomCode}/items`), list),
-          update(ref(db, `rooms/${state.roomCode}/meta`), { m23_spread:true })
-        ]);
+ await Promise.all([
+  set(ref(db, `rooms/${state.roomCode}/items`), list),
+   update(ref(db, `rooms/${state.roomCode}/meta`), { 
+     m23_spread: true,
+     m23_spreadRest: remain
+   })
+ ]);
         // 展開後は右側積みはクリア
         pile.innerHTML = '';
         pile.style.height = cssNum('--item-h') + 'px';
