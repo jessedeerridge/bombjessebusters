@@ -1061,13 +1061,15 @@ if (v) {
     state._lastMissionId = midNow;    renderM18(v);
     renderM39(v);
     renderM9(v);
-     renderM11(v);
+    renderM11(v);
     renderM12(v);
     renderM15(v);
     renderM16(v);
     renderM30(v);
     renderM23(v);
     renderM26(v);
+    renderConDeck(v, 32, 'm32'); // ★ 共通レンダラー (#32)
+    renderConDeck(v, 37, 'm37'); // ★ 共通レンダラー (#37)
     renderM42(v);
 
     // ▼ ホスト判定を最新化
@@ -4387,7 +4389,7 @@ function renderM30(v){
   mountLaneUnderItemsBar(lane);
 }
 
-  
+
   
 /* ===== #39：左に X、右に数値P1山＋公開札、下に自分の受け取り数値 ===== */
 function renderM39(v){
