@@ -24,7 +24,7 @@
   h1{margin:0;font-size:18px}
   .small{font-size:12px;opacity:.75}
   .bold{font-weight:700}
-  .copy-code{ text-decoration:underline; cursor:pointer }
+
   main{padding:10px 12px;display:flex;gap:12px; overflow:visible;}
   .col{flex:1;min-width:0; overflow:visible;}
   .side{width:38%;max-width:420px}
@@ -965,25 +965,7 @@ async function enter(mode){
 
                         
 function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード：${state.roomCode}　/　あなた：${state.userName}` : ''; }
- function updateHeaderInfo(){
-   if(!state.roomCode){ roomInfo.textContent=''; return; }
-   roomInfo.innerHTML =
-     `コード：<span id="copyCode" class="copy-code" title="クリックで招待リンクをコピー">${state.roomCode}</span>　/　あなた：${state.userName}`;
-   const el = document.getElementById('copyCode');
-   if (el){
-     el.onclick = async ()=>{
-       const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(state.roomCode)}`;
-       try{
-         await navigator.clipboard.writeText(url);
-        miniPop.textContent = '招待リンクをコピーしました';
-         miniPop.classList.remove('hidden');
-         setTimeout(()=> miniPop.classList.add('hidden'), 1200);
-       }catch(e){
-         alert(url); // 失敗時はリンク文字列を見せる
-       }
-    };
-   }
- }
+
 /* room base */
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
