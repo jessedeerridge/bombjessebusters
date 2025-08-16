@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>boあrs</title>
+<title>bas</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -1122,7 +1122,9 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
 
 
   // ★ 追加：#23 の残り山札アイテムをアイテム欄へ並べる
- if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true && Array.isArray(v?.meta?.m23_spreadRest) && v.meta.m23_spreadRest.length > 0) {    const rest = Array.isArray(v?.meta?.m23_spreadRest) ? v.meta.m23_spreadRest : [];
+ if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true
+     && (v.items?.length ?? 0) === 0
+     && Array.isArray(v?.meta?.m23_spreadRest) && v.meta.m23_spreadRest.length > 0) {
    for (const no of rest) {
       const div2 = document.createElement('div');
      div2.className = 'item m23-spread';
