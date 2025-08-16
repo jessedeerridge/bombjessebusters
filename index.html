@@ -3455,11 +3455,7 @@ async function setupMissionOnStart(code){
   }
 
 
-  // #11：パターン1（山札→めくる）
- if(flags.needsNumberLane && flags.pattern==='P1' && ((v.mission?.id|0)!==15)){
-    const lane = buildDeckLaneP1();
-    mountLaneUnderItemsBar(lane);
-  }
+
 
   // #30：P1-pop123（山札→1/2/3ポップ／横並びは上限リセット）
   if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
