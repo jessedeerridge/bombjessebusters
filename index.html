@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sters</title>
+<title>bomb busters</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -956,19 +956,31 @@ function baseRoom(hostId){
 }
 
 /* watch */
-function listenRoom(code){
-  onValue(ref(db, `rooms/${code}`),(snap)=>{
-    const v=snap.val(); state.watching=v;
-if (v) {
-  const p = Object.keys(v.players || {}).length;
-  const s = Object.keys(v.spectators || {}).length;
-  const empty = (p === 0 && s === 0);
-  const justCreated = (Date.now() - (v.createdAt || 0) < 2000); // 作成から2秒以内は削除しない
-  if (empty && !justCreated) {
-    remove(ref(db, `rooms/${code}`));
-    return;
-  }
-}    
+    if (v) {
+      const pIds = Object.keys(v.players || {});
+     const p = pIds.length;
+      const s = Object.keys(v.spectators || {}).length;
+      const empty = (p === 0 && s === 0);
+     const justCreated = (Date.now() - (v.createdAt || 0) < 2000);
+      // 最終アクティブ時間を更新
+      update(ref(db, `rooms/${code}`), { lastActive: Date.now() });
+     // 空になって30分経過で削除
+     if (empty && !justCreated) {
+        const idle = Date.now() - (v.lastActive || v.createdAt || 0);
+        if (idle > 30 * 60 * 1000) {
+         remove(ref(db, `rooms/${code}`));
+          return;
+        }
+      }
+     // 残り1人になったらその人をホストに
+      if (p === 1 && pIds[0] === state.userId && v.hostId !== state.userId) {
+       update(ref(db, `rooms/${code}`), { hostId: state.userId });
+      }
+    }
+
+   
+
+    
    renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
@@ -982,8 +994,7 @@ if (v) {
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 renderM39(v);
-    renderM09(v); renderM12(v); renderM15(v); renderM17(v); renderM18(v); renderM23(v); renderM26(v); renderM30(v); renderM32(v); renderM36(v); renderM37(v);
-renderM42(v);
+    renderM42(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -4044,84 +4055,6 @@ function renderM39(v){
   });
   missionFooter.insertAdjacentElement('beforebegin', row);
 }
-
-/* ================================
- * 数値デッキの初期化（ホストのみ）
- * 既存なら何もしない。なければ 1..12 を保存
- * ================================ */
-async function ensureNumDeckHostOnly(v, id) {
-  if (!state || !state.isHost) return;              // ホスト以外は絶対に初期化しない
-  const mkey = `m${id}_deck`;
-  const xkey = `m${id}_discards`;
-  const meta = (v && v.meta) || {};
-  if (Array.isArray(meta[mkey])) return;            // 既に初期化済み
-  const deck = (MATERIALS && MATERIALS.numbers ? MATERIALS.numbers.slice() : []);
-  if (typeof shuffle === 'function') shuffle(deck);
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { [mkey]: deck, [xkey]: [] });
-}
-
-// ========== 各ミッション専用の同期数値レーン ==========
-function __buildSyncedNumberLane(v, id, laneId){
-  const old = document.getElementById(laneId);
-  const isMe = (((v && v.mission && v.mission.id)|0) === id);
-  if (!isMe){ if (old) old.remove(); return null; }
-
-  if (old) old.remove();
-  const lane = document.createElement('div');
-  lane.id = laneId; lane.className = 'numlane';
-
-  const deckBtn = document.createElement('div'); deckBtn.className='numdeck'; deckBtn.title='めくる';
-  const restLbl = document.createElement('span'); restLbl.className='numrest';
-  const pile    = document.createElement('div');  pile.className='numcard-holder'; pile.style.position='relative';
-  lane.appendChild(deckBtn); lane.appendChild(restLbl); lane.appendChild(pile);
-
-  const refresh = ()=>{
-    const meta = (v && v.meta) || {};
-    const d = (meta[`m${id}_deck`]||[]);
-    const x = (meta[`m${id}_discards`]||[]);
-    const remain = d.filter(n=>!x.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
-    pile.innerHTML='';
-    x.forEach((n,i)=>{
-      const node=document.createElement('div'); node.className='numcard';
-      if (typeof imgNumber === 'function') node.style.backgroundImage=`url('${imgNumber(n)}')`;
-      if(i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; }
-      pile.appendChild(node);
-      const extra=i*2; pile.style.height=(48+extra)+'px'; lane.style.marginBottom=extra+'px';
-    });
-  };
-  refresh();
-
-  deckBtn.onclick = async ()=>{
-    try{
-      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-      const snap = await get(mRef); const meta = snap.val()||{};
-      const D  = Array.isArray(meta[`m${id}_deck`]) ? meta[`m${id}_deck`].slice() : [];
-      const Xs = Array.isArray(meta[`m${id}_discards`]) ? meta[`m${id}_discards`].slice() : [];
-      const next = D.find(n => !Xs.includes(n)); if(next==null) return;
-      Xs.push(next);
-      await update(mRef, { [`m${id}_discards`]: Xs });
-    }catch(e){ console.error(e); }
-  };
-
-  ensureNumDeckHostOnly(v, id);      // 初期化はホストだけ
-  if (typeof mountLaneUnderItemsBar === 'function') mountLaneUnderItemsBar(lane);
-  return lane;
-}
-
-function renderM09(v){ __buildSyncedNumberLane(v, 9,  'm09Row'); }
-function renderM12(v){ __buildSyncedNumberLane(v, 12, 'm12Row'); }
-function renderM15(v){ __buildSyncedNumberLane(v, 15, 'm15Row'); }
-function renderM17(v){ __buildSyncedNumberLane(v, 17, 'm17Row'); }
-function renderM18(v){ __buildSyncedNumberLane(v, 18, 'm18Row'); }
-function renderM23(v){ __buildSyncedNumberLane(v, 23, 'm23Row'); }
-function renderM26(v){ __buildSyncedNumberLane(v, 26, 'm26Row'); }
-function renderM30(v){ __buildSyncedNumberLane(v, 30, 'm30Row'); }
-function renderM32(v){ __buildSyncedNumberLane(v, 32, 'm32Row'); }
-function renderM36(v){ __buildSyncedNumberLane(v, 36, 'm36Row'); }
-function renderM37(v){ __buildSyncedNumberLane(v, 37, 'm37Row'); }
-
-
 
   async function performM39Deal(){
   try{
