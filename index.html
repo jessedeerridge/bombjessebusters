@@ -627,8 +627,11 @@ const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
 /* === 前のゲームの表示物を全て掃除する === */
 function clearMissionOverlays(){
   document.querySelectorAll('.numlane').forEach(n => n.remove());
+  document.querySelectorAll('.conlane').forEach(n => n.remove());     // ← 追加：制約帯も掃除
+  document.querySelectorAll('.rulelane').forEach(n => n.remove());    // ← 追加：矢印帯も掃除
+  document.querySelectorAll('[data-lane-id]').forEach(n => n.remove());// ← 追加：共通レーン識別で掃除
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
-  document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
+  document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 既存
   // ★ ミッション22：情報トークン表を確実に消す
   const info22 = document.getElementById('info22');
   if (info22) info22.remove();
@@ -643,6 +646,84 @@ function clearMissionOverlays(){
   NUMCARD_REG.clear();
 }
 
+/* ===== ここから追加：共通レーン同期描画 ===== */
+function renderSyncedLanes(v){
+  // DBにまだ何も無ければ何もしない
+  const lanes = v?.meta?.lanes || {};
+  // 既存の共通レーンDOMを一旦クリア（※他の機能には触らない）
+  document.querySelectorAll('[data-lane-id]').forEach(n => n.remove());
+
+  // レーンを描画
+  Object.values(lanes).forEach(L => {
+    try { upsertLaneDom(L); } catch(e){ console.warn('lane render error', L, e); }
+  });
+}
+
+/** laneオブジェクトをDOM化して親の直下に挿入
+ *  L: { id, type:'num'|'con'|'rule', parentSelector:'#itemsBar' 等,
+ *       cards:[{ num?:number, img?:string, className?:string, title?:string }], note?:string }
+ */
+function upsertLaneDom(L){
+  if(!L || !L.id || !L.type) return;
+  // 親ノードを取得（見つからなければ itemsBar の直下にフォールバック）
+  const parent = document.querySelector(L.parentSelector || '#itemsBar') || document.getElementById('itemsBar');
+  if(!parent) return;
+
+  // レーン本体
+  const lane = document.createElement('div');
+  lane.dataset.laneId = L.id; // ← 掃除用
+  if(L.type==='num') lane.className = 'numlane';
+  else if(L.type==='con') lane.className = 'conlane';
+  else if(L.type==='rule') lane.className = 'rulelane';
+  else lane.className = 'numlane'; // デフォルト
+
+  // カードDOMを並べる
+  (L.cards||[]).forEach(c=>{
+    if(L.type==='num'){
+      const holder = document.createElement('div');
+      holder.className = 'numcard-holder';
+      const card = document.createElement('div');
+      card.className = 'numcard ' + (c.className||'');
+      if (c.img){ card.style.backgroundImage = `url('${c.img}')`; }
+      else if (c.num!=null){ card.style.backgroundImage = `url('${imgNumber(c.num)}')`; }
+      if (c.title) card.title = String(c.title);
+      holder.appendChild(card);
+      lane.appendChild(holder);
+    }else if(L.type==='con'){
+      const card = document.createElement('div');
+      card.className = 'concard ' + (c.className||'');
+      if (c.img){ card.style.backgroundImage = `url('${c.img}')`; }
+      lane.appendChild(card);
+    }else if(L.type==='rule'){
+      const card = document.createElement('div');
+      card.className = 'rulecard ' + (c.className||'');
+      if (c.img){ card.style.backgroundImage = `url('${c.img}')`; }
+      else if (c.name){ card.style.backgroundImage = `url('${imgRule(c.name)}')`; }
+      lane.appendChild(card);
+    }
+  });
+
+  // 備考があればタイトルとして
+  if (L.note){
+    lane.title = String(L.note);
+  }
+
+  // 挿入：親要素の「すぐ下」に置きたい場合は afterend、同じ中に置きたいなら append
+  // ここでは「親の直後（外側）」に入れる
+  parent.insertAdjacentElement('afterend', lane);
+}
+
+/* lanes を書き込むための簡易API（ホスト操作側で使用） */
+async function setLane(lane){
+  // lane: { id, type, parentSelector, cards:[...], note? }
+  if(!state.roomCode) return;
+  await update(ref(db, `rooms/${state.roomCode}/meta/lanes/${lane.id}`), lane);
+}
+async function removeLane(laneId){
+  if(!state.roomCode) return;
+  await remove(ref(db, `rooms/${state.roomCode}/meta/lanes/${laneId}`));
+}
+  
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
   if (NUMCARD_REG.has(n)) {
@@ -952,7 +1033,15 @@ function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード�
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
     players:{}, spectators:{},
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null } };
+    // ▼ ここから：場の共通同期レーン置き場を追加
+    meta:{
+      itemUses:{i1:0,i2:0,i12:0,i14:0},
+      tokenCounts:{equal:0,noteq:0,x1:0},
+      i2Flow:null, i18Flow:null, i16Badge:null,
+      lanes:{}            // ← 追加：{ [laneId]: {id,type,parentSelector,cards:[...], note?} }
+    }
+    // ▲ ここまで追加
+  };
 }
 
 /* watch */
@@ -969,7 +1058,9 @@ if (v) {
     return;
   }
 }    
-   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
+  renderItemsAndDi(v);  renderM29(v); renderM31(v);
+   renderSyncedLanes(v);           // ← 追加：共通レーン同期描画
+   renderTables(v); 
      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
