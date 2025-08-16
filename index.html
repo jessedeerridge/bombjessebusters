@@ -3407,10 +3407,6 @@ async function setupMissionOnStart(code){
   if(flags.needsNumberLane && flags.pattern==='P1'){
     const lane = buildDeckLaneP1();
     mountLaneUnderItemsBar(lane);
-        // ★ #23：アイテム1〜13からランダム7枚の山札を作り、数値山の右側に表示
-    if (flags.m23_itemDeck7) {
-      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
-    }
   }
 
   // #30：P1-pop123（山札→1/2/3ポップ／横並びは上限リセット）
@@ -3733,13 +3729,7 @@ function buildDeckLaneP1(){
     restLbl.textContent = `残:${rest}`;
     addToPile(n);
 
-    // ★ #23：表になった数値をメタに記録（重複は追加しない）
-     try{
-       const cur = (state.watching?.meta?.m23_drawnNumbers) || [];
-      if (!cur.includes(n)) {
-         update(ref(db, `rooms/${state.roomCode}/meta`), { m23_drawnNumbers: cur.concat(n) });
-       }
-     }catch(_){}
+
    
     if(rest===0){
       deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
@@ -4670,7 +4660,7 @@ function missionInfo(id, opts={}){
           'これを解除するまでは、隊長の手番になるたびに装備カードの山から1枚ずつ捨て札にする。',
           'これを解除したら、捨て札になっていない装備が即座に全て使えるようになる。'
         ],
-          flags:{ m23_itemDeck7:true, m23_hideItemsUntilSpread:true, m23_singleNumber:true }
+ flags:{ m23_hideItemsUntilSpread:true }
       };
     }
 
