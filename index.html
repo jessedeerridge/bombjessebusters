@@ -1007,6 +1007,7 @@ if (v) {
     renderM18(v);
     renderM39(v);
     renderM9(v);
+     renderM11(v);
     renderM12(v);
     renderM15(v);
     renderM16(v);
@@ -1942,6 +1943,8 @@ function renderM22PickPanel(v){
   m22PickPanel.classList.remove('hidden');
 }
 
+
+  
 /* ：#29 描画・操作ロジック ▼▼ */
 function renderM29(v){
   const isM29 = (v?.mission?.id|0) === 29;
@@ -4007,7 +4010,53 @@ function buildFixedLane(list){
     lane.id = 'm9Row';
     mountLaneUnderItemsBar(lane);
   }
+/* ここから追加：#11 数値カード1枚（同期表示） */
+async function ensureM11MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  // 既に用意済みなら何もしない／初期化はホストのみ
+  if ((v?.meta?.m11_number|0) > 0) return;
+  if (!state.isHost) return;
 
+  // まだ場に使われていない数字から1枚選ぶ（重複防止ユーティリティを活用）
+  const pick = (typeof pickUnusedNumbers === 'function')
+    ? pickUnusedNumbers(1)[0]
+    : MATERIALS.numbers[Math.random()*MATERIALS.numbers.length|0];
+
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m11_number: pick });
+}
+
+function renderM11(v){
+  const isM11 = ((v?.mission?.id|0) === 11);
+  const rowId = 'm11Row';
+  const old   = document.getElementById(rowId);
+  if (!isM11){ if (old) old.remove(); return; }
+
+  // 初回：ホストが m11_number を用意（未用意なら用意して次のonValueで描画）
+  if ((v?.meta?.m11_number|0) === 0){ ensureM11MetaInit(v); if (old) old.remove(); return; }
+
+  if (old) old.remove();
+  const lane = document.createElement('div');
+  lane.id = rowId;
+  lane.className = 'numlane';
+
+  // 数値カード1枚を配置（重複禁止の登録つき）
+  const N = v?.meta?.m11_number|0;
+  if (typeof placeNumberCard === 'function'){
+    placeNumberCard(N, lane);     // 既存UI登録ユーティリティ
+  }else{
+    // フォールバック（ユーティリティが無い場合）
+    const holder = document.createElement('div');
+    holder.className = 'numcard-holder';
+    const nc = document.createElement('div');
+    nc.className = 'numcard';
+    nc.style.backgroundImage = `url('${imgNumber(N)}')`;
+    holder.appendChild(nc);
+    lane.appendChild(holder);
+  }
+
+  // DOM設置：アイテム列の直下（#39等と同じ）
+  mountLaneUnderItemsBar(lane);
+}
 
 function renderM12(v){
   const isM12 = ((v?.mission?.id|0) === 12);
