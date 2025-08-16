@@ -690,10 +690,19 @@ function distributeNumbersToItemsCentered(eachCount=1){
   under.className = 'num-under';
   itemsBar.insertAdjacentElement('afterend', under);
 
-  // 未使用数字から必要枚数ぶん抽選
+  // ▼▼ 同期対応：#12 のときは DB(meta) に保存された配列を優先使用
   const need  = items.length * eachCount;
-  const picks = pickUnusedNumbers(need);
-
+ let picks;
+  const v = state.watching;
+  const isM12 = ((v?.mission?.id|0) === 12);
+  const metaArr = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under.slice() : null;
+  if (isM12 && metaArr && metaArr.length >= items.length) {
+   // m12 は各アイテム1枚なので「人数分」だけ取り出す
+    picks = metaArr.slice(0, need);
+  } else {
+    // フォールバック（他ミッションや未初期化時）：ローカル抽選
+    picks = pickUnusedNumbers(need);
+ }
   // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
   let p = 0;
   items.forEach(()=> {
@@ -3345,8 +3354,18 @@ async function setupMissionOnStart(code){
      m9_rule: 'right2'
     });
   }
-
-  /* ここから追加：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
+  /* #12：各アイテムの“外側の真下”に置く数値を、人数分だけ決定して meta に保存 */
+  if ((v.mission?.id|0) === 12) {
+   const itemCount = (v.items || []).length;
+    if (itemCount > 0) {
+      const pool = MATERIALS.numbers.slice(); shuffle(pool);
+      const picks = pool.slice(0, itemCount); // 異なる数字を人数分
+      await update(ref(db, `rooms/${code}/meta`), { m12_under: picks });
+    } else {
+      // まだ items が整っていない場合は次の onValue で拾えるよう何もしない
+    }
+  }
+  /* ：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
   if ((v.mission?.id|0) === 41) {
     const tcount = v.tableCount|0;
     const cap    = v.captainTable|0;
