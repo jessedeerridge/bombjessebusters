@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>あers</title>
+<title>boｓsters</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -690,19 +690,10 @@ function distributeNumbersToItemsCentered(eachCount=1){
   under.className = 'num-under';
   itemsBar.insertAdjacentElement('afterend', under);
 
-  // ▼▼ 同期対応：#12 のときは DB(meta) に保存された配列を優先使用
+  // 未使用数字から必要枚数ぶん抽選
   const need  = items.length * eachCount;
- let picks;
-  const v = state.watching;
-  const isM12 = ((v?.mission?.id|0) === 12);
-  const metaArr = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under.slice() : null;
-  if (isM12 && metaArr && metaArr.length >= items.length) {
-   // m12 は各アイテム1枚なので「人数分」だけ取り出す
-    picks = metaArr.slice(0, need);
-  } else {
-    // フォールバック（他ミッションや未初期化時）：ローカル抽選
-    picks = pickUnusedNumbers(need);
- }
+  const picks = pickUnusedNumbers(need);
+
   // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
   let p = 0;
   items.forEach(()=> {
@@ -1015,6 +1006,7 @@ if (v) {
     state.gameStarted=!!v?.started;
     renderM39(v);
 renderM9(v);
+    renderM12(v);
     renderM42(v);
 
     // ▼ ホスト判定を最新化
@@ -3354,18 +3346,19 @@ async function setupMissionOnStart(code){
      m9_rule: 'right2'
     });
   }
-  /* #12：各アイテムの“外側の真下”に置く数値を、人数分だけ決定して meta に保存 */
-  if ((v.mission?.id|0) === 12) {
-   const itemCount = (v.items || []).length;
-    if (itemCount > 0) {
-      const pool = MATERIALS.numbers.slice(); shuffle(pool);
-      const picks = pool.slice(0, itemCount); // 異なる数字を人数分
-      await update(ref(db, `rooms/${code}/meta`), { m12_under: picks });
-    } else {
-      // まだ items が整っていない場合は次の onValue で拾えるよう何もしない
+
+    /* ★ #12：各アイテムの“真下”に置く数字を決定→metaへ保存（ホストのみ・一度だけ） */
+    if ((v.mission?.id|0) === 12) {
+    if (!Array.isArray(v?.meta?.m12_under)) {
+        const itemCount = Array.isArray(v.items) ? v.items.length : 0;
+       const pool = MATERIALS.numbers.slice(); shuffle(pool);
+        const picks = pool.slice(0, itemCount);   // 1アイテムにつき1枚、重複なし
+        await update(ref(db, `rooms/${code}/meta`), { m12_under: picks });
+      }
     }
-  }
-  /* ：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
+
+  
+  /* ここから追加：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
   if ((v.mission?.id|0) === 41) {
     const tcount = v.tableCount|0;
     const cap    = v.captainTable|0;
@@ -3990,6 +3983,37 @@ function buildFixedLane(list){
     ]);
     lane.id = 'm9Row';
     mountLaneUnderItemsBar(lane);
+  }
+
+
+  /* ===== #12：各アイテムの“真下”に1枚ずつ（同期表示） ===== */
+  function renderM12(v){
+    const isM12 = ((v?.mission?.id|0) === 12);
+    const oldUnder = document.querySelector('.num-under');
+    if (!isM12){ if (oldUnder) oldUnder.remove(); return; }
+
+  const arr = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under : null;
+    if (!arr || arr.length === 0) return; // 未準備なら次の onValue で
+
+    const itemsBar = document.getElementById('itemsBar');
+    const items    = document.querySelectorAll('#items .item');
+    if (!itemsBar || items.length === 0) return;
+    if (oldUnder) oldUnder.remove();
+
+    const under = document.createElement('div');
+    under.className = 'num-under';
+    itemsBar.insertAdjacentElement('afterend', under);
+
+    // アイテム順に、対応する数字を1枚ずつ配置
+    items.forEach((_, i)=>{
+      const n = arr[i];
+      const slot = document.createElement('div');
+     slot.className = 'slot';
+      under.appendChild(slot);
+      if (Number.isInteger(n)) {
+       placeNumberCard(n, slot);
+      }
+    });
   }
 
   
