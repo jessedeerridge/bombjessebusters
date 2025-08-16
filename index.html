@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>bas</title>
+<title>bｓｓs</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -1121,20 +1121,7 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   });
 
 
-  // ★ 追加：#23 の残り山札アイテムをアイテム欄へ並べる
- if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true
-     && (v.items?.length ?? 0) === 0
-     && Array.isArray(v?.meta?.m23_spreadRest) && v.meta.m23_spreadRest.length > 0) {
-   for (const no of rest) {
-      const div2 = document.createElement('div');
-     div2.className = 'item m23-spread';
-      div2.style.backgroundImage = `url("./item${no}.jpg")`;
-      // 表示のみ（拡大は可）。ゲーム状態は変更しない
-     div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true });
-      itemsEl.appendChild(div2);
-      itemNodes.push(div2);
-   }
-  }
+
   
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
@@ -4345,21 +4332,9 @@ async function performM23Spread(){
     const disc = Array.isArray(meta.m23_discards) ? meta.m23_discards.slice() : [];
     const rest = deck.filter(n => !disc.includes(n));
 
-    // メタに確定（表示制御と、クライアント側で描画に使う配列）
-    await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      m23_spread: true,
-      m23_spreadRest: rest
-    });
-     // 手動“広げる”と同じく items を差し替え（重複表示を防ぐ）
-    const list = rest.map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: true }));
-   await Promise.all([
-      set(ref(db, `rooms/${state.roomCode}/items`), list),
-      update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m23_spread: true,
-        // 追加描画に使っていた配列は空にしておく（ガード）
-        m23_spreadRest: []
-      })
-    ]);
+    await set(ref(db, `rooms/${state.roomCode}/items`), list);
+    // items反映後に「広げ済み」フラグのみを立てる（中間状態は持たない）
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_spread: true });
   }catch(e){
     console.error('performM23Spread', e);
   }
@@ -4427,12 +4402,14 @@ function attachM23DeckUI(lane){
 
     if (!meta.m23_spread && ready){
       openOneMini(ev.clientX, ev.clientY, '広げる', async ()=>{
-const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
-await update(ref(db, `rooms/${state.roomCode}`), {
-  'items': list,
-  'meta/m23_spread': true,
-  'meta/m23_spreadRest': [] // 追加描画を使わない/保険として空で固定
-});
+        const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
+ await Promise.all([
+  set(ref(db, `rooms/${state.roomCode}/items`), list),
+   update(ref(db, `rooms/${state.roomCode}/meta`), { 
+     m23_spread: true,
+     m23_spreadRest: remain
+   })
+ ]);
         // 展開後は右側積みはクリア
         pile.innerHTML = '';
         pile.style.height = cssNum('--item-h') + 'px';
