@@ -509,10 +509,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getDatabase, ref, get, set, update, remove, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-// ★ 追加：ルーム保持時間（3時間）
-const ROOM_KEEP_MS = 3 * 60 * 60 * 1000;
-
-
 /* Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSyBpSx_lEcg1j9ExMJsVl5lBqAxOCfmFmSnI",
@@ -528,7 +524,7 @@ const db  = getDatabase(app);
 
 /* State */
 const state = {
-  roomCode:null, userId:(()=>{let id=localStorage.getItem('bb_uid');if(!id){id=crypto.randomUUID();localStorage.setItem('bb_uid',id);}return id;})(), userName:'', // ★未入力なら入室時に採番
+  roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
   m22GaveOnce:false  // ★ #22：自分が渡した一回ガード（即時連打対策）
 };
@@ -600,142 +596,6 @@ const globalReveal = document.getElementById('globalReveal');
 const hostTool = document.getElementById('hostTool');
 
 /* helpers */
-
-/* ======== Lane Sync Helpers (mirror for non-host) ======== */
-function writeLane(id, data){
-  try{
-    if(!state.isHost || !state.roomCode) return;
-    const payload = Object.assign({type:'custom'}, data||{});
-    return update(ref(db, `rooms/${state.roomCode}/meta/lanes/${id}`), payload);
-  }catch(_){}
-}
-function clearLane(id){
-  try{
-    if(!state.isHost || !state.roomCode) return;
-    return remove(ref(db, `rooms/${state.roomCode}/meta/lanes/${id}`));
-  }catch(_){}
-}
-
-/* Mirror renderer: draw lanes for non-hosts so they see host's stage cards */
-function renderSyncedLanes(v){
-  try{
-    if(!v || !v.started) return;
-    if(state.isHost) return; // host has interactive UIs; others get mirror only
-    const lanes = (v?.meta?.lanes) || {};
-    const bar = document.getElementById('itemsBar');
-    if(!bar) return;
-    // cleanup existing mirrors
-    document.querySelectorAll('[data-mirror-lane="1"]').forEach(n=>n.remove());
-
-    const mountAfterBar = (node)=>{ bar.insertAdjacentElement('afterend', node); };
-
-    for(const [id, L] of Object.entries(lanes)){
-      const t = L?.type;
-      if(!t) continue;
-
-      if(t==='numUnder'){
-        const under = document.createElement('div');
-        under.className = 'num-under';
-        under.dataset.mirrorLane = '1';
-        under.id = `mirror-${id}`;
-        const grid = Array.isArray(L.grid)? L.grid : [];
-        grid.forEach(slotNums=>{
-          const slot = document.createElement('div');
-          slot.className = 'slot';
-          (slotNums||[]).forEach(n=>{
-            placeNumberCard(n, slot);
-          });
-          under.appendChild(slot);
-        });
-        mountAfterBar(under);
-        continue;
-      }
-
-      const lane = document.createElement('div');
-      lane.dataset.mirrorLane = '1';
-      lane.id = `mirror-${id}`;
-
-      if(t==='conP1'){ lane.className = 'conlane'; }
-      else if(t==='m36'){ lane.className = 'numlane'; }
-      else { lane.className = 'numlane'; }
-
-      const addPile = (pileNums, klass='numcard')=>{
-        const pile = document.createElement('div');
-        pile.className = 'numcard-holder';
-        pile.style.position = 'relative';
-        (pileNums||[]).forEach((val,idx)=>{
-          const d = document.createElement('div');
-          d.className = (klass==='concard') ? 'concard' : 'numcard';
-          if(klass==='concard'){
-            d.style.backgroundImage = `url('${imgConstraint(val)}')`;
-          }else{
-            d.style.backgroundImage = `url('${imgNumber(val)}')`;
-          }
-          if(idx>0){
-            const off = idx*2;
-            d.style.position = 'absolute';
-            d.style.left = off + 'px';
-            d.style.top  = off + 'px';
-          }
-          pile.appendChild(d);
-        });
-        lane.appendChild(pile);
-      };
-
-      if(t==='numP1'){
-        addPile(L?.pile||[], 'numcard');
-      }
-      else if(t==='numP1pop'){
-        addPile(L?.pile||[], 'numcard');
-        if(Array.isArray(L?.row) && L.row.length>0){
-          const row = document.createElement('div');
-          row.style.display = 'flex';
-          row.style.gap = '6px';
-          L.row.forEach(n=>{
-            const nc = document.createElement('div');
-            nc.className = 'numcard';
-            nc.style.backgroundImage = `url('${imgNumber(n)}')`;
-            row.appendChild(nc);
-          });
-          lane.appendChild(row);
-        }
-      }
-      else if(t==='p2' || t==='fixed'){
-        (L?.cards||[]).forEach(n=>{
-          const nc = document.createElement('div');
-          nc.className = 'numcard';
-          nc.style.backgroundImage = `url('${imgNumber(n)}')`;
-          lane.appendChild(nc);
-        });
-      }
-      else if(t==='conP1'){
-        addPile(L?.pile||[], 'concard');
-      }
-      else if(t==='m36'){
-        const leftBlank = document.createElement('div');
-        leftBlank.className = 'rulecard';
-        const rightBlank = document.createElement('div');
-        rightBlank.className = 'rulecard';
-        if(L?.rule==='right2'){ leftBlank.style.backgroundImage = `url('${imgRule('right2')}')`; }
-        if(L?.rule==='left2'){ rightBlank.style.backgroundImage = `url('${imgRule('left2')}')`; }
-        lane.appendChild(leftBlank);
-        (L?.center||[]).forEach(n=>{
-          const c = document.createElement('div');
-          c.className = 'numcard';
-          c.style.backgroundImage = `url('${imgNumber(n)}')`;
-          lane.appendChild(c);
-        });
-        lane.appendChild(rightBlank);
-      }else{
-        continue;
-      }
-
-      mountAfterBar(lane);
-    }
-  }catch(_){}
-}
-
-
 function hiragana(len=4){
   const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"];
   return Array.from({length:len},()=>h[Math.random()*h.length|0]).join('');
@@ -828,22 +688,204 @@ function distributeNumbersToItemsCentered(eachCount=1){
 
   // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
   let p = 0;
-  const grid = [];
-  items.forEach(()=>{
+  items.forEach(()=> {
     const slot = document.createElement('div');
     slot.className = 'slot';
     under.appendChild(slot);
-    const slotNums = [];
+
     for(let k=0; k<eachCount; k++){
       const n = picks[p++]; if(n==null) break;
+      // placeNumberCard は holder を作って mountParent に追加する
       placeNumberCard(n, slot);
-      slotNums.push(n);
     }
-    grid.push(slotNums);
   });
-  try{ writeLane('numUnder', {type:'numUnder', grid}); }catch(_){} 
 }
 
+
+/* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
+function pickK(arr, k){
+  const a = arr.slice(); shuffle(a);
+  return a.slice(0, Math.max(0, Math.min(k, a.length)));
+}
+
+/**
+ * ミッションごとの「赤/黄の混入仕様」をここで定義
+ */
+function buildMixPlan(missionId){
+  const plans = {
+    8:  [
+    {type:'redChoose', from:2, take:1},
+    {type:'yellowChoose', from:3, take:2},
+    ],    
+    9:  [
+      {type:'redPick',    k:1},
+      {type:'yellowPick', k:2},
+    ],
+    10: [
+      {type:'redPick',    k:1},
+      {type:'yellowPick', k:4},
+    ],
+    11: [
+      {type:'redPick',    k:2},
+    ],
+    12: [
+      {type:'redPick',    k:1},
+      {type:'yellowPick', k:4},
+    ],
+  13: [ /* #13 は専用配布をするのでここでは赤を混ぜない */ ],
+  14: [
+    {type:'redPick', k:2},
+    {type:'yellowChoose', from:3, take:2},
+  ],
+  15: [
+    {type:'redChoose', from:3, take:1},
+  ],
+  16: [
+    {type:'redPick', k:1},
+    {type:'yellowChoose', from:3, take:2},
+  ],
+  17: [
+    {type:'redChoose', from:3, take:2},
+  ],
+  18: [
+    {type:'redPick', k:2},
+  ],
+  19: [
+    {type:'redPick', k:1},
+    {type:'yellowChoose', from:3, take:2},
+  ],
+  20: [
+    {type:'redPick', k:2},
+    {type:'yellowPick', k:2},
+  ],
+  21: [
+    {type:'redChoose', from:3, take:1},
+  ],
+  22: [
+    {type:'redPick',    k:1},
+    {type:'yellowPick', k:4},
+  ],
+  23: [  // 赤3-
+    {type:'redChoose', from:3, take:1},
+  ],
+  24: [  // 赤2
+    {type:'redPick', k:2},
+  ],
+  25: [  // 赤2
+    {type:'redPick', k:2},
+  ],
+  26: [  // 赤2
+    {type:'redPick', k:2},
+  ],
+  27: [  // 赤1 黄4
+    {type:'redPick',    k:1},
+    {type:'yellowPick', k:4},
+  ],
+  28: [  // 赤2 黄4
+    {type:'redPick',    k:2},
+    {type:'yellowPick', k:4},
+  ],
+  28: [  // 赤2 黄4
+    {type:'redPick',    k:2},
+    {type:'yellowPick', k:4},
+  ],
+
+ 29: [  // 赤3
+    {type:'redPick', k:3},
+  ],
+
+  30: [  // 赤2-1、黄4
+    {type:'redChoose',  from:2, take:1},
+    {type:'yellowPick', k:4},
+  ],
+
+  31: [  // 赤3-2
+    {type:'redChoose', from:3, take:2},
+  ],
+
+  32: [  // 赤2
+    {type:'redPick', k:2},
+  ],
+
+  33: [  // 赤3-2
+    {type:'redChoose', from:3, take:2},
+  ],
+
+  34: [  // 赤1
+    {type:'redPick', k:1},
+  ],
+
+  35: [  // 赤3-2 黄4
+    {type:'redChoose',  from:3, take:2},
+    {type:'yellowPick', k:4},
+  ],
+
+  36: [  // 赤3-1 黄2
+    {type:'redChoose',  from:3, take:1},
+    {type:'yellowPick', k:2},
+  ],
+37: [  // 赤2
+  {type:'redPick', k:2},
+],
+38: [  // 赤2
+  {type:'redPick', k:2},
+],
+39: [  // 赤3-2 黄4
+  {type:'redChoose', from:3, take:2},
+  {type:'yellowPick', k:4},
+],
+40: [  // 赤3
+  {type:'redPick', k:3},
+],
+41: [  // 赤3-1
+  {type:'redChoose', from:3, take:1},
+],
+42: [  // 赤3-1 黄4
+  {type:'redChoose', from:3, take:1},
+  {type:'yellowPick', k:4},
+],
+
+    
+};
+return plans[missionId] || [];
+
+}
+
+/**
+ * ミックス実行
+ */
+function executeMixPlan(planList){
+  const toAdd = [];
+  const mixLines = [];
+  const chooseLines = [];
+
+  planList.forEach(p=>{
+    if(p.type==='redPick'){
+      const cand = pickK(MATERIALS.redCodes, p.k);
+      cand.forEach(n=> toAdd.push({num:n, kind:'red'}));
+      mixLines.push('<span style="color:red;">●</span>' + cand.map(v=>`[${v}]`).join(''));
+    }
+    if(p.type==='yellowPick'){
+      const cand = pickK(MATERIALS.yellowCodes, p.k);
+      cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
+　     mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
+    }
+    if(p.type==='redChoose'){
+      const cand = pickK(MATERIALS.redCodes, p.from);
+      chooseLines.push(`<span style="color:red;">●</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
+      const take = pickK(cand, p.take);
+      take.forEach(n=> toAdd.push({num:n, kind:'red'}));
+    }
+    if(p.type==='yellowChoose'){
+      const cand = pickK(MATERIALS.yellowCodes, p.from);
+      chooseLines.push(`<span style="color:gold;">▧</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
+      const take = pickK(cand, p.take);
+      take.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
+    }
+  });
+
+  return { toAdd, mixLines, chooseLines };
+}
 
 /* pop positioning */
 function placeInsideViewport(div, x, y){
@@ -877,7 +919,7 @@ function openBottomMenu(entries){
 }
 
 /* enter */
-btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); btnJoin.onclick(); };
+btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); };
 btnJoin.onclick   = ()=>{
   const nm = (inputName?.value || '').trim();
   // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
@@ -887,8 +929,6 @@ btnJoin.onclick   = ()=>{
 
 
 async function enter(mode){
-  /*__ENTER_TRY_INSERTED__*/ try {
-
   const code=(inputCode.value||"").trim();
   if(!code){ alert('コードを入力してください'); return; }
   state.roomCode = code; state.mode=mode;
@@ -903,14 +943,6 @@ async function enter(mode){
   listenRoom(code);
 
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
-
-  /*__ENTER_CATCH_INSERTED__*/ 
-} catch (e) {
-  console.error('enter() failed:', e);
-  alert('入室に失敗しました。権限や通信状態を確認してください。\n' + (e && e.message ? e.message : 'unknown error'));
-  return;
-}
-
 }
 
                         
@@ -920,9 +952,7 @@ function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード�
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
     players:{}, spectators:{},
-    expiresAt: Date.now() + ROOM_KEEP_MS, // ★ 追加：ルーム期限
-
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null , lanes:{} } };
+    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null } };
 }
 
 /* watch */
@@ -939,7 +969,7 @@ if (v) {
     return;
   }
 }    
-   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); renderSyncedLanes(v); 
+   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
@@ -3279,6 +3309,22 @@ async function setupMissionOnStart(code){
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
 
+// ★ #9：右2 + 数値2枚をDBに一度だけ確定（ホストのみ）
+try{
+  if ((v.mission?.id|0) === 9){
+    const amHost = (v?.hostId === state.userId);
+    const mRef = ref(db, `rooms/${code}/meta`);
+    const mSnap = await get(mRef);
+    const meta  = mSnap.val() || {};
+    if (amHost && (!meta.m9_rule || !Array.isArray(meta.m9_rule.nums))){
+      const deck = MATERIALS.numbers.slice(); shuffle(deck);
+      const nums = deck.slice(0,2);
+      await update(mRef, { m9_rule: { type:'right2', nums } });
+    }
+  }
+}catch(e){ console.error(e); }
+
+
 
   /* ここから追加：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
   if ((v.mission?.id|0) === 41) {
@@ -3331,16 +3377,22 @@ async function setupMissionOnStart(code){
 
 
   
-  // #9：右2 + ランダム数値2枚
-  if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
+  // #9：右2 + 数値2枚（DB同期版）
+if (flags.needsRuleRow && flags.rule?.type === 'R2with2'){
+  // 既存を除去（重複防止）
+  const old = document.getElementById('m9RuleRow');
+  if (old) old.remove();
+  const nums = v?.meta?.m9_rule?.nums;
+  if (Array.isArray(nums) && nums.length >= 2){
     const lane = buildNumLaneDOM([
       {kind:'rule', img: imgRule('right2')},
-      {kind:'num',  img: imgNumber(randNum())},
-      {kind:'num',  img: imgNumber(randNum())}
+      {kind:'num',  img: imgNumber(nums[0])},
+      {kind:'num',  img: imgNumber(nums[1])}
     ]);
+    lane.id = 'm9RuleRow';
     mountLaneUnderItemsBar(lane);
   }
-
+}
   // #11：パターン1（山札→めくる）
   if(flags.needsNumberLane && flags.pattern==='P1'){
     const lane = buildDeckLaneP1();
@@ -3373,51 +3425,30 @@ if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
 
   /* ▼▼ （#36：数値5枚を横一列） ▼▼ */
 // ここから追加（置換）
-    /* ▼▼ （#36：両端ブランク＋クリックで反対側に 2カードを出す＋同期） ▼▼ */
+  /* ▼▼ （#36：両端ブランク＋クリックで反対側に 2カードを出す） ▼▼ */
   if ((v.mission?.id|0) === 36){
+    // 既存があれば一度除去（再実行対策）
     const old36 = document.getElementById('m36NumRow');
     if (old36) old36.remove();
 
-    const lane36 = v?.meta?.lanes?.m36;
-    if (!lane36 && state.isHost){
-      const picks = pickUnusedNumbers(5);
-      writeLane('m36', {type:'m36', center: picks, rule: null});
-    }
+    // 中央の数値5枚を抽選
+    const picks = pickUnusedNumbers(5);  // 1..12 から未使用の5枚
 
-    const L = (state.watching?.meta?.lanes?.m36) || v?.meta?.lanes?.m36 || null;
-    if (!L) { /* 初期化待ち */ } 
-
+    // レーンDOMを手組み（buildNumLaneDOM を流用してもOKだがここは直書き）
     const lane = document.createElement('div');
     lane.className = 'numlane';
     lane.id = 'm36NumRow';
 
+    // 左ブランク（横向き）
     const leftBlank = document.createElement('div');
     leftBlank.className = 'rulecard';
-
-    const rightBlank = document.createElement('div');
-    rightBlank.className = 'rulecard';
+    leftBlank.id = 'm36LeftBlank';        // 背景なし＝ブランク横向き
 
     // 中央5枚
-    (L?.center||[]).forEach(n=>{
+    picks.forEach(n=>{
       const c = document.createElement('div');
       c.className = 'numcard';
       c.style.backgroundImage = `url('${imgNumber(n)}')`;
-      lane.appendChild(c);
-    });
-
-    // rule 反映
-    if (L?.rule === 'left2'){ rightBlank.style.backgroundImage = `url('${imgRule('left2')}')`; }
-    if (L?.rule === 'right2'){ leftBlank.style.backgroundImage = `url('${imgRule('right2')}')`; }
-
-    if (state.isHost){
-      rightBlank.onclick = ()=>{ writeLane('m36', {type:'m36', center: L?.center||[], rule: 'left2'}); };
-      leftBlank.onclick  = ()=>{ writeLane('m36', {type:'m36', center: L?.center||[], rule: 'right2'}); };
-    }
-
-    lane.insertBefore(leftBlank, lane.firstChild);
-    lane.appendChild(rightBlank);
-    mountLaneUnderItemsBar(lane);
-  }')`;
       lane.appendChild(c);
     });
 
@@ -3632,11 +3663,7 @@ function buildDeckLaneP1(){
   shuffle(deck);
   let rest = deck.length;
 
-  
-  const laneId = 'numP1';
-  let pileNums = [];
-  writeLane(laneId, {type:'numP1', pile:pileNums, rest});
-// 山札ボタンと残表示
+  // 山札ボタンと残表示
   const deckBtn = document.createElement('div');
   deckBtn.className='numdeck';
   deckBtn.title='めくる';
@@ -3726,9 +3753,7 @@ function buildConDeckLaneP1(){
   shuffle(deck);
   let rest = deck.length;
 
-  
-  const laneId='conP1'; let pileChars=[]; writeLane(laneId, {type:'conP1', pile:pileChars, rest});
-// 山札ボタンと残表示（数値P1と同じUI部品を流用）
+  // 山札ボタンと残表示（数値P1と同じUI部品を流用）
   const deckBtn = document.createElement('div');
   deckBtn.className = 'numdeck';   // 見た目は共通のデッキボタンでOK
   deckBtn.title = 'めくる';
@@ -3771,9 +3796,7 @@ function buildConDeckLaneP1(){
       // ★ ここまで変更
     };
 
-  
-  try{ pileChars.push(ch); writeLane(laneId, {type:'conP1', pile:pileChars.slice(), rest}); }catch(_){}
-deckBtn.onclick = ()=>{
+  deckBtn.onclick = ()=>{
     if (rest <= 0) return;
     const ch = deck.pop(); // 末尾から1枚
     rest -= 1;
@@ -3796,10 +3819,7 @@ function buildDeckLaneP1Pop123(){
   shuffle(deck);
   let rest = deck.length;
 
-  
-  const laneId='numP1pop'; let pileNums=[]; let rowNums=[];
-  writeLane(laneId, {type:'numP1pop', pile:pileNums, row:rowNums, rest});
-// UI部品
+  // UI部品
   const deckBtn = document.createElement('div');
   deckBtn.className = 'numdeck';
   deckBtn.title = 'めくる';
@@ -3841,12 +3861,16 @@ function buildDeckLaneP1Pop123(){
     lane.style.marginBottom = extraH + 'px';
   }
 
-  
-  
-  try{ pileNums.push(n); writeLane(laneId, {type:'numP1pop', pile:pileNums.slice(), row:rowNums.slice(), rest}); }catch(_){}
-try{ pileNums.push(n); writeLane(laneId, {type:'numP1', pile:pileNums.slice(), rest}); }catch(_){}
-// 横並び：常に希望枚数の上限で“リセットしてから”並べる
-  function setRowCards(list, max){ row.innerHTML=''; rowNums = list.slice(0, max).slice(); rowNums.forEach(n=>{ const nc=document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage = `url('${imgNumber(n)}')`; row.appendChild(nc); }); try{ writeLane(laneId, {type:'numP1pop', pile:pileNums.slice(), row:rowNums.slice(), rest}); }catch(_){} }
+  // 横並び：常に希望枚数の上限で“リセットしてから”並べる
+  function setRowCards(list, max){
+    row.innerHTML = '';                   // ←毎回クリア（累積しない）
+    list.slice(0, max).forEach(n=>{
+      const nc = document.createElement('div');
+      nc.className = 'numcard';
+      nc.style.backgroundImage = `url('${imgNumber(n)}')`;
+      row.appendChild(nc);
+    });
+  }
 
   function afterDraw(){
     restLbl.textContent = `残:${rest}`;
