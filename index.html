@@ -4446,10 +4446,11 @@ function renderM30(v){
           // ★ 以前の挙動に合わせる：常に「1枚目→右に積む」「残り→下段」
         const first = pick[0];
         const rest  = pick.slice(1);
+            // ★ 常に“最新のみ可視化”：前回表示は消し、今回分だけを保存
         const patch = {
-         m30_used: U.concat(pick),
-          m30_pile: [...P, first],
-          m30_row : rest   // 2なら1枚、3なら2枚が横並び
+          m30_used: U.concat(pick),  // 使用履歴は蓄積
+          m30_pile: [first],         // 右の公開札は常に1枚だけ（上書き）
+          m30_row : rest             // 下段は今回の残りだけ（置き換え）
         };
         await update(mRef, patch);
       }catch(e){ console.error(e); }
