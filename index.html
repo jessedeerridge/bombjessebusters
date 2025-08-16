@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>boえs</title>
+<title>boあrs</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -4341,8 +4341,7 @@ async function performM23Spread(){
     // 残っているアイテム（＝山札 - 捨て札）
     const deck = Array.isArray(meta.m23_deck)     ? meta.m23_deck.slice()     : [];
     const disc = Array.isArray(meta.m23_discards) ? meta.m23_discards.slice() : [];
-    const inItems = Array.isArray(R.items) ? R.items.map(i => i?.no|0) : [];
-+    const rest = deck.filter(n => !disc.includes(n) && !inItems.includes(n));
+    const rest = deck.filter(n => !disc.includes(n));
 
     // メタに確定（表示制御と、クライアント側で描画に使う配列）
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
@@ -4415,18 +4414,12 @@ function attachM23DeckUI(lane){
     const ready = Array.from(drawn).some(nn => (openCountByNum[nn]||0)===4);
 
     if (!meta.m23_spread && ready){
-    openOneMini(ev.clientX, ev.clientY, '広げる', async ()=>{
-     // 既存アイテムを残しつつ、重複しない“残り”だけを追記
-      const vNow = state.watching || {};
-      const exist = Array.isArray(vNow.items) ? vNow.items.slice() : [];
-     const existNos = new Set(exist.map(i => i?.no|0));
-      const add = remain
-        .filter(no => !existNos.has(no))
-       .map(no => ({ id: crypto.randomUUID(), no, used:false, faceUp:true }));
-      if (add.length > 0){
-        await set(ref(db, `rooms/${state.roomCode}/items`), exist.concat(add));
-      }
-      await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_spread:true });
+      openOneMini(ev.clientX, ev.clientY, '広げる', async ()=>{
+        const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
+        await Promise.all([
+          set(ref(db, `rooms/${state.roomCode}/items`), list),
+          update(ref(db, `rooms/${state.roomCode}/meta`), { m23_spread:true })
+        ]);
         // 展開後は右側積みはクリア
         pile.innerHTML = '';
         pile.style.height = cssNum('--item-h') + 'px';
