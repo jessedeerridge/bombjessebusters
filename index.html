@@ -3309,22 +3309,6 @@ async function setupMissionOnStart(code){
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
 
-// ★ #9：右2 + 数値2枚をDBに一度だけ確定（ホストのみ）
-try{
-  if ((v.mission?.id|0) === 9){
-    const amHost = (v?.hostId === state.userId);
-    const mRef = ref(db, `rooms/${code}/meta`);
-    const mSnap = await get(mRef);
-    const meta  = mSnap.val() || {};
-    if (amHost && (!meta.m9_rule || !Array.isArray(meta.m9_rule.nums))){
-      const deck = MATERIALS.numbers.slice(); shuffle(deck);
-      const nums = deck.slice(0,2);
-      await update(mRef, { m9_rule: { type:'right2', nums } });
-    }
-  }
-}catch(e){ console.error(e); }
-
-
 
   /* ここから追加：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
   if ((v.mission?.id|0) === 41) {
@@ -3377,22 +3361,16 @@ try{
 
 
   
-  // #9：右2 + 数値2枚（DB同期版）
-if (flags.needsRuleRow && flags.rule?.type === 'R2with2'){
-  // 既存を除去（重複防止）
-  const old = document.getElementById('m9RuleRow');
-  if (old) old.remove();
-  const nums = v?.meta?.m9_rule?.nums;
-  if (Array.isArray(nums) && nums.length >= 2){
+  // #9：右2 + ランダム数値2枚
+  if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
     const lane = buildNumLaneDOM([
       {kind:'rule', img: imgRule('right2')},
-      {kind:'num',  img: imgNumber(nums[0])},
-      {kind:'num',  img: imgNumber(nums[1])}
+      {kind:'num',  img: imgNumber(randNum())},
+      {kind:'num',  img: imgNumber(randNum())}
     ]);
-    lane.id = 'm9RuleRow';
     mountLaneUnderItemsBar(lane);
   }
-}
+
   // #11：パターン1（山札→めくる）
   if(flags.needsNumberLane && flags.pattern==='P1'){
     const lane = buildDeckLaneP1();
