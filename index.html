@@ -4443,13 +4443,14 @@ function renderM30(v){
         }
         if (pick.length < k) return; // 足りなければ何もしない
 
-        const patch = { m30_used: U.concat(pick) };
-        if (k===1){
-          patch.m30_pile = [...P, pick[0]]; // 右側に積む
-          patch.m30_row  = [];              // 横並びはクリア
-        }else{
-          patch.m30_row  = pick;            // 横並びに最新セットを“置き換え”
-        }
+          // ★ 以前の挙動に合わせる：常に「1枚目→右に積む」「残り→下段」
+        const first = pick[0];
+        const rest  = pick.slice(1);
+        const patch = {
+         m30_used: U.concat(pick),
+          m30_pile: [...P, first],
+          m30_row : rest   // 2なら1枚、3なら2枚が横並び
+        };
         await update(mRef, patch);
       }catch(e){ console.error(e); }
     };
