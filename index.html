@@ -637,7 +637,6 @@ function clearMissionOverlays(){
   document.querySelectorAll('.numlane').forEach(n => n.remove());
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
   document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
-  const m23 = document.getElementById('m23Row'); if (m23) m23.remove();
   // ★ ミッション22：情報トークン表を確実に消す
   const info22 = document.getElementById('info22');
   if (info22) info22.remove();
@@ -1009,7 +1008,6 @@ if (v) {
     renderM39(v);
     renderM9(v);
     renderM12(v);
-    renderM23(v);
     renderM42(v);
 
     // ▼ ホスト判定を最新化
@@ -4025,20 +4023,15 @@ function renderM12(v){
 /* ===== ★ #23：アイテム山（7枚）を数値山レーンの右側に表示 ===== */
 async function ensureM23MetaInit(){
   const v = state.watching; if(!v) return;
-  // 初期化はホストのみ。既にあれば何もしない
-  if (!state.isHost) return;
-  if (Array.isArray(v?.meta?.m23_deck)) return; // 既に初期化済み  const pool = itemDeckNumbers(v?.mission?.id || 23).slice(); // 1..13 or 1..12
+  if (Array.isArray(v?.meta?.m23_deck)) return; // 既に初期化済み
+  const pool = itemDeckNumbers(v?.mission?.id || 23).slice(); // 1..13 or 1..12
   shuffle(pool);
   const seven = pool.slice(0,7);
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
     m23_deck: seven,        // 山札（番号配列）
    m23_discards: [],       // 捨て札
     m23_spread: false,      // 広げたか？
-    m23_drawnNumbers: [],   // 数値山で表になった数値（公開済み）
-    // ★ 追加：#23 専用の「数値カード用デッキ」（1..12 を同期シャッフル）
-    m23_numDeck: (()=>{
-      const deck = MATERIALS.numbers.slice(); shuffle(deck); return deck;
-    })() 
+    m23_drawnNumbers: []    // 数値山で表になった数値
   });
 }
 
@@ -4226,99 +4219,6 @@ function renderM39(v){
   missionFooter.insertAdjacentElement('beforebegin', row);
 }
 
-
-/* ===== #23：左に「数値1枚公開用の山札」、右に「アイテム山札＋広げる」 ===== */
-function renderM23(v){
-  const isM23 = ((v?.mission?.id|0) === 23);
-  const rowId = 'm23Row';
-  const old = document.getElementById(rowId);
-  if (!isM23){ if (old) old.remove(); return; }
-
-  // メタ未準備ならホストが初期化して次回描画
-  if (!Array.isArray(v?.meta?.m23_deck) || !Array.isArray(v?.meta?.m23_numDeck)) {
-    ensureM23MetaInit(); if (old) old.remove(); return;
-  }
-
-  if (old) old.remove();
-  const lane = document.createElement('div');
-  lane.id = rowId;
-  lane.className = 'numlane';
-
-  /* --- 左：数値カード（1枚だけ公開） --- */
-  const deckBtn = document.createElement('div');
-  deckBtn.className = 'numdeck';
-  deckBtn.title = '1枚めくる';
-
-  // 公開先（1枚だけ置く）
-  const holder = document.createElement('div');
-  holder.className = 'numcard-holder';
-
-  // 既に公開済みなら表示してボタンを無効風に
-  const drawn = Array.isArray(v?.meta?.m23_drawnNumbers) ? v.meta.m23_drawnNumbers : [];
-  if (drawn.length > 0){
-    const card = document.createElement('div');
-    card.className = 'numcard';
-    card.style.backgroundImage = `url('${imgNumber(drawn[0])}')`;
-    holder.appendChild(card);
-    deckBtn.style.cursor = 'default';
-    deckBtn.title = '公開済み';
-  }
-
-  // クリックで1枚だけ公開（DBに保存 → 全員に同期）
-  deckBtn.onclick = async ()=>{
-    try{
-      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-      const mSnap = await get(mRef);
-      const meta  = mSnap.val()||{};
-      const D  = Array.isArray(meta.m23_numDeck) ? meta.m23_numDeck.slice() : [];
-      const Xs = Array.isArray(meta.m23_drawnNumbers) ? meta.m23_drawnNumbers.slice() : [];
-      if (Xs.length > 0) return; // 1枚だけ
-      const next = D.find(n => !Xs.includes(n));
-      if (next==null) return;
-      Xs.push(next);
-      await update(mRef, { m23_drawnNumbers: Xs });
-    }catch(e){ console.error(e); }
-  };
-
-  lane.appendChild(deckBtn);
-  lane.appendChild(holder);
-
-  /* --- 右：アイテム山札（7枚）＋ 広げる --- */
-  const spreadBtn = document.createElement('button');
-  spreadBtn.className = 'btn small';
-  spreadBtn.textContent = v?.meta?.m23_spread ? '広げた' : '広げる';
-  spreadBtn.disabled = !!v?.meta?.m23_spread;
-
-  const itemPile = document.createElement('div');
-  itemPile.className = 'numcard-holder';
-  itemPile.style.position = 'relative';
-  // 7枚の山を「裏面アート」で重ね表現（数だけ伝わればOK）
-  const total = (v?.meta?.m23_deck||[]).length - (v?.meta?.m23_discards||[]).length;
-  for(let i=0;i<Math.max(0,total);i++){
-    const node = document.createElement('div');
-    node.className = 'numcard';
-    node.style.backgroundImage = `url('./itemback.jpg')`;
-    if(i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; }
-    itemPile.appendChild(node);
-  }
-
-  // 「広げる」→ meta.m23_spread = true（Items側の表示がONになる）
-  spreadBtn.onclick = async ()=>{
-    try{
-      await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_spread: true });
-    }catch(e){ console.error(e); }
-  };
-
-  lane.appendChild(itemPile);
-  lane.appendChild(spreadBtn);
-
-  // アイテム列の直下に固定表示（itemsBar が非表示でもここは出す）
-  mountLaneUnderItemsBar(lane);
-}
-
-
-  
-  
   async function performM39Deal(){
   try{
     const rRef = ref(db, `rooms/${state.roomCode}`);
