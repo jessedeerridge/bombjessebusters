@@ -1021,6 +1021,7 @@ if (v) {
     renderM12(v);
     renderM15(v);
     renderM16(v);
+    renderM30(v);
     renderM23(v);
     renderM26(v);
     renderM42(v);
@@ -1332,22 +1333,15 @@ charCol.className = 'char-col';
 
 const char=document.createElement('div'); 
 char.className='char-card';
-      // ▼ ここを修正：観戦者（未着席ビューア） or 空席の席 はブランク固定
-      const viewerSeated = (document.body.getAttribute('data-seated') === 'yes'); // seatedNow と同義
-     const isOccupied   = !!t.playerId;
-      if (!viewerSeated || !isOccupied) {
-        // 観戦中ユーザー／空席→ブランク＆操作無効
-      char.classList.add('blank');
-        char.onclick = null;
-       char.removeAttribute('style');
-      } else {
-        // 自分が着席中かつ着席テーブル→従来どおり表示・反転可
-        const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-        char.style.backgroundImage = `url("${face}")`;
-        char.onclick = async () => {
-         await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), { flipped: !t.character?.flipped });
-        };
-     }
+if(!seatedAny){ 
+  char.classList.add('blank'); 
+}else{
+  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+  char.style.backgroundImage = `url("${face}")`;
+  char.onclick=async ()=>{ 
+    await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
+  };
+}
 
     if ((state.watching?.mission?.id|0) === 34 && t.playerId !== state.userId){
   // #34：自分以外はブランク表示・操作不可
@@ -4338,6 +4332,150 @@ function renderM15(v){
   mountLaneUnderItemsBar(lane);
 }
 
+
+/* ===== #30：数値カード山札（同期）─ 1/2/3枚ポップ対応 ===== */
+async function ensureM30MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if (((v?.mission?.id|0) !== 30)) return;
+  if (Array.isArray(v?.meta?.m30_deck)) return;  // 既に初期化済み
+  if (!state.isHost) return;                      // 初期化はホストのみ
+  const deck = MATERIALS.numbers.slice(); shuffle(deck); // 1..12 をシャッフル
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    m30_deck: deck,       // 山札順
+    m30_used: [],         // 山札から使用済み（1/2/3いずれもここに積む）
+    m30_pile: [],         // 1枚ドロー分（右の公開札に積み重ね表示）
+    m30_row:  []          // 2枚 or 3枚ドローの“横並び表示”の現行セット
+  });
+}
+
+function renderM30(v){
+  const isM30 = ((v?.mission?.id|0) === 30);
+  const rowId = 'm30Row';
+  const old   = document.getElementById(rowId);
+  if (!isM30){ if (old) old.remove(); return; }
+
+  // 初回：ホストが meta を用意（未用意なら用意して次の onValue で描画）
+  if (!Array.isArray(v?.meta?.m30_deck)){ ensureM30MetaInit(v); if (old) old.remove(); return; }
+
+  if (old) old.remove();
+  const lane = document.createElement('div');
+  lane.id = rowId;
+  lane.className = 'numlane';
+
+  // 山札ボタン + 残表示
+  const deckBtn = document.createElement('div');
+  deckBtn.className = 'numdeck';
+  deckBtn.title = 'めくる';
+
+  const restLbl = document.createElement('span');
+  restLbl.className = 'numrest';
+
+  // 右：1枚ドローの公開札（積み重ね）
+  const pile = document.createElement('div');
+  pile.className = 'numcard-holder';
+  pile.style.position = 'relative';
+
+  // 下：2/3枚ドローの横並び
+  const row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.gap = '6px';
+
+  lane.appendChild(deckBtn);
+  lane.appendChild(restLbl);
+  lane.appendChild(pile);
+  lane.appendChild(row);
+
+  // 描画リフレッシュ（#15/#39と同じ積み重ねロジック） 
+  const refresh = ()=>{
+    const d = (v?.meta?.m30_deck||[]);
+    const used = (v?.meta?.m30_used||[]);
+    const remain = d.filter(n => !used.includes(n)).length;
+    restLbl.textContent = `残:${remain}`;
+
+    // 右側：1枚公開札の積み重ね（2pxオフセット）
+    pile.innerHTML = '';
+    const xs = (v?.meta?.m30_pile||[]);
+    xs.forEach((n,i)=>{
+      const node = document.createElement('div');
+      node.className = 'numcard';
+      node.style.backgroundImage = `url('${imgNumber(n)}')`;
+      if (i>0){
+        const off = i*2;
+        node.style.position='absolute';
+        node.style.left = off+'px';
+        node.style.top  = off+'px';
+      }
+      pile.appendChild(node);
+      const extra = i*2;
+      pile.style.height = (48+extra)+'px';
+      lane.style.marginBottom = extra+'px';
+    });
+
+    // 下段：2/3ドローの横並び
+    row.innerHTML = '';
+    (v?.meta?.m30_row||[]).forEach(n=>{
+      const nc = document.createElement('div');
+      nc.className = 'numcard';
+      nc.style.backgroundImage = `url('${imgNumber(n)}')`;
+      row.appendChild(nc);
+    });
+  };
+  refresh();
+
+  // クリックで 1/2/3 を選ぶ（メニューは既存の openMenu を使用）
+  deckBtn.onclick = (ev)=>{
+    const d = (v?.meta?.m30_deck||[]);
+    const used = (v?.meta?.m30_used||[]);
+    const remain = d.filter(n => !used.includes(n)).length;
+
+    const make = (k)=> async ()=>{
+      try{
+        const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+        const mSnap = await get(mRef);
+        const meta  = mSnap.val()||{};
+        const D = Array.isArray(meta.m30_deck) ? meta.m30_deck.slice() : [];
+        const U = Array.isArray(meta.m30_used) ? meta.m30_used.slice() : [];
+        const P = Array.isArray(meta.m30_pile) ? meta.m30_pile.slice() : [];
+        // 山札順から未使用を k 枚取得
+        const pick = [];
+        for (const n of D){
+          if (!U.includes(n)){ pick.push(n); if (pick.length===k) break; }
+        }
+        if (pick.length < k) return; // 足りなければ何もしない
+
+        const patch = { m30_used: U.concat(pick) };
+        if (k===1){
+          patch.m30_pile = [...P, pick[0]]; // 右側に積む
+          patch.m30_row  = [];              // 横並びはクリア
+        }else{
+          patch.m30_row  = pick;            // 横並びに最新セットを“置き換え”
+        }
+        await update(mRef, patch);
+      }catch(e){ console.error(e); }
+    };
+
+    const rebuild = async ()=>{
+      try{
+        const deck = MATERIALS.numbers.slice(); shuffle(deck);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          m30_deck: deck, m30_used: [], m30_pile: [], m30_row: []
+        });
+      }catch(e){ console.error(e); }
+    };
+
+    const menu = [];
+    if (remain >= 1) menu.push({label:'1枚めくる（右に積む）', action: make(1)});
+    if (remain >= 2) menu.push({label:'2枚めくる（下に横並び）', action: make(2)});
+    if (remain >= 3) menu.push({label:'3枚めくる（下に横並び）', action: make(3)});
+    if (remain === 0) menu.push({label:'山札を作り直す', action: rebuild});
+    openMenu(ev.clientX, ev.clientY, menu);
+  };
+
+  // DOM設置：アイテム列の直下（他ミッションと同じ）
+  mountLaneUnderItemsBar(lane);
+}
+
+  
   
 /* ===== #39：左に X、右に数値P1山＋公開札、下に自分の受け取り数値 ===== */
 function renderM39(v){
