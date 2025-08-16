@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>あ</title>
+<title>あさ</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -4072,10 +4072,6 @@ function renderM23(v){
     lane.appendChild(nc);
   }
 
-  // 右：アイテム山札UI（※広げ済みは表示しない）
-  if (!(v?.meta?.m23_spread)) {
-    attachM23DeckUI(lane);
-  }
   // アイテム列の直下に設置（#39等と同じユーティリティ）
  mountLaneUnderItemsBar(lane);
 }  
@@ -4357,102 +4353,7 @@ async function performM23Spread(){
     console.error('performM23Spread', e);
   }
 }
-  
-function attachM23DeckUI(lane){
-  const deckBtn = document.createElement('div');
- deckBtn.className = 'numdeck';
-  deckBtn.style.backgroundImage = `url("./itemback.jpg")`;
-  const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
-  const refreshRest = ()=>{
-    const v=state.watching, meta=v?.meta||{};
-    const d=(meta.m23_deck||[]), x=(meta.m23_discards||[]);
-    const remain = d.filter(n=>!x.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
-  };
-  refreshRest();
-  lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
 
-  // ★ 追加：表向き捨て札の積み重ね表示（アイテム）
-  const pile = document.createElement('div');
-  pile.className = 'numcard-holder';
-  pile.style.position = 'relative';
-  pile.style.width = cssNum('--item-w') + 'px';
-  pile.style.height = cssNum('--item-h') + 'px';
-  lane.appendChild(pile);
-
-  const addToItemPile = (no)=>{
-    const already = pile.querySelectorAll('.item').length;
-    const node = document.createElement('div');
-    node.className = 'item';
-    node.style.backgroundImage = `url("./item${no}.jpg")`;
-    if(already>0){
-      const off = already * 2; // 数値山札と同じ2px刻み
-      node.style.position = 'absolute';
-      node.style.left = off + 'px';
-      node.style.top  = off + 'px';
-      // 見切れ防止：高さと下マージンを増やす
-      const baseH = cssNum('--item-h');
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
-    }
-    pile.appendChild(node);
-  };
-
-  // ★ 既存の捨て札を描画（リロード/再入室対策）
-  (state.watching?.meta?.m23_discards || []).forEach(addToItemPile);
-
-  deckBtn.onclick = async (ev)=>{
-    const v=state.watching, meta=v?.meta||{};
-    const d=(meta.m23_deck||[]), x=(meta.m23_discards||[]);
-    const remain = d.filter(n=>!x.includes(n));
-
-    // 「広げる」条件は従来通りポップで提示（指示は“めくる”のみポップ廃止）
-    const drawn = new Set(meta.m23_drawnNumbers||[]);
-    const openCountByNum = {};
-    (v.tables||[]).forEach(T=> (T.hand||[]).forEach(c=>{
-      if(c?.kind==='normal' && c.open===true){
-        const nn=c.num|0; openCountByNum[nn]=(openCountByNum[nn]||0)+1;
-      }
-    }));
-    const ready = Array.from(drawn).some(nn => (openCountByNum[nn]||0)===4);
-
-    if (!meta.m23_spread && ready){
-      openOneMini(ev.clientX, ev.clientY, '広げる', async ()=>{
-        const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
- await Promise.all([
-  set(ref(db, `rooms/${state.roomCode}/items`), list),
-   update(ref(db, `rooms/${state.roomCode}/meta`), { 
-     m23_spread: true,
-     m23_spreadRest: remain
-   })
- ]);
-        // 展開後は右側積みはクリア
-        pile.innerHTML = '';
-        pile.style.height = cssNum('--item-h') + 'px';
-        lane.style.marginBottom = '0px';
-        refreshRest();
-          // ★★★ ここから追加：アイテム山札UIを消滅させる ★★★
-        try{
-          deckBtn.onclick = null;              // 念のため無効化
-          if (restLbl?.parentNode) restLbl.remove();
-          if (pile?.parentNode)    pile.remove();
-          if (deckBtn?.parentNode) deckBtn.remove();
-        }catch(_){}
-    });
-      return;
-    }
-
-    // ★ 「めくる」は即時実行（ポップなし）
-    if (remain.length<=0) return;
-    const pick = remain[(Math.random()*remain.length)|0];
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_discards: (x||[]).concat(pick) });
-    addToItemPile(pick);  // 右側に表で重ねる
-    refreshRest();
-  };
-
-}
 
 /* ===== ★ #26：1〜12 を 3×4 で並べ、裏表をトグル ===== */
 function mountM26GridUnderItems(){
