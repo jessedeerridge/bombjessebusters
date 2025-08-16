@@ -4376,9 +4376,9 @@ function renderM30(v){
     };
 
     const menu = [];
-    if (remain >= 1) menu.push({label:'1枚めくる（右に積む）', action: make(1)});
-    if (remain >= 2) menu.push({label:'2枚めくる（下に横並び）', action: make(2)});
-    if (remain >= 3) menu.push({label:'3枚めくる（下に横並び）', action: make(3)});
+    if (remain >= 1) menu.push({label:'1', action: make(1)});
+    if (remain >= 2) menu.push({label:'2', action: make(2)});
+    if (remain >= 3) menu.push({label:'3', action: make(3)});
     if (remain === 0) menu.push({label:'山札を作り直す', action: rebuild});
     openMenu(ev.clientX, ev.clientY, menu);
   };
