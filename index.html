@@ -643,6 +643,119 @@ function clearMissionOverlays(){
   NUMCARD_REG.clear();
 }
 
+
+ * DB(meta.lanes)に「場の表示レーン」を統一管理して保存・描画する仕組み
+ * laneオブジェクトの基本形:
+ * { id, kind:'num'|'con'|'rule', parent:'cssセレクタ', htmlId:'DOMに付けるid',
+ *   cards:[{key, img, className}], note?:string }
+ */
+
+/* 保存系ヘルパ */
+async function lanes_setAll(lanesObj){
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { lanes: lanesObj||{} });
+}
+async function lanes_setLane(lane){      // upsert
+  const id = lane?.id; if(!id) return;
+  const cur = state.watching?.meta?.lanes || {};
+  const next = {...cur, [id]: lane};
+  await lanes_setAll(next);
+}
+async function lanes_removeLane(id){
+  const cur = state.watching?.meta?.lanes || {};
+  if(!(id in cur)) return;
+  const next = {...cur}; delete next[id];
+  await lanes_setAll(next);
+}
+async function lanes_clearAll(){
+  await lanes_setAll({});
+}
+
+/* 描画系：meta.lanes → DOM */
+function renderSyncedLanes(v){
+  const lanes = v?.meta?.lanes || {};
+  // 既存（同じhtmlId）を全て置き換え
+  Object.values(lanes).forEach(L=>{
+    const parent = document.querySelector(L.parent);
+    if(!parent) return;
+
+    // 既存を消してから生成
+    if(L.htmlId){
+      const old = document.getElementById(L.htmlId);
+      if(old) old.remove();
+    }
+
+    // kindごとにコンテナを作る
+    let wrap = document.createElement('div');
+    wrap.id = L.htmlId || '';
+    if(L.kind==='num'){
+      wrap.className = 'num-under';
+      // アイテム枚数に合わせスロットを作る想定
+      const items = document.querySelectorAll('#items .item');
+      const each = Math.max(1, L.eachCount|0);
+      let i = 0;
+      for(let s=0; s<items.length; s++){
+        const slot = document.createElement('div');
+        slot.className='slot';
+        for(let k=0;k<each;k++){
+          const C = L.cards[i++]; if(!C) break;
+          const holder = document.createElement('div');
+          holder.className='numcard-holder';
+          const card = document.createElement('div');
+          card.className = C.className || 'numcard';
+          if(C.img) card.style.backgroundImage = `url('${C.img}')`;
+          holder.appendChild(card);
+          slot.appendChild(holder);
+        }
+        wrap.appendChild(slot);
+      }
+      // itemsBarの「直後」に挿入（ローカル生成と同じ見た目）
+      const itemsBar = document.getElementById('itemsBar');
+      if(itemsBar) itemsBar.insertAdjacentElement('afterend', wrap);
+      return;
+    }
+
+    if(L.kind==='con'){
+      wrap.className = 'conlane';
+      L.cards.forEach(C=>{
+        const d = document.createElement('div');
+        d.className = C.className || 'concard';
+        if(C.img) d.style.backgroundImage = `url('${C.img}')`;
+        wrap.appendChild(d);
+      });
+      parent.appendChild(wrap);
+      return;
+    }
+
+    if(L.kind==='rule'){
+      wrap.className = 'numlane';
+      L.cards.forEach(C=>{
+        const d = document.createElement('div');
+        d.className = C.className || 'rulecard';
+        if(C.img) d.style.backgroundImage = `url('${C.img}')`;
+        wrap.appendChild(d);
+      });
+      parent.appendChild(wrap);
+      return;
+    }
+  });
+}
+
+/* 便利ショートカット：数値帯／制約帯／矢印帯をセット */
+async function setNumUnderLaneFromNumbers(laneId, numbers, eachCount=1){
+  const cards = numbers.map(n=>({ key:String(n), img: imgNumber(n), className:'numcard' }));
+  await lanes_setLane({ id:laneId, kind:'num', parent:'#itemsBar', htmlId:laneId, cards, eachCount });
+}
+async function setConstraintLane(laneId, parentSel, names){
+  // names：画像ファイル名（拡張子除く）や制約IDの配列
+  const cards = names.map(x=>({ key:String(x), img: imgConstraint(x), className:'concard' }));
+  await lanes_setLane({ id:laneId, kind:'con', parent:parentSel, htmlId:laneId, cards });
+}
+async function setRuleLane(laneId, parentSel, ruleNames){
+  // ruleNames: ['right2','left2','right4',...]
+  const cards = ruleNames.map(r=>({ key:r, img: imgRule(r), className:'rulecard' }));
+  await lanes_setLane({ id:laneId, kind:'rule', parent:parentSel, htmlId:laneId, cards });
+}
+  
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
   if (NUMCARD_REG.has(n)) {
@@ -667,41 +780,33 @@ function pickUnusedNumbers(count){
   return pool.slice(0, count);
 }
 
-/* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ【同期版】 === */
+/* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ === */
 function distributeNumbersToItemsCentered(eachCount=1){
   const itemsBar = document.getElementById('itemsBar');
   const items    = document.querySelectorAll('#items .item');
   if(!itemsBar || items.length===0) return;
 
+
+  if (state.isHost){
+    // 未使用数字から必要枚数ぶん抽選
+    const need  = items.length * Math.max(1, eachCount|0);
+    const picks = pickUnusedNumbers(need);   // 既存の未使用管理を活用
+    // lanesへ保存（idは用途が分かる任意名）
+    setNumUnderLaneFromNumbers('lane_numUnder', picks, eachCount);
+  }
+  
   // 既存を掃除（ミッションやり直し時の二重生成防止）
   const old = document.querySelector('.num-under');
   if(old) old.remove();
-
-  // ★ ここから同期ロジック：DB(meta.m12_under)に保存 → 全員がそれを描画
-  const v = state.watching || {};
-  const need = items.length * eachCount;
-  const plan = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under.slice() : null;
-
-  // ホストが一度だけ確定させる
-  if ((!plan || plan.length !== need) && state.isHost) {
-    // 未使用数字プールから必要枚数ぶん確定
-    const pool = MATERIALS.numbers.slice(); shuffle(pool);
-    const picks = pool.slice(0, need);
-    // DBに保存（他端末へ同期）
-    update(ref(db, `rooms/${state.roomCode}/meta`), { m12_under: picks });
-  }
-
-  // ここで最新のplanを読む（ホスト以外は onValue によりすぐ反映）
-  const use = (state.watching?.meta?.m12_under) || plan;
-  if (!Array.isArray(use) || use.length === 0) {
-    // まだホストが確定していない瞬間は何もしない（重複生成防止）
-    return;
-  }
 
   // レーンを作成してアイテム列の直下に挿入
   const under = document.createElement('div');
   under.className = 'num-under';
   itemsBar.insertAdjacentElement('afterend', under);
+
+  // 未使用数字から必要枚数ぶん抽選
+  const need  = items.length * eachCount;
+  const picks = pickUnusedNumbers(need);
 
   // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
   let p = 0;
@@ -711,12 +816,12 @@ function distributeNumbersToItemsCentered(eachCount=1){
     under.appendChild(slot);
 
     for(let k=0; k<eachCount; k++){
-      const n = use[p++]; if(n==null) break;
-      placeNumberCard(n, slot); // ← DBで確定した数字だけを描画
+      const n = picks[p++]; if(n==null) break;
+      // placeNumberCard は holder を作って mountParent に追加する
+      placeNumberCard(n, slot);
     }
   });
 }
-
 
 
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
@@ -986,7 +1091,7 @@ if (v) {
     return;
   }
 }    
-   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
+   renderItemsAndDi(v); renderSyncedLanes(v); renderM29(v); renderM31(v);  renderTables(v); 
      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
@@ -1115,9 +1220,6 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
       {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
     ]);
   };
-
-  /* ★ 追加：アイテム列直下の数値帯（共通・同期描画） */
-  distributeNumbersToItemsCentered(1);
 }
 
 /* ===== Global badge (item16) ===== */
