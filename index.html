@@ -3362,15 +3362,12 @@ async function setupMissionOnStart(code){
 
   
   // #9：右2 + ランダム数値2枚
-  if (flags.needsRuleRow && flags.rule?.type==='R2with2'){
-    // 一度だけDBに確定（ホストのみ書き込み）
-    ensureM9Row(v);
-    const nums = Array.isArray(v?.meta?.m9_row) ? v.meta.m9_row : [];
-    const cells = [
+  if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
+    const lane = buildNumLaneDOM([
       {kind:'rule', img: imgRule('right2')},
-      ...nums.map(n => ({kind:'num', img: imgNumber(n)}))
-    ];
-    const lane = buildNumLaneDOM(cells);
+      {kind:'num',  img: imgNumber(randNum())},
+      {kind:'num',  img: imgNumber(randNum())}
+    ]);
     mountLaneUnderItemsBar(lane);
   }
 
@@ -3946,19 +3943,6 @@ async function ensureM23MetaInit(){
     m23_drawnNumbers: []    // 数値山で表になった数値
   });
 }
-/* ===== #9：右2と数値2枚を同期用にメタへ一度だけ保存 ===== */
-async function ensureM9Row(vNow){
- const v = vNow || state.watching; if(!v) return;
-  // 既に保存済みなら何もしない
-  if (Array.isArray(v?.meta?.m9_row) && v.meta.m9_row.length === 2) return;
-  // 競合回避：基本はホストのみが確定
-  if (!state.isHost) return;
- // 1..12 から2枚（重複なし）
-  const deck = MATERIALS.numbers.slice(); shuffle(deck);
-  const picks = deck.slice(0,2);
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m9_row: picks });
-}
-  
 /* ===== #39：左に X、右に数値P1山＋公開札、下に自分の受け取り数値 ===== */
 function renderM39(v){
   const isM39 = ((v?.mission?.id|0) === 39);
