@@ -983,10 +983,7 @@ if (v) {
     state.gameStarted=!!v?.started;
 renderM39(v);
     renderM42(v);
-    // ▼ 追加：数値カードの同期表示（ミッション個別 renderM）
-    renderM9(v); renderM12(v); renderM15(v); renderM17(v); renderM18(v);
-    renderM23(v); renderM26(v); renderM30(v); renderM32(v); renderM36(v); renderM37(v);
-
+   renderSyncedNumbers(v); // ★追加：#9,12,15,17,18,23,26,30,32,36,37 の数値P1レーンを同期描画
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -4048,6 +4045,70 @@ function renderM39(v){
   missionFooter.insertAdjacentElement('beforebegin', row);
 }
 
+const SYNC_MISSIONS = new Set([9,12,15,17,18,23,26,30,32,36,37]);
+
+async function ensureSyncedNumMeta(v, id){
+  if (!state.isHost) return;                             // 初期化はホストのみ
+  const mkey = `m${id}_deck`;
+  const xkey = `m${id}_discards`;
+  const meta = v?.meta || {};
+  if (Array.isArray(meta[mkey])) return;                 // 既に初期化済み
+  const deck = MATERIALS.numbers.slice(); shuffle(deck); // 1..12
+ await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    [mkey]: deck, [xkey]: []
+  });
+}
+
+function renderSyncedNumbers(v){
+  const id = v?.mission?.id|0;
+ const laneId = `m${id}Row`;
+  const old = document.getElementById(laneId);
+  if (!SYNC_MISSIONS.has(id)){ if (old) old.remove(); return; }
+
+  // レーン作り直し
+  if (old) old.remove();
+  const lane = document.createElement('div');
+  lane.id = laneId;
+ lane.className = 'numlane';
+
+  // 中央：山札（残表示）
+  const deckBtn = document.createElement('div'); deckBtn.className='numdeck'; deckBtn.title='めくる';
+  const restLbl = document.createElement('span'); restLbl.className='numrest';
+  const pile    = document.createElement('div'); pile.className='numcard-holder'; pile.style.position='relative';
+  lane.appendChild(deckBtn); lane.appendChild(restLbl); lane.appendChild(pile);
+
+  const refresh = ()=>{
+    const d = (v?.meta?.[`m${id}_deck`]||[]);
+   const x = (v?.meta?.[`m${id}_discards`]||[]);
+    const remain = d.filter(n=>!x.includes(n)).length;
+    restLbl.textContent = `残:${remain}`;
+    pile.innerHTML='';
+    x.forEach((n,i)=>{
+      const node=document.createElement('div'); node.className='numcard'; node.style.backgroundImage=`url('${imgNumber(n)}')`;
+      if(i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; }
+      pile.appendChild(node);
+      const extra = i*2; pile.style.height=(48+extra)+'px'; lane.style.marginBottom=extra+'px';
+    });
+  };
+ refresh();
+
+  deckBtn.onclick = async ()=>{
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const snap = await get(mRef); const meta = snap.val()||{};
+     const D  = Array.isArray(meta[`m${id}_deck`]) ? meta[`m${id}_deck`].slice() : [];
+      const Xs = Array.isArray(meta[`m${id}_discards`]) ? meta[`m${id}_discards`].slice() : [];
+    const next = D.find(n => !Xs.includes(n)); if(next==null) return;
+      Xs.push(next);
+      await update(mRef, { [`m${id}_discards`]: Xs });
+    }catch(e){ console.error(e); }
+  };
+  // 初期化（ホストのみ実行 / 既存なら無視）
+ ensureSyncedNumMeta(v, id);
+  mountLaneUnderItemsBar(lane);
+}
+  
+
   async function performM39Deal(){
   try{
     const rRef = ref(db, `rooms/${state.roomCode}`);
@@ -4723,87 +4784,6 @@ function missionInfo(id, opts={}){
 
 // 画面タップで各種ポップは外側タップで消える
  document.addEventListener('click',(e)=>{ if(!miniPop.contains(e.target)) H(miniPop,true); }, true);
-
-/* ===== 追加：数値カード 同期レーン（ミッション個別 renderM 用） ===== */
-async function ensureNumMetaInit(mNo){
-  try{
-    const v = state?.watching; if(!v || !state?.roomCode) return;
-    const meta = v.meta || {};
-    const deckKey = `m${mNo}_deck`, discKey = `m${mNo}_discards`;
-    if (Array.isArray(meta[deckKey]) && Array.isArray(meta[discKey])) return;
-    const pool = MATERIALS.numbers.slice(); shuffle(pool);
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { [deckKey]: pool, [discKey]: [] });
-  }catch(e){ console.error(e); }
-}
-
-function renderNumLaneForMission(v, mNo){
-  const isTarget = ((v?.mission?.id|0) === (mNo|0));
-  const rowId = `m${mNo}Row`;
-  const old = document.getElementById(rowId);
-  if (!isTarget){ if (old) old.remove(); return; }
-
-  if (old) old.remove();
-  const lane = document.createElement('div');
-  lane.id = rowId;
-  lane.className = 'numlane';
-
-  const deckBtn = document.createElement('div'); deckBtn.className='numdeck'; deckBtn.title='めくる';
-  const restLbl = document.createElement('span'); restLbl.className='numrest';
-  const pile = document.createElement('div'); pile.className='numcard-holder'; pile.style.position='relative';
-  lane.appendChild(deckBtn); lane.appendChild(restLbl); lane.appendChild(pile);
-
-  const refresh = ()=>{
-    const meta = v?.meta || {};
-    const D = meta[`m${mNo}_deck`] || [];
-    const X = meta[`m${mNo}_discards`] || [];
-    const remain = D.filter(n => !X.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
-    pile.innerHTML='';
-    X.forEach((n,i)=>{
-      const node = document.createElement('div');
-      node.className = 'numcard';
-      node.style.backgroundImage = `url('${imgNumber(n)}')`;
-      if(i>0){
-        const off = i*2;
-        node.style.position='absolute';
-        node.style.left = off+'px';
-        node.style.top  = off+'px';
-        pile.style.height = (48+off)+'px';
-        lane.style.marginBottom = off+'px';
-      }
-      pile.appendChild(node);
-    });
-  };
-  refresh();
-
-  deckBtn.onclick = async ()=>{
-    try{
-      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-      const snap = await get(mRef);
-      const meta = snap.val() || {};
-      const D = Array.isArray(meta[`m${mNo}_deck`]) ? meta[`m${mNo}_deck`].slice() : [];
-      const X = Array.isArray(meta[`m${mNo}_discards`]) ? meta[`m${mNo}_discards`].slice() : [];
-      const next = D.find(n => !X.includes(n)); if (next==null) return;
-      X.push(next);
-      await update(mRef, { [`m${mNo}_discards`]: X });
-    }catch(e){ console.error(e); }
-  };
-
-  mountLaneUnderItemsBar(lane);
-}
-
-function renderM9(v){ if ((v?.mission?.id|0)===9)  ensureNumMetaInit(9);  renderNumLaneForMission(v,9);  }
-function renderM12(v){ if ((v?.mission?.id|0)===12) ensureNumMetaInit(12); renderNumLaneForMission(v,12); }
-function renderM15(v){ if ((v?.mission?.id|0)===15) ensureNumMetaInit(15); renderNumLaneForMission(v,15); }
-function renderM17(v){ if ((v?.mission?.id|0)===17) ensureNumMetaInit(17); renderNumLaneForMission(v,17); }
-function renderM18(v){ if ((v?.mission?.id|0)===18) ensureNumMetaInit(18); renderNumLaneForMission(v,18); }
-function renderM23(v){ if ((v?.mission?.id|0)===23) ensureNumMetaInit(23); renderNumLaneForMission(v,23); }
-function renderM26(v){ if ((v?.mission?.id|0)===26) ensureNumMetaInit(26); renderNumLaneForMission(v,26); }
-function renderM30(v){ if ((v?.mission?.id|0)===30) ensureNumMetaInit(30); renderNumLaneForMission(v,30); }
-function renderM32(v){ if ((v?.mission?.id|0)===32) ensureNumMetaInit(32); renderNumLaneForMission(v,32); }
-function renderM36(v){ if ((v?.mission?.id|0)===36) ensureNumMetaInit(36); renderNumLaneForMission(v,36); }
-function renderM37(v){ if ((v?.mission?.id|0)===37) ensureNumMetaInit(37); renderNumLaneForMission(v,37); }
-
 </script>
 </body>
 </html>
