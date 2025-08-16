@@ -709,7 +709,59 @@ function distributeNumbersToItemsCentered(eachCount=1){
   });
 }
 
+/* ===== M12：各アイテムの真下に「数値カードを1枚ずつ」同期表示 ===== */
+async function renderM12(v){
+  // ミッション12以外では帯を掃除して終了
+  if (!v?.started || ((v?.mission?.id|0) !== 12)) {
+    const old = document.querySelector('.num-under'); if (old) old.remove();
+    return;
+  }
+  const itemsBar = document.getElementById('itemsBar');
+  const itemsElList = document.querySelectorAll('#items .item');
+  if (!itemsBar || itemsElList.length === 0) return;
 
+  // 既存を掃除（やり直し・再描画での重複防止）
+  const old = document.querySelector('.num-under'); if (old) old.remove();
+
+  // DB上の確定マップを参照（キー=アイテム番号 it.no）
+  let m = v?.meta?.m12_map || null;
+
+  // 未確定ならホストが一度だけ確定して保存（“クライアント差”を排除）
+  if (!m && state.isHost) {
+    const itemList = Array.isArray(v.items) ? v.items.slice() : [];
+    const count = Math.min(itemList.length, MATERIALS.numbers.length);
+    const pool = MATERIALS.numbers.slice();
+    shuffle(pool);
+    m = {};
+    for (let i=0; i<count; i++){
+      const it = itemList[i];
+      const key = (it && it.no != null) ? String(it.no) : String(i);
+      m[key] = pool[i];
+    }
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m12_map: m });
+  }
+  // 非ホストは確定前は待つ
+  if (!m) return;
+
+  // 帯DOMを生成して、アイテム列のすぐ下に配置
+  const under = document.createElement('div');
+  under.className = 'num-under';
+  itemsBar.insertAdjacentElement('afterend', under);
+
+  // v.items の順にスロットを作り、対応する it.no の数字があれば置く
+  const list = Array.isArray(v.items) ? v.items : [];
+  list.forEach((it, idx)=>{
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    under.appendChild(slot);
+    const key = (it && it.no != null) ? String(it.no) : String(idx);
+    const n = m[key];
+    if (Number.isInteger(n)) placeNumberCard(n, slot);
+  });
+}
+
+
+  
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
 function pickK(arr, k){
   const a = arr.slice(); shuffle(a);
@@ -1145,53 +1197,6 @@ function renderHostTool(v){
   H(hostTool, !hasOdd);
 }
 hostTool.onclick = ()=> alert('全体公開されている通常コードの枚数に奇数が含まれています。');
-
- /* ===== M12：各アイテムの真下に「数値カードを1枚ずつ」同期表示 ===== */
- async function renderM12(v){
-   // 条件：ゲーム開始中 & ミッション12 & アイテム列が表示されている
-   if (!v?.started || (v?.mission?.id|0) !== 12) {
-     // 他ミッション時は帯を掃除（やり直し・切替での残留防止）
-     const old = document.querySelector('.num-under'); if (old) old.remove();
-    return;
-   }
-   const itemsBar = document.getElementById('itemsBar');
-   const items    = document.querySelectorAll('#items .item');
-   if (!itemsBar || items.length === 0) return;
-  // すでに表示があるなら一度掃除してから再生成（重複防止）
-   const old = document.querySelector('.num-under'); if (old) old.remove();
-
-   // DB上の確定済み数字を参照（無ければホストが一度だけ確定）
-   const fixed = Array.isArray(v?.meta?.m12Numbers) ? v.meta.m12Numbers : null;
-   let numbers = fixed;
-
-   if (!numbers || numbers.length !== items.length) {
-     if (state.isHost) {
-       // まだ未確定：未使用からアイテム数ぶん抽選してDBに保存（1アイテム=1枚）
-      const picks = pickUnusedNumbers(items.length);
-       // 念のため長さを揃える
-     numbers = picks.slice(0, items.length);
-       await update(ref(db, `rooms/${state.roomCode}/meta`), { m12Numbers: numbers });
-    } else {
-       // 非ホストは、ホストが確定するまで待つ（描画は行わない）
-       return;
-     }
-   }
-
-   // 帯DOMを作る（アイテムの“外側の真下”に並べる）
-   const under = document.createElement('div');
-  under.className = 'num-under';
-   // itemsBar の直後に配置
-   itemsBar.insertAdjacentElement('afterend', under);
-
-   // アイテムの数だけスロットを作り、確定数字を1枚ずつ描画
-  numbers.forEach((n, idx)=>{
-     const slot = document.createElement('div');
-     slot.className = 'slot';
-     under.appendChild(slot);
-     // placeNumberCard は同一番号の重複生成を防ぐ（NUMCARD_REGで管理）
-     if (Number.isInteger(n)) placeNumberCard(n, slot);
-   });
- }
 
 
   
