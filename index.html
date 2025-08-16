@@ -3425,9 +3425,7 @@ async function setupMissionOnStart(code){
   }
   
   // #12：各アイテムの中央下に「1枚ずつ」固定配置
-  if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
-    distributeNumbersToItemsCentered(1); // 一枚ずつ
-  }
+
 
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
 if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
@@ -3986,35 +3984,45 @@ function buildFixedLane(list){
   }
 
 
-  /* ===== #12：各アイテムの“真下”に1枚ずつ（同期表示） ===== */
-  function renderM12(v){
-    const isM12 = ((v?.mission?.id|0) === 12);
-    const oldUnder = document.querySelector('.num-under');
-    if (!isM12){ if (oldUnder) oldUnder.remove(); return; }
+function renderM12(v){
+  const isM12 = ((v?.mission?.id|0) === 12);
+  const old = document.getElementById('m12UnderRow');
+  if (!isM12){ if (old) old.remove(); return; }
 
-  const arr = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under : null;
-    if (!arr || arr.length === 0) return; // 未準備なら次の onValue で
+  const itemsBar = document.getElementById('itemsBar');
+  const items    = document.querySelectorAll('#items .item');
+  const arr      = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under.slice(0, items.length) : null;
 
-    const itemsBar = document.getElementById('itemsBar');
-    const items    = document.querySelectorAll('#items .item');
-    if (!itemsBar || items.length === 0) return;
-    if (oldUnder) oldUnder.remove();
+  // アイテムがまだ描画されていない／meta 未準備の瞬間はスキップ（次の onValue で描画）
+  if (!itemsBar || items.length === 0 || !arr || arr.length < items.length) return;
 
-    const under = document.createElement('div');
-    under.className = 'num-under';
-    itemsBar.insertAdjacentElement('afterend', under);
+  if (old) old.remove();
 
-    // アイテム順に、対応する数字を1枚ずつ配置
-    items.forEach((_, i)=>{
-      const n = arr[i];
-      const slot = document.createElement('div');
-     slot.className = 'slot';
-      under.appendChild(slot);
-      if (Number.isInteger(n)) {
-       placeNumberCard(n, slot);
-      }
-    });
-  }
+  const under = document.createElement('div');
+  under.id = 'm12UnderRow';
+  under.className = 'num-under';          // 既存CSS。アイテム外側の真下に横並びで配置 :contentReference[oaicite:4]{index=4}
+
+  arr.forEach(n=>{
+    const slot   = document.createElement('div');
+    slot.className = 'slot';
+
+    const holder = document.createElement('div');  // 既存のカード枠（重ね表現と整合）
+    holder.className = 'numcard-holder';           // :contentReference[oaicite:5]{index=5}
+
+    const card   = document.createElement('div');
+    card.className = 'numcard';
+    card.style.backgroundImage = `url('${imgNumber(n)}')`;
+
+    holder.appendChild(card);
+    slot.appendChild(holder);
+    under.appendChild(slot);
+
+    // 他のレーンと同じユニーク管理に合わせる（同数の多重表示を避ける仕様）
+    NUMCARD_REG.set(n, holder);                    // :contentReference[oaicite:6]{index=6}
+  });
+
+  itemsBar.insertAdjacentElement('afterend', under); // 既存ユーティリティ相当の挿入位置 :contentReference[oaicite:7]{index=7}
+}
 
   
  
