@@ -1008,6 +1008,7 @@ if (v) {
     renderM39(v);
     renderM9(v);
     renderM12(v);
+    renderM15(v);
     renderM23(v);
     renderM42(v);
 
@@ -3432,7 +3433,7 @@ async function setupMissionOnStart(code){
 
 
   // #11：パターン1（山札→めくる）
-  if(flags.needsNumberLane && flags.pattern==='P1'){
+ if(flags.needsNumberLane && flags.pattern==='P1' && ((v.mission?.id|0)!==15)){
     const lane = buildDeckLaneP1();
     mountLaneUnderItemsBar(lane);
   }
@@ -4177,6 +4178,93 @@ async function ensureM23MetaInit(){
     // アイテム列の直下に設置（既存ユーティリティ使用）
     mountLaneUnderItemsBar(lane);
   }
+
+/* ===== #15：数値カード山札（同期表示｜#39/#18に準拠） ===== */
+async function ensureM15MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if (Array.isArray(v?.meta?.m15_deck)) return;   // 既に初期化済み
+  if (!state.isHost) return;                       // 初期化はホストのみ
+  const deck = MATERIALS.numbers.slice(); shuffle(deck); // 1..12 をシャッフル
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    m15_deck: deck,
+    m15_discards: []
+  });
+}
+
+function renderM15(v){
+  const isM15 = ((v?.mission?.id|0) === 15);
+  const rowId = 'm15Row';
+  const old   = document.getElementById(rowId);
+  if (!isM15){ if (old) old.remove(); return; }
+  // 初回のみホストがメタを準備（未用意なら用意して次のonValueで描画）
+  if (!Array.isArray(v?.meta?.m15_deck)) { ensureM15MetaInit(v); if (old) old.remove(); return; }
+
+  if (old) old.remove();
+  const lane = document.createElement('div');
+  lane.id = rowId;
+  lane.className = 'numlane';
+
+  // 山札（数値）ボタンと残枚数
+  const deckBtn = document.createElement('div');
+  deckBtn.className = 'numdeck';
+  deckBtn.title = 'めくる';
+
+  const restLbl = document.createElement('span');
+  restLbl.className = 'numrest';
+
+  // 公開札の積み重ね
+  const pile = document.createElement('div');
+  pile.className = 'numcard-holder';
+  pile.style.position = 'relative';
+
+  lane.appendChild(deckBtn);
+  lane.appendChild(restLbl);
+  lane.appendChild(pile);
+
+  const refresh = ()=>{
+    const d = (v?.meta?.m15_deck||[]);
+    const x = (v?.meta?.m15_discards||[]);
+    const remain = d.filter(n=>!x.includes(n)).length;
+    restLbl.textContent = `残:${remain}`;
+
+    pile.innerHTML = '';
+    x.forEach((n, i)=>{
+      const node = document.createElement('div');
+      node.className = 'numcard';
+      node.style.backgroundImage = `url('${imgNumber(n)}')`;
+      if (i>0){
+        const off = i*2;
+        node.style.position='absolute';
+        node.style.left = off+'px';
+        node.style.top  = off+'px';
+      }
+      pile.appendChild(node);
+      const extra = i*2;
+      pile.style.height = (48+extra)+'px';
+      lane.style.marginBottom = extra+'px';
+    });
+  };
+  refresh();
+
+  // 1枚めくって公開札へ → DB(meta.m15_discards) を更新（全員に即同期）
+  deckBtn.onclick = async ()=>{
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const mSnap = await get(mRef);
+      const meta  = mSnap.val()||{};
+      const D = Array.isArray(meta.m15_deck) ? meta.m15_deck.slice() : [];
+      const Xs = Array.isArray(meta.m15_discards) ? meta.m15_discards.slice() : [];
+      const next = D.find(n=> !Xs.includes(n)); // 山札順で次
+      if (next==null) return;
+      Xs.push(next);
+      await update(mRef, { m15_discards: Xs });
+    }catch(e){ console.error(e); }
+  };
+
+  // DOM設置：アイテム列の直下
+  mountLaneUnderItemsBar(lane);
+}
+
   
 /* ===== #39：左に X、右に数値P1山＋公開札、下に自分の受け取り数値 ===== */
 function renderM39(v){
