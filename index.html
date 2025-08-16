@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>いrs</title>
+<title>bomb busters</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -981,7 +981,6 @@ if (v) {
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
-    renderM9(v);
 renderM39(v);
     renderM42(v);
 
@@ -2019,43 +2018,6 @@ function renderM29(v){
   }
 }
 
-/* ここから追加：#9 描画（全員共通：右2＋数値2をアイテム下に） */
-function renderM9(v){
-  const isM9 = ((v?.mission?.id|0) === 9) && (v?.mission?.flags?.m9_underTwo);
-  // 既存の帯を掃除（他ミッションの名残を消す）
-  document.querySelectorAll('.num-under').forEach(n => n.remove());
-  if (!isM9) return;
-
-  const bar = document.getElementById('itemsBar');
-  const items = document.querySelectorAll('#items .item');
-  const layout = Array.isArray(v?.meta?.m9_layout) ? v.meta.m9_layout : [];
-  if (!bar || items.length===0 || layout.length===0) return;
-  const under = document.createElement('div');
-  under.className = 'num-under';
-  bar.insertAdjacentElement('afterend', under);
-  // アイテムスロット数に合わせて並べる
-  for(let i=0;i<items.length;i++){
-    const slot = document.createElement('div');
-   slot.className = 'slot';
-    const plan = layout[i] || layout[0] || {nums:[]};
-
-    // 左に横向きの「右2」ルールカード
-    const rc = document.createElement('div');
-    rc.className = 'rulecard';
-    rc.style.backgroundImage = `url('${imgRule('right2')}')`;
-    slot.appendChild(rc);
-
-    // 右側に数値カード2枚（互いに異なる想定）
-    (plan.nums||[]).slice(0,2).forEach(n=>{
-      const nc = document.createElement('div');
-      nc.className = 'numcard';
-      nc.style.backgroundImage = `url('${imgNumber(n)}')`;
-     slot.appendChild(nc);
-    });
-
-    under.appendChild(slot);
-  }
-}
 
 
   
@@ -3342,26 +3304,11 @@ const items = pool
 }
 
 /* ==== ミッション開始時セットアップ ==== */
-  /* ===== #9：右2＋数値2（全員共通レイアウト）を初期化 ===== */
-  if ((v.mission?.id|0) === 9 && flags.m9_underTwo) {
-    try{
-      const tRef = ref(db, `rooms/${code}`);
-      const old = (await get(tRef)).val() || {};
-      const meta = old.meta || {};
-      if (!Array.isArray(meta.m9_layout)) {
-        const itemCount = (old.items||[]).length|0;
-        const layout = [];
-        for(let i=0;i<itemCount;i++){
-          // 互いに異なる2枚を選ぶ（全体での重複は許容）
-          const pool = MATERIALS.numbers.slice(); shuffle(pool);
-          const n1 = pool.shift();
-          const n2 = pool.find(x => x!==n1);
-         layout.push({ nums:[n1, n2] });
-        }
-        await update(ref(db, `rooms/${code}/meta`), { m9_layout: layout });
-      }
-    }catch(e){ console.error('m9 init', e); }
-  }
+async function setupMissionOnStart(code){
+  const snap = await get(ref(db, `rooms/${code}`));
+  const v = snap.val(); if(!v?.mission) return;
+  const flags = v.mission.flags || {};
+
 
   /* ここから追加：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
   if ((v.mission?.id|0) === 41) {
@@ -4331,7 +4278,7 @@ function missionInfo(id, opts={}){
           '最初に左にあるカードを切断しなければ、右にあるカードを切断できない。',
           '手番に切断できるコードがなければ起爆ダイヤルを1進める。'
         ],
-          flags: { m9_underTwo:true }
+        flags: { needsRuleRow:true, rule: { type:'R2with2', rightCount:2 } }
       };
     }
     case 10: {
