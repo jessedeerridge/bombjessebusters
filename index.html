@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>boああsters</title>
+<title>bomb busters</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -682,19 +682,9 @@ function distributeNumbersToItemsCentered(eachCount=1){
   under.className = 'num-under';
   itemsBar.insertAdjacentElement('afterend', under);
 
-  // ▼▼ 同期化：ミッションごとに固定キーを用意
-  const v   = state.watching;
-  const mid = v?.mission?.id | 0;
-  const key = `m${mid}_numUnder`;  // [n1,n2,...] スロット順
-  const need = items.length * eachCount;
- let picks = Array.isArray(v?.meta?.[key]) ? v.meta[key] : null;
-  // ホストが未設定なら確定してDBに保存
-  if ((!picks || picks.length !== need) && state.isHost) {
-    const pool = MATERIALS.numbers.slice(); shuffle(pool);
-    picks = pool.slice(0, need);
-    update(ref(db, `rooms/${state.roomCode}/meta`), { [key]: picks }).catch(console.error);
- }
-  picks = Array.isArray(picks) ? picks.slice(0, need) : [];
+  // 未使用数字から必要枚数ぶん抽選
+  const need  = items.length * eachCount;
+  const picks = pickUnusedNumbers(need);
 
   // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
   let p = 0;
@@ -993,7 +983,13 @@ if (v) {
     state.gameStarted=!!v?.started;
 renderM39(v);
     renderM42(v);
-
+    // ▼ 追加：#9,#12,#15,#17,#18,#23,#26,#30,#32,#36,#37 の数値P1レーンを同期表示
+    //    初回のみmetaを用意 → 各フレームで描画＆同期
+    [9,12,15,17,18,23,26,30,32,36,37].forEach(async (mid)=>{
+     if ((v?.mission?.id|0)===mid) await ensureNumMetaInit(mid);
+      renderNumLaneP1Synced(v, mid);
+    });
+ 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
 
@@ -3924,23 +3920,12 @@ function buildDeckLaneP1Pop123(){
 /* パターン2：デッキからn枚→並べる（アイテム下） */
 function buildDeckLaneP2(n=2){
   const lane = document.createElement('div'); lane.className='numlane';
-  const v = state.watching;
-  const mid = v?.mission?.id | 0;
- const key = `m${mid}_p2lane`;  // ← ミッションごとの固定キー
-  let picks = Array.isArray(v?.meta?.[key]) ? v.meta[key] : null;
-  // 初期化：ホストだけが1回だけ決定 → DBへ保存（全員同期）
-  if (!picks && state.isHost) {
-    const deck = MATERIALS.numbers.slice(); shuffle(deck);
-    picks = deck.slice(0, n);
-   // 非同期だが即描画もしつつDBへ書き込み（次のonValueで全員揃う）
-    update(ref(db, `rooms/${state.roomCode}/meta`), { [key]: picks }).catch(console.error);
-  }
-  (picks || []).slice(0, n).forEach(x=>{
-    const nc = document.createElement('div');
-   nc.className = 'numcard';
-    nc.style.backgroundImage = `url('${imgNumber(x)}')`;
+  const deck = MATERIALS.numbers.slice(); shuffle(deck);
+  const picks = deck.slice(0, n);
+  picks.forEach(x=>{
+    const nc = document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=`url('${imgNumber(x)}')`;
     lane.appendChild(nc);
- });
+  });
   return lane;
 }
 
@@ -3964,6 +3949,59 @@ async function ensureM23MetaInit(){
     m23_drawnNumbers: []    // 数値山で表になった数値
   });
 }
+
+/* ===== 追加：汎用 数値P1同期レーン（ミッションIDごとにデッキ/捨て札をmetaへ） ===== */
+async function ensureNumMetaInit(mNo){
+  const v = state.watching; if(!v) return;
+  const meta = v?.meta || {};
+  const deckKey = `m${mNo}_deck`, discKey = `m${mNo}_discards`;
+  if (Array.isArray(meta[deckKey])) return; // 初期化済み
+  const pool = MATERIALS.numbers.slice(); shuffle(pool);
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    [deckKey]: pool, [discKey]: []
+  });
+}
+
+function renderNumLaneP1Synced(v, mNo){
+  const isTarget = ((v?.mission?.id|0) === (mNo|0));
+  const rowId = `m${mNo}NumRow`;
+  const old = document.getElementById(rowId);
+  if (!isTarget){ if (old) old.remove(); return; }
+  // DOMを作成
+  const lane = document.createElement('div');
+  lane.id = rowId; lane.className = 'numlane';
+  const deckBtn = document.createElement('div'); deckBtn.className='numdeck'; deckBtn.title='めくる';
+  const restLbl = document.createElement('span'); restLbl.className='numrest';
+  const pile = document.createElement('div'); pile.className='numcard-holder'; pile.style.position='relative';
+  lane.appendChild(deckBtn); lane.appendChild(restLbl); lane.appendChild(pile);
+  // 再描画
+  const refresh = ()=>{
+   const meta=v?.meta||{}; const D=meta[`m${mNo}_deck`]||[]; const X=meta[`m${mNo}_discards`]||[];
+    const remain = D.filter(n=>!X.includes(n)).length; restLbl.textContent = `残:${remain}`;
+    pile.innerHTML=''; X.forEach((n,i)=>{
+      const node=document.createElement('div'); node.className='numcard';
+      node.style.backgroundImage = `url('${imgNumber(n)}')`;
+      if(i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; pile.style.height=(48+off)+'px'; lane.style.marginBottom=off+'px'; }
+      pile.appendChild(node);
+    });
+  };
+  refresh();
+ // クリックで1枚公開（metaへ保存 → 全員同期）
+  deckBtn.onclick = async ()=>{
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const mSnap = await get(mRef); const meta = mSnap.val()||{};
+      const D = Array.isArray(meta[`m${mNo}_deck`]) ? meta[`m${mNo}_deck`].slice() : [];
+      const X = Array.isArray(meta[`m${mNo}_discards`]) ? meta[`m${mNo}_discards`].slice() : [];
+      const next = D.find(n=>!X.includes(n)); if(next==null) return;
+      X.push(next);
+      await update(mRef, { [`m${mNo}_discards`]: X });
+    }catch(e){ console.error(e); }
+ };
+  mountLaneUnderItemsBar(lane);
+}
+
+  
 /* ===== #39：左に X、右に数値P1山＋公開札、下に自分の受け取り数値 ===== */
 function renderM39(v){
   const isM39 = ((v?.mission?.id|0) === 39);
