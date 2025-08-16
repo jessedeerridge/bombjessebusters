@@ -1332,18 +1332,15 @@ charCol.className = 'char-col';
 
 const char=document.createElement('div'); 
 char.className='char-card';
- // 観戦者（未着席）の場合は常にブランク表示
- if (state.seatedTable == null) {
-   char.classList.add('blank');
-  char.removeAttribute('style');
-   char.onclick = null;
- } else {
-   const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-   char.style.backgroundImage = `url("${face}")`;
-   char.onclick = async ()=>{ 
-     await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
-   };
- }
+if(!seatedAny){ 
+  char.classList.add('blank'); 
+}else{
+  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+  char.style.backgroundImage = `url("${face}")`;
+  char.onclick=async ()=>{ 
+    await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
+  };
+}
 
     if ((state.watching?.mission?.id|0) === 34 && t.playerId !== state.userId){
   // #34：自分以外はブランク表示・操作不可
