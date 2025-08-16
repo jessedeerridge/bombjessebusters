@@ -983,7 +983,7 @@ if (v) {
    // 最後に誰かがいた時刻を記録し、30分経過後に削除
     const lastActive = v.lastActiveAt || Date.now();
    const elapsed = Date.now() - lastActive;
-    if (elapsed >= 30 * 60 * 1000) {
+    if (elapsed >= 1 * 1000) {
       remove(ref(db, `rooms/${code}`));
       return;
    } else {
