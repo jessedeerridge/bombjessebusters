@@ -627,11 +627,8 @@ const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
 /* === 前のゲームの表示物を全て掃除する === */
 function clearMissionOverlays(){
   document.querySelectorAll('.numlane').forEach(n => n.remove());
-  document.querySelectorAll('.conlane').forEach(n => n.remove());     // ← 追加：制約帯も掃除
-  document.querySelectorAll('.rulelane').forEach(n => n.remove());    // ← 追加：矢印帯も掃除
-  document.querySelectorAll('[data-lane-id]').forEach(n => n.remove());// ← 追加：共通レーン識別で掃除
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
-  document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 既存
+  document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
   // ★ ミッション22：情報トークン表を確実に消す
   const info22 = document.getElementById('info22');
   if (info22) info22.remove();
@@ -642,88 +639,148 @@ function clearMissionOverlays(){
   document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m31HandRow/m31CenterRow/m32ConRowはconlane
   ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
     const el = document.getElementById(id); if (el) el.remove();
+  }
+/* ===== 同期レーン（meta.lanes）— すべての端末で同じ表示にする ===== */
+function sref(path){ return ref(db, `rooms/${state.roomCode}/${path}`); }
+
+async function lanesInitIfNeeded(){
+  const v = state.watching;
+  if (!v?.meta?.lanes) await update(sref('meta'), { lanes:{} });
+}
+
+function renderSyncedLanes(v){
+  // 既存の同期レーンDOMを除去
+  document.querySelectorAll('[data-synced-lane]').forEach(n=>n.remove());
+  const lanes = v?.meta?.lanes || {};
+  const bar = document.getElementById('itemsBar'); if(!bar) return;
+  Object.entries(lanes).forEach(([id, L])=>{
+     const lane = document.createElement('div');
+     lane.className = (L.kind==='conP1') ? 'conlane' : 'numlane';
+     lane.dataset.syncedLane = '1';
+     lane.id = id;
+
+     if (L.kind==='numP1' || L.kind==='numP1pop'){
+        const deckBtn = document.createElement('div'); deckBtn.className='numdeck'; deckBtn.title='めくる';
+        const restLbl = document.createElement('span'); restLbl.className='numrest'; restLbl.textContent = `残:${Math.max(0,(L.rest|0))}`;
+        const pile = document.createElement('div'); pile.className='numcard-holder'; pile.style.position='relative';
+        (L.pile||[]).forEach((n,i)=>{
+          const node = document.createElement('div'); node.className='numcard'; node.style.backgroundImage=`url('${imgNumber(n)}')`;
+          if (i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; }
+          pile.appendChild(node);
+        });
+        lane.append(deckBtn, restLbl, pile);
+
+        if (Array.isArray(L.row) && L.row.length>0){
+          const row = document.createElement('div'); row.style.display='flex'; row.style.gap='6px';
+          L.row.forEach(n=>{ const nc=document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=`url('${imgNumber(n)}')`; row.appendChild(nc); });
+          lane.appendChild(row);
+        }
+
+        deckBtn.onclick = async (ev)=>{
+          if (!state.isHost) return; // DB更新はホストのみ
+          if ((L.rest|0)<=0){
+            const newDeck = MATERIALS.numbers.slice(); shuffle(newDeck);
+            await update(sref('meta/lanes/'+id), { deck:newDeck, rest:newDeck.length, pile:[], row:[] });
+            return;
+          }
+          if (L.kind==='numP1'){
+             const deck = (L.deck||[]).slice(); const n = deck.pop(); const rest= (L.rest|0) - 1;
+             const pile = (L.pile||[]).concat(n);
+             await update(sref('meta/lanes/'+id), { deck, rest, pile });
+          }else{
+             openMenu(ev.clientX, ev.clientY, [
+                {label:'1', action: async ()=>{
+                  const deck = (L.deck||[]).slice(); if(deck.length<=0) return;
+                  const n = deck.pop(); const rest=(L.rest|0)-1;
+                  const pile=(L.pile||[]).concat(n);
+                  await update(sref('meta/lanes/'+id), { deck, rest, pile, row:[] });
+                }},
+                {label:'2', action: async ()=>{
+                  const deck = (L.deck||[]).slice(); const take = Math.min(2, deck.length); if(take<=0) return;
+                  const drawn = Array.from({length:take}, ()=> deck.pop());
+                  const rest=(L.rest|0)-take;
+                  const pile=(L.pile||[]).concat(drawn[0]);
+                  await update(sref('meta/lanes/'+id), { deck, rest, pile, row: drawn.slice(1) });
+                }},
+                {label:'3', action: async ()=>{
+                  const deck = (L.deck||[]).slice(); const take = Math.min(3, deck.length); if(take<=0) return;
+                  const drawn = Array.from({length:take}, ()=> deck.pop());
+                  const rest=(L.rest|0)-take;
+                  const pile=(L.pile||[]).concat(drawn[0]);
+                  await update(sref('meta/lanes/'+id), { deck, rest, pile, row: drawn.slice(1) });
+                }},
+             ]);
+          }
+        };
+     }else if (L.kind==='fixed'){
+        (L.cells||[]).forEach(c=>{
+          if (c.kind==='rule'){ const d=document.createElement('div'); d.className='rulecard'; d.style.backgroundImage=`url('${imgRule(c.name)}')`; lane.appendChild(d); }
+          if (c.kind==='num'){ const d=document.createElement('div'); d.className='numcard'; d.style.backgroundImage=`url('${imgNumber(c.num)}')`; lane.appendChild(d); }
+        });
+     }else if (L.kind==='conP1'){
+        const deckBtn = document.createElement('div'); deckBtn.className='numdeck'; deckBtn.title='めくる'; deckBtn.style.background = "#fff url('./conback.jpg') center/70% no-repeat"; 
+        const restLbl = document.createElement('span'); restLbl.className='numrest'; restLbl.textContent=`残:${Math.max(0,(L.rest|0))}`;
+        const pile=document.createElement('div'); pile.className='numcard-holder'; pile.style.position='relative';
+        (L.pile||[]).forEach((ch,i)=>{
+           const node=document.createElement('div'); node.className='concard'; node.style.backgroundImage=`url('${imgConstraint(ch)}')`;
+           if (i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; }
+           node.title='拡大'; node.onclick=(ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
+           pile.appendChild(node);
+        });
+        lane.append(deckBtn, restLbl, pile);
+        deckBtn.onclick = async ()=>{
+          if (!state.isHost) return;
+          if ((L.rest|0)<=0) return;
+          const deck = (L.deck||[]).slice(); const ch = deck.pop(); const rest=(L.rest|0)-1;
+          const pile=(L.pile||[]).concat(ch);
+          await update(sref('meta/lanes/'+id), { deck, rest, pile });
+        };
+     }else if (L.kind==='ruleEnds'){
+        const left = document.createElement('div'); left.className='rulecard'; const right=document.createElement('div'); right.className='rulecard';
+        if (L.left) left.style.backgroundImage = `url('${imgRule(L.left)}')`; 
+        if (L.right) right.style.backgroundImage = `url('${imgRule(L.right)}')`;
+        left.onclick = async ()=>{ if(!state.isHost) return; const next = (L.left ? null : 'right2'); await update(sref('meta/lanes/'+id), { left: next, right: null }); };
+        right.onclick = async ()=>{ if(!state.isHost) return; const next = (L.right ? null : 'left2'); await update(sref('meta/lanes/'+id), { right: next, left: null }); };
+        lane.append(left);
+        (L.centerNums||[]).forEach(n=>{ const d=document.createElement('div'); d.className='numcard'; d.style.backgroundImage=`url('${imgNumber(n)}')`; lane.appendChild(d); });
+        lane.appendChild(right);
+     }
+     bar.insertAdjacentElement('afterend', lane);
   });
+}
+
+/* ホスト側：レーン作成ヘルパー */
+async function ensureLane(id, obj){
+  await lanesInitIfNeeded();
+  const snap = state.watching?.meta?.lanes || {};
+  if (snap[id]) return; 
+  await update(sref('meta/lanes'), { [id]: obj });
+}
+async function ensureFixedLane(id, cells){
+  await ensureLane(id, { kind:'fixed', cells });
+}
+async function ensureNumP1Lane(id){
+  const deck = MATERIALS.numbers.slice(); shuffle(deck);
+  await ensureLane(id, { kind:'numP1', deck, rest: deck.length, pile:[], row:[] });
+}
+async function ensureNumP1PopLane(id){
+  const deck = MATERIALS.numbers.slice(); shuffle(deck);
+  await ensureLane(id, { kind:'numP1pop', deck, rest: deck.length, pile:[], row:[] });
+}
+async function ensureConP1Lane(id){
+  const deck = 'ABCDEFGHIJKL'.split(''); shuffle(deck);
+  await ensureLane(id, { kind:'conP1', deck, rest: deck.length, pile:[] });
+}
+async function ensureRuleEndsLane(id, centerNums){
+  await ensureLane(id, { kind:'ruleEnds', left:null, right:null, centerNums: (centerNums||[]) });
+}
+async function clearSyncedLanes(){
+  await update(sref('meta'), { lanes: {} });
+}
+);
   NUMCARD_REG.clear();
 }
 
-/* ===== ここから追加：共通レーン同期描画 ===== */
-function renderSyncedLanes(v){
-  // DBにまだ何も無ければ何もしない
-  const lanes = v?.meta?.lanes || {};
-  // 既存の共通レーンDOMを一旦クリア（※他の機能には触らない）
-  document.querySelectorAll('[data-lane-id]').forEach(n => n.remove());
-
-  // レーンを描画
-  Object.values(lanes).forEach(L => {
-    try { upsertLaneDom(L); } catch(e){ console.warn('lane render error', L, e); }
-  });
-}
-
-/** laneオブジェクトをDOM化して親の直下に挿入
- *  L: { id, type:'num'|'con'|'rule', parentSelector:'#itemsBar' 等,
- *       cards:[{ num?:number, img?:string, className?:string, title?:string }], note?:string }
- */
-function upsertLaneDom(L){
-  if(!L || !L.id || !L.type) return;
-  // 親ノードを取得（見つからなければ itemsBar の直下にフォールバック）
-  const parent = document.querySelector(L.parentSelector || '#itemsBar') || document.getElementById('itemsBar');
-  if(!parent) return;
-
-  // レーン本体
-  const lane = document.createElement('div');
-  lane.dataset.laneId = L.id; // ← 掃除用
-  if(L.type==='num') lane.className = 'numlane';
-  else if(L.type==='con') lane.className = 'conlane';
-  else if(L.type==='rule') lane.className = 'rulelane';
-  else lane.className = 'numlane'; // デフォルト
-
-  // カードDOMを並べる
-  (L.cards||[]).forEach(c=>{
-    if(L.type==='num'){
-      const holder = document.createElement('div');
-      holder.className = 'numcard-holder';
-      const card = document.createElement('div');
-      card.className = 'numcard ' + (c.className||'');
-      if (c.img){ card.style.backgroundImage = `url('${c.img}')`; }
-      else if (c.num!=null){ card.style.backgroundImage = `url('${imgNumber(c.num)}')`; }
-      if (c.title) card.title = String(c.title);
-      holder.appendChild(card);
-      lane.appendChild(holder);
-    }else if(L.type==='con'){
-      const card = document.createElement('div');
-      card.className = 'concard ' + (c.className||'');
-      if (c.img){ card.style.backgroundImage = `url('${c.img}')`; }
-      lane.appendChild(card);
-    }else if(L.type==='rule'){
-      const card = document.createElement('div');
-      card.className = 'rulecard ' + (c.className||'');
-      if (c.img){ card.style.backgroundImage = `url('${c.img}')`; }
-      else if (c.name){ card.style.backgroundImage = `url('${imgRule(c.name)}')`; }
-      lane.appendChild(card);
-    }
-  });
-
-  // 備考があればタイトルとして
-  if (L.note){
-    lane.title = String(L.note);
-  }
-
-  // 挿入：親要素の「すぐ下」に置きたい場合は afterend、同じ中に置きたいなら append
-  // ここでは「親の直後（外側）」に入れる
-  parent.insertAdjacentElement('afterend', lane);
-}
-
-/* lanes を書き込むための簡易API（ホスト操作側で使用） */
-async function setLane(lane){
-  // lane: { id, type, parentSelector, cards:[...], note? }
-  if(!state.roomCode) return;
-  await update(ref(db, `rooms/${state.roomCode}/meta/lanes/${lane.id}`), lane);
-}
-async function removeLane(laneId){
-  if(!state.roomCode) return;
-  await remove(ref(db, `rooms/${state.roomCode}/meta/lanes/${laneId}`));
-}
-  
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
   if (NUMCARD_REG.has(n)) {
@@ -749,499 +806,53 @@ function pickUnusedNumbers(count){
 }
 
 /* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ === */
+
 function distributeNumbersToItemsCentered(eachCount=1){
   const itemsBar = document.getElementById('itemsBar');
   const items    = document.querySelectorAll('#items .item');
   if(!itemsBar || items.length===0) return;
 
-  // 既存を掃除（ミッションやり直し時の二重生成防止）
+  // 既存掃除
   const old = document.querySelector('.num-under');
   if(old) old.remove();
 
-  // レーンを作成してアイテム列の直下に挿入
   const under = document.createElement('div');
   under.className = 'num-under';
   itemsBar.insertAdjacentElement('afterend', under);
 
-  // 未使用数字から必要枚数ぶん抽選
-  const need  = items.length * eachCount;
-  const picks = pickUnusedNumbers(need);
+  const v = state.watching || {};
+  const key = 'numUnderEach';
+  const data = Array.isArray(v?.meta?.[key]) ? v.meta[key] : null;
 
-  // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
-  let p = 0;
-  items.forEach(()=> {
-    const slot = document.createElement('div');
-    slot.className = 'slot';
-    under.appendChild(slot);
-
-    for(let k=0; k<eachCount; k++){
-      const n = picks[p++]; if(n==null) break;
-      // placeNumberCard は holder を作って mountParent に追加する
-      placeNumberCard(n, slot);
+  const ensureData = async ()=>{
+    const need  = items.length * eachCount;
+    const picks = pickUnusedNumbers(need);
+    const slots = [];
+    let p = 0;
+    for(let i=0;i<items.length;i++){
+      const row=[];
+      for(let k=0;k<eachCount;k++){ const n=picks[p++]; if(n!=null) row.push(n); }
+      slots.push(row);
     }
-  });
-}
-
-
-/* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
-function pickK(arr, k){
-  const a = arr.slice(); shuffle(a);
-  return a.slice(0, Math.max(0, Math.min(k, a.length)));
-}
-
-/**
- * ミッションごとの「赤/黄の混入仕様」をここで定義
- */
-function buildMixPlan(missionId){
-  const plans = {
-    8:  [
-    {type:'redChoose', from:2, take:1},
-    {type:'yellowChoose', from:3, take:2},
-    ],    
-    9:  [
-      {type:'redPick',    k:1},
-      {type:'yellowPick', k:2},
-    ],
-    10: [
-      {type:'redPick',    k:1},
-      {type:'yellowPick', k:4},
-    ],
-    11: [
-      {type:'redPick',    k:2},
-    ],
-    12: [
-      {type:'redPick',    k:1},
-      {type:'yellowPick', k:4},
-    ],
-  13: [ /* #13 は専用配布をするのでここでは赤を混ぜない */ ],
-  14: [
-    {type:'redPick', k:2},
-    {type:'yellowChoose', from:3, take:2},
-  ],
-  15: [
-    {type:'redChoose', from:3, take:1},
-  ],
-  16: [
-    {type:'redPick', k:1},
-    {type:'yellowChoose', from:3, take:2},
-  ],
-  17: [
-    {type:'redChoose', from:3, take:2},
-  ],
-  18: [
-    {type:'redPick', k:2},
-  ],
-  19: [
-    {type:'redPick', k:1},
-    {type:'yellowChoose', from:3, take:2},
-  ],
-  20: [
-    {type:'redPick', k:2},
-    {type:'yellowPick', k:2},
-  ],
-  21: [
-    {type:'redChoose', from:3, take:1},
-  ],
-  22: [
-    {type:'redPick',    k:1},
-    {type:'yellowPick', k:4},
-  ],
-  23: [  // 赤3-
-    {type:'redChoose', from:3, take:1},
-  ],
-  24: [  // 赤2
-    {type:'redPick', k:2},
-  ],
-  25: [  // 赤2
-    {type:'redPick', k:2},
-  ],
-  26: [  // 赤2
-    {type:'redPick', k:2},
-  ],
-  27: [  // 赤1 黄4
-    {type:'redPick',    k:1},
-    {type:'yellowPick', k:4},
-  ],
-  28: [  // 赤2 黄4
-    {type:'redPick',    k:2},
-    {type:'yellowPick', k:4},
-  ],
-  28: [  // 赤2 黄4
-    {type:'redPick',    k:2},
-    {type:'yellowPick', k:4},
-  ],
-
- 29: [  // 赤3
-    {type:'redPick', k:3},
-  ],
-
-  30: [  // 赤2-1、黄4
-    {type:'redChoose',  from:2, take:1},
-    {type:'yellowPick', k:4},
-  ],
-
-  31: [  // 赤3-2
-    {type:'redChoose', from:3, take:2},
-  ],
-
-  32: [  // 赤2
-    {type:'redPick', k:2},
-  ],
-
-  33: [  // 赤3-2
-    {type:'redChoose', from:3, take:2},
-  ],
-
-  34: [  // 赤1
-    {type:'redPick', k:1},
-  ],
-
-  35: [  // 赤3-2 黄4
-    {type:'redChoose',  from:3, take:2},
-    {type:'yellowPick', k:4},
-  ],
-
-  36: [  // 赤3-1 黄2
-    {type:'redChoose',  from:3, take:1},
-    {type:'yellowPick', k:2},
-  ],
-37: [  // 赤2
-  {type:'redPick', k:2},
-],
-38: [  // 赤2
-  {type:'redPick', k:2},
-],
-39: [  // 赤3-2 黄4
-  {type:'redChoose', from:3, take:2},
-  {type:'yellowPick', k:4},
-],
-40: [  // 赤3
-  {type:'redPick', k:3},
-],
-41: [  // 赤3-1
-  {type:'redChoose', from:3, take:1},
-],
-42: [  // 赤3-1 黄4
-  {type:'redChoose', from:3, take:1},
-  {type:'yellowPick', k:4},
-],
-
-    
-};
-return plans[missionId] || [];
-
-}
-
-/**
- * ミックス実行
- */
-function executeMixPlan(planList){
-  const toAdd = [];
-  const mixLines = [];
-  const chooseLines = [];
-
-  planList.forEach(p=>{
-    if(p.type==='redPick'){
-      const cand = pickK(MATERIALS.redCodes, p.k);
-      cand.forEach(n=> toAdd.push({num:n, kind:'red'}));
-      mixLines.push('<span style="color:red;">●</span>' + cand.map(v=>`[${v}]`).join(''));
-    }
-    if(p.type==='yellowPick'){
-      const cand = pickK(MATERIALS.yellowCodes, p.k);
-      cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
-　     mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
-    }
-    if(p.type==='redChoose'){
-      const cand = pickK(MATERIALS.redCodes, p.from);
-      chooseLines.push(`<span style="color:red;">●</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
-      const take = pickK(cand, p.take);
-      take.forEach(n=> toAdd.push({num:n, kind:'red'}));
-    }
-    if(p.type==='yellowChoose'){
-      const cand = pickK(MATERIALS.yellowCodes, p.from);
-      chooseLines.push(`<span style="color:gold;">▧</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
-      const take = pickK(cand, p.take);
-      take.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
-    }
-  });
-
-  return { toAdd, mixLines, chooseLines };
-}
-
-/* pop positioning */
-function placeInsideViewport(div, x, y){
-  popLayer.appendChild(div);
-  const pad = 8;
-  pos(div, x + 6, y + 6);
-  let r = div.getBoundingClientRect();
-  if (r.right > innerWidth - pad){ const nx = Math.max(pad, x - r.width - 6); pos(div, nx, y + 6); r = div.getBoundingClientRect(); }
-  if (r.left < pad) pos(div, pad, r.top);
-  if (r.top < pad) pos(div, r.left, pad);
-  if (r.bottom > innerHeight - pad) pos(div, r.left, Math.max(pad, innerHeight - r.height - pad));
-}
-function openOneMini(x,y,label,cb){
-  const div=document.createElement('div'); div.className='mini-pop';
-  div.addEventListener('click', e=>e.stopPropagation());
-  const b=document.createElement('button'); b.className='btn small'; b.textContent=label;
-  b.onclick=()=>{ if(div.isConnected) div.remove(); cb&&cb(); };
-  div.appendChild(b); placeInsideViewport(div,x,y);
-}
-function openMenu(x,y, entries){
-  const div=document.createElement('div'); div.className='mini-pop';
-  div.addEventListener('click', e=>e.stopPropagation());
-  entries.forEach(ent=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=ent.label; b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); }; div.appendChild(b); });
-  placeInsideViewport(div, x, y);
-}
-function openBottomMenu(entries){
-  const div=document.createElement('div'); div.className='mini-pop bottom-pop';
-  div.addEventListener('click', e=>e.stopPropagation());
-  entries.forEach(ent=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=ent.label; b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); }; div.appendChild(b); });
-  popLayer.appendChild(div);
-}
-
-/* enter */
-btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); };
-btnJoin.onclick   = ()=>{
-  const nm = (inputName?.value || '').trim();
-  // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
-  state.userName = nm ? nm.slice(0,4) : hiragana(4);
-  enter('player');
-};
-
-
-async function enter(mode){
-  const code=(inputCode.value||"").trim();
-  if(!code){ alert('コードを入力してください'); return; }
-  state.roomCode = code; state.mode=mode;
-
-  const roomRef = ref(db, `rooms/${code}`);
-  const snap=await get(roomRef);
-  if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
-  else{ state.isHost = snap.val()?.hostId === state.userId; }
-
-  await set(ref(db, `rooms/${code}/players/${state.userId}`), {name:state.userName, at:Date.now()});
-  onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
-  listenRoom(code);
-
-  H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
-}
-
-                        
-function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード：${state.roomCode}　/　あなた：${state.userName}` : ''; }
-
-/* room base */
-function baseRoom(hostId){
-  return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
-    players:{}, spectators:{},
-    // ▼ ここから：場の共通同期レーン置き場を追加
-    meta:{
-      itemUses:{i1:0,i2:0,i12:0,i14:0},
-      tokenCounts:{equal:0,noteq:0,x1:0},
-      i2Flow:null, i18Flow:null, i16Badge:null,
-      lanes:{}            // ← 追加：{ [laneId]: {id,type,parentSelector,cards:[...], note?} }
-    }
-    // ▲ ここまで追加
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { [key]: slots });
+    return slots;
   };
-}
 
-/* watch */
-function listenRoom(code){
-  onValue(ref(db, `rooms/${code}`),(snap)=>{
-    const v=snap.val(); state.watching=v;
-if (v) {
-  const p = Object.keys(v.players || {}).length;
-  const s = Object.keys(v.spectators || {}).length;
-  const empty = (p === 0 && s === 0);
-  const justCreated = (Date.now() - (v.createdAt || 0) < 2000); // 作成から2秒以内は削除しない
-  if (empty && !justCreated) {
-    remove(ref(db, `rooms/${code}`));
-    return;
-  }
-}    
-  renderItemsAndDi(v);  renderM29(v); renderM31(v);
-   renderSyncedLanes(v);           // ← 追加：共通レーン同期描画
-   renderTables(v); 
-     // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
-     if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
-  showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
-  refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
-}
- if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
-   btnSit.onclick();
+  const apply = (slots)=>{
+    let idx = 0;
+    for(let i=0;i<items.length;i++){
+      const slot = document.createElement('div');
+      slot.className='slot';
+      under.appendChild(slot);
+      const row = slots[i] || [];
+      row.forEach(n=> placeNumberCard(n, slot));
     }
-    
-    renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
-    state.gameStarted=!!v?.started;
-renderM39(v);
-    renderM42(v);
-
-    // ▼ ホスト判定を最新化
-    state.isHost = (v?.hostId === state.userId);
-
-
-    // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
-    H(btnPickMission, !state.isHost);
-// 条件：ホスト && 未開始 && まだミッション未選択 && まだ未実行
-    // v.started は false、v.mission は null で入ってくる
-    /* ここから追加 */
-    if (state.isHost && !v?.started && !v?.mission && !state._mpAutoOnce) {
-      openMissionPicker();        // 下部ピッカーを表示
-      state._mpAutoOnce = true;   // 以後は開かない
-    }
-    // ▼ 追加：ホストなら開始前後いつでもクイックピッカーを使える
-    updateHeaderInfo();
-    // ★ 自分の席がDB上で消えていたらローカルもクリア（やり直し直後の残留防止）
-    const myIdxNow = (v?.tables||[]).findIndex(T => T.playerId === state.userId);
-    if (myIdxNow < 0) state.seatedTable = null;
-  });
-}
-
-
-/* mission panels */
-function renderMissionPanels(v){
-  if(!v?.mission){
-    // 右サイドの missionBox を廃止したので未選択表示は出さない
-    missionDetailTitle.textContent = '';
-    missionDetailBody.innerHTML = '';
-    H(missionFooter, true);
-    return;
-  }
-  missionDetailTitle.textContent = v.mission.display?.[0] || '';
-  missionDetailBody.innerHTML = (v.mission.display||[]).slice(1)
-    .map(line=>`<div class="line">${line}</div>`).join('');
-  H(missionFooter, !v.started);
-}
-
-
-
-/* ===== Items & DI ===== */
-function renderItemsAndDi(v){
-  if(!v || !v.started){ H(itemsBar,true); return; }
-  // ★ #23：広げる前はアイテム列を非表示
-  {
-    const flags = v?.mission?.flags || {};
-    const hide = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
-    H(itemsBar, hide ? true : false);
-    if (hide) return; // ここで終了（数値帯や#23のデッキUIは別途表示）
-  }
-
-  itemsEl.innerHTML='';
-  const itemNodes = []; // ★ ノード参照を保持
-
-  (v.items||[]).forEach((it, idx)=>{
-    const flags = v?.mission?.flags || {};
-    const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
-    if(!it.used){
-      // #15: 最初は裏向き表示（使用可だが faceUp===false の間は裏面アートを表示）
-      if(flags.itemsFaceDownStart && it.faceUp===false){
-        div.style.backgroundImage = `url("./itemback.jpg")`;
-      }else{
-        div.style.backgroundImage = `url("./item${it.no}.jpg")`;
-      }
-    }
-
-
- // ★ 追加：アイテム16の情報トークンをカードの真下に表示
-if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
-  const below = document.createElement('div');
-  below.className = 'i16-below';
-  const tok = document.createElement('div');
-  tok.className = 'token black';
-  tok.textContent = String(v.meta.i16Badge.num);
-  tok.title = 'クリックで操作';
-  tok.onclick = (ev)=>{
-    openMenu(ev.clientX, ev.clientY, [
-      {label:'消す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta`), { i16Badge: null }); }}
-    ]);
   };
-  below.appendChild(tok);
-  div.appendChild(below);
 
-  // 追加：カードを上に持ち上げて下のトークンがスクロールなしで見えるように
-  div.classList.add('i16-lift');
-}
-
-    div.onclick=(ev)=>{
-      const flags = state.watching?.mission?.flags || {};
-      if(it.used){
-        openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
-          await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
-        });
- 
-      }else{
-        // 未使用時：初回クリック＝拡大（制約カードと同じ挙動）
-        const canFaceUp = !!(flags.itemsFaceDownStart && it.faceUp===false);
-        openItemZoom(it.no, idx, { canFaceUp });
-      }
-   };
-
-
-    itemsEl.appendChild(div);
-    itemNodes.push(div);
-  });
-
-
-  const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
-  diEl.style.backgroundImage = `url("./di${val}.png")`;
-  diEl.onclick=(ev)=>{
-    openMenu(ev.clientX, ev.clientY, [
-      {label:'進める', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
-      {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
-    ]);
-  };
-}
-
-/* ===== Global badge (item16) ===== */
-function renderGlobalReveal(v){
-  // 変更：サイド表示に切り替えたため常に非表示
-  globalReveal.innerHTML='';
-  H(globalReveal,true);
-}
-
-/* ===== Host tool (odd-open normal codes) ===== */
-function renderHostTool(v){
-  if(!v?.tables){ H(hostTool,true); return; }
-  const openCountByNum = {};
-  (v.tables||[]).forEach(T=>{
-    (T.hand||[]).forEach(c=>{
-      if(c?.kind==='normal' && c.open===true){
-        const n = c.num|0;
-        openCountByNum[n] = (openCountByNum[n]||0) + 1;
-      }
-    });
-  });
-  const hasOdd = Object.values(openCountByNum).some(cnt => (cnt % 2)===1);
-  H(hostTool, !hasOdd);
-}
-hostTool.onclick = ()=> alert('全体公開されている通常コードの枚数に奇数が含まれています。');
-
-/* ===== Tables ===== */
-function renderTables(v){
-  tablesEl.innerHTML=''; if(!v) return;
-    const seatedNow = (v?.tables||[]).some(T => T.playerId === state.userId);
-  document.body.setAttribute('data-seated', seatedNow ? 'yes' : 'no');
-  
-  if (!(v.meta?.m22_infoShown)) {
-    const old = document.getElementById('info22');
-    if (old) old.remove();
-  }
-  
-  /* ★ 全体公開中の通常コードの「数字別枚数」を集計 */
-  const openCountByNum = {};
-  (v.tables||[]).forEach(T=>{
-    (T.hand||[]).forEach(c=>{
-      if(c?.kind==='normal' && c.open===true){
-        const n = c.num|0; // 1..12
-        openCountByNum[n] = (openCountByNum[n]||0) + 1;
-      }
-    });
-  });
-// #39：X が 4枚全体公開 → 自動配布（ホストのみ・一度だけ）
-if ((v.mission?.id|0) === 39) {
-  const X = v?.meta?.m39_x|0;
-  const done = v?.meta?.m39_dealt === true;
-  if (X && !done && (openCountByNum[X]||0) === 4 && state.isHost) {
-    performM39Deal();
+  if (data){
+    apply(data);
+  }else if (state.isHost){
+    ensureData().then(apply);
   }
 }
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
@@ -3452,72 +3063,64 @@ async function setupMissionOnStart(code){
 
 
   
-  // #9：右2 + ランダム数値2枚
+  
+  // #9：右2 + ランダム数値2枚（DB同期）
   if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
-    const lane = buildNumLaneDOM([
-      {kind:'rule', img: imgRule('right2')},
-      {kind:'num',  img: imgNumber(randNum())},
-      {kind:'num',  img: imgNumber(randNum())}
-    ]);
-    mountLaneUnderItemsBar(lane);
-  }
-
-  // #11：パターン1（山札→めくる）
-  if(flags.needsNumberLane && flags.pattern==='P1'){
-    const lane = buildDeckLaneP1();
-    mountLaneUnderItemsBar(lane);
-        // ★ #23：アイテム1〜13からランダム7枚の山札を作り、数値山の右側に表示
-    if (flags.m23_itemDeck7) {
-      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
+    if (state.isHost){
+      const cells = [
+        {kind:'rule', name:'right2'},
+        {kind:'num',  num: randNum()},
+        {kind:'num',  num: randNum()}
+      ];
+      ensureFixedLane(`m${(v.mission?.id||9)}_rule`, cells);
     }
   }
+    
 
-  // #30：P1-pop123（山札→1/2/3ポップ／横並びは上限リセット）
-  if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
-    const lane = buildDeckLaneP1Pop123();
-    mountLaneUnderItemsBar(lane);
+  
+  // #11：パターン1（山札→めくる）— DB同期
+  if(flags.needsNumberLane && flags.pattern==='P1'){
+    if (state.isHost){
+      ensureNumP1Lane(`m${(v.mission?.id||11)}_numP1`);
+    }
   }
+// ★ #23：アイテム1〜13からランダム7枚の山札を作り、数値山の右側に表示
+    if (flags.m23_itemDeck7) {
+      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
+}
+    
+  }
+
+  
+  // #30：P1-pop123（山札→1/2/3ポップ）— DB同期
+  if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
+    if (state.isHost){
+      ensureNumP1PopLane(`m${(v.mission?.id||30)}_numP1pop`);
+    }
+  }
+    
   
   // #12：各アイテムの中央下に「1枚ずつ」固定配置
   if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
     distributeNumbersToItemsCentered(1); // 一枚ずつ
   }
 
-  // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
-if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
-    // 既存があれば一度除去（再実行対策）
-    const old = document.getElementById('m32ConRow');
-    if (old) old.remove();
-    const lane = buildConDeckLaneP1();
-    mountLaneUnderItemsBar(lane);
+  
+  // #32/#37：制約カード12枚の山札（P1相当）— DB同期
+  if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
+    if (state.isHost){
+      ensureConP1Lane(`m${(v.mission?.id||32)}_conP1`);
+    }
   }
-
-  /* ▼▼ （#36：数値5枚を横一列） ▼▼ */
-// ここから追加（置換）
-  /* ▼▼ （#36：両端ブランク＋クリックで反対側に 2カードを出す） ▼▼ */
+    
+  /* ▼▼ （#36：数値5枚＋両端2カードはトグル）— DB同期 ▼▼ */
   if ((v.mission?.id|0) === 36){
-    // 既存があれば一度除去（再実行対策）
-    const old36 = document.getElementById('m36NumRow');
-    if (old36) old36.remove();
-
-    // 中央の数値5枚を抽選
-    const picks = pickUnusedNumbers(5);  // 1..12 から未使用の5枚
-
-    // レーンDOMを手組み（buildNumLaneDOM を流用してもOKだがここは直書き）
-    const lane = document.createElement('div');
-    lane.className = 'numlane';
-    lane.id = 'm36NumRow';
-
-    // 左ブランク（横向き）
-    const leftBlank = document.createElement('div');
-    leftBlank.className = 'rulecard';
-    leftBlank.id = 'm36LeftBlank';        // 背景なし＝ブランク横向き
-
-    // 中央5枚
-    picks.forEach(n=>{
-      const c = document.createElement('div');
-      c.className = 'numcard';
-      c.style.backgroundImage = `url('${imgNumber(n)}')`;
+    if (state.isHost){
+      const picks = pickUnusedNumbers(5);
+      ensureRuleEndsLane('m36_ruleEnds', picks);
+    }
+  }
+    ')`;
       lane.appendChild(c);
     });
 
