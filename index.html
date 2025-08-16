@@ -667,7 +667,7 @@ function pickUnusedNumbers(count){
   return pool.slice(0, count);
 }
 
-/* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ === */
+/* === ミッション12用：各アイテムの“外側の真下”に一枚ずつ【同期版】 === */
 function distributeNumbersToItemsCentered(eachCount=1){
   const itemsBar = document.getElementById('itemsBar');
   const items    = document.querySelectorAll('#items .item');
@@ -677,14 +677,31 @@ function distributeNumbersToItemsCentered(eachCount=1){
   const old = document.querySelector('.num-under');
   if(old) old.remove();
 
+  // ★ ここから同期ロジック：DB(meta.m12_under)に保存 → 全員がそれを描画
+  const v = state.watching || {};
+  const need = items.length * eachCount;
+  const plan = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under.slice() : null;
+
+  // ホストが一度だけ確定させる
+  if ((!plan || plan.length !== need) && state.isHost) {
+    // 未使用数字プールから必要枚数ぶん確定
+    const pool = MATERIALS.numbers.slice(); shuffle(pool);
+    const picks = pool.slice(0, need);
+    // DBに保存（他端末へ同期）
+    update(ref(db, `rooms/${state.roomCode}/meta`), { m12_under: picks });
+  }
+
+  // ここで最新のplanを読む（ホスト以外は onValue によりすぐ反映）
+  const use = (state.watching?.meta?.m12_under) || plan;
+  if (!Array.isArray(use) || use.length === 0) {
+    // まだホストが確定していない瞬間は何もしない（重複生成防止）
+    return;
+  }
+
   // レーンを作成してアイテム列の直下に挿入
   const under = document.createElement('div');
   under.className = 'num-under';
   itemsBar.insertAdjacentElement('afterend', under);
-
-  // 未使用数字から必要枚数ぶん抽選
-  const need  = items.length * eachCount;
-  const picks = pickUnusedNumbers(need);
 
   // アイテム数に合わせて同数のスロットを用意し、中央にカードを配置
   let p = 0;
@@ -694,12 +711,12 @@ function distributeNumbersToItemsCentered(eachCount=1){
     under.appendChild(slot);
 
     for(let k=0; k<eachCount; k++){
-      const n = picks[p++]; if(n==null) break;
-      // placeNumberCard は holder を作って mountParent に追加する
-      placeNumberCard(n, slot);
+      const n = use[p++]; if(n==null) break;
+      placeNumberCard(n, slot); // ← DBで確定した数字だけを描画
     }
   });
 }
+
 
 
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
@@ -1098,6 +1115,9 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
       {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
     ]);
   };
+
+  /* ★ 追加：アイテム列直下の数値帯（共通・同期描画） */
+  distributeNumbersToItemsCentered(1);
 }
 
 /* ===== Global badge (item16) ===== */
