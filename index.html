@@ -952,35 +952,32 @@ function updateHeaderInfo(){ roomInfo.textContent = state.roomCode ? `コード�
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
     players:{}, spectators:{},
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null } };
-}
+    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null },
+    lastActiveAt: Date.now()
+  };}
 
 /* watch */
-    if (v) {
-      const pIds = Object.keys(v.players || {});
-     const p = pIds.length;
-      const s = Object.keys(v.spectators || {}).length;
-      const empty = (p === 0 && s === 0);
-     const justCreated = (Date.now() - (v.createdAt || 0) < 2000);
-      // 最終アクティブ時間を更新
-      update(ref(db, `rooms/${code}`), { lastActive: Date.now() });
-     // 空になって30分経過で削除
-     if (empty && !justCreated) {
-        const idle = Date.now() - (v.lastActive || v.createdAt || 0);
-        if (idle > 30 * 60 * 1000) {
-         remove(ref(db, `rooms/${code}`));
-          return;
-        }
-      }
-     // 残り1人になったらその人をホストに
-      if (p === 1 && pIds[0] === state.userId && v.hostId !== state.userId) {
-       update(ref(db, `rooms/${code}`), { hostId: state.userId });
-      }
+function listenRoom(code){
+  onValue(ref(db, `rooms/${code}`),(snap)=>{
+    const v=snap.val(); state.watching=v;
+if (v) {
+  const p = Object.keys(v.players || {}).length;
+  const s = Object.keys(v.spectators || {}).length;
+  const empty = (p === 0 && s === 0);
+  const justCreated = (Date.now() - (v.createdAt || 0) < 2000); // 作成から2秒以内は削除しない
+  if (empty && !justCreated) {
+   // 最後に誰かがいた時刻を記録し、30分経過後に削除
+    const lastActive = v.lastActiveAt || Date.now();
+   const elapsed = Date.now() - lastActive;
+    if (elapsed >= 30 * 60 * 1000) {
+      remove(ref(db, `rooms/${code}`));
+      return;
+   } else {
+      // active時刻更新
+      update(ref(db, `rooms/${code}`), { lastActiveAt: Date.now() });
     }
-
-   
-
-    
+  }
+}    
    renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
@@ -998,7 +995,11 @@ renderM39(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
-
+    // ★ 追加：プレイヤーが1人だけなら、その人を自動でホストにする
+    const playerIds = Object.keys(v.players || {});
+    if (playerIds.length === 1 && v.hostId !== playerIds[0]) {
+     update(ref(db, `rooms/${code}`), { hostId: playerIds[0] });
+    }
 
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
