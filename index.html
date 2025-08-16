@@ -1119,7 +1119,26 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
     itemsEl.appendChild(div);
     itemNodes.push(div);
   });
+  // ★ 追加：#23 残り山札（= 山札 - 捨て札）だけをアイテム欄へ並べる
+if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true) {
+    // 原則は m23_spreadRest を使用。なければ安全に「deck - discards」で再計算
+   const meta = v?.meta || {};
+    const rest = Array.isArray(meta.m23_spreadRest)
+      ? meta.m23_spreadRest
+      : (Array.isArray(meta.m23_deck) ? meta.m23_deck : []).filter(n =>
+          !(Array.isArray(meta.m23_discards) ? meta.m23_discards : []).includes(n)
+        );
 
+    for (const no of rest) {
+      const div2 = document.createElement('div');
+      div2.className = 'item m23-spread';
+      div2.style.backgroundImage = `url("./item${no}.jpg")`;
+      // 表示のみ（拡大は可）。ゲーム状態は変更しない
+      div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true });
+     itemsEl.appendChild(div2);
+      itemNodes.push(div2);
+    }
+  }
 
   // ★ 追加：#23 の残り山札アイテムをアイテム欄へ並べる
   if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true) {
@@ -4338,10 +4357,10 @@ async function performM23Spread(){
     // すでに実行済みなら何もしない
     if (meta.m23_spread === true) return;
 
-    // 残っているアイテム（＝山札 - 捨て札）
+    // 残っているアイテム（＝山札 - 捨て札）だけを抽出
     const deck = Array.isArray(meta.m23_deck)     ? meta.m23_deck.slice()     : [];
     const disc = Array.isArray(meta.m23_discards) ? meta.m23_discards.slice() : [];
-    const rest = deck.filter(n => !disc.includes(n));
+    const rest = deck.filter(n => disc.indexOf(n) === -1);
 
     // メタに確定（表示制御と、クライアント側で描画に使う配列）
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
