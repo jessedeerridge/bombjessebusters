@@ -1006,7 +1006,6 @@ if (v) {
     state.gameStarted=!!v?.started;
     renderM18(v);
     renderM39(v);
-    renderM15(v);
     renderM9(v);
     renderM12(v);
     renderM23(v);
@@ -3330,11 +3329,12 @@ shuffle(pool);
 // #15: 最初は裏向き（faceUp:false）。それ以外は通常どおり表（faceUp:true）
 const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
 
-// limitItemsTo が 1 枚しかない場合でもその 1 枚を必ず配る
-const items = pool
-  .slice(0, Math.min(playerCount, pool.length))
-  .map(no=>({ id:crypto.randomUUID(), no, used:false, faceUp: faceUpStart }));
-
+ // #23 は開始時は配らない（広げ条件を満たすまで非表示）
+ const items = (missionMeta?.id === 23)
+   ? []
+   : pool
+       .slice(0, Math.min(playerCount, pool.length))
+       .map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: faceUpStart }));
 
   // ★ 開始エッジを作るために一瞬だけ false を書く（ミッションは未選択状態へ）
   await update(ref(db, `rooms/${code}`), { started:false, mission:null });
@@ -4107,92 +4107,6 @@ async function ensureM23MetaInit(){
    });
   }
 
-  /* ===== ★ #15：数値カード山札（同期表示） ===== */
-async function ensureM15MetaInit(vNow){
-  const v = vNow || state.watching; if (!v) return;
-  if (Array.isArray(v?.meta?.m15_deck)) return;   // 既に初期化済み
-  if (!state.isHost) return;                      // 初期化はホストのみ
-  const deck = MATERIALS.numbers.slice(); shuffle(deck); // 1..12 をシャッフル
-  await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    m15_deck: deck,
-    m15_discards: []
-  });
-}
-
-function renderM15(v){
-  const isM15 = ((v?.mission?.id|0) === 15);
-  const rowId = 'm15Row';
-  const old = document.getElementById(rowId);
-  if (!isM15){ if (old) old.remove(); return; }
-  // 初回のみホストがメタを準備（未用意なら用意して次のonValueで描画）
-  if (!Array.isArray(v?.meta?.m15_deck)) { ensureM15MetaInit(v); if (old) old.remove(); return; }
-
-  if (old) old.remove();
-  const lane = document.createElement('div');
-  lane.id = rowId;
-  lane.className = 'numlane';
-
-  // 山札ボタンと残枚数
-  const deckBtn = document.createElement('div');
-  deckBtn.className = 'numdeck';
-  deckBtn.title = 'めくる';
-  const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
-
-  // 公開札の積み重ね
-  const pile = document.createElement('div');
-  pile.className = 'numcard-holder';
-  pile.style.position = 'relative';
-
-  lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
-  lane.appendChild(pile);
-
-  // 既存公開札の再描画 & 残表示
-  const refresh = ()=>{
-    const d = (v?.meta?.m15_deck||[]);
-    const x = (v?.meta?.m15_discards||[]);
-    const remain = d.filter(n=>!x.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
-    pile.innerHTML = '';
-    x.forEach((n, i)=>{
-      const node = document.createElement('div');
-      node.className = 'numcard';
-      node.style.backgroundImage = `url('${imgNumber(n)}')`;
-      if (i>0){
-        const off = i*2;
-        node.style.position='absolute';
-        node.style.left = off+'px';
-        node.style.top  = off+'px';
-      }
-      pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
-    });
-  };
-  refresh();
-
-  // 1枚めくって公開札へ → DB(meta.m15_discards) を更新（全員に即同期）
-  deckBtn.onclick = async ()=>{
-    try{
-      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-      const mSnap = await get(mRef);
-      const meta  = mSnap.val()||{};
-      const D  = Array.isArray(meta.m15_deck)      ? meta.m15_deck.slice()      : [];
-      const Xs = Array.isArray(meta.m15_discards)  ? meta.m15_discards.slice()  : [];
-      const next = D.find(n=> !Xs.includes(n)); // 山札順で次
-      if (next==null) return;
-      Xs.push(next);
-      await update(mRef, { m15_discards: Xs });
-    }catch(e){ console.error(e); }
-  };
-
-  // アイテム列の直下に設置（#18/#39と同じユーティリティ）
-  mountLaneUnderItemsBar(lane);
-}
-
-
  function renderM18(v){
    const isM18 = ((v?.mission?.id|0) === 18);
     const rowId = 'm18Row';
@@ -4431,22 +4345,14 @@ async function performM23Spread(){
     const deck = Array.isArray(meta.m23_deck)     ? meta.m23_deck.slice()     : [];
     const disc = Array.isArray(meta.m23_discards) ? meta.m23_discards.slice() : [];
     const rest = deck.filter(n => !disc.includes(n));
-
-    // メタに確定（表示制御と、クライアント側で描画に使う配列）
-    await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      m23_spread: true,
-      m23_spreadRest: rest
-    });
-     // 手動“広げる”と同じく items を差し替え（重複表示を防ぐ）
-    const list = rest.map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: true }));
-   await Promise.all([
-      set(ref(db, `rooms/${state.roomCode}/items`), list),
-      update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m23_spread: true,
-        // 追加描画に使っていた配列は空にしておく（ガード）
-        m23_spreadRest: []
-      })
-    ]);
+     // ★ items と meta を同時に更新（チラつき防止）
+     const list = rest.map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: true }));
+    await update(ref(db, `rooms/${state.roomCode}`), {
+      'items': list,
+      'meta/m23_spread': true,
+      'meta/m23_spreadRest': []
+     });
+   
   }catch(e){
     console.error('performM23Spread', e);
   }
