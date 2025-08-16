@@ -534,8 +534,8 @@ const db  = getDatabase(app);
 const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
-  m22GaveOnce:false  // ★ #22：自分が渡した一回ガード（即時連打対策）
-};
+  m22GaveOnce:false, // ★ #22：自分が渡した一回ガード（即時連打対策）
+  _lastMissionId:null};
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -1007,8 +1007,14 @@ if (v) {
     }
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
+    // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
+   const midNow  = (v?.mission?.id|0);
+    const midPrev = (state._lastMissionId|0);
+    if (!state.seatedTable && midNow && midNow !== midPrev && seatPop.classList.contains('hidden')) {
+     btnSit.onclick();
+    }
     state.gameStarted=!!v?.started;
-    renderM18(v);
+    state._lastMissionId = midNow;    renderM18(v);
     renderM39(v);
     renderM9(v);
      renderM11(v);
