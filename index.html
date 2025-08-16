@@ -700,7 +700,37 @@ function distributeNumbersToItemsCentered(eachCount=1){
     }
   });
 }
-
+/* === 同期版：#12 各アイテム直下（m12_slots を共有） === */
+async function ensureM12Init(){
+  const v = state.watching; if(!v) return;
+  if((v?.mission?.id|0)!==12) return;
+  const items = document.querySelectorAll('#items .item'); if(items.length===0) return;
+  const m = v.meta || {};
+ if(Array.isArray(m.m12_slots) && m.m12_slots.length===items.length) return;
+ const nums = MATERIALS.numbers.slice(); shuffle(nums);
+  const picks = nums.slice(0, items.length);
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m12_slots: picks });
+}
+function renderM12Synced(v){
+  if((v?.mission?.id|0)!==12) return;
+  const itemsBar = document.getElementById('itemsBar');
+  const items    = document.querySelectorAll('#items .item');
+  if(!itemsBar || items.length===0) return;
+  // 既存掃除
+  const old = document.querySelector('.num-under'); if(old) old.remove();
+  const under = document.createElement('div'); under.className='num-under';
+  itemsBar.insertAdjacentElement('afterend', under);
+  const picks = (v?.meta?.m12_slots)||[];
+  items.forEach((_,i)=>{
+    const slot = document.createElement('div'); slot.className='slot'; under.appendChild(slot);
+    const n = picks[i]; if(n!=null){
+      const holder = document.createElement('div'); holder.className='numcard-holder';
+      const base = document.createElement('div'); base.className='numcard';
+      base.style.backgroundImage = `url('${imgNumber(n)}')`;
+     holder.appendChild(base); slot.appendChild(holder);
+    }
+  });
+}
 
 /* ★★★ 赤/黄コード抽選ヘルパー ★★★ */
 function pickK(arr, k){
@@ -982,6 +1012,12 @@ if (v) {
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
 renderM39(v);
+    // P1 / P1-pop123（#9,#11,#15,#17,#18,#23,#30 ...）
+    ensureSyncedNumP1Init(v?.mission?.id|0).then(()=> renderSyncedNumP1(v));
+    // #12（アイテム直下）
+    if ((v?.mission?.id|0)===12){ ensureM12Init().then(()=> renderM12Synced(v)); }
+
+    
     renderM42(v);
 
     // ▼ ホスト判定を最新化
@@ -3371,26 +3407,7 @@ async function setupMissionOnStart(code){
     mountLaneUnderItemsBar(lane);
   }
 
-  // #11：パターン1（山札→めくる）
-  if(flags.needsNumberLane && flags.pattern==='P1'){
-    const lane = buildDeckLaneP1();
-    mountLaneUnderItemsBar(lane);
-        // ★ #23：アイテム1〜13からランダム7枚の山札を作り、数値山の右側に表示
-    if (flags.m23_itemDeck7) {
-      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
-    }
-  }
 
-  // #30：P1-pop123（山札→1/2/3ポップ／横並びは上限リセット）
-  if(flags.needsNumberLane && flags.pattern==='P1-pop123'){
-    const lane = buildDeckLaneP1Pop123();
-    mountLaneUnderItemsBar(lane);
-  }
-  
-  // #12：各アイテムの中央下に「1枚ずつ」固定配置
-  if(flags.needsNumberLane && flags.pattern==='P2-eachItem'){
-    distributeNumbersToItemsCentered(1); // 一枚ずつ
-  }
 
   // #32：制約カード12枚の山札（P1相当）をアイテム列の直下に表示
 if ((v.mission?.id|0) === 32 || (v.mission?.id|0) === 37){
@@ -3631,6 +3648,125 @@ function mountLaneUnderItemsBar(lane){
   bar.insertAdjacentElement('afterend', lane);
 }
 
++/* ===== 同期版：数値P1デッキ（山札→公開札積み重ね） ===== */
++async function ensureSyncedNumP1Init(missionId){
++  const v = state.watching; if(!v) return;
++  const key = `m${missionId}`;
++  const m = v.meta || {};
++  if (Array.isArray(m[`${key}_deck`])) return; // 既に初期化済み
++  const deck = MATERIALS.numbers.slice(); shuffle(deck);
++  await update(ref(db, `rooms/${state.roomCode}/meta`), {
++    [`${key}_deck`]: deck,
++    [`${key}_discards`]: [],
++    // pop123用の横並び（都度置換する）
++    [`${key}_row`]: []
++  });
++}
++
++function renderSyncedNumP1(v, opts={}){
++  const id = v?.mission?.id|0; if(!id) return;
++  const flags = v?.mission?.flags || {};
++  // 対象：#9,#12,#15,#17,#18,#23,#26,#30,#32,#36,#37 のうち
++  //   ・P1 / P1-pop123（#12は別関数で同期実装）
++  const targetSet = new Set([9,12,15,17,18,23,26,30,32,36,37]);
++  if(!targetSet.has(id)) return;
++  const pattern = flags.pattern;
++  if(!(flags.needsNumberLane && (pattern==='P1' || pattern==='P1-pop123'))) return;
++
++  const key = `m${id}`;
++  const laneId = `${key}NumRow`;
++  const old = document.getElementById(laneId);
++  if (old) old.remove();
++
++  const lane = document.createElement('div');
++  lane.className = 'numlane'; lane.id = laneId;
++
++  // 山札ボタン・残表示・公開札用ホルダー
++  const deckBtn = document.createElement('div'); deckBtn.className='numdeck'; deckBtn.title='めくる';
++  const restLbl = document.createElement('span'); restLbl.className='numrest';
++  const pile   = document.createElement('div');  pile.className='numcard-holder'; pile.style.position='relative';
++  lane.appendChild(deckBtn); lane.appendChild(restLbl); lane.appendChild(pile);
++
++  // pop123の横並び（任意）
++  const row = (pattern==='P1-pop123') ? Object.assign(document.createElement('div'), {style:'display:flex;gap:6px;'}) : null;
++  if (row) lane.appendChild(row);
++
++  const refresh = ()=>{
++    const m = v?.meta || {};
++    const D = (m[`${key}_deck`]||[]);
++    const X = (m[`${key}_discards`]||[]);
++    const remain = D.filter(n=>!X.includes(n)).length;
++    restLbl.textContent = `残:${remain}`;
++    // 公開札描画
++    pile.innerHTML = '';
++    X.forEach((n,i)=>{
++      const node = document.createElement('div');
++      node.className = 'numcard';
++      node.style.backgroundImage = `url('${imgNumber(n)}')`;
++      if (i>0){ const off=i*2; node.style.position='absolute'; node.style.left=off+'px'; node.style.top=off+'px'; }
++      pile.appendChild(node);
++      const extra=i*2; pile.style.height=(48+extra)+'px'; lane.style.marginBottom=extra+'px';
++    });
++    // 横並び（pop123）
++    if(row){
++      row.innerHTML='';
++      const r = m[`${key}_row`]||[];
++      r.forEach(n=>{
++        const nc=document.createElement('div'); nc.className='numcard'; nc.style.backgroundImage=`url('${imgNumber(n)}')`;
++        row.appendChild(nc);
++      });
++    }
++  };
++  refresh();
++
++  deckBtn.onclick = (ev)=>{
++    const m = v?.meta || {};
++    const D = (m[`${key}_deck`]||[]);
++    const X = (m[`${key}_discards`]||[]);
++    const remain = D.filter(n=>!X.includes(n)).length;
++    if (remain<=0){
++      // 山札再生成
++      openOneMini(ev.clientX, ev.clientY, '山札を作る', async ()=>{
++        const nd = MATERIALS.numbers.slice(); shuffle(nd);
++        await update(ref(db, `rooms/${state.roomCode}/meta`), { [`${key}_deck`]: nd, [`${key}_discards`]: [], [`${key}_row`]: [] });
++      });
++      return;
++    }
++    if (pattern!=='P1-pop123'){
++      // 単純P1：次の1枚を公開札へ
++      const next = D.find(n=> !X.includes(n)); if(next==null) return;
++      update(ref(db, `rooms/${state.roomCode}/meta`), { [`${key}_discards`]: [...X, next] });
++      return;
++    }
++    // pop123：1/2/3を選ぶ
++    openMenu(ev.clientX, ev.clientY, [
++      {label:'1', action: async ()=>{
++        const d2 = (v?.meta?.[`${key}_discards`]||[]).slice();
++        const next = D.find(n=> !d2.includes(n)); if(next==null) return;
++        await update(ref(db, `rooms/${state.roomCode}/meta`), { [`${key}_discards`]: [...d2, next], [`${key}_row`]: [] });
++      }},
++      {label:'2', action: async ()=>{
++        const seq = []; let rem = D.filter(n=>!(v?.meta?.[`${key}_discards`]||[]).includes(n));
++        for(let i=0;i<2 && rem.length>0;i++){ const n=rem[0]; seq.push(n); rem = rem.slice(1); }
++        if(seq.length===0) return;
++        const first = seq[0]; const rest = seq.slice(1);
++        const d2 = (v?.meta?.[`${key}_discards`]||[]).slice(); if(first!=null) d2.push(first);
++        await update(ref(db, `rooms/${state.roomCode}/meta`), { [`${key}_discards`]: d2, [`${key}_row`]: rest });
++      }},
++      {label:'3', action: async ()=>{
++        const seq = []; let rem = D.filter(n=>!(v?.meta?.[`${key}_discards`]||[]).includes(n));
++        for(let i=0;i<3 && rem.length>0;i++){ const n=rem[0]; seq.push(n); rem = rem.slice(1); }
++        if(seq.length===0) return;
++        const first = seq[0]; const rest = seq.slice(1);
++        const d2 = (v?.meta?.[`${key}_discards`]||[]).slice(); if(first!=null) d2.push(first);
++        await update(ref(db, `rooms/${state.roomCode}/meta`), { [`${key}_discards`]: d2, [`${key}_row`]: rest });
++      }},
++    ]);
++  };
++
++  mountLaneUnderItemsBar(lane);
++}
+  
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
   const lane = document.createElement('div'); 
