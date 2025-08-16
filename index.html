@@ -1332,15 +1332,22 @@ charCol.className = 'char-col';
 
 const char=document.createElement('div'); 
 char.className='char-card';
-if(!seatedAny){ 
-  char.classList.add('blank'); 
-}else{
-  const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-  char.style.backgroundImage = `url("${face}")`;
-  char.onclick=async ()=>{ 
-    await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
-  };
-}
+      // ▼ ここを修正：観戦者（未着席ビューア） or 空席の席 はブランク固定
+      const viewerSeated = (document.body.getAttribute('data-seated') === 'yes'); // seatedNow と同義
+     const isOccupied   = !!t.playerId;
+      if (!viewerSeated || !isOccupied) {
+        // 観戦中ユーザー／空席→ブランク＆操作無効
+      char.classList.add('blank');
+        char.onclick = null;
+       char.removeAttribute('style');
+      } else {
+        // 自分が着席中かつ着席テーブル→従来どおり表示・反転可
+        const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+        char.style.backgroundImage = `url("${face}")`;
+        char.onclick = async () => {
+         await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), { flipped: !t.character?.flipped });
+        };
+     }
 
     if ((state.watching?.mission?.id|0) === 34 && t.playerId !== state.userId){
   // #34：自分以外はブランク表示・操作不可
