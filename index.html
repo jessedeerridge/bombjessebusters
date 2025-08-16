@@ -4436,16 +4436,25 @@ function renderM30(v){
 async function ensureM36MetaInit(vNow){
   const v = vNow || state.watching; if (!v) return;
   if (((v?.mission?.id|0) !== 36)) return;
-  // すでに5枚確定済みなら何もしない
-  if (Array.isArray(v?.meta?.m36_numbers) && v.meta.m36_numbers.length === 5) return;
-  if (!state.isHost) return; // 初期化はホストのみ
 
-  // 既存ユーティリティがあれば重複を避けて5枚、なければ単純サンプル
-  const picks = (typeof pickUnusedNumbers === 'function')
-    ? pickUnusedNumbers(5)
-    : MATERIALS.numbers.slice().sort(()=>Math.random()-0.5).slice(0,5);
+  // 数値5枚が未確定ならホストが一度だけ確定
+  if (!Array.isArray(v?.meta?.m36_numbers) || v.meta.m36_numbers.length !== 5){
+    if (!state.isHost) return;
+    const picks = (typeof pickUnusedNumbers === 'function')
+      ? pickUnusedNumbers(5)
+      : MATERIALS.numbers.slice().sort(()=>Math.random()-0.5).slice(0,5);
 
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_numbers: picks });
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m36_numbers: picks,
+      m36_side: null    // ← 左右どちらもブランクで開始
+    });
+    return;
+  }
+
+  // 数値は確定済みだが m36_side が未定義なら補完（ホストのみ）
+  if (typeof v?.meta?.m36_side === 'undefined' && state.isHost){
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_side: null });
+  }
 }
 
 function renderM36(v){
@@ -4454,24 +4463,69 @@ function renderM36(v){
   const old   = document.getElementById(rowId);
   if (!isM36){ if (old) old.remove(); return; }
 
-  // 初回：ホストが5枚を確定（未準備なら一旦抜けて次のonValueで描画）
   const nums = Array.isArray(v?.meta?.m36_numbers) ? v.meta.m36_numbers : null;
   if (!nums || nums.length < 5){ ensureM36MetaInit(v); if (old) old.remove(); return; }
 
   if (old) old.remove();
-  // 左に left2、右に right2 を固定、中央に数値5枚を同期表示
-  const lane = buildNumLaneDOM([
-    { kind:'rule', img: imgRule('left2') },   // ← 左2
-    { kind:'num',  img: imgNumber(nums[0]) },
-    { kind:'num',  img: imgNumber(nums[1]) },
-    { kind:'num',  img: imgNumber(nums[2]) },
-    { kind:'num',  img: imgNumber(nums[3]) },
-    { kind:'num',  img: imgNumber(nums[4]) },
-    { kind:'rule', img: imgRule('right2') }   // 右2 →
-  ]);
+
+  // レーン（土台）
+  const lane = document.createElement('div');
   lane.id = rowId;
-  mountLaneUnderItemsBar(lane);  // 既存の設置ユーティリティ
+  lane.className = 'numlane';
+
+  // ユーティリティ：カードDOM（背景未指定＝ブランク）
+  const mkCard = (imgUrl)=>{
+    const d = document.createElement('div');
+    d.className = 'numcard';
+    if (imgUrl) d.style.backgroundImage = `url('${imgUrl}')`;
+    return d;
+  };
+
+  // 左ブランク（クリックで左に right2）
+  const leftSlot = mkCard(null);
+  leftSlot.classList.add('m36-slot','m36-left');
+  leftSlot.title = 'クリックで右2を表示';
+  leftSlot.onclick = async (ev)=>{
+    ev.stopPropagation();
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_side: 'L' });
+  };
+
+  // 数値5枚（中央）
+  const n0 = mkCard(imgNumber(nums[0]));
+  const n1 = mkCard(imgNumber(nums[1]));
+  const n2 = mkCard(imgNumber(nums[2]));
+  const n3 = mkCard(imgNumber(nums[3]));
+  const n4 = mkCard(imgNumber(nums[4]));
+
+  // 右ブランク（クリックで右側に left2）
+  const rightSlot = mkCard(null);
+  rightSlot.classList.add('m36-slot','m36-right');
+  rightSlot.title = 'クリックで左2を表示';
+  rightSlot.onclick = async (ev)=>{
+    ev.stopPropagation();
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_side: 'R' });
+  };
+
+  // 現在のサイド状態を反映：'L' → 左=right2/右=ブランク、'R' → 右=left2/左=ブランク、null → 両方ブランク
+  const side = v?.meta?.m36_side ?? null;
+  if (side === 'L'){
+    leftSlot.style.backgroundImage  = `url('${imgRule('right2')}')`;
+    rightSlot.style.backgroundImage = ''; // ブランク
+  }else if (side === 'R'){
+    leftSlot.style.backgroundImage  = ''; // ブランク
+    rightSlot.style.backgroundImage = `url('${imgRule('left2')}')`;
+  } // null のときは両方ブランクのまま
+
+  // 並べる：左ブランク → 数値5 → 右ブランク
+  lane.appendChild(leftSlot);
+  lane.appendChild(n0); lane.appendChild(n1); lane.appendChild(n2); lane.appendChild(n3); lane.appendChild(n4);
+  lane.appendChild(rightSlot);
+
+  // 既存の設置ユーティリティで配置
+  mountLaneUnderItemsBar(lane);
 }
+/* ここまで追加 */
+
 
 
   
