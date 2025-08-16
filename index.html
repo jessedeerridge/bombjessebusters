@@ -1120,23 +1120,24 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
     itemNodes.push(div);
   });
   // ★ 追加：#23 残り山札（= 山札 - 捨て札）だけをアイテム欄へ並べる
-if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true) {
-    // 原則は m23_spreadRest を使用。なければ安全に「deck - discards」で再計算
-   const meta = v?.meta || {};
+  // ★ 追加：#23 広げ済なら「山札に残っていたカードだけ」をアイテム欄に並べる
+ if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true) {
+    // 原則 m23_spreadRest を使用。なければ安全に deck - discards を再計算
+    const meta = v?.meta || {};
     const rest = Array.isArray(meta.m23_spreadRest)
       ? meta.m23_spreadRest
       : (Array.isArray(meta.m23_deck) ? meta.m23_deck : []).filter(n =>
-          !(Array.isArray(meta.m23_discards) ? meta.m23_discards : []).includes(n)
+         !(Array.isArray(meta.m23_discards) ? meta.m23_discards : []).includes(n)
         );
 
     for (const no of rest) {
       const div2 = document.createElement('div');
       div2.className = 'item m23-spread';
-      div2.style.backgroundImage = `url("./item${no}.jpg")`;
+     div2.style.backgroundImage = `url("./item${no}.jpg")`;
       // 表示のみ（拡大は可）。ゲーム状態は変更しない
       div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true });
-     itemsEl.appendChild(div2);
-      itemNodes.push(div2);
+      itemsEl.appendChild(div2);
+     itemNodes.push(div2);
     }
   }
 
@@ -4088,12 +4089,17 @@ function renderM23(v){
     nc.style.backgroundImage = `url('${imgNumber(N)}')`;
     lane.appendChild(nc);
   }
-
-  // 右：アイテム山札UI（既存のattachM23DeckUIを再利用）
-  attachM23DeckUI(lane);
-
+ // ★ 広げ済みなら山札UIは表示しない（消す）
+ if (!v?.meta?.m23_spread) {
+   attachM23DeckUI(lane); // 残枚数は m23_deck / m23_discards から自動表示
+ }
   // アイテム列の直下に設置（#39等と同じユーティリティ）
  mountLaneUnderItemsBar(lane);
+
+ // ★ 広げ後は残りアイテム（= 山札−捨て札）をアイテム欄に並べる
+ if (v?.meta?.m23_spread) {
+   renderM23OpenedItems(v);
+ }
 }  
  
 /* ===== ★ #23：アイテム山（7枚）を数値山レーンの右側に表示 ===== */
@@ -4362,10 +4368,11 @@ async function performM23Spread(){
     const disc = Array.isArray(meta.m23_discards) ? meta.m23_discards.slice() : [];
     const rest = deck.filter(n => disc.indexOf(n) === -1);
 
-    // メタに確定（表示制御と、クライアント側で描画に使う配列）
-    await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      m23_spread: true,
-      m23_spreadRest: rest
+   await update(ref(db, `rooms/${state.roomCode}/meta`), {
+     m23_spread: true,
+      m23_spreadRest: rest,
+      m23_deck: [],
+      m23_discards: []
     });
   }catch(e){
     console.error('performM23Spread', e);
