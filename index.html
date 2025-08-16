@@ -1008,7 +1008,6 @@ if (v) {
     renderM39(v);
     renderM9(v);
     renderM12(v);
-    renderM23(v);
     renderM42(v);
 
     // ▼ ホスト判定を最新化
@@ -1119,42 +1118,8 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
     itemsEl.appendChild(div);
     itemNodes.push(div);
   });
-  // ★ 追加：#23 残り山札（= 山札 - 捨て札）だけをアイテム欄へ並べる
-  // ★ 追加：#23 広げ済なら「山札に残っていたカードだけ」をアイテム欄に並べる
- if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true) {
-    // 原則 m23_spreadRest を使用。なければ安全に deck - discards を再計算
-    const meta = v?.meta || {};
-    const rest = Array.isArray(meta.m23_spreadRest)
-      ? meta.m23_spreadRest
-      : (Array.isArray(meta.m23_deck) ? meta.m23_deck : []).filter(n =>
-         !(Array.isArray(meta.m23_discards) ? meta.m23_discards : []).includes(n)
-        );
 
-    for (const no of rest) {
-      const div2 = document.createElement('div');
-      div2.className = 'item m23-spread';
-     div2.style.backgroundImage = `url("./item${no}.jpg")`;
-      // 表示のみ（拡大は可）。ゲーム状態は変更しない
-      div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true });
-      itemsEl.appendChild(div2);
-     itemNodes.push(div2);
-    }
-  }
 
-  // ★ 追加：#23 の残り山札アイテムをアイテム欄へ並べる
-  if ((v.mission?.id|0) === 23 && v?.meta?.m23_spread === true) {
-    const rest = Array.isArray(v?.meta?.m23_spreadRest) ? v.meta.m23_spreadRest : [];
-   for (const no of rest) {
-      const div2 = document.createElement('div');
-     div2.className = 'item m23-spread';
-      div2.style.backgroundImage = `url("./item${no}.jpg")`;
-      // 表示のみ（拡大は可）。ゲーム状態は変更しない
-     div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true });
-      itemsEl.appendChild(div2);
-      itemNodes.push(div2);
-   }
-  }
-  
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
@@ -1218,18 +1183,6 @@ if ((v.mission?.id|0) === 39) {
     performM39Deal();
   }
 }
-
-// #23：表示中の“数値カード（m23_number）”と同じ数字が4枚全体公開
-// → 山札に残っているアイテムカードをアイテム欄に並べる（ホストのみ・一回）
-if ((v.mission?.id|0) === 23) {
-  const X = v?.meta?.m23_number|0;
-  const done = v?.meta?.m23_spread === true;
-  if (X && !done && (openCountByNum[X]||0) === 4 && state.isHost) {
-    performM23Spread();
-  }
-}
-
-  
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
@@ -3453,6 +3406,10 @@ async function setupMissionOnStart(code){
   if(flags.needsNumberLane && flags.pattern==='P1'){
     const lane = buildDeckLaneP1();
     mountLaneUnderItemsBar(lane);
+        // ★ #23：アイテム1〜13からランダム7枚の山札を作り、数値山の右側に表示
+    if (flags.m23_itemDeck7) {
+      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
+    }
   }
 
   // #30：P1-pop123（山札→1/2/3ポップ／横並びは上限リセット）
@@ -3775,7 +3732,13 @@ function buildDeckLaneP1(){
     restLbl.textContent = `残:${rest}`;
     addToPile(n);
 
-
+    // ★ #23：表になった数値をメタに記録（重複は追加しない）
+     try{
+       const cur = (state.watching?.meta?.m23_drawnNumbers) || [];
+      if (!cur.includes(n)) {
+         update(ref(db, `rooms/${state.roomCode}/meta`), { m23_drawnNumbers: cur.concat(n) });
+       }
+     }catch(_){}
    
     if(rest===0){
       deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
@@ -4055,52 +4018,7 @@ function renderM12(v){
   itemsBar.insertAdjacentElement('afterend', under); // 既存ユーティリティ相当の挿入位置 :contentReference[oaicite:7]{index=7}
 }
 
-/* ===== #23：数値1枚 固定表示 + 右側にアイテム山札（同期） ===== */
-async function ensureM23NumberInit(vNow){
-  const v = vNow || state.watching; if(!v) return;
-  if (v?.mission?.id !== 23) return;
-  const has = (v.meta && (v.meta.m23_number|0) > 0);
-  if (has) return;
-  if (!state.isHost) return; // 初期化はホストのみ
-  const n = MATERIALS.numbers[(Math.random()*MATERIALS.numbers.length)|0] | 0; // 1..12
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_number: n });
-}
-
-function renderM23(v){
-  const isM23 = ((v?.mission?.id|0) === 23);
-  const rowId = 'm23Row';
-  const old = document.getElementById(rowId);
-  if (!isM23){ if (old) old.remove(); return; }
-
-  // 数値＆アイテム山のメタが未準備ならホストが準備して次tickへ
-  if (!((v?.meta?.m23_number|0) > 0)) { ensureM23NumberInit(v); if (old) old.remove(); return; }
-  if (!Array.isArray(v?.meta?.m23_deck)) { ensureM23MetaInit().then(()=>{}); if (old) old.remove(); return; }
-
-  if (old) old.remove();
-  const lane = document.createElement('div');
-  lane.id = rowId;
-  lane.className = 'numlane';
-
-  // 左：数値1枚を固定表示（全員に同期）
-  const N = v?.meta?.m23_number|0;
-  if (N){
-    const nc = document.createElement('div');
-   nc.className = 'numcard';
-    nc.style.backgroundImage = `url('${imgNumber(N)}')`;
-    lane.appendChild(nc);
-  }
- // ★ 広げ済みなら山札UIは表示しない（消す）
- if (!v?.meta?.m23_spread) {
-   attachM23DeckUI(lane); // 残枚数は m23_deck / m23_discards から自動表示
- }
-  // アイテム列の直下に設置（#39等と同じユーティリティ）
- mountLaneUnderItemsBar(lane);
-
- // ★ 広げ後は残りアイテム（= 山札−捨て札）をアイテム欄に並べる
- if (v?.meta?.m23_spread) {
-   renderM23OpenedItems(v);
- }
-}  
+  
  
 /* ===== ★ #23：アイテム山（7枚）を数値山レーンの右側に表示 ===== */
 async function ensureM23MetaInit(){
@@ -4352,32 +4270,6 @@ function renderM39(v){
   }catch(e){ console.error('performM39Deal', e); }
 }
 
-// #23：残りのアイテム山札を“アイテム欄”に並べる（メタへ確定保存）
-async function performM23Spread(){
-  try{
-    const rRef   = ref(db, `rooms/${state.roomCode}`);
-    const rSnap  = await get(rRef);
-    const R      = rSnap.val() || {};
-    const meta   = R.meta || {};
-
-    // すでに実行済みなら何もしない
-    if (meta.m23_spread === true) return;
-
-    // 残っているアイテム（＝山札 - 捨て札）だけを抽出
-    const deck = Array.isArray(meta.m23_deck)     ? meta.m23_deck.slice()     : [];
-    const disc = Array.isArray(meta.m23_discards) ? meta.m23_discards.slice() : [];
-    const rest = deck.filter(n => disc.indexOf(n) === -1);
-
-   await update(ref(db, `rooms/${state.roomCode}/meta`), {
-     m23_spread: true,
-      m23_spreadRest: rest,
-      m23_deck: [],
-      m23_discards: []
-    });
-  }catch(e){
-    console.error('performM23Spread', e);
-  }
-}
   
 function attachM23DeckUI(lane){
   const deckBtn = document.createElement('div');
@@ -4737,7 +4629,7 @@ function missionInfo(id, opts={}){
           'これを解除するまでは、隊長の手番になるたびに装備カードの山から1枚ずつ捨て札にする。',
           'これを解除したら、捨て札になっていない装備が即座に全て使えるようになる。'
         ],
- flags:{ m23_hideItemsUntilSpread:true }
+        flags:{ needsNumberLane:true, pattern:'P1', m23_itemDeck7:true, m23_hideItemsUntilSpread:true }
       };
     }
 
