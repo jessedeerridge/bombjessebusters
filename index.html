@@ -1009,7 +1009,8 @@ if (v) {
     renderM9(v);
     renderM12(v);
     renderM42(v);
-
+renderM23(v);
+    
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
     // ★ 追加：プレイヤーが1人だけなら、その人を自動でホストにする
@@ -3406,10 +3407,6 @@ async function setupMissionOnStart(code){
   if(flags.needsNumberLane && flags.pattern==='P1'){
     const lane = buildDeckLaneP1();
     mountLaneUnderItemsBar(lane);
-        // ★ #23：アイテム1〜13からランダム7枚の山札を作り、数値山の右側に表示
-    if (flags.m23_itemDeck7) {
-      ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
-    }
   }
 
   // #30：P1-pop123（山札→1/2/3ポップ／横並びは上限リセット）
@@ -4018,22 +4015,40 @@ function renderM12(v){
   itemsBar.insertAdjacentElement('afterend', under); // 既存ユーティリティ相当の挿入位置 :contentReference[oaicite:7]{index=7}
 }
 
-  
- 
-/* ===== ★ #23：アイテム山（7枚）を数値山レーンの右側に表示 ===== */
-async function ensureM23MetaInit(){
-  const v = state.watching; if(!v) return;
-  if (Array.isArray(v?.meta?.m23_deck)) return; // 既に初期化済み
-  const pool = itemDeckNumbers(v?.mission?.id || 23).slice(); // 1..13 or 1..12
-  shuffle(pool);
-  const seven = pool.slice(0,7);
-  await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    m23_deck: seven,        // 山札（番号配列）
-   m23_discards: [],       // 捨て札
-    m23_spread: false,      // 広げたか？
-    m23_drawnNumbers: []    // 数値山で表になった数値
-  });
-}
+ /* ===== #23：数値カード1枚を同期表示 ===== */
+ function renderM23(v){
+   const isM23 = ((v?.mission?.id|0) === 23);
+   const rowId = 'm23Row';
+   const old   = document.getElementById(rowId);
+   if (!isM23){ if (old) old.remove(); return; }
+
+   // 初期化：ホストだけが一度だけ m23_num を決める
+   const cur = v?.meta?.m23_num | 0;
+   if (!cur){
+     if (state.isHost){
+       // 既に場にある数値と重複しないように未使用から抽選
+       const picks = pickUnusedNumbers(1);             /* 既存ユーティリティ */ :contentReference[oaicite:5]{index=5}
+       const n = picks[0] || (MATERIALS.numbers[(Math.random()*MATERIALS.numbers.length)|0]);
+       update(ref(db, `rooms/${state.roomCode}/meta`), { m23_num: n }).catch(console.error);
+     }
+     // 次の onValue で描画する
+     if (old) old.remove();
+     return;
+   }
+
+   if (old) old.remove();
+   const lane = document.createElement('div');
+   lane.id = rowId;
+   lane.className = 'numlane';
+
+  // 1枚だけ中央に表示（既存ユーティリティで安全に設置）
+   const holder = document.createElement('div'); holder.className='slot';
+   lane.appendChild(holder);
+   placeNumberCard(cur, holder);                       /* 既存ユーティリティ */ :contentReference[oaicite:6]{index=6}
+
+   mountLaneUnderItemsBar(lane);                       /* 既存ユーティリティ */ :contentReference[oaicite:7]{index=7}
+ }  
+
 
   /* ===== #18：数値カード山札（同期表示） ===== */
   async function ensureM18MetaInit(vNow){
@@ -4270,99 +4285,6 @@ function renderM39(v){
   }catch(e){ console.error('performM39Deal', e); }
 }
 
-  
-function attachM23DeckUI(lane){
-  const deckBtn = document.createElement('div');
- deckBtn.className = 'numdeck';
-  deckBtn.style.backgroundImage = `url("./itemback.jpg")`;
-  const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
-  const refreshRest = ()=>{
-    const v=state.watching, meta=v?.meta||{};
-    const d=(meta.m23_deck||[]), x=(meta.m23_discards||[]);
-    const remain = d.filter(n=>!x.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
-  };
-  refreshRest();
-  lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
-
-  // ★ 追加：表向き捨て札の積み重ね表示（アイテム）
-  const pile = document.createElement('div');
-  pile.className = 'numcard-holder';
-  pile.style.position = 'relative';
-  pile.style.width = cssNum('--item-w') + 'px';
-  pile.style.height = cssNum('--item-h') + 'px';
-  lane.appendChild(pile);
-
-  const addToItemPile = (no)=>{
-    const already = pile.querySelectorAll('.item').length;
-    const node = document.createElement('div');
-    node.className = 'item';
-    node.style.backgroundImage = `url("./item${no}.jpg")`;
-    if(already>0){
-      const off = already * 2; // 数値山札と同じ2px刻み
-      node.style.position = 'absolute';
-      node.style.left = off + 'px';
-      node.style.top  = off + 'px';
-      // 見切れ防止：高さと下マージンを増やす
-      const baseH = cssNum('--item-h');
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
-    }
-    pile.appendChild(node);
-  };
-
-  // ★ 既存の捨て札を描画（リロード/再入室対策）
-  (state.watching?.meta?.m23_discards || []).forEach(addToItemPile);
-
-  deckBtn.onclick = async (ev)=>{
-    const v=state.watching, meta=v?.meta||{};
-    const d=(meta.m23_deck||[]), x=(meta.m23_discards||[]);
-    const remain = d.filter(n=>!x.includes(n));
-
-    // 「広げる」条件は従来通りポップで提示（指示は“めくる”のみポップ廃止）
-    const drawn = new Set(meta.m23_drawnNumbers||[]);
-    const openCountByNum = {};
-    (v.tables||[]).forEach(T=> (T.hand||[]).forEach(c=>{
-      if(c?.kind==='normal' && c.open===true){
-        const nn=c.num|0; openCountByNum[nn]=(openCountByNum[nn]||0)+1;
-      }
-    }));
-    const ready = Array.from(drawn).some(nn => (openCountByNum[nn]||0)===4);
-
-    if (!meta.m23_spread && ready){
-      openOneMini(ev.clientX, ev.clientY, '広げる', async ()=>{
-        const list = remain.map(no=>({id:crypto.randomUUID(), no, used:false, faceUp:true}));
-        await Promise.all([
-          set(ref(db, `rooms/${state.roomCode}/items`), list),
-          update(ref(db, `rooms/${state.roomCode}/meta`), { m23_spread:true })
-        ]);
-        // 展開後は右側積みはクリア
-        pile.innerHTML = '';
-        pile.style.height = cssNum('--item-h') + 'px';
-        lane.style.marginBottom = '0px';
-        refreshRest();
-          // ★★★ ここから追加：アイテム山札UIを消滅させる ★★★
-        try{
-          deckBtn.onclick = null;              // 念のため無効化
-          if (restLbl?.parentNode) restLbl.remove();
-          if (pile?.parentNode)    pile.remove();
-          if (deckBtn?.parentNode) deckBtn.remove();
-        }catch(_){}
-    });
-      return;
-    }
-
-    // ★ 「めくる」は即時実行（ポップなし）
-    if (remain.length<=0) return;
-    const pick = remain[(Math.random()*remain.length)|0];
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { m23_discards: (x||[]).concat(pick) });
-    addToItemPile(pick);  // 右側に表で重ねる
-    refreshRest();
-  };
-
-}
 
 /* ===== ★ #26：1〜12 を 3×4 で並べ、裏表をトグル ===== */
 function mountM26GridUnderItems(){
