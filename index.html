@@ -969,9 +969,9 @@ if (v) {
     return;
   }
 }    
-   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
-     // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
-     if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
+  renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
+      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
+      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
@@ -981,7 +981,8 @@ if (v) {
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     state.gameStarted=!!v?.started;
-renderM39(v);
+    renderM9(v);       // ← ★ 追加：#9 の同期描画
+    renderM39(v);
     renderM42(v);
 
     // ▼ ホスト判定を最新化
@@ -3356,25 +3357,30 @@ async function setupMissionOnStart(code){
       tbls[ti].hand = hand;
     });
 
-    await set(ref(db, `rooms/${code}/tables`), tbls);
-  }
-
-
+      await set(ref(db, `rooms/${code}/tables`), tbls);
+    }
   
-  // #9：右2 + ランダム数値2枚
-  if(flags.needsRuleRow && flags.rule?.type==='R2with2'){
-    const lane = buildNumLaneDOM([
-      {kind:'rule', img: imgRule('right2')},
-      {kind:'num',  img: imgNumber(randNum())},
-      {kind:'num',  img: imgNumber(randNum())}
-    ]);
-    mountLaneUnderItemsBar(lane);
-  }
+  
+    // #9：右2 + ランダム数値2枚（DBに保存して全端末で同期表示）
+    if (flags.needsRuleRow && flags.rule?.type === 'R2with2') {
+      // 既に作成済みならスキップ（再スタート等の重複生成を防止）
+      const m9snap = await get(ref(db, `rooms/${code}/meta/m9_lane`));
+      if (!m9snap.exists()) {
+        // 未使用数字のユーティリティがあれば優先、無ければランダム
+        const nums = (typeof pickUnusedNumbers === 'function')
+          ? pickUnusedNumbers(2)
+          : [randNum(), randNum()];
+        await update(ref(db, `rooms/${code}/meta`), {
+          m9_lane: { rule: 'right2', nums }
+        });
+      }
+    }
+  
+    // #11：パターン1（山札→めくる）
+    if(flags.needsNumberLane && flags.pattern==='P1'){
+      const lane = buildDeckLaneP1();
+      mountLaneUnderItemsBar(lane);
 
-  // #11：パターン1（山札→めくる）
-  if(flags.needsNumberLane && flags.pattern==='P1'){
-    const lane = buildDeckLaneP1();
-    mountLaneUnderItemsBar(lane);
         // ★ #23：アイテム1〜13からランダム7枚の山札を作り、数値山の右側に表示
     if (flags.m23_itemDeck7) {
       ensureM23MetaInit().then(()=> attachM23DeckUI(lane));
@@ -3943,6 +3949,45 @@ async function ensureM23MetaInit(){
     m23_drawnNumbers: []    // 数値山で表になった数値
   });
 }
+
+  /* ===== #9：right2 + 数値2枚（DB同期描画） ===== */
+function renderM9(v){
+  const isM9 = ((v?.mission?.id|0) === 9);
+  const bar  = document.getElementById('itemsBar');
+  const old  = document.getElementById('m9Row');
+  if (!isM9 || !bar){
+    if (old) old.remove();
+    return;
+  }
+
+  const L = v?.meta?.m9_lane;
+  if (!L || !Array.isArray(L.nums) || L.nums.length < 2){
+    if (old) old.remove();
+    return;
+  }
+
+  const lane = document.createElement('div');
+  lane.id = 'm9Row';
+  lane.className = 'numlane';
+
+  // 先頭：right2
+  const rc = document.createElement('div');
+  rc.className = 'rulecard';
+  rc.style.backgroundImage = `url('${imgRule(L.rule || 'right2')}')`;
+  lane.appendChild(rc);
+
+  // 続いて数値2枚
+  L.nums.forEach(n=>{
+    const d = document.createElement('div');
+    d.className = 'numcard';
+    d.style.backgroundImage = `url('${imgNumber(n)}')`;
+    lane.appendChild(d);
+  });
+
+  if (old) old.replaceWith(lane);
+  else bar.insertAdjacentElement('afterend', lane);
+}
+
 /* ===== #39：左に X、右に数値P1山＋公開札、下に自分の受け取り数値 ===== */
 function renderM39(v){
   const isM39 = ((v?.mission?.id|0) === 39);
