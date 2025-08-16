@@ -1011,6 +1011,7 @@ if (v) {
     renderM15(v);
     renderM16(v);
     renderM23(v);
+    renderM26(v);
     renderM42(v);
 
     // ▼ ホスト判定を最新化
@@ -2071,8 +2072,26 @@ function renderM29(v){
   }
 }
 
+function renderM26(v){
+  const isM26 = ((v?.mission?.id|0) === 26);
+  const old   = document.getElementById('m26Grid');
 
+  // ミッション26でなければ消すだけ
+  if (!isM26){ if (old) old.remove(); return; }
 
+  // アイテム帯がまだ描画されていない瞬間はスキップ（次の onValue で描画）
+  const bar = document.getElementById('itemsBar');
+  if (!bar) return;
+
+  // まだ未設置なら設置
+  if (!old) {
+    mountM26GridUnderItems();
+    return; // 次の onValue で _sync が走る
+  }
+
+  // 既にある場合は最新 state に合わせて再同期
+  old._sync && old._sync();
+}
   
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
@@ -4579,9 +4598,13 @@ function attachM23DeckUI(lane){
 /* ===== ★ #26：1〜12 を 3×4 で並べ、裏表をトグル ===== */
 function mountM26GridUnderItems(){
   const bar = document.getElementById('itemsBar');
- // 3行 × 4列（flexレーンを3本作る）
+  // 二重生成防止（既にあれば一旦消す）
+  const existed = document.getElementById('m26Grid');
+  if (existed) existed.remove();
+
+  // 2行 × 6列（合計12枚）
   const wrap = document.createElement('div');
-  wrap.className = 'numlane';
+  wrap.id = 'm26Grid';                      // ★ 後でremoveできるようにID付与
   wrap.style.flexDirection = 'column';
  wrap.style.alignItems = 'flex-start';
   wrap.style.gap = '6px';
@@ -4607,6 +4630,7 @@ function mountM26GridUnderItems(){
     });
   };
   sync();
+  wrap._sync = sync;
 
   wrap.querySelectorAll('.numcard').forEach(el=>{
    el.onclick = (ev)=>{
