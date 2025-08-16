@@ -1009,6 +1009,7 @@ if (v) {
     renderM9(v);
     renderM12(v);
     renderM15(v);
+    renderM16(v);
     renderM23(v);
     renderM42(v);
 
@@ -3551,16 +3552,7 @@ try{
     ]);
   }
 
-  // ===== #16：「右4」＋ランダム3 をアイテム下に敷く =====
-  if(v.mission?.flags?.m16_ruleRight4With3){
-    const lane = buildNumLaneDOM([
-      {kind:'rule', img: imgRule('right4')},
-      {kind:'num',  img: imgNumber(randNum())},
-      {kind:'num',  img: imgNumber(randNum())},
-      {kind:'num',  img: imgNumber(randNum())},
-    ]);
-    mountLaneUnderItemsBar(lane);
-  }
+
 
   // ===== #18：アイテムを 8 のみ、かつ P1 山札 =====
   if(Array.isArray(v.mission?.flags?.limitItemsTo)){
@@ -4367,6 +4359,48 @@ function renderM39(v){
   missionFooter.insertAdjacentElement('beforebegin', row);
 }
 
+/* ===== #16：数値3 + 右4（全員同期） ===== */
+function renderM16(v){
+  const isM16 = ((v?.mission?.id|0) === 16);
+  const old = document.getElementById('m16Row');
+  if (!isM16){ if (old) old.remove(); return; }
+
+  // ★ ホストが一度だけ3枚を確定（DBに保存）—無ければ作って即return（次のonValueで描画）
+  if (state.isHost){
+    const ok = Array.isArray(v?.meta?.m16_nums) && v.meta.m16_nums.length === 3;
+    if (!ok){
+      const pool = MATERIALS.numbers.slice(); shuffle(pool);
+      const three = pool.slice(0,3); // 重複なし
+      update(ref(db, `rooms/${state.roomCode}/meta`), { m16_nums: three });
+      return;
+    }
+  }
+
+  const nums = Array.isArray(v?.meta?.m16_nums) ? v.meta.m16_nums.slice(0,3) : [];
+  if (old) old.remove();
+ const lane = document.createElement('div');
+  lane.id = 'm16Row';
+  lane.className = 'numlane';
+
+  // 左：数値カード3枚（静的表示・操作なし）
+  nums.forEach(n=>{
+   const node = document.createElement('div');
+   node.className = 'numcard';
+    node.style.backgroundImage = `url('${imgNumber(n)}')`;
+    lane.appendChild(node);
+  });
+
+  // 右端：右4カード（横向き）
+  const rule = document.createElement('div');
+ rule.className = 'rulecard';
+  rule.style.backgroundImage = `url('${imgRule('right4')}')`;
+  lane.appendChild(rule);
+
+  // アイテム列の直下に敷く（#39と同じ置き方）
+ mountLaneUnderItemsBar(lane);
+}
+
+  
   async function performM39Deal(){
   try{
     const rRef = ref(db, `rooms/${state.roomCode}`);
