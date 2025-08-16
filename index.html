@@ -1333,16 +1333,20 @@ charCol.className = 'char-col';
 
 const char=document.createElement('div'); 
 char.className='char-card';
-if(!seatedAny){ 
-  char.classList.add('blank'); 
-}else{
+// 自分が未着席  または  この席が空席 → ブランク固定
+const amSeated = seatedNow;           // 先頭で算出済み
+const seatEmpty = !t.playerId;        // 空席判定
+if (!amSeated || seatEmpty) {
+  char.classList.add('blank');
+  char.removeAttribute('style');
+  char.onclick = null;
+} else {
   const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
   char.style.backgroundImage = `url("${face}")`;
-  char.onclick=async ()=>{ 
-    await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), {flipped: !t.character?.flipped}); 
+  char.onclick = async ()=> {
+    await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), { flipped: !t.character?.flipped });
   };
 }
-
     if ((state.watching?.mission?.id|0) === 34 && t.playerId !== state.userId){
   // #34：自分以外はブランク表示・操作不可
   char.removeAttribute('style');
