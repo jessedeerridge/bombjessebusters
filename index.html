@@ -4141,16 +4141,10 @@ if ((v.mission?.id|0) === 39) {
   const allNums = MATERIALS.numbers.slice();
 
   tbls.forEach(T=>{
-    const handNums = (T.hand||[])
-      .filter(c=>c?.kind==='normal')
-      .map(c=> c.num|0);
-    const cands = allNums.filter(n=> !handNums.includes(n));
-    if (cands.length>0){
-      const tok = cands[(Math.random()*cands.length)|0];
-      const row = Array.isArray(T.m22Tokens) ? T.m22Tokens.slice() : [];
-      if (!row.includes(tok)) row.push(tok); // 1つだけ追加（既存は保持）
-      T.m22Tokens = row;
-    }
+    const tok = allNums[(Math.random()*allNums.length)|0]; // ← 手札は見ない
+    const row = Array.isArray(T.m22Tokens) ? T.m22Tokens.slice() : [];
+    if (!row.includes(tok)) row.push(tok);                 // 既存は保持しつつ1つ追加
+    T.m22Tokens = row;
   });
 
   // 2) X を決定、3) X を除く 11 枚から 8 枚の山札
