@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ｓ</title>
+<title>aaa</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -1106,7 +1106,7 @@ if (v) {
   }
 }    
    renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
- fitAllTableHeights();    // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
+     // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
@@ -2919,29 +2919,16 @@ function renderM43(v){
   if (!node.isConnected) tablesEl.appendChild(node);
 }
 /* ここまで追加：ミッション43 */
-// ★ 追加：全ミッション共通—テーブル高さの自動フィット
-function fitTableHeight(tb){
-  const base = 96; // :root --table-h 既定
-  const content = tb.querySelector('.t-content');
-  if (!content){ tb.style.setProperty('--table-h', base + 'px'); return; }
-  // 絶対配置でも scrollHeight は実寸を返す。上辺=offsetTop、下は scrollHeight
-  const top = content.offsetTop || 0;
-  const need = Math.max(base, Math.ceil(top + content.scrollHeight + 4));
-  tb.style.setProperty('--table-h', need + 'px');
-}
-
-function fitAllTableHeights(){
-  // レイアウト確定後にまとめて実行（依存する寸法計測が安定）
-  requestAnimationFrame(()=> {
-    document.querySelectorAll('.table').forEach(fitTableHeight);
-  });
-}
 
 
 /* ▼▼ ここから追加：ミッション44（酸素トークン） ▼▼ */
 function renderM44(v){
   if ((v?.mission?.id|0) !== 44) return;
-   // --- 1) 初期セット（ホストのみ）：人数×2 を全体プールに用意 ---
+  // ミッション44描画前に各テーブルの高さを基準に戻す（前回の残りを消す）
+  document.querySelectorAll('.table').forEach(tb=>{
+    tb.style.removeProperty('--table-h');
+  });
+  // --- 1) 初期セット（ホストのみ）：人数×2 を全体プールに用意 ---
   if (state.isHost && (!v.meta || typeof v.meta.oxItem !== 'number')) {
     const init = (v.tables?.length || 0) * 2;
     update(ref(db, `rooms/${state.roomCode}/meta`), { oxItem:init, oxByTable:{} });
@@ -3060,7 +3047,14 @@ function renderM44(v){
     }
 
 
-  
+    // ▼▼ テーブル高さを所持酸素の行数に合わせて自動調整（スクロール抑止）
+    // 横一列固定（折返しなし）：所持があれば 1 行ぶんだけ高さを足す
+    const baseH = 96;                        // CSS :root の --table-h 既定（96px）
+    const rows  = (cnt > 0 ? 1 : 0);         // ← 常に 1 行 or 0 行
+    const extra = rows > 0 ? (4 + 20) : 0;   // 先頭4px + トークン高さ20px
+    const needH = Math.max(baseH, baseH + extra); // 既定より低くはしない
+    box.style.setProperty('--table-h', `${needH}px`);
+ 
   
 
     // 自分の所持酸素をクリック → 1/2/3 を返却（プールへ）
@@ -3083,7 +3077,6 @@ function renderM44(v){
       ownRow.onclick = null;
     }
   });
-  fitAllTableHeights();
 }
 /* ▲▲ ここまで追加：ミッション44（酸素トークン） ▲▲ */
 
