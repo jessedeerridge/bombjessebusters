@@ -2846,14 +2846,14 @@ function renderM43(v){
       tablesEl.insertAdjacentElement('afterbegin', row);
     }
   }
-  // 行の幅に合わせて左座標を決定（target の左端基準）
+  cl.style.position = 'relative';
+  // target の位置とサイズを取得
   const left = target.offsetLeft + (target.offsetWidth - 56) / 2;
-  node.style.left = `${Math.max(0, left)}px`;
-  node.style.top  = `0px`;
+  const top  = target.offsetTop - 56; // ← nanoの高さぶん上に
+  node.style.left = `${left}px`;
+  node.style.top  = `${top}px`;
 
-  if (!node.isConnected) row.appendChild(node);}
-/* ここまで追加：ミッション43 */
-
+  if (!node.isConnected) cl.appendChild(node);
 
   
   // #31：制約カード拡大ポップ（オーバーレイ表示）
