@@ -400,7 +400,10 @@
 
 .code-link{ text-decoration: underline; cursor: pointer; }
   .m43-nano{
-    position:absolute; z-index:2147483601;
+    position:absolute;
+      top: -10px;          /* ← チェックリストより少し上 */
+  left: 0;             /* 必要に応じて調整 */
+z-index:2147483601;
     width:56px; height:56px;
     background-size:contain; background-repeat:no-repeat; background-position:center;
     pointer-events:auto;   /* クリックして回収メニューを出す */
