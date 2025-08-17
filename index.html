@@ -264,7 +264,7 @@
 
 /* ★ チェック表（テーブル1の真上） */
 .checklist{
-  display:flex; gap:6px; margin:2px 0 2px 10px; align-items:center;
+  display:flex; gap:6px; margin:0 0 0 10px; align-items:center;
 }
 .check-item{
   position:relative; width:30px; height:30px;
@@ -406,7 +406,10 @@
     pointer-events:auto;   /* クリックして回収メニューを出す */
   }
  /* nanoが他と重ならないように全テーブルを下げる */
-  .tables.m43-shift{ margin-top: 56px; } /* 画像の高さぶん下げる */
+ .tables.m43-shift{
+   margin-top: 0;        /* アイテム列との外側余白を0に */
+   padding-top: 56px;    /* 内側に nano の高さぶんスペースを確保 */
+ }
 </style>
 </head>
 <body>
@@ -2833,9 +2836,9 @@ function renderM43(v){
   const tb = tablesEl.getBoundingClientRect();
   const rb = target.getBoundingClientRect();
   const x = rb.left - tb.left + (rb.width/2) - (56/2);
-  const y = rb.top  - tb.top  - 56 - 4 ;  // ← ここだけ変更
+  const y = 0; // ← 縦位置は常に tables 内の先頭（= アイテム列との間）に固定、上下余白0
   node.style.left = `${Math.max(0, x)}px`;
-  node.style.top  = `${Math.max(0, y)}px`;
+  node.style.top  = `${y}px`;
 
   if (!node.isConnected) tablesEl.appendChild(node);
 }
@@ -5514,7 +5517,7 @@ function missionInfo(id, opts={}){
         id:43, name:'#43', desc:'',
         display:[
           '#43',...linesForMix,
-          '',
+          '1の位置にナノロボットを',
           '',
           '',
        ],
