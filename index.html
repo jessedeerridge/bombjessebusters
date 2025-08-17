@@ -423,6 +423,19 @@
    /* 横10個で改行（20pxトークン×10 + 2pxギャップ×9 を上限目安に） */
    max-width:calc(20px * 10 + 2px * 9);
  }
+.ox-row.ox-pool{ align-items:center; gap:6px; max-width:none; }
+.ox-side{
+ width:var(--item-w); height:var(--item-h);
+  border-radius:8px; border:1px solid #ddd;
+  background:#fff url('./ox2.jpg') center/cover no-repeat;
+  flex:0 0 auto;
+}
+.ox-wrap{
+  display:flex; flex-wrap:wrap; gap:2px;
+  max-width:calc(20px * 10 + 2px * 9);
+}
+
+  
  /* ▲▲ ：ミッション44（酸素トークン） ▲▲ */
   
 </style>
@@ -2925,17 +2938,26 @@ function renderM44(v){
   if (!poolRow){
     poolRow = document.createElement('div');
     poolRow.id = 'm44OxPool';
-    poolRow.className = 'ox-row';
+    poolRow.className = 'ox-row ox-pool';   // 左画像を置くプール行
     // アイテム列の“直下”に置く（ミッション12の num-under と同様の位置感）
     itemsBar.insertAdjacentElement('afterend', poolRow);
   }
-  // 再描画
-  poolRow.innerHTML = '';
-  const poolCnt = Math.max(0, v.meta?.oxItem|0);
+  let wrap = poolRow.querySelector('.ox-wrap');
+  if (!wrap){
+    poolRow.innerHTML = '';
+    const side = document.createElement('div');
+    side.className = 'ox-side';       // ← 左側の ox2.jpg（アイテムカードと同サイズ）
+    poolRow.appendChild(side);
+    wrap = document.createElement('div');
+    wrap.className = 'ox-wrap';       // ← トークンを詰める枠（10個で改行）
+    poolRow.appendChild(wrap);
+  }else{
+    wrap.innerHTML = '';
+  }  const poolCnt = Math.max(0, v.meta?.oxItem|0);
   for (let i=0; i<poolCnt; i++){
     const t = document.createElement('div');
     t.className = 'token ox';
-    poolRow.appendChild(t);
+    wrap.appendChild(t);  // ← トークンは .ox-wrap の中へ
   }
 
   // クリックで 1/2/3 取得（隊長は「集める」も表示）
