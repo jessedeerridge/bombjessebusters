@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>aえ</title>
+<title>aaa</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3030,7 +3030,7 @@ function renderM44(v){
         anchor.insertAdjacentElement('afterend', ownRow);
         // 「アルファベット二個分」だけ下げる（文字高を動的取得）
         const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
-        ownRow.style.marginTop = `${Math.round(ah * 15)}px`;
+        ownRow.style.marginTop = `${Math.round(ah * 5)}px`;
       } else {
         // フォールバック：手札の直後に置く
         const hand = box.querySelector('.hand');
