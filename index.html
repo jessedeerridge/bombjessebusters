@@ -278,6 +278,17 @@
   background:rgba(34,197,94,.35);
   pointer-events:none;
 }
+
+.nano-img{
+  position:absolute;
+  left:50%; bottom:100%;
+  transform:translate(-50%, -6px);
+  width:40px; height:40px;
+  background-size:contain; background-repeat:no-repeat; background-position:center;
+ pointer-events:auto;  /* クリックで回収タブ */
+  z-index:20000;
+}
+.tables.m43-slid{ margin-top:28px; } /* nano と重ならないよう少し下げる */
   
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
   .mini-pop{
@@ -2744,140 +2755,120 @@ await Promise.all([
   }
 }
 /* ここまで追加：#42 */
-
-/* ここから追加：#43 描画・操作ロジック */
+<!-- ここから追加：#43 -->
+<script>
 function renderM43(v){
   const isM43 = ((v?.mission?.id|0) === 43);
-  const oldRow   = document.getElementById('m43Row');
-  const oldSpace = document.getElementById('m43Spacer');
-
+  // 後始末（ミッション外）
   if (!isM43){
-    if (oldRow)   oldRow.remove();
-    if (oldSpace) oldSpace.remove();
+    const old = document.getElementById('m43Nano');
+    if (old) old.remove();
+    const tbls = document.querySelector('.tables');
+    if (tbls) tbls.classList.remove('m43-slid');
     return;
   }
 
-  // メタ未用意ならホストが初期化済みになるまで待機（#41/#30等と同じ流儀）
-  if (!Array.isArray(v?.meta?.m43_a)){
-    if (oldRow) oldRow.remove();
-    return;
-  }
+  // チェック表（.checklist）は renderTables で生成される：存在しなければ何もしない
+  const cl = document.querySelector('.checklist');
+  const tbls = document.querySelector('.tables');
+  if (!cl || !tbls) return;
 
-  // 既存をクリアして作り直し
-  if (oldRow) oldRow.remove();
-
-  // テーブル直前にスペーサを差し込んで、nano画像が被らないようにする
-  if (!oldSpace){
-    const sp = document.createElement('div');
-    sp.id = 'm43Spacer';
-    sp.style.height = '54px';
-    tablesEl.parentElement.insertBefore(sp, tablesEl);
-  }
-
-  // チェックリスト行（テーブル群の直前）
-  const row = document.createElement('div');
-  row.id = 'm43Row';
-  row.className = 'checklist';
-  row.style.position = 'relative';
-  const sel  = (v?.meta?.m43_sel|0);
-  const prev = (v?.meta?.m43_prev|0);
-
-  for(let i=1; i<=12; i++){
-    const cell = document.createElement('div');
-    cell.className = 'check-item';
-    cell.textContent = String(i);
-    if (sel === (i-1)){
-      const mark = document.createElement('div');
-      mark.className = 'check-mark';
-      cell.appendChild(mark);
-    }
+  // 1) チェック数字をクリック可能に（押された数字を meta に同期）
+  [...cl.children].forEach((cell, i)=>{
+    cell.style.cursor = 'pointer';
     cell.onclick = async (ev)=>{
-      const now = i-1;
-      const dir = (now < (v?.meta?.m43_prev ?? now)) ? 'left' : 'right';
+      ev.stopPropagation();
+      const nowN  = i+1;                             // 1..12
+      const prevN = v?.meta?.m43_anchor|0;
+      const dir   = (prevN && nowN < prevN) ? 'left' : 'right';
       await update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m43_sel: now, m43_prev: now, m43_dir: dir
+        m43_anchor: nowN, m43_dir: dir
       });
     };
-    row.appendChild(cell);
+  });
+
+  // 2) nano 画像の再描画（前回のを消してから 1個だけ表示）
+  const old = document.getElementById('m43Nano');
+  if (old) old.remove();
+
+  const anchor = v?.meta?.m43_anchor|0;              // 配置先（チェック数字）
+  const level  = Math.max(0, Math.min(3, (v?.meta?.m43_level|0))); // 0..3
+  const dir    = (v?.meta?.m43_dir === 'left') ? 'left' : 'right';
+
+  if (anchor){
+    const target = cl.children[anchor-1];
+    if (target){
+      const nano = document.createElement('div');
+      nano.id = 'm43Nano';
+      nano.className = 'nano-img';
+      // 画像名：nano{level}[left].png
+      const name = (dir==='left') ? `nano${level}left.png` : `nano${level}.png`;
+      nano.style.backgroundImage = `url('./${name}')`;
+
+      // クリック → 「回収」ミニメニュー
+      nano.onclick = (ev)=>{
+        ev.stopPropagation();
+        openMenu(ev.clientX, ev.clientY, [
+          {label:'回収', action: async ()=>{ await performM43Collect(); }}
+        ]);
+      };
+
+      target.appendChild(nano);
+      tbls.classList.add('m43-slid');     // テーブルを少し下げる
+    }
+  }else{
+    tbls.classList.remove('m43-slid');
+  }
+}
+
+// #43：回収アクション（押した人の手札へ A群トップを昇順で挿入＆▼5秒）
+async function performM43Collect(){
+  const tIdx = (state.seatedTable|0);
+  if (!Number.isInteger(tIdx)) { alert('着席してから操作してください。'); return; }
+
+  const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+  const hRef = ref(db, `rooms/${state.roomCode}/tables/${tIdx}/hand`);
+
+  const [mSnap, hSnap] = await Promise.all([ get(mRef), get(hRef) ]);
+  const meta = mSnap.val() || {};
+  const hand = hSnap.val() || [];
+
+  const A = Array.isArray(meta.m43_A) ? meta.m43_A.slice() : [];
+  if (A.length === 0){
+    // A群が空でも「数字だけ減らす」仕様ならここで level だけ減らす
+    const nextLv = Math.max(0, (meta.m43_level|0) - 1);
+    await update(mRef, { m43_level: nextLv });
+    return;
   }
 
-  // nano画像（選択セルの「上」）
-  const nano = document.createElement('div');
-  nano.id = 'm43Nano';
-  nano.style.position   = 'absolute';
-  nano.style.width      = '80px';
-  nano.style.height     = '40px';
-  nano.style.zIndex     = '2147483600';
-  nano.style.cursor     = 'pointer';
-  nano.style.pointerEvents = 'auto';
-
-  // 画像ファイル名（方向：上がる→通常 / 下がる→left）
-  const level = (v?.meta?.m43_nano|0);                   // 0..4 を想定
-  const dir   = (v?.meta?.m43_dir || 'right');
-  nano.style.background = `url('./nano${level}${dir==='left'?'left':''}.png') center/contain no-repeat`;
-
-  // 位置：選択セルの真上（上下オフセット固定）
-  const cell = row.children[sel] || row.children[0];
-  const x = cell.offsetLeft + (cell.offsetWidth/2) - 40;
-  nano.style.left = x + 'px';
-  nano.style.top  = '-46px';
-
-  // クリック→回収メニュー（既存openOneMini）
-  nano.onclick = (ev)=>{
-    openOneMini(ev.clientX, ev.clientY, '回収', async ()=>{
-      await doM43Collect();   // 下で定義
-    });
+  const pick = A.shift();  // {num, kind}
+  const newCard = {
+    id: crypto.randomUUID(),
+    num: pick.num|0,
+    kind: pick.kind||'normal',
+    open: false,
+    ownerId: state.userId,
+    tokens: [],
+    markUntil: (Date.now() + 5000)         // ▼ 5秒表示
   };
 
-  row.appendChild(nano);
-  tablesEl.parentElement.insertBefore(row, document.getElementById('m43Spacer') || tablesEl);
+  hand.push(newCard);
+  hand.sort((a,b)=> a.num - b.num);
+  // α再付与（既存慣例）
+  const alpha='abcdefghijklmnopqrstuvwxyz';
+  hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]);
+
+  const nextLv = Math.max(0, (meta.m43_level|0) - 1);
+
+  await Promise.all([
+    set(hRef, hand),
+    update(mRef, { m43_A: A, m43_level: nextLv })
+  ]);
 }
+</script>
+<!-- ここまで追加：#43 -->
 
-/* 回収アクション：A群の先頭を自分の手札に昇順で挿入＋▼マーク（5秒） */
-async function doM43Collect(){
-  try{
-    const v = state.watching; if (!v) return;
-    const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-    const tRef = ref(db, `rooms/${state.roomCode}/tables`);
 
-    const [mSnap, tSnap] = await Promise.all([get(mRef), get(tRef)]);
-    const meta = mSnap.val()||{};
-    const tables = tSnap.val()||[];
-
-    let A = Array.isArray(meta.m43_a) ? meta.m43_a.slice() : [];
-    if (A.length === 0) return;  // もう無い
-
-    const give = A.shift();      // 先頭1枚
-    const myIdx = (tables||[]).findIndex(T => T?.playerId === state.userId);
-    if (myIdx < 0) return;
-
-    const T = tables[myIdx] || {hand:[]};
-    const hand = Array.isArray(T.hand) ? T.hand.slice() : [];
-
-    // αの採番は既存の realpha を使用（無ければ空文字）
-    let alpha = '';
-    try{ alpha = realpha(hand, give) || ''; }catch(_e){}
-
-    const card = {
-      id: crypto.randomUUID(), num: give, alpha,
-      kind:'normal', open:false, ownerId: state.userId,
-      markUntil: Date.now() + 5000  // ▼を5秒表示（既存UI：marker/ blink）
-    };
-    hand.push(card);
-    hand.sort((a,b)=> (a.num|0)-(b.num|0) || String(a.alpha||'').localeCompare(String(b.alpha||'')));
-
-    const newNano = Math.max(0, (meta.m43_nano|0) - 1);
-
-    await update(ref(db, `rooms/${state.roomCode}`), {
-      [`tables/${myIdx}/hand`]: hand,
-      [`meta/m43_a`]: A,
-      [`meta/m43_nano`]: newNano
-    });
-  }catch(e){ console.error(e); }
-}
-/* ここまで追加 */
-
-  
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
   try{
@@ -3648,6 +3639,16 @@ async function startGame(playerCount, missionId){
     toAdd.map(s => ({ id:crypto.randomUUID(), num:s.num, kind:s.kind, open:false, ownerId:null }))
   );
   shuffle(deck);
+  /* ここから追加：#43 A群の準備（配布前に抜き取り） */
+  let m43A = null;           // [{num,kind}, ...]
+  let m43Level = null;       // 0..3
+  if (missionId === 43){
+    const k = (playerCount >= 5 ? 3 : 4);         // 5-6人→3枚 / 3-4人→4枚
+    const taken = deck.splice(0, Math.min(k, deck.length));
+    m43A = taken.map(c => ({ num:c.num, kind:c.kind||'normal' }));
+    // 指示では 3-4人で nano4.png だが、提供画像は nano0..3 のため 3 に丸める
+    m43Level = Math.min(3, (playerCount >= 5 ? 3 : 4));  // → 実質 3 をセット
+  }
 
   // ミッション表示メタ生成（赤/黄の結果行を先頭に差し込む）
   missionMeta = missionInfo(missionId, { mixLines, chooseLines });
@@ -3706,8 +3707,17 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
      /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
     /* ▲▲ ここまで追加 ▼▼ */
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
-  });
+    meta:{
+      itemUses:{i1:0,i2:0,i12:0,i14:0},
+      tokenCounts:{equal:0,noteq:0,x1:0},
+      i2Flow:null, i18Flow:null, i16Badge:null,
+      /* ここから追加：#43 初期メタ */
+      m43_A: (missionMeta?.id===43 ? (m43A||[]) : null),
+      m43_level: (missionMeta?.id===43 ? (m43Level??3) : null),
+      m43_anchor: null,       // 1..12（最後に押されたチェック数字）
+      m43_dir: 'right'        // 'left' or 'right'（移動方向）
+      /* ここまで追加 */
+    }  });
 
   await setupMissionOnStart(code);   // ★追加
 
@@ -3729,42 +3739,6 @@ async function setupMissionOnStart(code){
     });
   }
 
-
-/* ：#43 初期化（A群の生成と各手札からの除去） */
-if ((v.mission?.id|0) === 43 && v?.meta?.m43_setup !== true && state.isHost){
-  const tcount = v.tableCount|0;
-  const takeN  = (tcount >= 5 ? 3 : 4);
-
-  // 全テーブル手札から「通常数値カード」を収集
-  const normals = [];
-  (v.tables||[]).forEach((T, ti)=>{
-    (T?.hand||[]).forEach(c=>{
-      if ((c?.kind||'normal') === 'normal'){ normals.push({ti, id:c.id, num:c.num|0}); }
-    });
-  });
-
-  shuffle(normals);                     // 既存のshuffleを使用
-  const pick = normals.slice(0, takeN); // A群に回す分
-  const A = pick.map(p=>p.num|0);       // A群は「数字」だけの山（先頭＝上）
-
-  // 選出カードを各手札から除去
-  const tablesNew = (v.tables||[]).map((T, ti)=>{
-    const toRemove = new Set(pick.filter(p=>p.ti===ti).map(p=>p.id));
-    return {...T, hand:(T?.hand||[]).filter(c=>!toRemove.has(c.id))};
-  });
-
-  await update(ref(db, `rooms/${code}`), {
-    [`tables`]: tablesNew,
-    [`meta/m43_setup`]: true,
-    [`meta/m43_a`]: A,
-    [`meta/m43_nano`]: (tcount>=5?3:4),
-    [`meta/m43_sel`]: 0,       // チェックリストの選択位置（0始まり）
-    [`meta/m43_prev`]: 0,      // 直前に押された位置
-    [`meta/m43_dir`]: 'right'  // 'left' or 'right'（初期は右）
-  });
-}
-
-  
     /* ★ #12：各アイテムの“真下”に置く数字を決定→metaへ保存（ホストのみ・一度だけ） */
     if ((v.mission?.id|0) === 12) {
     if (!Array.isArray(v?.meta?.m12_under)) {
