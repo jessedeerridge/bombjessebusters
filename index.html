@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>えsa</title>
+<title>aaa</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -138,13 +138,6 @@
     padding:0 8px;height:var(--table-h);display:block;background:#fff;
     overflow:auto;width:max-content;z-index:0;
   }
- @media (hover: hover) and (pointer: fine){
-   /* Firefox */
-  .table{ scrollbar-width: none; }
-   /* Chrome / Edge / Safari */
-   .table::-webkit-scrollbar{ display: none; }
-}
-  
   .table.elevated{ z-index:9999; }
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
@@ -351,6 +344,10 @@
   .tab.active{background:#111;color:#fff;border-color:#111}
   .tab.disabled{opacity:.35;pointer-events:none}
 
+ @media (max-width: 860px){
+    main{flex-direction:column}
+    .side{width:100%;max-width:none}
+  }
 
 /* ▼▼ 画面下部ミッションピッカー ▼▼ */
 .mp{
@@ -440,28 +437,7 @@
   max-width:calc(20px * 10 + 2px * 9);
 }
 
- @media (min-width: 1025px){
-   /* 3) 縦バーの原因を根本解消：下方向の余白拡張をPCでは0に */
-   :root{ --content-extra: 0px; }
-
-   /* 1) 2) 本体と内側レーンのバー自体を非表示（動作は維持） */
-   .table{ -ms-overflow-style:none; scrollbar-width:none; }            /* Firefox/旧Edge */
-   .table::-webkit-scrollbar{ width:0; height:0; }                     /* Chrome/Edge/Safari */
-
-   .items, .numlane, .conlane{ -ms-overflow-style:none; scrollbar-width:none; }
-  .items::-webkit-scrollbar,
-   .numlane::-webkit-scrollbar,
-   .conlane::-webkit-scrollbar{ width:0; height:0; }
- }
-
-  /* 絶対配置をやめてフローに戻す：親の高さに寄与させる */
-  .t-content {
-    position: static !important;
-    left: auto; right: auto; top: auto; bottom: auto;  /* inset解除 */
-    min-height: auto;                                   /* 固定最小高も解除 */
-    margin-top: 2px;                                    /* 見た目の余白だけ足す */
-  }
-}
+  
  /* ▲▲ ：ミッション44（酸素トークン） ▲▲ */
   
 </style>
@@ -948,8 +924,8 @@ function buildMixPlan(missionId){
   45: [  // 赤2
     {type:'redPick', k:2},
   ],
-  46: [  // 黄4（5.1,6.1,7.1,8.1 固定）
-    { type:'yellowFixed', list:[5.1, 6.1, 7.1, 8.1] },
+  46: [  // 黄4 (5.1,6.1,7.1,8.1)
+    {type:'yellowPick', k:4},
   ],
   47: [  // 赤3-2
     {type:'redChoose', from:3, take:2},
