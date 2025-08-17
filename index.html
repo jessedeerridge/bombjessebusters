@@ -2833,7 +2833,7 @@ function renderM43(v){
   const tb = tablesEl.getBoundingClientRect();
   const rb = target.getBoundingClientRect();
   const x = rb.left - tb.left + (rb.width/2) - (56/2);
-  const y = rb.top  - tb.top  - 56 - 4 - 200;  // ← ここだけ変更
+  const y = rb.top  - tb.top  - 56 - 4 ;  // ← ここだけ変更
   node.style.left = `${Math.max(0, x)}px`;
   node.style.top  = `${Math.max(0, y)}px`;
 
