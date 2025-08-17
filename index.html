@@ -699,7 +699,6 @@ document.querySelectorAll('.numlane').forEach(n => {
   ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
     const el = document.getElementById(id); if (el) el.remove();
   });
- const m44 = document.getElementById('m44Reserve'); if (m44) m44.remove();
   NUMCARD_REG.clear();
 }
 
@@ -2910,15 +2909,6 @@ function renderM43(v){
 /* ▼▼ ここから追加：ミッション44（酸素トークン） ▼▼ */
 function renderM44(v){
   if ((v?.mission?.id|0) !== 44) return;
-
-  // ★ 44でないなら、もし残っていればDOMを掃除して終了
-  if (!isM44){
-    const wrap = document.getElementById('m44Reserve');
-    if (wrap) wrap.remove();                // ← アイコン＋リザーブの親
-    const pool = document.getElementById('m44OxPool');
-    if (pool && pool.isConnected) pool.remove();
-    return;
-  }
 
   // --- 1) 初期セット（ホストのみ）：人数×2 を全体プールに用意 ---
   if (state.isHost && (!v.meta || typeof v.meta.oxItem !== 'number')) {
