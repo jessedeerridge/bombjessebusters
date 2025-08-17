@@ -3014,7 +3014,6 @@ function renderM44(v){
     if (entries.length === 0) return; openMenu(ev.clientX, ev.clientY, entries);  };
 
   // --- 3) 各プレイヤーテーブルの“下部”（情報トークン群より下）に所持酸素を表示 ---
-  // --- 3) 各プレイヤーテーブルの“下部”（情報トークン群より下）に所持酸素を表示 ---
   const tableNodes = document.querySelectorAll('.table'); // renderTables の並びと同順
   (v.tables||[]).forEach((T, ti)=>{
     const box = tableNodes[ti];
@@ -3026,16 +3025,18 @@ function renderM44(v){
       ownRow = document.createElement('div');
       ownRow.className = 'ox-row';
       ownRow.dataset.owner = '1';
+     // アルファベット(.alpha)と情報トークン(.tok-col)の「直後」に置く
+     const anchor =
+       box.querySelector('.tok-col') ||
+       box.querySelector('.badge-fixed') ||
+       box.querySelector('.hand');
+     if (anchor) {
+       anchor.insertAdjacentElement('afterend', ownRow);
+     } else {
+       // フォールバック（従来どおりテーブル末尾）
+       box.appendChild(ownRow);
+     }
     }
-    // ★修正：.tok-col/.badge-fixed の「中」に入れると幅がカード幅に固定され折り返さない
-    //        常に .t-content の直後（テーブル直下）に配置してテーブル幅で折り返す
-    const tContent = box.querySelector('.t-content');   // ★
-    if (tContent) {                                     // ★
-      tContent.insertAdjacentElement('afterend', ownRow); // ★ 既存でも移動させる
-    } else {                                            // ★
-      box.appendChild(ownRow);                          // ★
-    }                                                   // ★
-
     // 再描画
     ownRow.innerHTML = '';
     const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
@@ -3044,7 +3045,6 @@ function renderM44(v){
       t.className = 'token ox';
       ownRow.appendChild(t);
     }
-
 
 
     // ▼▼ テーブル高さを所持酸素の行数に合わせて自動調整（スクロール抑止）
