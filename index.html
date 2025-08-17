@@ -2844,6 +2844,67 @@ function renderM43(v){
 }
 /* ここまで追加：ミッション43 */
 
+/* ▼▼ ここから追加：ミッション43の初期A群処理 ▼▼ */
+async function setupM43Deck(v){
+  if(!state.isHost) return;
+  if(!v?.mission || (v.mission.id|0)!==43) return;
+  if(v.meta?.m43_A) return; // 既にセット済み
+
+  // 山札の用意（例: 通常numbers）
+  let pool = MATERIALS.numbers.slice();
+  shuffle(pool);
+
+  // 人数に応じてA群を抜く
+  const cnt = (v.tableCount>=5 ? 3 : 4);
+  const A = pool.splice(0, cnt);
+
+  // DBに保存
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    m43_A: A,
+    m43_rest: pool
+  });
+}
+/* ▲▲ ここまで追加 ▼▼ */
+
+
+/* ▼▼ 回収アクション時の補充処理 ▼▼ */
+async function performM43Draw(playerId){
+  const v = state.watching;
+  if(!v?.mission || (v.mission.id|0)!==43) return;
+  const A = (v.meta?.m43_A)||[];
+  if(A.length===0) return;
+
+  const card = A[0];
+  const rest = A.slice(1);
+
+  // 手札を更新（昇順ソート）
+  const table = (v.tables||[]).find(T=>T.playerId===playerId);
+  if(!table) return;
+  const hand = (table.hand||[]).slice();
+  hand.push({num:card, kind:'normal'});
+  hand.sort((a,b)=>(a.num|0)-(b.num|0));
+
+  await update(ref(db, `rooms/${state.roomCode}`), {
+    [`tables/${table.titleNumber-1}/hand`]: hand,
+    "meta/m43_A": rest
+  });
+
+  // ▼マーカーを5秒間表示
+  setTimeout(()=>{
+    const tableDiv = tablesEl.children[table.titleNumber-1];
+    if(tableDiv){
+      const last = tableDiv.querySelector('.card-wrap:last-child');
+      if(last){
+        const mk = document.createElement('div');
+        mk.className='marker';
+        mk.textContent='▼';
+        last.appendChild(mk);
+        setTimeout(()=> mk.remove(), 5000);
+      }
+    }
+  }, 200);
+}
+/* ▲▲ ここまで追加 ▼▼ */
 
   
   // #31：制約カード拡大ポップ（オーバーレイ表示）
