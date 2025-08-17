@@ -142,7 +142,7 @@
     /* 横幅は親に収め、スクロールバーは出さない */
     width:100%;
     max-width:100%;
-    overflow:hidden;   /* ← 縦横スクロール禁止 */
+  overflow:visible;  /* ← 切れ防止。内側のスクロールも表示される */
     z-index:0;
   }
   .table.elevated{ z-index:9999; }
@@ -175,10 +175,11 @@
 
 .hand{
   display:flex;align-items:flex-start;gap:var(--card-gap);
-  overflow-y:hidden; overflow-x:auto;   /* ← 横スクロール可にする */
+  overflow-y:hidden;  /* ← 縦は出さない */
+  overflow-x:auto;    /* ← 手札レーン内だけ横スクロール */
   flex:0 0 auto;position:relative;
-  width:max-content;                    /* ← 内容ぶん横幅を広げる */
-  white-space:nowrap;                   /* ← 折り返し禁止 */
+  width:max-content;  /* ← 枚数ぶんだけ横に広がる */
+  white-space:nowrap; /* ← 折り返し禁止＝横一列を維持 */
   max-height:calc(var(--content-h) - 2px + var(--content-extra));
   padding-bottom:2px;
 }
