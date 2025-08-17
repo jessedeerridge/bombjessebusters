@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>sあ</title>
+<title>ああ</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -278,11 +278,7 @@
   background:rgba(34,197,94,.35);
   pointer-events:none;
 }
- /* ここから追加：#43 用オーバーレイとテーブルのスライド */
-.m43-nano{ position:absolute; width:48px; height:60px; z-index:2147483000; pointer-events:auto; }
-.m43-nano img{ display:block; width:48px; height:60px; }
-.tables.m43-shift{ margin-top:50px; }  /* nano が被らないようにテーブル群を下げる */
- 
+  
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
   .mini-pop{
     position:fixed;z-index:2147483647;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
@@ -680,11 +676,7 @@ document.querySelectorAll('.numlane').forEach(n => {
   });
   NUMCARD_REG.clear();
 }
-{
-  const m43 = document.getElementById('m43Nano');
-  if (m43) m43.remove();
-  tablesEl?.classList?.remove('m43-shift');
-}
+
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
 function placeNumberCard(n, mountParent){
   const existing = NUMCARD_REG.get(n);
@@ -1100,7 +1092,6 @@ if (v) {
     renderM23(v);
     renderM26(v);
     renderM42(v);
-    renderM43(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1309,37 +1300,19 @@ if ((v.mission?.id|0) === 23) {
 
   
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
-if ((v.tables||[]).length > 0){
-  const cl = document.createElement('div'); cl.className = 'checklist';
-  const isM43 = ((v?.mission?.id|0) === 43);   // 43かどうか判定
-
-  for (let n=1; n<=12; n++){
-    const cell = document.createElement('div'); cell.className='check-item';
-    cell.textContent = String(n);
-
-    // 既存：チェックマーク表示
-    if ((openCountByNum[n]||0) === 4){
-      const mk = document.createElement('div'); mk.className='check-mark';
-      cell.appendChild(mk);
+  if((v.tables||[]).length>0){
+    const cl = document.createElement('div'); cl.className='checklist';
+    for(let n=1; n<=12; n++){
+      const cell = document.createElement('div'); cell.className='check-item';
+      cell.textContent = String(n);
+      if((openCountByNum[n]||0) === 4){ // 同じ数字が4本全体公開
+        const mk = document.createElement('div'); mk.className='check-mark';
+        cell.appendChild(mk);
+      }
+      cl.appendChild(cell);
     }
-
-    // ★追加：ミッション43ならクリックできるようにする
-    if (isM43){
-      cell.style.cursor = 'pointer';
-      cell.onclick = async ()=>{
-        try{
-          const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-          const currNow = (state.watching?.meta?.m43_curr|0) || n;
-          await update(mRef, { m43_prev: currNow, m43_curr: n });
-        }catch(e){ console.error(e); }
-      };
-    }
-
-    cl.appendChild(cell);
+    tablesEl.appendChild(cl); // ← 直後にテーブル1が来るので「真上」になる
   }
-  tablesEl.appendChild(cl);  // チェックリストを配置
-}
-
 
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
   const seatedAny = (v.tables||[]).some(T => !!T.playerId);
@@ -2771,83 +2744,6 @@ await Promise.all([
 }
 /* ここまで追加：#42 */
 
-/* ここから追加：#43 初期化と描画 */
-async function ensureM43MetaInit(vNow){
-  const v = vNow || state.watching; if (!v) return;
-  if (typeof v?.meta?.m43_count === 'number') return;
-  if (!state.isHost) return;  // 初期化はホストのみ
-
-  // 人数に応じた初期カウント（画像は 0..3 のため最大3に丸める）
-  const people = v?.tableCount|0;
-const start = (people >= 5) ? 3 : 4;
-   const initPos = 6; // 初期表示位置（チェック表の6の上）※後でクリックで動く
-
-  await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    m43_count: start,   // 0..3
-    m43_prev:  initPos, // 直前に押されていた番号
-    m43_curr:  initPos  // 現在の番号
-  });
-}
-
-// ここから変更：renderM43 を人数で初期 nano を決めて表示する版に置き換え
-function renderM43(v){
-  const isM43 = ((v?.mission?.id|0) === 43);
-  const old = document.getElementById('m43Nano');
-
-  // ミッション外：掃除して終了
-  if (!isM43){
-    if (old) old.remove();
-    tablesEl.classList.remove('m43-shift');
-    return;
-  }
-
-  // 既存オーバーレイを一度掃除
-  if (old) old.remove();
-
-  // ★初回：ホストが人数を見て初期 nano 画像を決定（1回だけ）
-  //   m43_initialized が未設定のときだけ実行
-  if (state.isHost && !v?.meta?.m43_initialized){
-    // 着席人数（なければ開始ポップの選択値 or tableCount をフォールバック）
-    const seated = (v?.tables||[]).filter(T => !!T.playerId).length;
-    const selected = parseInt((selCount?.value||'0'), 10) || 0;
-    const fallback = (v?.tableCount|0);
-    const count = seated || selected || fallback;
-
-    // 5–6人: nano3.png / 3–4人: nano4.png
-    const initImg = (count >= 5 ? 'nano3.png' : 'nano4.png');
-
-    // meta に保存（onValue の次回呼び出しで描画する）
-    update(ref(db, `rooms/${state.roomCode}/meta`), {
-      m43_initialized: true,
-      m43_img: initImg
-    });
-    return;
-  }
-
-  // ★表示：meta の m43_img を使って nano を出す
-  const imgName = v?.meta?.m43_img || 'nano3.png';
-
-  // テーブル群が被らないように下げる（CSSで余白確保）
-  tablesEl.classList.add('m43-shift');
-
-  // オーバーレイ生成
-  const wrap = document.createElement('div');
-  wrap.id = 'm43Nano';
-  wrap.className = 'm43-nano';
-  const img = document.createElement('img');
-  img.src = `./${imgName}`;
-  wrap.appendChild(img);
-
-  // ひとまず左上に固定（後でクリック移動などを付ける場合はここに追記）
-  wrap.style.left = '10px';
-  wrap.style.top  = '8px';
-
-  tablesEl.appendChild(wrap);
-}
-
-
-
-  
 
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
