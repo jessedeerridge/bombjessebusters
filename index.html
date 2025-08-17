@@ -2815,10 +2815,50 @@ function renderM43(v){
   node.onclick = (ev)=>{
     openMenu(ev.clientX, ev.clientY, [
       { label:'回収（段階を下げる）', action: async ()=>{
-          const cur = (state.watching?.meta?.m43_nano|0);
-          const next = Math.max(0, cur - 1);
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { m43_nano: next, m43_updatedAt: Date.now() });
-        } 
+      /* ここから追加：#43 回収タップ → A群から1枚を自分の手札へ */
+      const code = state.roomCode;
+      const myTable = state.seatedTable;
+      if (myTable == null) { alert('席に座っているプレイヤーのみ操作できます'); return; }
+
+      // メタとテーブルを取得
+      const mRef = ref(db, `rooms/${code}/meta`);
+      const tRef = ref(db, `rooms/${code}/tables`);
+      const [mSnap, tSnap] = await Promise.all([ get(mRef), get(tRef) ]);
+      const meta = mSnap.val() || {};
+      const tbls = tSnap.val() || [];
+      const A = Array.isArray(meta.m43_A) ? meta.m43_A.slice() : [];
+
+      // A群から1枚取り出し（先頭＝一番上）
+      if (A.length > 0 && tbls[myTable]) {
+        const n = A.shift(); // number
+        const T = tbls[myTable];
+        const hand = Array.isArray(T.hand) ? T.hand : [];
+        hand.push({
+          id: crypto.randomUUID(),
+          num: n,
+          kind: 'normal',
+          open: false,
+          ownerId: T.playerId || null,
+          tokens: [],
+          markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
+        });
+        hand.sort((a,b)=> a.num - b.num);
+        const alpha = 'abcdefghijklmnopqrstuvwxyz';
+        hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
+        T.hand = hand;
+
+        // DB へ反映（テーブル更新＋A群を更新）
+        await Promise.all([
+          set(ref(db, `rooms/${code}/tables`), tbls),
+          update(mRef, { m43_A: A })
+        ]);
+      }
+
+      // 既存の「段階を下げる」もそのまま実行
+      const cur = (state.watching?.meta?.m43_nano|0);
+      const next = Math.max(0, cur - 1);
+      await update(mRef, { m43_nano: next, m43_updatedAt: Date.now() });
+      }
       }
     ]);
   };
@@ -2844,67 +2884,7 @@ function renderM43(v){
 }
 /* ここまで追加：ミッション43 */
 
-/* ▼▼ ここから追加：ミッション43の初期A群処理 ▼▼ */
-async function setupM43Deck(v){
-  if(!state.isHost) return;
-  if(!v?.mission || (v.mission.id|0)!==43) return;
-  if(v.meta?.m43_A) return; // 既にセット済み
 
-  // 山札の用意（例: 通常numbers）
-  let pool = MATERIALS.numbers.slice();
-  shuffle(pool);
-
-  // 人数に応じてA群を抜く
-  const cnt = (v.tableCount>=5 ? 3 : 4);
-  const A = pool.splice(0, cnt);
-
-  // DBに保存
-  await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    m43_A: A,
-    m43_rest: pool
-  });
-}
-/* ▲▲ ここまで追加 ▼▼ */
-
-
-/* ▼▼ 回収アクション時の補充処理 ▼▼ */
-async function performM43Draw(playerId){
-  const v = state.watching;
-  if(!v?.mission || (v.mission.id|0)!==43) return;
-  const A = (v.meta?.m43_A)||[];
-  if(A.length===0) return;
-
-  const card = A[0];
-  const rest = A.slice(1);
-
-  // 手札を更新（昇順ソート）
-  const table = (v.tables||[]).find(T=>T.playerId===playerId);
-  if(!table) return;
-  const hand = (table.hand||[]).slice();
-  hand.push({num:card, kind:'normal'});
-  hand.sort((a,b)=>(a.num|0)-(b.num|0));
-
-  await update(ref(db, `rooms/${state.roomCode}`), {
-    [`tables/${table.titleNumber-1}/hand`]: hand,
-    "meta/m43_A": rest
-  });
-
-  // ▼マーカーを5秒間表示
-  setTimeout(()=>{
-    const tableDiv = tablesEl.children[table.titleNumber-1];
-    if(tableDiv){
-      const last = tableDiv.querySelector('.card-wrap:last-child');
-      if(last){
-        const mk = document.createElement('div');
-        mk.className='marker';
-        mk.textContent='▼';
-        last.appendChild(mk);
-        setTimeout(()=> mk.remove(), 5000);
-      }
-    }
-  }, 200);
-}
-/* ▲▲ ここまで追加 ▼▼ */
 
   
   // #31：制約カード拡大ポップ（オーバーレイ表示）
@@ -3698,6 +3678,25 @@ async function startGame(playerCount, missionId){
   }
   /* ▲▲ ここまで追加：#29 ▼▼ */
 
+  let m43A = [];
+  if (missionId === 43) {
+    // 5,6人→3枚 / 3,4人→4枚（2人は想定外だが 4 に寄せる）
+    const need = (playerCount >= 5) ? 3 : 4;
+    // 「このミッションで配布する予定のカード」＝現在の deck から通常数値カードだけを候補に
+    const normalIdx = deck.map((c,i)=> c?.kind==='normal' ? i : -1).filter(i=> i>=0);
+    shuffle(normalIdx);
+    // ランダムに必要枚数ぶんを選び、デッキから“抜き取り”→ A群（数値の配列）に
+    const takeIdx = normalIdx.slice(0, need).sort((a,b)=> b-a); // 後ろから splice するため降順
+    takeIdx.forEach(i=>{
+      const c = deck[i];
+      if (c && typeof c.num === 'number') {
+        m43A.push(c.num|0);
+        deck.splice(i,1); // デッキから除外
+      }
+    });
+  }
+
+  
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
   let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
@@ -3737,7 +3736,18 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
     /* ▲▲ ここまで追加 ▼▼ */
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
-
+  /* ここから追加：#43 A群と nano 初期値を meta に保存 */
+  if (missionId === 43) {
+    const initNano = (playerCount >= 5) ? 3 : 4; // スタート時の表示（仕様どおり）
+    try{
+      await update(ref(db, `rooms/${code}/meta`), {
+        m43_A: Array.isArray(m43A) ? m43A : [],
+        m43_nano: initNano,
+        m43_pos: 0,
+        m43_prevPos: 0
+      });
+    }catch(_e){}
+  }
   await setupMissionOnStart(code);   // ★追加
 
   H(gear,false);
