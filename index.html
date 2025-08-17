@@ -437,7 +437,12 @@
   max-width:calc(20px * 10 + 2px * 9);
 }
 
-  
+  @media (min-width: 861px) {
+  .table {
+    overflow: hidden;   /* 完全に消す場合 */
+    /* overflow: visible; にすると、中身に合わせてテーブルが伸びる */
+  }
+}
  /* ▲▲ ：ミッション44（酸素トークン） ▲▲ */
   
 </style>
