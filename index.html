@@ -419,12 +419,13 @@
   background-repeat:no-repeat;
 }
  .ox-row{
-   display:flex; flex-wrap:wrap; gap:2px; margin-top:4px;
-   /* 横10個で改行（20pxトークン×10 + 2pxギャップ×9 を上限目安に） */
- max-width:calc(20px * 12 + 2px * 11);
-  width:max-content;     /* 中身の幅ぶんを確保（折返しは max-width に任せる） */
-  flex:0 0 auto;         /* フレックス収縮を禁止 → 縦1列化を防ぐ */
-  align-self:flex-start; /* （任意）上寄せで安定配置 */
+  display:flex; flex-wrap:nowrap; gap:2px; margin-top:0;
+   width:max-content; flex:0 0 auto; align-self:flex-start;
+ }
+ /* 新規：アルファベットの高さを基準に“固定配置”するためのクラス */
+ .ox-row.ox-fixed{
+   position:absolute; left:50%; transform:translateX(-50%);
+   top:0; /* 実際のY座標はJSで .alpha 高さ×2 を計算して代入 */
  }
 .ox-row.ox-pool{ align-items:center; gap:6px; max-width:none; }
 .ox-side{
@@ -3023,19 +3024,16 @@ function renderM44(v){
     let ownRow = box.querySelector('.ox-row[data-owner="1"]');
     if (!ownRow){
       ownRow = document.createElement('div');
-      ownRow.className = 'ox-row';
+      ownRow.className = 'ox-row ox-fixed';
       ownRow.dataset.owner = '1';
-     // アルファベット(.alpha)と情報トークン(.tok-col)の「直後」に置く
-     const anchor =
-       box.querySelector('.tok-col') ||
-       box.querySelector('.badge-fixed') ||
-       box.querySelector('.hand');
-     if (anchor) {
-       anchor.insertAdjacentElement('afterend', ownRow);
-     } else {
-       // フォールバック（従来どおりテーブル末尾）
-       box.appendChild(ownRow);
-     }
+      // 常に .badge-fixed 内へ（情報トークンの有無に依存しない）
+      const badge = box.querySelector('.badge-fixed');
+      if (badge) {
+        badge.appendChild(ownRow);
+      } else {
+        // フォールバック（万一 .badge-fixed が無い場合はテーブル末尾）
+        box.appendChild(ownRow);
+      }
     }
     // 再描画
     ownRow.innerHTML = '';
@@ -3046,13 +3044,25 @@ function renderM44(v){
       ownRow.appendChild(t);
     }
 
+    // ▼ 位置決め：アルファベット(.alpha) の「2個分下」に固定
+    (()=>{
+      const badge = box.querySelector('.badge-fixed');
+      const alpha = badge?.querySelector('.alpha');
+      if (!badge) return;
+      // 絶対配置用に行クラスを付け直し（再利用時の保険）
+      ownRow.classList.add('ox-fixed');
+      // .alpha の高さを測って 2倍 + 少しの余白（2px）
+      const h = (alpha?.getBoundingClientRect().height || 11); // フォールバック 11px
+      const y = (alpha ? alpha.offsetTop : 0) + (h * 2) + 2;
+      ownRow.style.top = `${y}px`;    
+
 
     // ▼▼ テーブル高さを所持酸素の行数に合わせて自動調整（スクロール抑止）
-    // 1行=最大12個（.ox-row は横12で折返し。トークン20px + 行間2px、先頭に4pxマージン）
-    const baseH = 96;                        // CSS :root の --table-h 既定（96px）
-    const rows  = Math.ceil(cnt / 12);       // 何段になるか
-    const extra = rows > 0 ? (4 + rows*20 + Math.max(0, rows-1)*2) : 0; // 4px + 段×(20+2)
-    const needH = Math.max(baseH, baseH + extra); // 既定より低くはしない
+    // 横一列固定：所持があれば常に1段ぶんだけ余白を確保
+    const baseH = 96;                        // CSS :root --table-h 既定
+    const rows  = (cnt > 0 ? 1 : 0);
+    const extra = rows ? (22) : 0;           // 目安：トークン20px + 余白2px
+    const needH = Math.max(baseH, baseH + extra);
     box.style.setProperty('--table-h', `${needH}px`);
  
   
