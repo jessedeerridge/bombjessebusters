@@ -3025,14 +3025,17 @@ function renderM44(v){
       ownRow = document.createElement('div');
       ownRow.className = 'ox-row';
       ownRow.dataset.owner = '1';
-      // カード帯(.t-content)の「直後」に必ず置く（情報トークンの有無や位置に依存しない）
-      const content = box.querySelector('.t-content');
-      if (content) {
-        content.insertAdjacentElement('afterend', ownRow);
-      } else {
-        // フォールバック（従来どおりテーブル末尾）
-        box.appendChild(ownRow);
-      }
+     // アルファベット(.alpha)と情報トークン(.tok-col)の「直後」に置く
+     const anchor =
+       box.querySelector('.tok-col') ||
+       box.querySelector('.badge-fixed') ||
+       box.querySelector('.hand');
+     if (anchor) {
+       anchor.insertAdjacentElement('afterend', ownRow);
+     } else {
+       // フォールバック（従来どおりテーブル末尾）
+       box.appendChild(ownRow);
+     }
     }
     // 再描画
     ownRow.innerHTML = '';
