@@ -399,7 +399,14 @@
 /* ▲▲ 画面下部ミッションピッカー ▲▲ */
 
 .code-link{ text-decoration: underline; cursor: pointer; }
-
+  .m43-nano{
+    position:absolute; z-index:2147483601;
+    width:56px; height:56px;
+    background-size:contain; background-repeat:no-repeat; background-position:center;
+    pointer-events:auto;   /* クリックして回収メニューを出す */
+  }
+ /* nanoが他と重ならないように全テーブルを下げる */
+  .tables.m43-shift{ margin-top: 56px; } /* 画像の高さぶん下げる */
 </style>
 </head>
 <body>
@@ -1092,6 +1099,7 @@ if (v) {
     renderM23(v);
     renderM26(v);
     renderM42(v);
+    renderM43(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1309,6 +1317,21 @@ if ((v.mission?.id|0) === 23) {
         const mk = document.createElement('div'); mk.className='check-mark';
         cell.appendChild(mk);
       }
+      /* ここから追加：#43のときだけクリック可能（全員） */
+      if ((v?.mission?.id|0) === 43) {
+        cell.style.cursor = 'pointer';
+        cell.onclick = async ()=>{
+          const prev = v?.meta?.m43_pos|0;    // 以前の位置（0=未配置）
+          const next = n|0;
+          if (!state.roomCode) return;
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            m43_prevPos: prev || 0,
+           m43_pos: next,
+            m43_updatedAt: Date.now()
+          });
+        };
+      }
+      
       cl.appendChild(cell);
     }
     tablesEl.appendChild(cl); // ← 直後にテーブル1が来るので「真上」になる
@@ -2744,7 +2767,82 @@ await Promise.all([
 }
 /* ここまで追加：#42 */
 
+/* ここから追加：ミッション43 */
+function renderM43(v){
+  const isM43 = ((v?.mission?.id|0) === 43);
+  const old = document.getElementById('m43Nano');
 
+  // ミッション43以外 → 後片付け
+  if (!isM43){
+    if (old) old.remove();
+    tablesEl.classList.remove('m43-shift');
+    return;
+  }
+
+  // 初期化：ホストが m43_nano を用意
+  if ((v?.meta?.m43_nano|0) === 0){
+    if (state.isHost){
+      const P = (v?.tableCount|0) || (v?.tables?.length|0) || 0;
+      const initNano = (P>=5) ? 3 : 4;
+      update(ref(db, `rooms/${state.roomCode}/meta`), { m43_nano: initNano, m43_pos: 0, m43_prevPos: 0 });
+    }
+    if (old) old.remove();
+    tablesEl.classList.toggle('m43-shift', false);
+    return;
+  }
+
+  const pos     = v?.meta?.m43_pos|0;
+  const prevPos = v?.meta?.m43_prevPos|0;
+  const nanoLv  = clamp(v?.meta?.m43_nano|0, 0, 4);
+
+  if (!pos){
+    if (old) old.remove();
+    tablesEl.classList.remove('m43-shift');
+    return;
+  }
+
+  const goingLeft = (prevPos>0 && pos < prevPos);
+  const img = goingLeft ? `./nano${nanoLv}left.png` : `./nano${nanoLv}.png`;
+
+  const node = old || document.createElement('div');
+  node.id = 'm43Nano';
+  node.className = 'm43-nano';
+  node.style.backgroundImage = `url("${img}")`;
+
+  node.onclick = (ev)=>{
+    openMenu(ev.clientX, ev.clientY, [
+      { label:'回収（段階を下げる）', action: async ()=>{
+          const cur = (state.watching?.meta?.m43_nano|0);
+          const next = Math.max(0, cur - 1);
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m43_nano: next, m43_updatedAt: Date.now() });
+        } 
+      }
+    ]);
+  };
+
+  const cells = tablesEl.querySelectorAll('.checklist .check-item');
+  const target = cells[pos-1];
+  if (!target){
+    if (node.isConnected) node.remove();
+    tablesEl.classList.remove('m43-shift');
+    return;
+  }
+
+  tablesEl.classList.add('m43-shift');
+
+  const tb = tablesEl.getBoundingClientRect();
+  const rb = target.getBoundingClientRect();
+  const x = rb.left - tb.left + (rb.width/2) - (56/2);
+  const y = rb.top  - tb.top  - 56 - 4;
+  node.style.left = `${Math.max(0, x)}px`;
+  node.style.top  = `${Math.max(0, y)}px`;
+
+  if (!node.isConnected) tablesEl.appendChild(node);
+}
+/* ここまで追加：ミッション43 */
+
+
+  
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
   try{
