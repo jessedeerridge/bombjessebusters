@@ -942,10 +942,10 @@ function buildMixPlan(missionId){
   47: [  // 赤3-2
     {type:'redChoose', from:3, take:2},
   ],
-  48: [  // 赤2 黄3
-    {type:'redPick', k:2},
-    {type:'yellowPick', k:3},
-  ],
+ 48: [  // 赤2 黄3（隊長と次＋次の次のテーブル）
+   { type:'redPick', k:2 },
+   { type:'yellowCaptain3' },
+ ],
   49: [  // 赤2
     {type:'redPick', k:2},
   ],
@@ -978,6 +978,15 @@ function executeMixPlan(planList){
       cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
 　     mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
     }
+   if(p.type==='yellowCaptain3'){
+     // 黄コードを3枚用意
+     const cand = pickK(MATERIALS.yellowCodes, 3);
+     cand.forEach((n, idx)=> {
+       toAdd.push({ num:n, kind:'yellow', target:'captain', offset:idx });
+     });
+     mixLines.push('<span style="color:gold;">▧</span> 隊長と次の2テーブル');
+   }
+    
         if(p.type==='yellowFixed'){
       const cand = (p.list || []).slice();
       cand.forEach(n => toAdd.push({ num:n, kind:'yellow' }));
