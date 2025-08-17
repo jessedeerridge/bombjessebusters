@@ -138,6 +138,13 @@
     padding:0 8px;height:var(--table-h);display:block;background:#fff;
     overflow:auto;width:max-content;z-index:0;
   }
+ @media (hover: hover) and (pointer: fine){
+   /* Firefox */
+  .table{ scrollbar-width: none; }
+   /* Chrome / Edge / Safari */
+   .table::-webkit-scrollbar{ display: none; }
+}
+  
   .table.elevated{ z-index:9999; }
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
