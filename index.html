@@ -2962,20 +2962,23 @@ function renderM44(v){
 
   // クリックで 1/2/3 取得（隊長は「集める」も表示）
   poolRow.onclick = (ev)=>{
-    const entries = [1,2,3].map(k => ({
-      label: String(k),
-      action: async ()=>{
-        const left = (v.meta?.oxItem|0) - k;
-        const idx  = state.seatedTable;
-        if (idx==null) return;
-        const mine = (v.meta?.oxByTable?.[idx]||0) + k;
-        if (left < 0) return;
-        await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          oxItem: left,
-          [`oxByTable/${idx}`]: mine
-        });
-      }
-    }));
+    const poolCnt = Math.max(0, v.meta?.oxItem|0);  // ← プール残量
+    const entries = [1,2,3]
+      .filter(k => poolCnt >= k)                    // ← 足りる数だけ表示
+     .map(k => ({
+        label: String(k),
+        action: async ()=>{
+         const left = (v.meta?.oxItem|0) - k;
+          const idx  = state.seatedTable;
+          if (idx==null) return;
+          const mine = (v.meta?.oxByTable?.[idx]||0) + k;
+         if (left < 0) return;
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            oxItem: left,
+            [`oxByTable/${idx}`]: mine
+          });
+        }
+      }));
 
     // ★隊長だけ：全員の酸素トークンを集めてリザーブ（oxItem）へ戻す
     if ((v.captainTable|0) === (state.seatedTable|0)) {
@@ -3002,12 +3005,7 @@ function renderM44(v){
         }
       });
     }
-
-    openMenu(ev.clientX, ev.clientY, entries);
-  };
-
-
-
+    if (entries.length === 0) return; openMenu(ev.clientX, ev.clientY, entries);  };
 
   // --- 3) 各プレイヤーテーブルの“下部”（情報トークン群より下）に所持酸素を表示 ---
   const tableNodes = document.querySelectorAll('.table'); // renderTables の並びと同順
