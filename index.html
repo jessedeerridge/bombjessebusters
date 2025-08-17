@@ -421,7 +421,7 @@
  .ox-row{
    display:flex; flex-wrap:wrap; gap:2px; margin-top:4px;
    /* 横10個で改行（20pxトークン×10 + 2pxギャップ×9 を上限目安に） */
-   max-width:calc(20px * 10 + 2px * 9);
+ max-width:calc(20px * 12 + 2px * 11);
  }
 .ox-row.ox-pool{ align-items:center; gap:6px; max-width:none; }
 .ox-side{
@@ -3020,6 +3020,22 @@ function renderM44(v){
       ownRow.className = 'ox-row';
       ownRow.dataset.owner = '1';
       box.appendChild(ownRow);
+      +      // ここから追加①：作成直後に「下端」よりさらに下へ配置
+      {
+        const boxRect = box.getBoundingClientRect();
+       let maxBottom = 0;
+        box.querySelectorAll('.badge-fixed, .card').forEach(el=>{
+          const r = el.getBoundingClientRect();
+          if (r.bottom > maxBottom) maxBottom = r.bottom;
+        });
+        const topY = Math.max(8, Math.round(maxBottom - boxRect.top + 4)); // 余白4px
+        Object.assign(ownRow.style, {
+          position: 'absolute',
+          left: '8px',
+          right: '8px',
+          top: `${topY}px`
+        });
+      }
     }
     // 再描画
     ownRow.innerHTML = '';
@@ -3029,7 +3045,22 @@ function renderM44(v){
       t.className = 'token ox';
       ownRow.appendChild(t);
     }
+    // ここから追加②：再描画後も改めて位置を測り直して下へスライド
+    {
+      const boxRect = box.getBoundingClientRect();
+      let maxBottom = 0;
+      box.querySelectorAll('.badge-fixed, .card').forEach(el=>{
+        const r = el.getBoundingClientRect();
+        if (r.bottom > maxBottom) maxBottom = r.bottom;
+      });
+      const topY = Math.max(8, Math.round(maxBottom - boxRect.top + 4));
+      ownRow.style.top = `${topY}px`;
+      ownRow.style.position = 'absolute';
+      ownRow.style.left = '8px';
+      ownRow.style.right = '8px';
+    }
 
+  
     // 自分の所持酸素をクリック → 1/2/3 を返却（プールへ）
     if ((state.seatedTable|0) === (ti|0)){
       ownRow.onclick = (ev)=>{
