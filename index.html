@@ -410,21 +410,6 @@
    margin-top: 0;        /* アイテム列との外側余白を0に */
    padding-top: 56px;    /* 内側に nano の高さぶんスペースを確保 */
  }
-
- .m44-reserve{
-   display:flex; align-items:center; gap:8px; margin-top:4px;
- }
- /* アイテムカードより“少し小さく”。
-    var(--item-w/--item-h) が未定義でも動くようにデフォルトを併記 */
- .m44-oxicon{
-   width:  calc(var(--item-w, 50px) * 0.8);
-   height: calc(var(--item-h, 75px) * 0.8);
-   background-image:url('./ox2.jpg');
-   background-size:cover; background-repeat:no-repeat; background-position:center;
-  border-radius:6px; flex:0 0 auto;
- }
-
-  
  /* ▼▼ ミッション44（酸素トークン） ▼▼ */
 .token.ox{
   background:none;   /* ← 背景色を消す */
@@ -714,6 +699,7 @@ document.querySelectorAll('.numlane').forEach(n => {
   ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
     const el = document.getElementById(id); if (el) el.remove();
   });
+ const m44 = document.getElementById('m44Reserve'); if (m44) m44.remove();
   NUMCARD_REG.clear();
 }
 
@@ -2925,6 +2911,15 @@ function renderM43(v){
 function renderM44(v){
   if ((v?.mission?.id|0) !== 44) return;
 
+  // ★ 44でないなら、もし残っていればDOMを掃除して終了
+  if (!isM44){
+    const wrap = document.getElementById('m44Reserve');
+    if (wrap) wrap.remove();                // ← アイコン＋リザーブの親
+    const pool = document.getElementById('m44OxPool');
+    if (pool && pool.isConnected) pool.remove();
+    return;
+  }
+
   // --- 1) 初期セット（ホストのみ）：人数×2 を全体プールに用意 ---
   if (state.isHost && (!v.meta || typeof v.meta.oxItem !== 'number')) {
     const init = (v.tables?.length || 0) * 2;
@@ -2933,40 +2928,18 @@ function renderM44(v){
   }
 
   // --- 2) アイテム列の下に全体プールを表示（クリックで 1/2/3 の取得） ---
-  // --- 2) アイテム列の下に「アイコン＋リザーブ（横並び）」を表示 ---
   const itemsBar = document.getElementById('itemsBar');
   if (!itemsBar) return;
 
-  // ラッパー（横並び）
-  let reserveWrap = document.getElementById('m44Reserve');
-  let poolRow     = document.getElementById('m44OxPool');
-
-  if (!reserveWrap){
-    reserveWrap = document.createElement('div');
-    reserveWrap.id = 'm44Reserve';
-    reserveWrap.className = 'm44-reserve';
-    // itemsBar の“直下”に設置（HTML上この位置が最適） :contentReference[oaicite:2]{index=2}
-    itemsBar.insertAdjacentElement('afterend', reserveWrap);
-  }
-
-  // 左側アイコン
-  let icon = document.getElementById('m44OxIcon');
-  if (!icon){
-    icon = document.createElement('div');
-    icon.id = 'm44OxIcon';
-    icon.className = 'm44-oxicon';
-    reserveWrap.appendChild(icon);
-  }
-
-  // 右側：リザーブの酸素トークン列
+  let poolRow = document.getElementById('m44OxPool');
   if (!poolRow){
     poolRow = document.createElement('div');
     poolRow.id = 'm44OxPool';
     poolRow.className = 'ox-row';
-    reserveWrap.appendChild(poolRow);
+    // アイテム列の“直下”に置く（ミッション12の num-under と同様の位置感）
+    itemsBar.insertAdjacentElement('afterend', poolRow);
   }
-
-  // 再描画：リザーブ内のトークン
+  // 再描画
   poolRow.innerHTML = '';
   const poolCnt = Math.max(0, v.meta?.oxItem|0);
   for (let i=0; i<poolCnt; i++){
@@ -2974,7 +2947,6 @@ function renderM44(v){
     t.className = 'token ox';
     poolRow.appendChild(t);
   }
-
 
   // クリックで 1/2/3 取得（隊長は「集める」も表示）
   poolRow.onclick = (ev)=>{
