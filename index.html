@@ -410,6 +410,22 @@
    margin-top: 0;        /* アイテム列との外側余白を0に */
    padding-top: 56px;    /* 内側に nano の高さぶんスペースを確保 */
  }
+/* ▼▼ ここから追加：酸素トークン ▼▼ */
+.token.oxygen {
+  width:20px; height:20px;
+  background:url('./ox.png') center/contain no-repeat;
+  border:none;
+  margin:1px;
+}
+.o2-row { display:flex; flex-wrap:wrap; gap:2px;
+  max-width: calc(20px * 10 + 2px * 9);
+}
+#m44O2Pool { display:flex; flex-wrap:wrap; gap:2px; margin-top:4px; }
+.o2-under { display:flex; flex-wrap:wrap; gap:2px; margin-top:2px; }
+
+
+
+  
 </style>
 </head>
 <body>
@@ -1044,7 +1060,8 @@ function updateHeaderInfo(){
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
     players:{}, spectators:{},
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null },
+   meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null,
+          m44_pool:0, m44_tables:{} },
     lastActiveAt: Date.now()
   };}
 
@@ -1103,6 +1120,7 @@ if (v) {
     renderM26(v);
     renderM42(v);
     renderM43(v);
+    renderM44(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -2884,6 +2902,93 @@ function renderM43(v){
 }
 /* ここまで追加：ミッション43 */
 
+function renderM44(v){
+  if((v?.mission?.id|0) !== 44) return;
+
+  // ▼ プール（アイテム下）
+  const poolEl = document.getElementById('m44O2Pool') || (()=> {
+    const el=document.createElement('div');
+    el.id='m44O2Pool';
+    const itemsBar=document.getElementById('itemsBar');
+    itemsBar.insertAdjacentElement('afterend', el);
+    return el;
+  })();
+  poolEl.innerHTML='';
+  const poolCount = v.meta?.m44_pool ?? ((v.tables?.length||0)*2);
+  for(let i=0;i<poolCount;i++){
+    const tok=document.createElement('div');
+    tok.className='token oxygen';
+    tok.onclick=(ev)=>{
+      openMenu(ev.clientX, ev.clientY, [
+        {label:'1', action:()=>moveO2('pool','self',1)},
+        {label:'2', action:()=>moveO2('pool','self',2)},
+        {label:'3', action:()=>moveO2('pool','self',3)},
+        ...(state.isHost && v.mission?.captainTable===state.seatedTable ?
+          [{label:'集める', action:()=>collectO2()}] : [])
+      ]);
+    };
+    poolEl.appendChild(tok);
+  }
+
+  // ▼ 各テーブル下
+  (v.tables||[]).forEach((T,idx)=>{
+    const underId=`m44O2-${idx}`;
+    let under=document.getElementById(underId);
+    if(!under){
+      under=document.createElement('div');
+      under.className='o2-under';
+      under.id=underId;
+      const tbl=document.querySelectorAll('.table')[idx];
+      if(tbl) tbl.appendChild(under);
+    }
+    under.innerHTML='';
+    const cnt=(v.meta?.m44_tables?.[idx]||0);
+    for(let j=0;j<cnt;j++){
+      const tok=document.createElement('div');
+      tok.className='token oxygen';
+      tok.onclick=(ev)=>{
+        openMenu(ev.clientX, ev.clientY, [
+          {label:'1', action:()=>moveO2('self','pool',1)},
+          {label:'2', action:()=>moveO2('self','pool',2)},
+          {label:'3', action:()=>moveO2('self','pool',3)},
+        ]);
+      };
+      under.appendChild(tok);
+    }
+  });
+}
+
+  async function moveO2(from,to,num){
+  const v=state.watching;
+  const idx=state.seatedTable;
+  if(idx==null) return;
+  const pool=v.meta?.m44_pool|0;
+  const tables=Object.assign({}, v.meta?.m44_tables||{});
+  if(from==='pool' && to==='self'){
+    const take=Math.min(num,pool);
+    tables[idx]=(tables[idx]||0)+take;
+    await update(ref(db,`rooms/${state.roomCode}/meta`),{
+      m44_pool:pool-take, m44_tables:tables
+    });
+  }
+  if(from==='self' && to==='pool'){
+    const have=tables[idx]||0;
+    const ret=Math.min(num,have);
+    tables[idx]=have-ret;
+    await update(ref(db,`rooms/${state.roomCode}/meta`),{
+      m44_pool:pool+ret, m44_tables:tables
+    });
+  }
+}
+
+async function collectO2(){
+  const v=state.watching;
+  const total=Object.values(v.meta?.m44_tables||{}).reduce((a,b)=>a+b,0);
+  await update(ref(db,`rooms/${state.roomCode}/meta`),{
+    m44_pool:(v.meta?.m44_pool|0)+total,
+    m44_tables:{}  // 全員リセット
+  });
+}
 
 
   
