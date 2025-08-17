@@ -3020,16 +3020,14 @@ function renderM44(v){
       ownRow.className = 'ox-row';
       ownRow.dataset.owner = '1';
      // アルファベット(.alpha)と情報トークン(.tok-col)の「直後」に置く
-     const anchor =
-       box.querySelector('.tok-col') ||
-       box.querySelector('.badge-fixed') ||
-       box.querySelector('.hand');
+     const anchor = box.querySelector('.tok-col');
      if (anchor) {
+       // 情報トークン列の「直後」に酸素トークンを置く（横一列に並ぶ）
        anchor.insertAdjacentElement('afterend', ownRow);
      } else {
-       // フォールバック（従来どおりテーブル末尾）
        box.appendChild(ownRow);
-     }    }
+     }
+    }
     // 再描画
     ownRow.innerHTML = '';
     const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
