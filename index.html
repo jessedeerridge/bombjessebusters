@@ -525,6 +525,29 @@
   </div>
 </div>
 
+<div id="startPop" class="start-pop hidden">
+  <div class="row"><label>人数</label>
+    <select id="selCount"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select>
+  </div>
+  <div class="row"><label>ミッション</label>
+<select id="selMission">
+  <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
+  <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
+  <option value="8">#8</option>
+  <option value="9">#9 aaa</option>
+  <option value="10">#10 bbb</option>
+  <option value="11">#11 ccc</option>
+  <option value="12">#12</option>
+  <option value="42">#42</option><option value="43">#43</option>
+</select>
+  </div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn small" id="btnStartOk">OK</button>
+    <button class="btn small ghost" id="btnStartCancel">キャンセル</button>
+  </div>
+</div>
+
+  
 <div id="seatPop" class="seat-pop hidden">
   <div class="row"><label>席を選択</label><div id="seatTabs" class="tabs"></div></div>
   <div class="row" style="justify-content:flex-end">
@@ -4131,6 +4154,13 @@ if ((v.mission?.id|0) === 39) {
   ]);
 }
 
+if ((v.mission?.id|0) === 48) {
+  const done = v?.meta?.m48_restricted === true;
+  if (!done && state.isHost && Array.isArray(v?.tables) && (v.tables.length > 0)) {
+    performM48Restrict(v).catch(console.error);
+  }
+}
+  
   // #26：1〜12を3×4で配置（裏表トグル）
   if (flags.m26_grid12) {
     mountM26GridUnderItems();
@@ -5110,6 +5140,62 @@ function renderM16(v){
   }catch(e){ console.error('performM39Deal', e); }
 }
 
+async function performM48Restrict(v){
+  try{
+    const tables = (v?.tables || []).map(t => ({ ...(t||{}), hand:[...(t?.hand||[])] }));
+    const n = tables.length|0;
+    if (n === 0) return;
+
+    // 1) 隊長テーブル index と、許可 index 三つを算出
+    let cap = v?.captainTable;
+    if (cap == null || cap < 0 || cap >= n) cap = 0; // 安全側
+    const allow = new Set([ cap, (cap+1)%n, (cap+2)%n ]);
+
+    // 2) 非許可テーブルが持っている黄コードを回収 → 許可テーブルに順番配布
+    const pool = [];  // { card, fromIdx }
+    for (let i=0; i<n; i++){
+      if (allow.has(i)) continue;
+      const keep = [];
+      for (const c of (tables[i].hand||[])){
+        // 黄コードの判定規則：kind==='yellow' で判定（既存カード構造に準拠）
+        if (c && c.kind === 'yellow'){
+          pool.push({ card:c, fromIdx:i });
+        } else {
+          keep.push(c);
+        }
+      }
+      tables[i].hand = keep;
+    }
+
+    if (pool.length === 0){
+      // 何も動かしていない → フラグだけ付けて終了
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m48_restricted:true, m48_updatedAt:Date.now() });
+      return;
+    }
+
+    // 3) 許可テーブルにラウンドロビンで配る（手札末尾に追加。昇順整列等が必要ならここで対応）
+    const allowArr = [...allow].sort((a,b)=>a-b); // 一応昇順
+    let p = 0;
+    for (const {card} of pool){
+      const targetIdx = allowArr[p % allowArr.length];
+      tables[targetIdx].hand.push(card);
+      p++;
+    }
+
+    // 4) DB へ一括反映（tables/*/hand を更新）
+    const upd = {};
+    tables.forEach((t, i)=>{
+      upd[`tables/${i}/hand`] = t.hand;
+    });
+    upd[`meta/m48_restricted`] = true;
+    upd[`meta/m48_updatedAt`] = Date.now();
+    await update(ref(db, `rooms/${state.roomCode}`), upd);
+  }catch(err){
+    console.error('performM48Restrict failed', err);
+  }
+}
+
+  
 // #23：残りのアイテム山札を“アイテム欄”に並べる（メタへ確定保存）
 async function performM23Spread(){
   try{
