@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ｆえ</title>
+<title>え</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -419,13 +419,11 @@
   background-repeat:no-repeat;
 }
  .ox-row{
-  display:flex; flex-wrap:nowrap; gap:2px; margin-top:0;
-   width:max-content; flex:0 0 auto; align-self:flex-start;
- }
- /* 新規：アルファベットの高さを基準に“固定配置”するためのクラス */
- .ox-row.ox-fixed{
-   position:absolute; left:50%; transform:translateX(-50%);
-   top:0; /* 実際のY座標はJSで .alpha 高さ×2 を計算して代入 */
+   display:flex; flex-wrap:nowrap; gap:2px; margin-top:0; /* ← 横一列＆縦位置はJSで制御 */
+   max-width:none;                 /* ← 折り返し禁止 */
+   width:max-content;              /* ← 中身幅に合わせる */
+   flex:0 0 auto;
+   align-self:flex-start;
  }
 .ox-row.ox-pool{ align-items:center; gap:6px; max-width:none; }
 .ox-side{
@@ -3024,15 +3022,19 @@ function renderM44(v){
     let ownRow = box.querySelector('.ox-row[data-owner="1"]');
     if (!ownRow){
       ownRow = document.createElement('div');
-      ownRow.className = 'ox-row ox-fixed';
+      ownRow.className = 'ox-row';
       ownRow.dataset.owner = '1';
-      // 常に .badge-fixed 内へ（情報トークンの有無に依存しない）
-      const badge = box.querySelector('.badge-fixed');
-      if (badge) {
-        badge.appendChild(ownRow);
+      // ★変更：情報トークン有無に依らず、常に「アルファベット直下」に置く
+      const anchor = box.querySelector('.badge-fixed'); // ← 1枚目の .alpha を含む
+      if (anchor) {
+        anchor.insertAdjacentElement('afterend', ownRow);
+        // 「アルファベット二個分」だけ下げる（文字高を動的取得）
+        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        ownRow.style.marginTop = `${Math.round(ah * 2)}px`;
       } else {
-        // フォールバック（万一 .badge-fixed が無い場合はテーブル末尾）
-        box.appendChild(ownRow);
+        // フォールバック：手札の直後に置く
+        const hand = box.querySelector('.hand');
+        (hand || box).appendChild(ownRow);
       }
     }
     // 再描画
@@ -3044,25 +3046,13 @@ function renderM44(v){
       ownRow.appendChild(t);
     }
 
-    // ▼ 位置決め：アルファベット(.alpha) の「2個分下」に固定
-    (()=>{
-      const badge = box.querySelector('.badge-fixed');
-      const alpha = badge?.querySelector('.alpha');
-      if (!badge) return;
-      // 絶対配置用に行クラスを付け直し（再利用時の保険）
-      ownRow.classList.add('ox-fixed');
-      // .alpha の高さを測って 2倍 + 少しの余白（2px）
-      const h = (alpha?.getBoundingClientRect().height || 11); // フォールバック 11px
-      const y = (alpha ? alpha.offsetTop : 0) + (h * 2) + 2;
-      ownRow.style.top = `${y}px`;    
-
 
     // ▼▼ テーブル高さを所持酸素の行数に合わせて自動調整（スクロール抑止）
-    // 横一列固定：所持があれば常に1段ぶんだけ余白を確保
-    const baseH = 96;                        // CSS :root --table-h 既定
-    const rows  = (cnt > 0 ? 1 : 0);
-    const extra = rows ? (22) : 0;           // 目安：トークン20px + 余白2px
-    const needH = Math.max(baseH, baseH + extra);
+    // 横一列固定（折返しなし）：所持があれば 1 行ぶんだけ高さを足す
+    const baseH = 96;                        // CSS :root の --table-h 既定（96px）
+    const rows  = (cnt > 0 ? 1 : 0);         // ← 常に 1 行 or 0 行
+    const extra = rows > 0 ? (4 + 20) : 0;   // 先頭4px + トークン高さ20px
+    const needH = Math.max(baseH, baseH + extra); // 既定より低くはしない
     box.style.setProperty('--table-h', `${needH}px`);
  
   
