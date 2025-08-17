@@ -2933,18 +2933,40 @@ function renderM44(v){
   }
 
   // --- 2) アイテム列の下に全体プールを表示（クリックで 1/2/3 の取得） ---
+  // --- 2) アイテム列の下に「アイコン＋リザーブ（横並び）」を表示 ---
   const itemsBar = document.getElementById('itemsBar');
   if (!itemsBar) return;
 
-  let poolRow = document.getElementById('m44OxPool');
+  // ラッパー（横並び）
+  let reserveWrap = document.getElementById('m44Reserve');
+  let poolRow     = document.getElementById('m44OxPool');
+
+  if (!reserveWrap){
+    reserveWrap = document.createElement('div');
+    reserveWrap.id = 'm44Reserve';
+    reserveWrap.className = 'm44-reserve';
+    // itemsBar の“直下”に設置（HTML上この位置が最適） :contentReference[oaicite:2]{index=2}
+    itemsBar.insertAdjacentElement('afterend', reserveWrap);
+  }
+
+  // 左側アイコン
+  let icon = document.getElementById('m44OxIcon');
+  if (!icon){
+    icon = document.createElement('div');
+    icon.id = 'm44OxIcon';
+    icon.className = 'm44-oxicon';
+    reserveWrap.appendChild(icon);
+  }
+
+  // 右側：リザーブの酸素トークン列
   if (!poolRow){
     poolRow = document.createElement('div');
     poolRow.id = 'm44OxPool';
     poolRow.className = 'ox-row';
-    // アイテム列の“直下”に置く（ミッション12の num-under と同様の位置感）
-    itemsBar.insertAdjacentElement('afterend', poolRow);
+    reserveWrap.appendChild(poolRow);
   }
-  // 再描画
+
+  // 再描画：リザーブ内のトークン
   poolRow.innerHTML = '';
   const poolCnt = Math.max(0, v.meta?.oxItem|0);
   for (let i=0; i<poolCnt; i++){
@@ -2952,6 +2974,7 @@ function renderM44(v){
     t.className = 'token ox';
     poolRow.appendChild(t);
   }
+
 
   // クリックで 1/2/3 取得（隊長は「集める」も表示）
   poolRow.onclick = (ev)=>{
