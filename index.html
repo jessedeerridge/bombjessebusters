@@ -435,7 +435,22 @@
 
 @media (min-width: 861px) {
   .table {
-    overflow: visible;    /* スクロールバーを出さない */
+    height: auto !important;      /* 高さ固定をやめて中身に合わせる */
+    overflow: visible !important;  /* スクロールバーを出さない */
+    /* 念のため各ブラウザでスクロールバー自体も不可視化 */
+    scrollbar-width: none;         /* Firefox */
+    -ms-overflow-style: none;      /* 旧Edge/IE */
+  }
+  .table::-webkit-scrollbar {      /* Chrome/Safari */
+    display: none;
+  }
+
+  /* 絶対配置をやめてフローに戻す：親の高さに寄与させる */
+  .t-content {
+    position: static !important;
+    left: auto; right: auto; top: auto; bottom: auto;  /* inset解除 */
+    min-height: auto;                                   /* 固定最小高も解除 */
+    margin-top: 2px;                                    /* 見た目の余白だけ足す */
   }
 }
  /* ▲▲ ：ミッション44（酸素トークン） ▲▲ */
