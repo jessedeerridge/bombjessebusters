@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>aaa</title>
+<title>ｓ</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -135,7 +135,7 @@
   .tables{display:flex;flex-direction:column;gap:8px;margin-top:6px;overflow:visible;position:relative;margin-left:-12px;}
   .table{
     position:relative; border:1px dashed #ddd; border-radius:10px;
-padding:0 8px;    /* 高さを固定しない：中身に合わせて伸びる */
+  padding:0 4px 0 8px;  /* 左8px・右4px にする */
     height:auto;
     display:block; background:#fff;
     /* 横幅は親に収め、スクロールバーは出さない */
@@ -181,6 +181,8 @@ padding:0 8px;    /* 高さを固定しない：中身に合わせて伸びる *
   white-space:nowrap; /* ← 折り返し禁止＝横一列を維持 */
   max-height:calc(var(--content-h) - 2px + var(--content-extra));
   padding-bottom:2px;
+  padding-right:4px;   /* ← 右端カードとテーブル枠の間を4pxに */
+
 }
 
   .card-wrap{position:relative;width:var(--card-w);min-height:calc(var(--card-h) + 36px);flex:0 0 auto;}
