@@ -410,6 +410,21 @@
    margin-top: 0;        /* アイテム列との外側余白を0に */
    padding-top: 56px;    /* 内側に nano の高さぶんスペースを確保 */
  }
+ /* ▼▼ ミッション44（酸素トークン） ▼▼ */
+ .token.ox{
+   background:#00bcd4;   /* 水色で酸素感 */
+   color:#fff;
+   background-image:url('./ox.png');
+   background-size:contain;
+  background-repeat:no-repeat;
+ }
+ .ox-row{
+   display:flex; flex-wrap:wrap; gap:2px; margin-top:4px;
+   /* 横10個で改行（20pxトークン×10 + 2pxギャップ×9 を上限目安に） */
+   max-width:calc(20px * 10 + 2px * 9);
+ }
+ /* ▲▲ ：ミッション44（酸素トークン） ▲▲ */
+  
 </style>
 </head>
 <body>
@@ -1044,7 +1059,12 @@ function updateHeaderInfo(){
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
     players:{}, spectators:{},
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null },
+    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null,
+      /* ▼▼ ：ミッション44用 状態 ▼▼ */
+      oxItem: 0,         // アイテム列の下（全体プール）の酸素トークン数
+      oxByTable: {}      // 各テーブルごとの酸素トークン所持数 { [tableIndex]: number }
+      /* ▲▲ ：ミッション44用 状態 ▲▲ */
+    },
     lastActiveAt: Date.now()
   };}
 
@@ -1103,6 +1123,7 @@ if (v) {
     renderM26(v);
     renderM42(v);
     renderM43(v);
+    renderM44(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -2885,6 +2906,132 @@ function renderM43(v){
 /* ここまで追加：ミッション43 */
 
 
+/* ▼▼ ここから追加：ミッション44（酸素トークン） ▼▼ */
+function renderM44(v){
+  if ((v?.mission?.id|0) !== 44) return;
+
+  // --- 1) 初期セット（ホストのみ）：人数×2 を全体プールに用意 ---
+  if (state.isHost && (!v.meta || typeof v.meta.oxItem !== 'number')) {
+    const init = (v.tables?.length || 0) * 2;
+    update(ref(db, `rooms/${state.roomCode}/meta`), { oxItem:init, oxByTable:{} });
+    return; // 次回 onValue で描画
+  }
+
+  // --- 2) アイテム列の下に全体プールを表示（クリックで 1/2/3 の取得） ---
+  const itemsBar = document.getElementById('itemsBar');
+  if (!itemsBar) return;
+
+  let poolRow = document.getElementById('m44OxPool');
+  if (!poolRow){
+    poolRow = document.createElement('div');
+    poolRow.id = 'm44OxPool';
+    poolRow.className = 'ox-row';
+    // アイテム列の“直下”に置く（ミッション12の num-under と同様の位置感）
+    itemsBar.insertAdjacentElement('afterend', poolRow);
+  }
+  // 再描画
+  poolRow.innerHTML = '';
+  const poolCnt = Math.max(0, v.meta?.oxItem|0);
+  for (let i=0; i<poolCnt; i++){
+    const t = document.createElement('div');
+    t.className = 'token ox';
+    poolRow.appendChild(t);
+  }
+
+  // クリックで 1/2/3 取得（隊長は「集める」も表示）
+  poolRow.onclick = (ev)=>{
+    const entries = [1,2,3].map(k => ({
+      label: String(k),
+      action: async ()=>{
+        const left = (v.meta?.oxItem|0) - k;
+        const idx  = state.seatedTable;
+        if (idx==null) return;
+        const mine = (v.meta?.oxByTable?.[idx]||0) + k;
+        if (left < 0) return;
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          oxItem: left,
+          [`oxByTable/${idx}`]: mine
+        });
+      }
+    }));
+
+    // 隊長追加メニュー：「集める」＝全テーブルの情報トークンを回収して oxItem に変換
+    if ((v.captainTable|0) === (state.seatedTable|0)) {
+      entries.push({
+        label:'集める',
+        action: async ()=>{
+          // 情報トークンの数を数える（各テーブルの各手札 c.tokens の合計）
+          const tables = v.tables || [];
+          let totalInfo = 0;
+          const updates = {};
+          tables.forEach((T, ti)=>{
+            (T.hand||[]).forEach((c, ci)=>{
+              const tokCnt = Array.isArray(c?.tokens) ? c.tokens.length : 0;
+              if (tokCnt > 0){
+                totalInfo += tokCnt;
+                updates[`rooms/${state.roomCode}/tables/${ti}/hand/${ci}/tokens`] = [];
+              }
+            });
+          });
+
+          // まとめて更新：各手札の tokens を空にし、oxItem を増やす
+          if (totalInfo > 0){
+            await Promise.all(Object.entries(updates).map(([path,val]) => update(ref(db, path.replace(/^rooms\/[^/]+\/?/, '')), val)));
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              oxItem: (v.meta?.oxItem||0) + totalInfo
+            });
+          }
+        }
+      });
+    }
+    openMenu(ev.clientX, ev.clientY, entries);
+  };
+
+  // --- 3) 各プレイヤーテーブルの“下部”（情報トークン群より下）に所持酸素を表示 ---
+  const tableNodes = document.querySelectorAll('.table'); // renderTables の並びと同順
+  (v.tables||[]).forEach((T, ti)=>{
+    const box = tableNodes[ti];
+    if (!box) return;
+
+    // 既存の行を再利用 or 生成
+    let ownRow = box.querySelector('.ox-row[data-owner="1"]');
+    if (!ownRow){
+      ownRow = document.createElement('div');
+      ownRow.className = 'ox-row';
+      ownRow.dataset.owner = '1';
+      box.appendChild(ownRow);
+    }
+    // 再描画
+    ownRow.innerHTML = '';
+    const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
+    for (let i=0; i<cnt; i++){
+      const t = document.createElement('div');
+      t.className = 'token ox';
+      ownRow.appendChild(t);
+    }
+
+    // 自分の所持酸素をクリック → 1/2/3 を返却（プールへ）
+    if ((state.seatedTable|0) === (ti|0)){
+      ownRow.onclick = (ev)=>{
+        openMenu(ev.clientX, ev.clientY, [1,2,3].map(k=>({
+          label:String(k),
+          action: async ()=>{
+            const mine = (v.meta?.oxByTable?.[ti]||0) - k;
+            const pool = (v.meta?.oxItem||0) + k;
+            if (mine < 0) return;
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              oxItem: pool,
+              [`oxByTable/${ti}`]: mine
+            });
+          }
+        })));
+      };
+    }else{
+      ownRow.onclick = null;
+    }
+  });
+}
+/* ▲▲ ここまで追加：ミッション44（酸素トークン） ▲▲ */
 
   
   // #31：制約カード拡大ポップ（オーバーレイ表示）
