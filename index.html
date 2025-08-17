@@ -2779,7 +2779,7 @@ async function ensureM43MetaInit(vNow){
 
   // 人数に応じた初期カウント（画像は 0..3 のため最大3に丸める）
   const people = v?.tableCount|0;
-const start = (people >= 5) ? 4 : 3;
+const start = (people >= 5) ? 3 : 4;
 //   const initPos = 6; // 初期表示位置（チェック表の6の上）※後でクリックで動く
 
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
