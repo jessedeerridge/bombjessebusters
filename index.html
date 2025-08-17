@@ -2932,7 +2932,7 @@ function renderM44(v){
   // 再描画
   poolRow.innerHTML = '';
   const poolCnt = Math.max(0, v.meta?.oxItem|0);
-   for (let i=0; i<poolCnt; i++){
+  for (let i=0; i<poolCnt; i++){
     const t = document.createElement('div');
     t.className = 'token ox';
     poolRow.appendChild(t);
@@ -2961,27 +2961,46 @@ function renderM44(v){
         label:'集める',
         action: async ()=>{
           const tables = v.tables || [];
-          let totalInfo = 0;
-          const jobs = [];
 
-          // 1) 各手札の tokens を空配列にする（必ず set() を使う）
+          // 種別別の減算カウント（＝、≠、x1 は meta 側の上限管理用）
+          let decEqual = 0, decNoteq = 0, decX1 = 0;
+          let totalRemoved = 0;
+
+          // 1) まず各カードの tokens を調べて、削除数を集計
+          const clearJobs = [];
           tables.forEach((T, ti)=>{
             (T.hand||[]).forEach((c, ci)=>{
-              const tokCnt = Array.isArray(c?.tokens) ? c.tokens.length : 0;
-              if (tokCnt > 0){
-                totalInfo += tokCnt;
-                jobs.push(
-                  set(ref(db, `rooms/${state.roomCode}/tables/${ti}/hand/${ci}/tokens`), [])
-                );
-              }
+              const arr = Array.isArray(c?.tokens) ? c.tokens : [];
+              if (arr.length === 0) return;
+
+              // 種別ごとに数える
+              arr.forEach(tk=>{
+                if (tk?.type === 'equal') decEqual++;
+                else if (tk?.type === 'noteq') decNoteq++;
+                else if (tk?.type === 'x1') decX1++;
+                // 数字や黄色なども「情報トークン」扱いとして回収対象に含める
+                totalRemoved++;
+              });
+
+              // 実データを消す（既存の運用に合わせて update で配列を書き換える）
+              const cardPath = `rooms/${state.roomCode}/tables/${ti}/hand/${ci}`;
+              clearJobs.push(update(ref(db, cardPath), { tokens: [] }));
             });
           });
 
-          // 2) まず tokens を全部消してから、oxItem を合算して増やす
-          await Promise.all(jobs);
-          if (totalInfo > 0){
+          // 2) DBから実カードの tokens をすべて空に
+          await Promise.all(clearJobs);
+
+          // 3) tokenCounts を減算（＝／≠／x1 のみ）
+          //    ※既存実装の単体操作と同じヘルパーを呼ぶ（incToken）
+          if (decEqual) await incToken('equal', -decEqual);   // :contentReference[oaicite:2]{index=2}
+          if (decNoteq) await incToken('noteq', -decNoteq);
+          if (decX1)    await incToken('x1',    -decX1);
+
+          // 4) プール（oxItem）を増やす
+          if (totalRemoved > 0){
             await update(ref(db, `rooms/${state.roomCode}/meta`), {
-              oxItem: (v.meta?.oxItem||0) + totalInfo
+              oxItem: (v.meta?.oxItem||0) + totalRemoved
             });
           }
         }
@@ -2990,6 +3009,7 @@ function renderM44(v){
 
     openMenu(ev.clientX, ev.clientY, entries);
   };
+
 
 
   // --- 3) 各プレイヤーテーブルの“下部”（情報トークン群より下）に所持酸素を表示 ---
