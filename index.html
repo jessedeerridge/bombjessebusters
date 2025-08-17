@@ -272,12 +272,23 @@
   background:#fff; display:grid; place-items:center;
   font-size:12px; user-select:none; color:#000;
 }
+  
 .check-mark{
   position:absolute; inset:0; margin:auto;
   width:18px; height:18px; border-radius:50%;
   background:rgba(34,197,94,.35);
   pointer-events:none;
 }
+
+.tables.nano-shift{ transform: translateX(42px); transition: transform .15s ease; }
+
+.m43-nano{
+  position:absolute; width:64px; height:64px;
+  background:center/contain no-repeat;
+  pointer-events:auto;
+  z-index:2147483600; /* pop層より下げたい場合は適宜調整 */
+}
+  
   
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
   .mini-pop{
@@ -1092,6 +1103,7 @@ if (v) {
     renderM23(v);
     renderM26(v);
     renderM42(v);
+    renderM43(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3490,6 +3502,7 @@ async function startGame(playerCount, missionId){
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
+  let m43meta = null;
   // ベースデッキ 1..12 x4 = 48（通常コード）
   const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
   shuffle(base);
@@ -3536,6 +3549,35 @@ async function startGame(playerCount, missionId){
   }
   /* ▲▲ ここまで追加：#29 ▼▼ */
 
+/* ここから追加：#43 配布前にA群を抜き取る */
+if (missionId === 43) {
+  // 人数でA群枚数を決定（5-6人→3枚、3-4人→4枚）
+  const pickCount = (playerCount <= 4) ? 4 : 3;
+
+  // 「このミッションで配布する予定のカード」＝通常数値カードのみ対象
+  const numIdx = [];
+  for (let i=0; i<deck.length; i++){
+    if (deck[i]?.kind === 'normal') numIdx.push(i);
+  }
+  const idxShuffled = numIdx.slice(); shuffle(idxShuffled);
+  const removeIdx = idxShuffled.slice(0, pickCount).sort((a,b)=> b-a);
+
+  const A = [];
+  removeIdx.forEach(idx=>{
+    const [c] = deck.splice(idx, 1);
+    if (c && typeof c.num === 'number') A.push(c.num|0);
+  });
+
+  // スタート時nanoレベル（指定のnano4.pngが無い可能性があるため、4は3に丸めて表示します）
+  const levelStart = (playerCount <= 4) ? 4 : 3;
+
+  // 後でrooms/{code}にまとめて書くため、一時的に保持
+  m43meta = { m43_A: A, m43_used: 0, m43_level: levelStart, m43_sel: -1, m43_prev: -1 };
+}
+/* ここまで追加 */
+
+
+  
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
   let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
@@ -3573,7 +3615,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
      /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
     /* ▲▲ ここまで追加 ▼▼ */
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
+    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null, ...(m43meta || {}) }
   });
 
   await setupMissionOnStart(code);   // ★追加
@@ -4666,6 +4708,164 @@ function renderM39(v){
   missionFooter.insertAdjacentElement('beforebegin', row);
 }
 
+/* ここから追加：#43 同期UI（チェックリスト→nano表示／回収→A群配布） */
+
+// 画像ファイル名を決定（4は3にフォールバック）
+function imgNano(level, isLeft){
+  const lv = Math.max(0, Math.min(3, level|0)); // 0..3 に丸める
+  return `./nano${lv}${isLeft ? 'left' : ''}.png`;
+}
+
+// 初期メタの補助（ホストのみ）
+async function ensureM43MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if ((v?.mission?.id|0) !== 43) return;
+  const has = (v?.meta && (v.meta.m43_level!=null));
+  if (has) return;
+  if (!state.isHost) return;
+
+  const tcount = v.tableCount|0;
+  const levelStart = (tcount <= 4) ? 4 : 3;
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    m43_level: levelStart, m43_sel: -1, m43_prev: -1, m43_used: (v?.meta?.m43_used|0) || 0
+  });
+}
+
+// 回収：A群の先頭を自席に昇順挿入（左寄せ）＋5秒▼
+async function performM43Pickup(tableIdx){
+  if (tableIdx==null || tableIdx<0) return;
+  const code = state.roomCode;
+  const mRef = ref(db, `rooms/${code}/meta`);
+  const mSnap = await get(mRef);
+  const meta  = mSnap.val() || {};
+  const A     = Array.isArray(meta.m43_A) ? meta.m43_A.slice() : [];
+  const used  = meta.m43_used|0;
+  if (used >= A.length) return;
+
+  const n = A[used]|0;
+
+  const hRef = ref(db, `rooms/${code}/tables/${tableIdx}/hand`);
+  const hSnap = await get(hRef);
+  const hand = hSnap.val() || [];
+
+  const card = { id: crypto.randomUUID(), num:n, kind:'normal', open:false,
+                 ownerId: state.userId || null, markUntil: Date.now()+5000 };
+
+  // 昇順で同値は左側に挿入
+  let pos = 0;
+  while (pos < hand.length && (hand[pos]?.num|0) < n) pos++;
+  while (pos > 0 && (hand[pos-1]?.num|0) === n) pos--;
+  hand.splice(pos, 0, card);
+
+  const alpha='abcdefghijklmnopqrstuvwxyz';
+  hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]);
+
+  await Promise.all([
+    set(hRef, hand),
+    update(mRef, { m43_used: used+1 })
+  ]);
+}
+
+// 描画本体
+function renderM43(v){
+  const isM43 = ((v?.mission?.id|0) === 43);
+  const rowId = 'm43Row';
+  const old   = document.getElementById(rowId);
+
+  // ミッション外：UI/スライドを除去して終了
+  if (!isM43){
+    if (old) old.remove();
+    const ex = document.getElementById('m43Nano'); if (ex) ex.remove();
+    const box = document.querySelector('.tables'); if (box) box.classList.remove('nano-shift');
+    return;
+  }
+
+  // 初期メタ（レベル等）が無ければホストが一度だけ用意
+  if (!(v?.meta) || (v.meta.m43_level==null)) { ensureM43MetaInit(v); if (old) old.remove(); return; }
+
+  // 既存を作り直し
+  if (old) old.remove();
+
+  // チェックリスト（1..12）
+  const row = document.createElement('div');
+  row.id = rowId;
+  row.className = 'checklist';
+  row.title = '数字をクリックするとナノ画像の位置が移動します';
+
+  for (let i=1; i<=12; i++){
+    const cell = document.createElement('div');
+    cell.className = 'check-item';
+    cell.textContent = String(i);
+    cell.onclick = async (ev)=>{
+      const prev = (v?.meta?.m43_sel|0);
+      const nowI = i|0;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), {
+        m43_prev: (prev>0 ? prev : nowI),
+        m43_sel: nowI
+      });
+      // 即時描画（次tick待たずに）
+      placeNanoAt(cell, (prev>0 && nowI < prev));
+    };
+    row.appendChild(cell);
+  }
+
+  // Itemsバーの直後＝テーブルの直前に挿入（#23等と同じ位置） 
+  itemsBar.insertAdjacentElement('afterend', row);
+
+  // 選択があるなら、そのセル上へ表示
+  const sel  = v?.meta?.m43_sel|0;
+  const prev = v?.meta?.m43_prev|0;
+  if (sel>0) {
+    const cell = row.children[sel-1];
+    if (cell) placeNanoAt(cell, (prev>0 && sel<prev));
+  } else {
+    // 初回：行中央の上に表示（見やすい位置）
+    placeNanoAt(row, false, true);
+  }
+
+  function placeNanoAt(targetEl, isLeft=false, center=false){
+    const base = document.querySelector('.tables');
+    if (!base) return;
+    // 古い表示を消す
+    const ex = document.getElementById('m43Nano'); if (ex) ex.remove();
+
+    const div = document.createElement('div');
+    div.id = 'm43Nano';
+    div.className = 'm43-nano';
+    const level = v?.meta?.m43_level|0;
+    div.style.backgroundImage = `url('${imgNano(level, isLeft)}')`;
+
+    // 位置計算（tables基準）
+    const baseRect = base.getBoundingClientRect();
+    const r = center ? row.getBoundingClientRect() : targetEl.getBoundingClientRect();
+    const x = (r.left + r.width/2) - baseRect.left - 32; // 64px幅の中心合わせ
+    const y = (r.top) - baseRect.top - 68;               // 行の少し上
+
+    Object.assign(div.style, { left: Math.max(0,x)+'px', top: Math.max(0,y)+'px' });
+
+    // クリック→回収タブ
+    div.onclick = (ev)=>{
+      openOneMini(ev.clientX, ev.clientY, '回収', async ()=>{
+        // レベルを1減（0未満にならない）
+        const cur = (state.watching?.meta?.m43_level|0);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m43_level: Math.max(0, cur-1) });
+
+        // 自席にA群を1枚配布
+        const myTable = (state.seatedTable!=null) ? (state.seatedTable|0)
+                       : ((state.watching?.tables||[]).findIndex(t=> t?.playerId===state.userId));
+        if (myTable==null || myTable<0){ alert('席に座っていません'); return; }
+        await performM43Pickup(myTable);
+      });
+    };
+
+    base.appendChild(div);
+    // 重なり回避：テーブル群を少し右へスライド
+    base.classList.add('nano-shift');
+  }
+}
+/* ここまで追加：#43 */
+
+  
 /* ===== #16：数値3 + 右4（全員同期） ===== */
 function renderM16(v){
   const isM16 = ((v?.mission?.id|0) === 16);
