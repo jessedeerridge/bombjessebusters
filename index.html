@@ -134,9 +134,16 @@
   
   .tables{display:flex;flex-direction:column;gap:8px;margin-top:6px;overflow:visible;position:relative;margin-left:-12px;}
   .table{
-    position:relative;border:1px dashed #ddd;border-radius:10px;
-    padding:0 8px;height:var(--table-h);display:block;background:#fff;
-    overflow:auto;width:max-content;z-index:0;
+    position:relative; border:1px dashed #ddd; border-radius:10px;
+    padding:0 8px;
+    /* 高さを固定しない：中身に合わせて伸びる */
+    height:auto;
+    display:block; background:#fff;
+    /* 横幅は親に収め、スクロールバーは出さない */
+    width:100%;
+    max-width:100%;
+    overflow:hidden;   /* ← 縦横スクロール禁止 */
+    z-index:0;
   }
   .table.elevated{ z-index:9999; }
 
@@ -144,8 +151,14 @@
   .title{text-decoration:underline;padding-right:4px}
 
   .t-content{
-    position:absolute;left:8px;right:8px;top:calc(var(--header-h) + 2px);bottom:calc(4px - var(--content-extra));
-    display:flex;gap:8px;align-items:flex-start;min-height:var(--content-h);overflow:visible;
+    /* 通常フローに乗せる */
+    position:static;
+    /* 余白は margin で確保（ヘッダ直下） */
+    margin-top:2px;
+    display:flex; gap:8px; align-items:flex-start;
+    /* 固定の min-height を外し、内容に応じて伸縮 */
+    min-height:auto;
+    overflow:visible;
   }
 
   .char-card{
