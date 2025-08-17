@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>えa</title>
+<title>えsa</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -989,11 +989,6 @@ function executeMixPlan(planList){
       const cand = pickK(MATERIALS.yellowCodes, p.k);
       cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
 　     mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
-    }
-       if(p.type==='yellowFixed'){
-      const cand = (p.list || []).slice();
-      cand.forEach(n => toAdd.push({ num:n, kind:'yellow' }));
-      mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
     }
     if(p.type==='redChoose'){
       const cand = pickK(MATERIALS.redCodes, p.from);
