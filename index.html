@@ -4991,6 +4991,11 @@ function renderM39(v){
   lane.appendChild(restLbl);
   lane.appendChild(pile);
 
+  if (v?.meta?.m39_dealt) {
+    deckBtn.remove();     // 山札ボタンを消す
+    restLbl.remove();     // 残数ラベルも消す（山札とペアなので）
+  }
+  
   // 既存公開札の再描画 & 残表示
   const refresh = ()=>{
     const d = (v?.meta?.m39_deck||[]);
