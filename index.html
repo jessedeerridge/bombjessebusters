@@ -1184,19 +1184,25 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
 }
 
     div.onclick=(ev)=>{
-      const flags = state.watching?.mission?.flags || {};
+     const flags = state.watching?.mission?.flags || {};
+     // 使用済み → 「表にする」だけ
       if(it.used){
         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {used:false});
         });
- 
       }else{
-        // 未使用時：初回クリック＝拡大（制約カードと同じ挙動）
-        const canFaceUp = !!(flags.itemsFaceDownStart && it.faceUp===false);
-        openItemZoom(it.no, idx, { canFaceUp });
-      }
-   };
-
+        // ミッション15 && 裏向き → 拡大させず「表にする」だけ
+        if((state.watching?.mission?.id|0) === 15 && flags.itemsFaceDownStart && it.faceUp===false){
+         openOneMini(ev.clientX, ev.clientY, '表にする', async ()=>{
+           await update(ref(db, `rooms/${state.roomCode}/items/${idx}`), {faceUp:true});
+          });
+        }else{
+         // 通常通り拡大（表状態 or 他ミッション）
+         const canFaceUp = !!(flags.itemsFaceDownStart && it.faceUp===false);
+          openItemZoom(it.no, idx, { canFaceUp });
+        }
+     }
+    };
 
     itemsEl.appendChild(div);
     itemNodes.push(div);
