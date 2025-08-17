@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>aaa</title>
+<title>saaa</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -344,12 +344,7 @@
   .tab.active{background:#111;color:#fff;border-color:#111}
   .tab.disabled{opacity:.35;pointer-events:none}
 
-@media (min-width: 861px) {
-  .table {
-    height: auto;         /* 高さを固定せず中身に合わせる */
-    overflow: visible;    /* スクロールバーを出さない */
-  }
-}
+
 /* ▼▼ 画面下部ミッションピッカー ▼▼ */
 .mp{
   position:fixed; left:0; right:0; bottom:0;
@@ -438,10 +433,10 @@
   max-width:calc(20px * 10 + 2px * 9);
 }
 
-  @media (min-width: 861px) {
+@media (min-width: 861px) {
   .table {
-    overflow: hidden;   /* 完全に消す場合 */
-    /* overflow: visible; にすると、中身に合わせてテーブルが伸びる */
+    height: auto;         /* 高さを固定せず中身に合わせる */
+    overflow: visible;    /* スクロールバーを出さない */
   }
 }
  /* ▲▲ ：ミッション44（酸素トークン） ▲▲ */
