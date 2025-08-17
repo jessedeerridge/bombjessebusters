@@ -2833,8 +2833,8 @@ function renderM43(v){
   const tb = tablesEl.getBoundingClientRect();
   const rb = target.getBoundingClientRect();
   const x = rb.left - tb.left + (rb.width/2) - (56/2);
-  const NANO_SHIFT_UP = 20; // px。必要に応じて±調整（例: 12, 24 など）
-  const y = rb.top  - tb.top  - 24 - 4 - NANO_SHIFT_UP;  // ← ここだけ変更
+  const NANO_SHIFT_UP = 60; // px。必要に応じて±調整（例: 12, 24 など）
+  const y = rb.top  - tb.top  - 56 - 4 - NANO_SHIFT_UP;  // ← ここだけ変更
   node.style.left = `${Math.max(0, x)}px`;
   node.style.top  = `${Math.max(0, y)}px`;
 
