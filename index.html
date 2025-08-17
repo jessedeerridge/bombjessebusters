@@ -280,7 +280,7 @@
   pointer-events:none;
 }
 
-.tables.nano-shift{ transform: translateX(42px); transition: transform .15s ease; }
+.tables{ position:relative; } /* ★ nano の absolute 位置の基準にする */
 
 .m43-nano{
   position:absolute; width:64px; height:64px;
@@ -4777,6 +4777,10 @@ function renderM43(v){
     if (old) old.remove();
     const ex = document.getElementById('m43Nano'); if (ex) ex.remove();
     const box = document.querySelector('.tables'); if (box) box.classList.remove('nano-shift');
+    // #43専用の都合で隠した汎用チェック表を復帰
+    document.querySelectorAll('.checklist[data-_m43hide="1"]').forEach(el=>{
+      el.style.display = ''; delete el.dataset._m43hide;
+    });
     return;
   }
 
@@ -4785,16 +4789,17 @@ function renderM43(v){
 
   // 既存を作り直し
   if (old) old.remove();
+  document.querySelectorAll('.m43-checklist').forEach(n=>n.remove());
 
   // チェックリスト（1..12）
   const row = document.createElement('div');
   row.id = rowId;
-  row.className = 'checklist';
+  row.className = 'm43-checklist';
   row.title = '数字をクリックするとナノ画像の位置が移動します';
 
   for (let i=1; i<=12; i++){
     const cell = document.createElement('div');
-    cell.className = 'check-item';
+    cell.className = 'm43-item';
     cell.textContent = String(i);
     cell.onclick = async (ev)=>{
       const prev = (v?.meta?.m43_sel|0);
@@ -4811,7 +4816,9 @@ function renderM43(v){
 
   // Itemsバーの直後＝テーブルの直前に挿入（#23等と同じ位置） 
   itemsBar.insertAdjacentElement('afterend', row);
-
+  document.querySelectorAll('.checklist').forEach(el=>{
+    if (el.id !== 'm43Row') { el.style.display = 'none'; el.dataset._m43hide = '1'; }
+  });
   // 選択があるなら、そのセル上へ表示
   const sel  = v?.meta?.m43_sel|0;
   const prev = v?.meta?.m43_prev|0;
