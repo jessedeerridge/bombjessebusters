@@ -411,13 +411,13 @@
    padding-top: 56px;    /* 内側に nano の高さぶんスペースを確保 */
  }
  /* ▼▼ ミッション44（酸素トークン） ▼▼ */
- .token.ox{
-   background:#00bcd4;   /* 水色で酸素感 */
-   color:#fff;
-   background-image:url('./ox.png');
-   background-size:contain;
+.token.ox{
+  background:none;   /* ← 背景色を消す */
+  color:transparent; /* ← テキスト色も消す */
+  background-image:url('./ox.png');
+  background-size:contain;
   background-repeat:no-repeat;
- }
+}
  .ox-row{
    display:flex; flex-wrap:wrap; gap:2px; margin-top:4px;
    /* 横10個で改行（20pxトークン×10 + 2pxギャップ×9 を上限目安に） */
