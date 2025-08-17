@@ -136,7 +136,12 @@
   .table{
     position:relative;border:1px dashed #ddd;border-radius:10px;
     padding:0 8px;height:var(--table-h);display:block;background:#fff;
-    overflow:auto;width:max-content;z-index:0;
+    /* PCで横スクロールが出ないようにする */
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;  /* 横スクロールを殺す */
+    overflow-y:auto;    /* 縦スクロールは許可 */
+    z-index:0;
   }
   .table.elevated{ z-index:9999; }
 
