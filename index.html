@@ -990,6 +990,11 @@ function executeMixPlan(planList){
       cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
 　     mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
     }
+       if(p.type==='yellowFixed'){
+      const cand = (p.list || []).slice();
+      cand.forEach(n => toAdd.push({ num:n, kind:'yellow' }));
+      mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
+    }
     if(p.type==='redChoose'){
       const cand = pickK(MATERIALS.redCodes, p.from);
       chooseLines.push(`<span style="color:red;">●</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
