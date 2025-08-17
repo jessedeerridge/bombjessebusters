@@ -399,11 +399,12 @@
 /* ▲▲ 画面下部ミッションピッカー ▲▲ */
 
 .code-link{ text-decoration: underline; cursor: pointer; }
-  .m43-nano{
-    position:absolute; z-index:2147483601;
-    width:56px; height:56px;
-    background-size:contain; background-repeat:no-repeat; background-position:center;
-    pointer-events:auto;   /* クリックして回収メニューを出す */
+.m43-nano{
+  display:block;
+  width:56px; height:56px;
+  margin:0 auto;   /* 中央寄せ（不要なら消す） */
+  background-size:contain; background-repeat:no-repeat; background-position:center;
+  pointer-events:auto;
   }
  /* nanoが他と重ならないように全テーブルを下げる */
   .tables.m43-shift{ margin-top: 56px; } /* 画像の高さぶん下げる */
