@@ -2932,7 +2932,7 @@ function renderM44(v){
   // 再描画
   poolRow.innerHTML = '';
   const poolCnt = Math.max(0, v.meta?.oxItem|0);
-  for (let i=0; i<poolCnt; i++){
+   for (let i=0; i<poolCnt; i++){
     const t = document.createElement('div');
     t.className = 'token ox';
     poolRow.appendChild(t);
@@ -2955,28 +2955,31 @@ function renderM44(v){
       }
     }));
 
-    // 隊長追加メニュー：「集める」＝全テーブルの情報トークンを回収して oxItem に変換
+    // ★隊長だけ：全員の情報トークンを「回収」→ 同数をプールへ
     if ((v.captainTable|0) === (state.seatedTable|0)) {
       entries.push({
         label:'集める',
         action: async ()=>{
-          // 情報トークンの数を数える（各テーブルの各手札 c.tokens の合計）
           const tables = v.tables || [];
           let totalInfo = 0;
-          const updates = {};
+          const jobs = [];
+
+          // 1) 各手札の tokens を空配列にする（必ず set() を使う）
           tables.forEach((T, ti)=>{
             (T.hand||[]).forEach((c, ci)=>{
               const tokCnt = Array.isArray(c?.tokens) ? c.tokens.length : 0;
               if (tokCnt > 0){
                 totalInfo += tokCnt;
-                updates[`rooms/${state.roomCode}/tables/${ti}/hand/${ci}/tokens`] = [];
+                jobs.push(
+                  set(ref(db, `rooms/${state.roomCode}/tables/${ti}/hand/${ci}/tokens`), [])
+                );
               }
             });
           });
 
-          // まとめて更新：各手札の tokens を空にし、oxItem を増やす
+          // 2) まず tokens を全部消してから、oxItem を合算して増やす
+          await Promise.all(jobs);
           if (totalInfo > 0){
-            await Promise.all(Object.entries(updates).map(([path,val]) => update(ref(db, path.replace(/^rooms\/[^/]+\/?/, '')), val)));
             await update(ref(db, `rooms/${state.roomCode}/meta`), {
               oxItem: (v.meta?.oxItem||0) + totalInfo
             });
@@ -2984,8 +2987,10 @@ function renderM44(v){
         }
       });
     }
+
     openMenu(ev.clientX, ev.clientY, entries);
   };
+
 
   // --- 3) 各プレイヤーテーブルの“下部”（情報トークン群より下）に所持酸素を表示 ---
   const tableNodes = document.querySelectorAll('.table'); // renderTables の並びと同順
