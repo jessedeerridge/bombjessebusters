@@ -2789,75 +2789,61 @@ const start = (people >= 5) ? 3 : 4;
   });
 }
 
+// ここから変更：renderM43 を人数で初期 nano を決めて表示する版に置き換え
 function renderM43(v){
   const isM43 = ((v?.mission?.id|0) === 43);
   const old = document.getElementById('m43Nano');
 
+  // ミッション外：掃除して終了
   if (!isM43){
     if (old) old.remove();
     tablesEl.classList.remove('m43-shift');
     return;
   }
 
-  // 初回：ホストが meta を用意（未用意なら用意して次の onValue で描画）
-  if (typeof v?.meta?.m43_count !== 'number'){
-    ensureM43MetaInit(v);
-    if (old) old.remove();
+  // 既存オーバーレイを一度掃除
+  if (old) old.remove();
+
+  // ★初回：ホストが人数を見て初期 nano 画像を決定（1回だけ）
+  //   m43_initialized が未設定のときだけ実行
+  if (state.isHost && !v?.meta?.m43_initialized){
+    // 着席人数（なければ開始ポップの選択値 or tableCount をフォールバック）
+    const seated = (v?.tables||[]).filter(T => !!T.playerId).length;
+    const selected = parseInt((selCount?.value||'0'), 10) || 0;
+    const fallback = (v?.tableCount|0);
+    const count = seated || selected || fallback;
+
+    // 5–6人: nano3.png / 3–4人: nano4.png
+    const initImg = (count >= 5 ? 'nano3.png' : 'nano4.png');
+
+    // meta に保存（onValue の次回呼び出しで描画する）
+    update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m43_initialized: true,
+      m43_img: initImg
+    });
     return;
   }
 
-  // テーブル群を少し下げて、nano が被らないようにする
+  // ★表示：meta の m43_img を使って nano を出す
+  const imgName = v?.meta?.m43_img || 'nano3.png';
+
+  // テーブル群が被らないように下げる（CSSで余白確保）
   tablesEl.classList.add('m43-shift');
 
-  const curr = v?.meta?.m43_curr|0;
-  const prev = v?.meta?.m43_prev|0;
-  const cnt  = Math.max(0, Math.min(3, v?.meta?.m43_count|0)); // 0..3
-
-  // 対象のチェックセルを取得
-  const checklist = tablesEl.querySelector('.checklist');
-  if (!checklist){ if (old) old.remove(); return; }
-  const cells = Array.from(checklist.querySelectorAll('.check-item'));
-  const target = cells.find(c => (c.textContent|0) === curr);
-  if (!target){ if (old) old.remove(); return; }
-
-  // 配置座標（tablesEl を基準）
-  const hostR = tablesEl.getBoundingClientRect();
-  const r = target.getBoundingClientRect();
-  const x = (r.left - hostR.left) + (r.width/2) - 24; // 48px の半分
-  const y = (r.top  - hostR.top)  - 52;               // セルの上に表示
-
-  // 画像：前回より下がったら left 系、上がったら通常系
-  const useLeft = prev && curr && (curr < prev);
-  const src = `./nano${cnt}${useLeft ? 'left' : ''}.png`;
-
-  // 再生成
-  if (old) old.remove();
-  const div = document.createElement('div');
-  div.id = 'm43Nano';
-  div.className = 'm43-nano';
-  div.style.left = x + 'px';
-  div.style.top  = y + 'px';
-
+  // オーバーレイ生成
+  const wrap = document.createElement('div');
+  wrap.id = 'm43Nano';
+  wrap.className = 'm43-nano';
   const img = document.createElement('img');
-  img.src = src; img.alt = 'nano';
-  div.appendChild(img);
+  img.src = `./${imgName}`;
+  wrap.appendChild(img);
 
-  // クリック → 「回収」メニュー（押すたびカウントを1減らす）
-  div.onclick = (ev)=>{
-    openMenu(ev.clientX, ev.clientY, [
-      { label:'回収', action: async ()=>{
-          const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-          const snap = await get(mRef);
-          const meta = snap.val()||{};
-          const next = Math.max(0, Math.min(3, (meta.m43_count|0) - 1));
-          await update(mRef, { m43_count: next });
-        } }
-    ]);
-  };
+  // ひとまず左上に固定（後でクリック移動などを付ける場合はここに追記）
+  wrap.style.left = '10px';
+  wrap.style.top  = '8px';
 
-  tablesEl.appendChild(div);
+  tablesEl.appendChild(wrap);
 }
-/* ここまで追加 */
 
 
 
