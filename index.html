@@ -2955,60 +2955,35 @@ function renderM44(v){
       }
     }));
 
-    // ★隊長だけ：全員の情報トークンを「回収」→ 同数をプールへ
+    // ★隊長だけ：全員の酸素トークンを集めてリザーブ（oxItem）へ戻す
     if ((v.captainTable|0) === (state.seatedTable|0)) {
       entries.push({
         label:'集める',
         action: async ()=>{
-          const tables = v.tables || [];
+          const by = v.meta?.oxByTable || {};
+          // 全テーブル所持酸素の合計
+          const total = Object.values(by).reduce((a,b)=> a + ((b|0) || 0), 0);
 
-          // 種別別の減算カウント（＝、≠、x1 は meta 側の上限管理用）
-          let decEqual = 0, decNoteq = 0, decX1 = 0;
-          let totalRemoved = 0;
+          // 変更が無ければ何もしない
+          if (total <= 0) return;
 
-          // 1) まず各カードの tokens を調べて、削除数を集計
-          const clearJobs = [];
-          tables.forEach((T, ti)=>{
-            (T.hand||[]).forEach((c, ci)=>{
-              const arr = Array.isArray(c?.tokens) ? c.tokens : [];
-              if (arr.length === 0) return;
-
-              // 種別ごとに数える
-              arr.forEach(tk=>{
-                if (tk?.type === 'equal') decEqual++;
-                else if (tk?.type === 'noteq') decNoteq++;
-                else if (tk?.type === 'x1') decX1++;
-                // 数字や黄色なども「情報トークン」扱いとして回収対象に含める
-                totalRemoved++;
-              });
-
-              // 実データを消す（既存の運用に合わせて update で配列を書き換える）
-              const cardPath = `rooms/${state.roomCode}/tables/${ti}/hand/${ci}`;
-              clearJobs.push(update(ref(db, cardPath), { tokens: [] }));
-            });
+          // meta 直下を update でまとめて更新（oxByTable[*] を 0 に、oxItem を合算加算）
+          const upd = {
+            oxItem: (v.meta?.oxItem || 0) + total
+          };
+          // いま持っているキーだけ 0 にする（存在しないキーは触らない）
+          Object.keys(by).forEach(k=>{
+            upd[`oxByTable/${k}`] = 0;
           });
 
-          // 2) DBから実カードの tokens をすべて空に
-          await Promise.all(clearJobs);
-
-          // 3) tokenCounts を減算（＝／≠／x1 のみ）
-          //    ※既存実装の単体操作と同じヘルパーを呼ぶ（incToken）
-          if (decEqual) await incToken('equal', -decEqual);   // :contentReference[oaicite:2]{index=2}
-          if (decNoteq) await incToken('noteq', -decNoteq);
-          if (decX1)    await incToken('x1',    -decX1);
-
-          // 4) プール（oxItem）を増やす
-          if (totalRemoved > 0){
-            await update(ref(db, `rooms/${state.roomCode}/meta`), {
-              oxItem: (v.meta?.oxItem||0) + totalRemoved
-            });
-          }
+          await update(ref(db, `rooms/${state.roomCode}/meta`), upd);
         }
       });
     }
 
     openMenu(ev.clientX, ev.clientY, entries);
   };
+
 
 
 
