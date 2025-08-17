@@ -399,22 +399,14 @@
 /* ▲▲ 画面下部ミッションピッカー ▲▲ */
 
 .code-link{ text-decoration: underline; cursor: pointer; }
-  /* ミッション43：nano を checklist と items の間に置くための行 */
-  #m43Row{
-    position:relative;
-    height:0;           /* ← スペースを潰す */
-    margin:0;           /* ← 余白も消す */
-    overflow:visible;   /* ← 中の nano が上にはみ出しても表示される */
-  }
   .m43-nano{
     position:absolute; z-index:2147483601;
     width:56px; height:56px;
-    background-size:contain;
-    background-repeat:no-repeat;
-    background-position:center;
-    pointer-events:auto;
-    top:-100px;             /* ← checklistのすぐ真上まで寄せる。数値は微調整可 */
+    background-size:contain; background-repeat:no-repeat; background-position:center;
+    pointer-events:auto;   /* クリックして回収メニューを出す */
   }
+ /* nanoが他と重ならないように全テーブルを下げる */
+  .tables.m43-shift{ margin-top: 56px; } /* 画像の高さぶん下げる */
 </style>
 </head>
 <body>
@@ -2783,6 +2775,7 @@ function renderM43(v){
   // ミッション43以外 → 後片付け
   if (!isM43){
     if (old) old.remove();
+    tablesEl.classList.remove('m43-shift');
     return;
   }
 
@@ -2794,6 +2787,7 @@ function renderM43(v){
       update(ref(db, `rooms/${state.roomCode}/meta`), { m43_nano: initNano, m43_pos: 0, m43_prevPos: 0 });
     }
     if (old) old.remove();
+    tablesEl.classList.toggle('m43-shift', false);
     return;
   }
 
@@ -2803,6 +2797,7 @@ function renderM43(v){
 
   if (!pos){
     if (old) old.remove();
+    tablesEl.classList.remove('m43-shift');
     return;
   }
 
@@ -2825,35 +2820,27 @@ function renderM43(v){
     ]);
   };
 
-  const cl = tablesEl.querySelector('.checklist');
-  const cells = cl ? cl.querySelectorAll('.check-item') : [];
-   const target = cells[pos-1];
+  const cells = tablesEl.querySelectorAll('.checklist .check-item');
+  const target = cells[pos-1];
   if (!target){
     if (node.isConnected) node.remove();
+    tablesEl.classList.remove('m43-shift');
     return;
   }
 
-  let row = document.getElementById('m43Row');
-  if (!row){
-    row = document.createElement('div');
-    row.id = 'm43Row';
-    const itemsBar = document.getElementById('itemsBar');
-    if (cl && itemsBar){
-      // checklist と itemsBar の「間」に差し込む
-   cl.insertAdjacentElement('beforebegin', row);
-    }else{
-      // フォールバック：tables の先頭
-      tablesEl.insertAdjacentElement('afterbegin', row);
-    }
-  }
-  cl.style.position = 'relative';
-  // target の位置とサイズを取得
-  const left = target.offsetLeft + (target.offsetWidth - 56) / 2;
-  const top  = target.offsetTop - 56; // ← nanoの高さぶん上に
-  node.style.left = `${left}px`;
-  node.style.top  = `${top}px`;
+  tablesEl.classList.add('m43-shift');
 
-  if (!node.isConnected) cl.appendChild(node);
+  const tb = tablesEl.getBoundingClientRect();
+  const rb = target.getBoundingClientRect();
+  const x = rb.left - tb.left + (rb.width/2) - (56/2);
+  const y = rb.top  - tb.top  - 56 - 4 ;  // ← ここだけ変更
+  node.style.left = `${Math.max(0, x)}px`;
+  node.style.top  = `${Math.max(0, y)}px`;
+
+  if (!node.isConnected) tablesEl.appendChild(node);
+}
+/* ここまで追加：ミッション43 */
+
 
   
   // #31：制約カード拡大ポップ（オーバーレイ表示）
