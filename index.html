@@ -140,9 +140,9 @@
     height:auto;
     display:block; background:#fff;
     /* 横幅は親に収め、スクロールバーは出さない */
-    width:100%;
-    max-width:100%;
-  overflow:visible;  /* ← 切れ防止。内側のスクロールも表示される */
+  width:max-content;   /* カード枚数ぶん枠が広がる */
+  max-width:none;      /* 上限を外す */
+  overflow:visible;    /* 内側を切らない */
     z-index:0;
   }
   .table.elevated{ z-index:9999; }
