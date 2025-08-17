@@ -715,7 +715,7 @@ document.querySelectorAll('.numlane').forEach(n => {
   // ★追加：制約系UI（#31/#32/#37）を丸ごと掃除
   document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m31HandRow/m31CenterRow/m32ConRowはconlane
   ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
-    const el = document.getElementById(id); if (el) el.remove();
+  const m44 = document.getElementById('m44OxPool'); if (m44) m44.remove(); // ← ox2の行を確実に掃除
   });
   // ★ M44：酸素UIを完全掃除（プール=ox2 と各テーブル所持行）
   const m44 = document.getElementById('m44OxPool');
@@ -2942,7 +2942,7 @@ function renderM43(v){
 
 /* ▼▼ ここから追加：ミッション44（酸素トークン） ▼▼ */
 function renderM44(v){
-  if ((v?.mission?.id|0) !== 44) return;
+  if ((v?.mission?.id|0) !== 44) { const x=document.getElementById('m44OxPool'); if(x) x.remove(); return; }
   // ミッション44描画前に各テーブルの高さを基準に戻す（前回の残りを消す）
   document.querySelectorAll('.table').forEach(tb=>{
     tb.style.removeProperty('--table-h');
