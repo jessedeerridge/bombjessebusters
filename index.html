@@ -525,28 +525,6 @@
   </div>
 </div>
 
-<div id="startPop" class="start-pop hidden">
-  <div class="row"><label>人数</label>
-    <select id="selCount"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select>
-  </div>
-  <div class="row"><label>ミッション</label>
-<select id="selMission">
-  <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
-  <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
-  <option value="8">#8</option>
-  <option value="9">#9 aaa</option>
-  <option value="10">#10 bbb</option>
-  <option value="11">#11 ccc</option>
-  <option value="12">#12</option>
-  <option value="42">#42</option><option value="43">#43</option>
-</select>
-  </div>
-  <div class="row" style="justify-content:flex-end">
-    <button class="btn small" id="btnStartOk">OK</button>
-    <button class="btn small ghost" id="btnStartCancel">キャンセル</button>
-  </div>
-</div>
-
 <div id="seatPop" class="seat-pop hidden">
   <div class="row"><label>席を選択</label><div id="seatTabs" class="tabs"></div></div>
   <div class="row" style="justify-content:flex-end">
@@ -924,8 +902,8 @@ function buildMixPlan(missionId){
   45: [  // 赤2
     {type:'redPick', k:2},
   ],
-  46: [  // 黄4 (5.1,6.1,7.1,8.1)
-    {type:'yellowPick', k:4},
+46: [  // 黄4（5.1,6.1,7.1,8.1 固定）
+    { type:'yellowFixed', list:[5.1, 6.1, 7.1, 8.1] },
   ],
   47: [  // 赤3-2
     {type:'redChoose', from:3, take:2},
@@ -965,6 +943,11 @@ function executeMixPlan(planList){
       const cand = pickK(MATERIALS.yellowCodes, p.k);
       cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
 　     mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
+    }
+        if(p.type==='yellowFixed'){
+      const cand = (p.list || []).slice();
+      cand.forEach(n => toAdd.push({ num:n, kind:'yellow' }));
+      mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
     }
     if(p.type==='redChoose'){
       const cand = pickK(MATERIALS.redCodes, p.from);
@@ -2226,7 +2209,8 @@ function renderM29(v){
 }
 
 function renderM26(v){
-  const isM26 = ((v?.mission?.id|0) === 26);
+  const mid = (v?.mission?.id|0);
+  if (mid !== 26 && mid !== 47) return;  // ← #47を許可
   const old   = document.getElementById('m26Grid');
 
   // ミッション26でなければ消すだけ
@@ -4611,7 +4595,8 @@ async function ensureM15MetaInit(vNow){
 }
 
 function renderM15(v){
-  const isM15 = ((v?.mission?.id|0) === 15);
+ const mid   = (v?.mission?.id|0);
+  const isM15 = (mid === 15 || mid === 45); // ← #45でも動かす
   const rowId = 'm15Row';
   const old   = document.getElementById(rowId);
   if (!isM15){ if (old) old.remove(); return; }
