@@ -157,7 +157,11 @@
     display:flex; flex-direction:column; align-items:center; gap:2px;
     width:var(--char-w); flex:0 0 auto;
   }
-  
+.hand-col{
+  display:flex; flex-direction:column; align-items:flex-start;
+}
+.hand-col .ox-row{ margin-top:2px; }
+
   .char-card.blank{background:#f3f4f6;border:1px dashed #d1d5db;cursor:default;}
 
   .hand{
@@ -420,8 +424,7 @@
 }
  .ox-row{
    display:flex; flex-wrap:wrap; gap:2px; margin-top:4px;
-   /* 横10個で改行（20pxトークン×10 + 2pxギャップ×9 を上限目安に） */
-   max-width:calc(20px * 10 + 2px * 9);
+  max-width:calc(20px * 12 + 2px * 11);
  }
 .ox-row.ox-pool{ align-items:center; gap:6px; max-width:none; }
 .ox-side{
@@ -432,7 +435,7 @@
 }
 .ox-wrap{
   display:flex; flex-wrap:wrap; gap:2px;
-  max-width:calc(20px * 10 + 2px * 9);
++  max-width:calc(20px * 12 + 2px * 11);
 }
 
   
