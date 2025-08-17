@@ -410,6 +410,21 @@
    margin-top: 0;        /* アイテム列との外側余白を0に */
    padding-top: 56px;    /* 内側に nano の高さぶんスペースを確保 */
  }
+
+ .m44-reserve{
+   display:flex; align-items:center; gap:8px; margin-top:4px;
+ }
+ /* アイテムカードより“少し小さく”。
+    var(--item-w/--item-h) が未定義でも動くようにデフォルトを併記 */
+ .m44-oxicon{
+   width:  calc(var(--item-w, 50px) * 0.8);
+   height: calc(var(--item-h, 75px) * 0.8);
+   background-image:url('./ox2.jpg');
+   background-size:cover; background-repeat:no-repeat; background-position:center;
+  border-radius:6px; flex:0 0 auto;
+ }
+
+  
  /* ▼▼ ミッション44（酸素トークン） ▼▼ */
 .token.ox{
   background:none;   /* ← 背景色を消す */
