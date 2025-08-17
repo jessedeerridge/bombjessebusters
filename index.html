@@ -401,16 +401,19 @@
 .code-link{ text-decoration: underline; cursor: pointer; }
   /* ミッション43：nano を checklist と items の間に置くための行 */
   #m43Row{
-   position:relative;
-    height:28px;        /* nano の高さぶんスペースを確保 */
-    margin:4px 0;       /* checklist と items の間の余白 */
+    position:relative;
+    height:0;           /* ← スペースを潰す */
+    margin:0;           /* ← 余白も消す */
+    overflow:visible;   /* ← 中の nano が上にはみ出しても表示される */
   }
   .m43-nano{
     position:absolute; z-index:2147483601;
-    width:56px; height:28px;
-    background-size:contain; background-repeat:no-repeat; background-position:center;
-   pointer-events:auto;   /* クリックで回収メニュー */
-    top:0;                 /* 行の上端から配置 */
+    width:56px; height:56px;
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    pointer-events:auto;
+    top:-60px;             /* ← checklistのすぐ真上まで寄せる。数値は微調整可 */
   }
 </style>
 </head>
