@@ -1335,19 +1335,6 @@ if ((v.mission?.id|0) === 23) {
       cl.appendChild(cell);
     }
     tablesEl.appendChild(cl); // ← 直後にテーブル1が来るので「真上」になる
-  /* ▼ ここから追加：#43用 nano画像を checklist の上に配置 */
-if ((v?.mission?.id|0) === 43) {
-  const oldNano = document.getElementById('m43Nano');
-  if (oldNano) oldNano.remove();
-
-  const nano = document.createElement('div');
-  nano.id = 'm43Nano';
-  nano.className = 'm43-nano';
-  // 初期画像（例：nano3.png）
-  nano.style.backgroundImage = "url('./nano3.png')";
-
-  // checklistの直前に挿入
-  cl.insertAdjacentElement('beforebegin', nano);
   }
 
   const W = cssNum('--card-w'), G = cssNum('--card-gap'), CW = cssNum('--char-w');
