@@ -2833,11 +2833,11 @@ function renderM43(v){
   const tb = tablesEl.getBoundingClientRect();
   const rb = target.getBoundingClientRect();
   const x = rb.left - tb.left + (rb.width/2) - (56/2);
- const y = rb.top  - tb.top  - 28;   // 高さ56の半分だけ上げる
+ const y = rb.top  - tb.top  - 56;       // 枠ちょうど上に配置（-4 を削除）
   node.style.left = `${Math.max(0, x)}px`;
   node.style.top  = `${Math.max(0, y)}px`;
 
-if (!node.isConnected) target.appendChild(node);
+  if (!node.isConnected) tablesEl.appendChild(node);
 }
 /* ここまで追加：ミッション43 */
 
