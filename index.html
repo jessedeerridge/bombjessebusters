@@ -5027,7 +5027,11 @@ function renderM39(v){
   };
 
   mountLaneUnderItemsBar(lane);
-
+  
+ if (v?.meta?.m39_dealt === true) {
+    lane.remove(); // ← 上部の数値カードUIを非表示にする
+  }
+  
   // 自分の受け取り数値（m39Hand）をミッション詳細の直上に表示
   const rowId = 'm39HandRow';
   const oldRow = document.getElementById(rowId);
