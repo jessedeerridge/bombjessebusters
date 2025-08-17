@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>aaa</title>
+<title>bombbusters</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -703,20 +703,7 @@ function clearMissionOverlays(){
 document.querySelectorAll('.numlane').forEach(n => {
   if (n.id !== 'm11Row') n.remove();  // m11Rowは残す
 });
-    // --- M44: 酸素UIの掃除（プールと各テーブル行） ---
-  const pool = document.getElementById('m44OxPool');
-  if (pool) pool.remove();
-
-  // テーブル内の所持酸素行と高さリセット
-  document.querySelectorAll('.table').forEach(tb=>{
-    tb.querySelectorAll('.ox-row').forEach(n => n.remove());
-    tb.style.removeProperty('--table-h');
-  });
-
-  // 念のため M43 の残留もクリア（関係あれば）
-  const tablesWrap = document.querySelector('.tables');
-  if (tablesWrap) tablesWrap.classList.remove('m43-shift');
-
+ 
   document.querySelectorAll('.num-pin').forEach(pin => pin.remove());
   document.querySelectorAll('.num-under').forEach(n => n.remove()); // ★ 追加
   // ★ ミッション22：情報トークン表を確実に消す
