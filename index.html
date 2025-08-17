@@ -2837,7 +2837,7 @@ function renderM43(v){
     const itemsBar = document.getElementById('itemsBar');
     if (cl && itemsBar){
       // checklist と itemsBar の「間」に差し込む
-      cl.insertAdjacentElement('afterend', row);
+   cl.insertAdjacentElement('beforebegin', row);
     }else{
       // フォールバック：tables の先頭
       tablesEl.insertAdjacentElement('afterbegin', row);
