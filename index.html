@@ -135,7 +135,7 @@
   .tables{display:flex;flex-direction:column;gap:8px;margin-top:6px;overflow:visible;position:relative;margin-left:-12px;}
   .table{
     position:relative; border:1px dashed #ddd; border-radius:10px;
-    padding:0 8px;
+   padding:0 4px 0 4px; /* 右だけ4px、左は従来どおり8px */
     /* 高さを固定しない：中身に合わせて伸びる */
     height:auto;
     display:block; background:#fff;
@@ -150,18 +150,15 @@
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
   .title{text-decoration:underline;padding-right:4px}
 
-  .t-content{
-    /* 通常フローに乗せる */
+.t-content{
     position:static;
-    /* 余白は margin で確保（ヘッダ直下） */
     margin-top:2px;
-    display:flex; gap:8px; align-items:flex-start;
-    /* 固定の min-height を外し、内容に応じて伸縮 */
+    display:flex;
+    gap:8px;
+    align-items:flex-start;
     min-height:auto;
     overflow:visible;
-        padding-right:4px;   /* ★追加：右端の余白を常に4pxにする */
-    box-sizing:border-box; /* ★念のため */
-  }
+}
 
   .char-card{
     width:var(--char-w);height:var(--char-h);background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
