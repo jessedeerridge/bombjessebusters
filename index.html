@@ -2233,11 +2233,12 @@ function renderM29(v){
 }
 
 function renderM26(v){
-  const isM26 = ((v?.mission?.id|0) === 26);
+  const mid = (v?.mission?.id|0);
+  const isTarget = (mid === 26 || mid === 47);   // ← ここだけ追加・変更
   const old   = document.getElementById('m26Grid');
 
-  // ミッション26でなければ消すだけ
-  if (!isM26){ if (old) old.remove(); return; }
+  // 26/47 以外なら消すだけ
+  if (!isTarget){ if (old) old.remove(); return; }
 
   // アイテム帯がまだ描画されていない瞬間はスキップ（次の onValue で描画）
   const bar = document.getElementById('itemsBar');
@@ -2245,13 +2246,14 @@ function renderM26(v){
 
   // まだ未設置なら設置
   if (!old) {
-    mountM26GridUnderItems();
+    mountM26GridUnderItems();     // ← 関数名も id もそのまま流用でOK
     return; // 次の onValue で _sync が走る
   }
 
   // 既にある場合は最新 state に合わせて再同期
   old._sync && old._sync();
 }
+
   
 /* ここから追加：#31 描画・操作ロジック */
 function renderM31(v){
