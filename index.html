@@ -418,14 +418,11 @@
   background-size:contain;
   background-repeat:no-repeat;
 }
- .ox-row{
-   display:flex; flex-wrap:wrap; gap:2px; margin-top:4px;
-   /* 横10個で改行（20pxトークン×10 + 2pxギャップ×9 を上限目安に） */
- max-width:calc(20px * 12 + 2px * 11);
-  width:max-content;     /* 中身の幅ぶんを確保（折返しは max-width に任せる） */
-  flex:0 0 auto;         /* フレックス収縮を禁止 → 縦1列化を防ぐ */
-  align-self:flex-start; /* （任意）上寄せで安定配置 */
- }
+.ox-row{
+  display:flex; flex-wrap:wrap; gap:2px; margin-top:4px;
+  width:100%;     /* ★ テーブル幅いっぱいを占有＝“行”として改行が安定 */
+  max-width:none; /* ★ 個数での上限は外し、親幅で折り返し */
+}
 .ox-row.ox-pool{ align-items:center; gap:6px; max-width:none; }
 .ox-side{
  width:var(--item-w); height:var(--item-h);
@@ -3020,23 +3017,21 @@ function renderM44(v){
     if (!box) return;
 
     // 既存の行を再利用 or 生成
-    let ownRow = box.querySelector('.ox-row[data-owner="1"]');
-    if (!ownRow){
-      ownRow = document.createElement('div');
-      ownRow.className = 'ox-row';
-      ownRow.dataset.owner = '1';
-     // アルファベット(.alpha)と情報トークン(.tok-col)の「直後」に置く
-     const anchor =
-       box.querySelector('.tok-col') ||
-       box.querySelector('.badge-fixed') ||
-       box.querySelector('.hand');
-     if (anchor) {
-       anchor.insertAdjacentElement('afterend', ownRow);
-     } else {
-       // フォールバック（従来どおりテーブル末尾）
-       box.appendChild(ownRow);
-     }
-    }
+// 既存の行を再利用 or 生成
+let ownRow = box.querySelector('.ox-row[data-owner="1"]');
+if (!ownRow){
+  ownRow = document.createElement('div');
+  ownRow.className = 'ox-row';
+  ownRow.dataset.owner = '1';
+  // ★ 常にテーブル共通ラッパー（t-content）の末尾に置く＝列に依存しない“行”になる
+  const tContent = box.querySelector('.t-content');
+  if (tContent) {
+    tContent.appendChild(ownRow);
+  } else {
+    // フォールバック（テーブル末尾）
+    box.appendChild(ownRow);
+  }
+}
     // 再描画
     ownRow.innerHTML = '';
     const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
