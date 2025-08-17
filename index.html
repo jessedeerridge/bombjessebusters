@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>えa</title>
+<title>ｓえa</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -549,6 +549,27 @@
   </div>
 </div>
 
+<div id="startPop" class="start-pop hidden">
+  <div class="row"><label>人数</label>
+    <select id="selCount"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select>
+  </div>
+  <div class="row"><label>ミッション</label>
+<select id="selMission">
+  <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
+  <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
+  <option value="8">#8</option>
+  <option value="9">#9 aaa</option>
+  <option value="10">#10 bbb</option>
+  <option value="11">#11 ccc</option>
+  <option value="12">#12</option>
+  <option value="42">#42</option><option value="43">#43</option>
+</select>
+  </div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn small" id="btnStartOk">OK</button>
+    <button class="btn small ghost" id="btnStartCancel">キャンセル</button>
+  </div>
+</div>
 
 <div id="seatPop" class="seat-pop hidden">
   <div class="row"><label>席を選択</label><div id="seatTabs" class="tabs"></div></div>
