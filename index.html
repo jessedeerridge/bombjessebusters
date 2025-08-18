@@ -944,7 +944,6 @@ function buildMixPlan(missionId){
   ],
  48: [  // 赤2 黄3（隊長と次＋次の次のテーブル）
    { type:'redPick', k:2 },
-   { type:'yellowCaptain3' },
  ],
   49: [  // 赤2
     {type:'redPick', k:2},
@@ -1165,7 +1164,8 @@ if (v) {
     renderM42(v);
     renderM43(v);
     renderM44(v);
-
+　　renderM48(v);
+    
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
     // ★ 追加：プレイヤーが1人だけなら、その人を自動でホストにする
@@ -1207,6 +1207,43 @@ function renderMissionPanels(v){
   H(missionFooter, !v.started);
 }
 
+/* ===== M48：黄コード対象テーブル番号の表示（配布はしない） ===== */
+function renderM48(v){
+  const isM48 = ((v?.mission?.id|0) === 48);
+  // 既存の表示を掃除
+  const old = document.getElementById('m48Row');
+  if (!isM48){ if (old) old.remove(); return; }
+  if (!v?.started){ if (old) old.remove(); return; }
+  const tables = v?.tables || [];
+  const T = tables.length|0;
+  if (T <= 0){ if (old) old.remove(); return; }
+  const capIdx = (v?.captainTable ?? -1)|0;
+  if (capIdx < 0){ if (old) old.remove(); return; }
+  const nums = [0,1,2].map(d => ((capIdx + d) % T) + 1);
+
+  const row = old ?? document.createElement('div');
+  row.id = 'm48Row';
+  row.className = 'm27-row';
+  row.innerHTML = '';
+
+  const cap = document.createElement('span');
+  cap.className = 'cap';
+  cap.textContent = '黄コード対象：';
+  row.appendChild(cap);
+
+  nums.forEach(n=>{
+    const badge = document.createElement('div');
+    badge.className = 'token yellowX';
+    badge.textContent = String(n);
+    badge.title = 'このテーブルが黄コード対象';
+    row.appendChild(badge);
+  });
+
+  const footer = document.getElementById('missionFooter');
+  if (footer && !old){
+    footer.appendChild(row);
+  }
+}
 
 
 /* ===== Items & DI ===== */
