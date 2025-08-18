@@ -1209,6 +1209,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM43(v);
     renderM44(v);
     renderM49(v);
+    renderM52(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3033,7 +3034,37 @@ function renderM43(v){
 }
 /* ここまで追加：ミッション43 */
 
+function renderM52(v){
+  const isM52 = ((v?.mission?.id|0) === 52);
+  const rowId = 'm52Row';
+  const old   = document.getElementById(rowId);
+  if (!isM52){ if (old) old.remove(); return; }
 
+  if (old) old.remove();
+  const row = document.createElement('div');
+  row.id = rowId;
+  row.className = 'm52-row';
+
+  (v.tables||[]).forEach(T=>{
+    (T.hand||[]).forEach(card=>{
+      if(card.kind==='normal' || card.kind==='red'){
+        const wrap = document.createElement('div');
+        wrap.className = 'tok-col';
+        // 1~12 から card.num を除外
+        for(let n=1;n<=12;n++){
+          if(n === card.num) continue;
+          const tok = document.createElement('div');
+          tok.className = 'token black';
+          tok.textContent = n;
+          wrap.appendChild(tok);
+        }
+        row.appendChild(wrap);
+      }
+    });
+  });
+
+  tablesEl.appendChild(row);
+}
   
 /* ▼▼ ここから追加：ミッション44（酸素トークン） ▼▼ */
 function renderM44(v){
