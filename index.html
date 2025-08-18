@@ -1209,6 +1209,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM43(v);
     renderM44(v);
     renderM49(v);
+    renderM53(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1468,18 +1469,25 @@ if ((v.mission?.id|0) === 23) {
         cell.appendChild(mk);
       }
       /* ここから追加：#43のときだけクリック可能（全員） */
-      if ((v?.mission?.id|0) === 43) {
-        cell.style.cursor = 'pointer';
-        cell.onclick = async ()=>{
-          const prev = v?.meta?.m43_pos|0;    // 以前の位置（0=未配置）
-          const next = n|0;
-          if (!state.roomCode) return;
-          await update(ref(db, `rooms/${state.roomCode}/meta`), {
-            m43_prevPos: prev || 0,
-           m43_pos: next,
-            m43_updatedAt: Date.now()
-          });
-        };
+          {
+        const mid = (v?.mission?.id|0);
+        if (mid === 43 || mid === 53) {
+          cell.style.cursor = 'pointer';
+          cell.onclick = async ()=>{
+            const prev = (mid===43 ? (v?.meta?.m43_pos|0) : (v?.meta?.m53_pos|0));
+            const next = n|0;
+            if (!state.roomCode) return;
+            if (mid === 43){
+              await update(ref(db, `rooms/${state.roomCode}/meta`), {
+                m43_prevPos: prev||0, m43_pos: next, m43_updatedAt: Date.now()
+              });
+            }else{
+              await update(ref(db, `rooms/${state.roomCode}/meta`), {
+                m53_prevPos: prev||0, m53_pos: next, m53_updatedAt: Date.now()
+              });
+            }
+          };
+        }
       }
       
       cl.appendChild(cell);
@@ -3047,6 +3055,52 @@ function renderM43(v){
   if (!node.isConnected) tablesEl.appendChild(node);
 }
 /* ：ミッション43 */
+
+/* ここから追加：ミッション53（nano0 固定） */
+function renderM53(v){
+  const isM53 = ((v?.mission?.id|0) === 53);
+  const old = document.getElementById('m53Nano');
+
+  // #53 以外なら後片付け
+  if (!isM53){
+    if (old) old.remove();
+    tablesEl.classList.remove('m43-shift'); // #43 と同じレイアウト調整を流用
+    return;
+  }
+
+  const pos = v?.meta?.m53_pos|0;
+  if (!pos){
+    if (old) old.remove();
+    tablesEl.classList.remove('m43-shift');
+    return;
+  }
+
+  // 画像は常に nano0.png（レベルや向きは不使用）
+  const node = old || document.createElement('div');
+  node.id = 'm53Nano';
+  node.className = 'm43-nano'; // CSSは#43のnanoを共用
+  node.style.backgroundImage = `url("./nano0.png")`;
+
+  // 位置は #43 と同じ：チェックリストのセル中央上
+  const cells = tablesEl.querySelectorAll('.checklist .check-item');
+  const target = cells[pos-1];
+  if (!target){
+    if (node.isConnected) node.remove();
+    tablesEl.classList.remove('m43-shift');
+    return;
+  }
+
+  tablesEl.classList.add('m43-shift');
+  const tb = tablesEl.getBoundingClientRect();
+  const rb = target.getBoundingClientRect();
+  const x = rb.left - tb.left + (rb.width/2) - (56/2);
+  const y = 0; // テーブル上端に固定
+  node.style.left = `${Math.max(0, x)}px`;
+  node.style.top  = `${y}px`;
+
+  if (!node.isConnected) tablesEl.appendChild(node);
+}
+/* ここまで追加：ミッション53 */
 
   
 /* ▼▼ ：ミッション44（酸素トークン） ▼▼ */
