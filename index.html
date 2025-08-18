@@ -3170,45 +3170,7 @@ if (Number.isInteger(idx) && idx === ti){
         row.appendChild(t);
       }
 
-try{
-  // 自分の席（＝自分の playerId があるテーブル index）
-  const myIdx = (v?.tables||[]).findIndex(tb => tb?.playerId === state.userId);
-  const isMine = (ti === myIdx);
-
-  // 自分の列は何もしない（自分→相手の譲渡のみ）
-  if (!isMine) {
-    row.classList.add('clickable'); // 見た目ヒント（CSSは後述）
-    row.onclick = (ev)=>{
-      if (myIdx < 0) return; // まだ着席してない
-      const myCnt = Math.max(0, v?.meta?.oxByTable?.[myIdx] || 0);
-      if (myCnt <= 0) return; // 自分が0なら譲渡できない
-
-      // 1～自分の所持数の選択肢（最大3にしたいなら Math.min(myCnt,3)）
-      const choices = Array.from({length: myCnt}, (_,i)=> i+1);
-      openMenu(ev.clientX, ev.clientY, choices.map(k=>({
-        label: String(k),
-        action: async ()=>{
-          // 最新値で再計算（他端末同時操作対策）
-          const mineNow  = Math.max(0, (state.watching?.meta?.oxByTable?.[myIdx] || 0));
-          const otherNow = Math.max(0, (state.watching?.meta?.oxByTable?.[ti]    || 0));
-          if (k <= 0 || k > mineNow) return;
-          // M49 はプール未使用。テーブル→テーブルで更新:contentReference[oaicite:8]{index=8}
-          await update(ref(db, `rooms/${state.roomCode}/meta`), {
-            [`oxByTable/${myIdx}`]: mineNow  - k,
-            [`oxByTable/${ti}`]:    otherNow + k
-          });
-        }
-      })));
-    };
-  } else {
-    row.classList.remove('clickable');
-    row.onclick = null;
-  }
-}catch(_e){
-  // ここは黙殺（M49 本体は try/catch 内部で呼ばれている設計）
-}
-
-      
+    
       // テーブル高さを1行ぶんだけ拡張（#44の挙動と整合）
       const baseH = 96;  // :root --table-h 既定
       const extra = (cnt>0) ? (4 + 20) : 0;  // 4px + トークン20px
