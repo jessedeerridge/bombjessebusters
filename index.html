@@ -1128,7 +1128,7 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
- if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
+if (state.seatedTable == null && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
    btnSit.onclick();
     }
     
@@ -1136,7 +1136,7 @@ if (v) {
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
    const midNow  = (v?.mission?.id|0);
     const midPrev = (state._lastMissionId|0);
-    if (!state.seatedTable && midNow && midNow !== midPrev && seatPop.classList.contains('hidden')) {
+if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classList.contains('hidden')) {
      btnSit.onclick();
     }
     state.gameStarted=!!v?.started;
@@ -2529,7 +2529,7 @@ function renderM42(v){
     const clearEx = ()=>{ const ex=document.getElementById('m42Ex'); if(ex) ex.remove(); };
 
     const findMySeat = (vv)=>{
-      if (state.seatedTable!=null) return state.seatedTable|0;
+  if (state.seatedTable != null) return Number(state.seatedTable);
       const i = (vv?.tables||[]).findIndex(t=> t?.playerId===state.userId);
       return (i>=0? i : null);
     };
@@ -3079,7 +3079,7 @@ function renderM44(v){
   
 
     // 自分の所持酸素をクリック → 1/2/3 を返却（プールへ）
-    if ((state.seatedTable|0) === (ti|0)){
+if (Number.isInteger(idx) && idx === ti){
       ownRow.onclick = (ev)=>{
         openMenu(ev.clientX, ev.clientY, [1,2,3].map(k=>({
           label:String(k),
@@ -3178,16 +3178,12 @@ function renderM44(v){
       // --- 3) 譲渡メニュー：自分“以外”の行だけクリック可 ---
       // 自分のテーブル番号を安全に特定する
       const myIdx = (() => {
-        const s = state?.seatedTable;
-        if (Number.isInteger(s) && s >= 0 && s < n) return s;
-        // v.tables から uid で推定（プロジェクトの実データに合わせて or 条件を増やす）
-        const alt = (v.tables || []).findIndex(t =>
-          t?.uid === state?.uid ||
-          t?.playerId === state?.uid ||
-          t?.id === state?.tableId
-        );
-        return (alt >= 0 ? alt : null);
-      })();
+  const sNum = (state?.seatedTable == null) ? null : Number(state.seatedTable);
+  if (Number.isInteger(sNum) && sNum >= 0 && sNum < n) return sNum;
+
+  // フォールバック：playerId と自分の userId を照合
+  const alt = (v.tables || []).findIndex(t => t?.playerId === state.userId);
+  return (alt >= 0 ? alt : null);      })();
 
       if (myIdx !== null && myIdx !== ti){
 
