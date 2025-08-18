@@ -4123,8 +4123,8 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
     
-  di:{ value: ((missionId===51 || missionId===55) ? 1 : playerCount), max:6 },
-  captainTable: captainIndex, mission: missionMeta,
+  di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
+
     /* ▼▼ ：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
