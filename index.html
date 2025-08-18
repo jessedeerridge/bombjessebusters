@@ -1330,6 +1330,9 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   }
   
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
+    if ((v?.mission?.id|0) === 51 && (v.di?.value ?? null) === 0) {
+    val = 1;
+  }
   diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
     openMenu(ev.clientX, ev.clientY, [
@@ -1337,23 +1340,6 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
       {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
     ]);
   };
- let val = clamp(v.di?.value ?? v.tableCount, 0, 6);
-
-  // ★ ミッション51専用：最初は di1.png 固定
-  if ((v?.mission?.id|0) === 51 && (v.di?.value ?? null) === 0) {
-    val = 1;
-  }
-
-  diEl.style.backgroundImage = `url("./di${val}.png")`;
-  // ▲ ここまで追加/修正 ▲
-
-  diEl.onclick=(ev)=>{
-    openMenu(ev.clientX, ev.clientY, [
-      {label:'進める', action: async ()=>{ ... }},
-      {label:'戻す', action: async ()=>{ ... }},
-    ]);
-  };
-  
 }
 
 /* ===== Global badge (item16) ===== */
