@@ -3100,6 +3100,85 @@ function renderM44(v){
 }
 /* ▲▲ ここまで追加：ミッション44（酸素トークン） ▲▲ */
 
+/* ▼▼ ここから追加：ミッション49（酸素トークン・相互譲渡） ▼▼ */
+function renderM49(v){
+  if ((v?.mission?.id|0) !== 49) return;
+
+  // --- 0) 初期化（ホストのみ一度だけ） ---
+  // m49_inited が無い場合に、各テーブルへ最初の所持量を配布
+  if (state.isHost && v?.tables && v.meta?.m49_inited !== true){
+    const n = (v.tables||[]).length|0;
+    const initMap = {2:7, 3:6, 4:5, 5:4, 6:4};
+    const give = initMap[n] || 4; // 念のためフォールバック
+    const by = {};
+    (v.tables||[]).forEach((_, idx)=>{ by[idx] = give; });
+    // #44 との整合：プールは使わないので 0 にする
+    update(ref(db, `rooms/${state.roomCode}/meta`), {
+      oxItem: 0,
+      oxByTable: by,
+      m49_inited: true
+    });
+    return; // 次の onValue で描画
+  }
+
+  // --- 1) 各テーブルの「所持酸素」表示（#44 と同じ位置に出す） ---
+  const tableNodes = document.querySelectorAll('.table'); // renderTables の並びと同順
+  (v.tables||[]).forEach((T, ti)=>{
+    const box = tableNodes[ti];
+    if (!box) return;
+
+    // 既存の行を再利用 or 生成（#44 と同仕様）
+    let row = box.querySelector('.ox-row[data-owner="1"]');
+    if (!row){
+      row = document.createElement('div');
+      row.className = 'ox-row';
+      row.dataset.owner = '1';
+      const anchor = box.querySelector('.badge-fixed'); // ← アルファベット直下に固定
+      if (anchor) {
+        anchor.insertAdjacentElement('afterend', row);
+        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        row.style.marginTop = `${Math.round(ah * 5)}px`; // 「アルファベット二個分下」相当
+      }else{
+        const hand = box.querySelector('.hand');
+        (hand || box).appendChild(row);
+      }
+    }
+    // 再描画
+    row.innerHTML = '';
+    const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
+    for (let i=0; i<cnt; i++){
+      const t = document.createElement('div');
+      t.className = 'token ox';
+      row.appendChild(t);
+    }
+
+    // --- 2) クリック動作 ---
+    // 自分のテーブル → クリック不可（ターゲットは「自分以外」）
+    // 自分以外のテーブル → 自分の所持数 1..N のポップを出し、選択数だけ譲渡
+    const myIdx = state.seatedTable;
+    if (typeof myIdx === 'number' && myIdx >= 0 && (ti|0) !== (myIdx|0)){
+      row.style.cursor = 'pointer';
+      row.onclick = (ev)=>{
+        const myCnt = Math.max(0, v.meta?.oxByTable?.[myIdx]||0);
+        if (myCnt <= 0) return;
+        const entries = Array.from({length: myCnt}, (_,i)=> i+1).map(k=>({
+          label: String(k),
+          action: async ()=>{
+            // 競合を最小化するため現値を参照して差分適用
+            const myNow   = Math.max(0, (state.watching?.meta?.oxByTable?.[myIdx]||0));
+            const tgtNow  = Math.max(0, (state.watching?.meta?.oxByTable?.[ti]   ||0));
+            if (k > myNow) return; // 保険
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              [`oxByTable/${myIdx}`]: myNow - k,
+              [`oxByTable/${ti}`]   : tgtNow + k
+            });
+          }
+        }));
+        openMenu(ev.clientX, ev.clientY, entries);
+      };
+    }else{
+      row.style.cursor = 'default';
+      row.onclick = null;
 
 
   
