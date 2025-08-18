@@ -3866,16 +3866,16 @@ function openConstraintZoom(letter, myIdx){
       };
 
    
-      m.appendChild(btnOut);
-const btnPick = document.createElement('button');
-btnPick.textContent = '選ぶ';
-btnPick.onclick = async(ev)=>{
-  ev.stopPropagation();
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Pick: letter });
-  closeConstraintZoom();
-};
-m.appendChild(btnPick);
-      
+   const btnPick = document.createElement('button');   // ← ここから追加
+       btnPick.textContent = '選ぶ';
+       btnPick.onclick = (ev)=>{
+         ev.stopPropagation();
+         diEl.insertAdjacentHTML("beforebegin", `<div class="concard" style="background-image:url('${imgConstraint(letter)}')"></div>`);
+        closeConstraintZoom();
+       };  // ← ここまで追加
+ 
+       m.appendChild(btnOut);
+      m.appendChild(btnPick);   // ← 追加
       wrap.appendChild(m);
     });
 
