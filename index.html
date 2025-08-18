@@ -3174,10 +3174,10 @@ if (cnt > 0) {
   }
 } else {
   // 0枚のとき：nano4left.png を2枚並べて表示（クリック判定は row に付く）
-  for (let i=0; i<2; i++){
+  for (let i=0; i<4; i++){
     const t = document.createElement('div');
     t.className = 'token ox';                     // 既存サイズ/containを流用
-    t.style.backgroundImage = "url('./nano4left.png')";  // 画像だけ差し替え
+    t.style.backgroundImage = "url('./0ox.png')";  // 画像だけ差し替え
     row.appendChild(t);
   }
 }
