@@ -963,7 +963,8 @@ function buildMixPlan(missionId){
     ],
     52: [  // 赤3
       {type:'redPick', k:3},
-    ],
+       { type: 'infoAllExceptSelf' },
+ ],
     53: [  // 赤2
       {type:'redPick', k:2},
     ],
@@ -1047,6 +1048,24 @@ function executeMixPlan(planList){
       const take = pickK(cand, p.take);
       take.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
     }
+   if (p.type === 'infoAllExceptSelf') {
+      const all = MATERIALS.numbers;
+      const used = new Set();
+      (state.watching?.tables || []).forEach(T=>{
+        (T.hand||[]).forEach(c=>{
+          if(c?.kind === 'normal' || c?.kind === 'red'){
+            used.add(c.num|0);
+          }
+        });
+      });
+      const cand = all.filter(n => !used.has(n));
+      cand.forEach(n=>{
+        toAdd.push({ num:n, kind:'normal' });
+        toAdd.push({ num:n, kind:'red' });
+      });
+      mixLines.push('情報トークン: ' + cand.map(n=>`[${n}]`).join(' '));
+    }
+    
   });
 
   return { toAdd, mixLines, chooseLines };
