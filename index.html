@@ -3210,6 +3210,58 @@ if (Number.isInteger(idx) && idx === ti){
           }));
           if (entries.length>0) openMenu(ev.clientX, ev.clientY, entries);
         };
+                // ★追加：テーブル内「手札下の空白」全域をクリックターゲットにする
+        // 既存があれば先に外す（onValue再描画の多重登録防止）
+        if (box._m49Pad) {
+          box.removeEventListener('click', box._m49Pad);
+          box._m49Pad = null;
+        }
+
+        box._m49Pad = async (ev) => {
+          // 自分のテーブルは不可
+          if (myIdx === ti) return;
+
+          // カード/バッジ/トークンなど“部品”を直接クリックした場合は無視
+          if (ev.target.closest('.card,.badge-fixed,.token,.char-card,.numcard,.item')) return;
+
+          const handEl = box.querySelector('.hand');
+          if (!handEl) return;
+
+          const y = ev.clientY;
+          const hb = handEl.getBoundingClientRect().bottom;
+          const tb = box.getBoundingClientRect();
+
+          // テーブル領域内 かつ 手札“より下”のみ反応
+          if (y <= hb || y < tb.top || y > tb.bottom) return;
+
+          const mineSnap = await get(ref(db, `rooms/${state.roomCode}/meta`));
+          const metaNow  = mineSnap.val()||{};
+          const mine = Math.max(0, metaNow?.oxByTable?.[myIdx]||0);
+          const tgt  = Math.max(0, metaNow?.oxByTable?.[ti]||0);
+          if (mine <= 0) return;
+
+          const entries = Array.from({length: mine}, (_,i)=> i+1).map(k=>({
+            label: String(k),
+            action: async ()=>{
+              // 再検算（多重同時クリック対策）
+              const snap2 = await get(ref(db, `rooms/${state.roomCode}/meta`));
+              const m2 = snap2.val()||{};
+              const curMine   = Math.max(0, m2?.oxByTable?.[myIdx]||0);
+              const curTarget = Math.max(0, m2?.oxByTable?.[ti]||0);
+              if (k > curMine) return;
+
+              const upd = {};
+              upd[`oxByTable/${myIdx}`] = curMine - k;
+              upd[`oxByTable/${ti}`]    = curTarget + k;
+              await update(ref(db, `rooms/${state.roomCode}/meta`), upd);
+            }
+          }));
+
+          openMenu(ev.clientX, ev.clientY, entries);
+        };
+
+        box.addEventListener('click', box._m49Pad);
+
       }else{
         row.onclick = null; // 自分の行はクリック不可（譲渡は相手側行から）
       }
