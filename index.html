@@ -1209,7 +1209,6 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM43(v);
     renderM44(v);
     renderM49(v);
-    renderM53(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1903,13 +1902,28 @@ if (USE_PARITY && !isColorCode){
   }
 }
 
+/* ここから追加：#52 数字トークンポップ（通常=自数だけ除外／赤=全て可） */
+const _m52 = ((state.watching?.mission?.id|0) === 52);
+if (_m52 && canNum && (c.kind==='normal' || c.kind==='red')) {
+  for (let nn = 1; nn <= 12; nn++) {
+    if (c.kind === 'normal' && nn === (c.num|0)) continue; // 通常は上の数だけ除外
+    entries.push({
+      label: String(nn),
+      action: async ()=>{
+        const updated = [ ...(tokens), { type:'num', value: nn, style:'black' } ];
+        await update(ref(db, cardPath), { tokens: updated });
+        box.classList.add('elevated');
+      }
+    });
+  }
+}
+          
 const suppressNumberPop = (c.kind !== 'normal') || !!flags.useYellowToken || !!flags.useXTokens || !!flags.useParityToken;
  const m40 = ((state.watching?.mission?.id|0) === 40);
  const suppressNumberPop_m40 = suppressNumberPop || m40;
 // ▼ 数字ポップの出し方（通常 or #17 隊長用）
 const isCaptain = (state.watching?.captainTable|0) === idx;
- if(!suppressNumberPop_m40 && canNum){
-  if(v.mission?.flags?.m17_captainInverseNumberPop && isCaptain){
+if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captainInverseNumberPop && isCaptain){
     // 隊長は「自分のカード数値 以外」の 1..12 を候補にする
     for(let nn=1; nn<=12; nn++){
       if(nn===c.num) continue;
@@ -3194,22 +3208,7 @@ if (Number.isInteger(idx) && idx === ti){
 }
 /* ▲▲ ここまで追加：ミッション44（酸素トークン） ▲▲ */
 
-function renderM53(v){
-  if((v?.mission?.id|0)!==53) return;
-  clearMissionOverlays();
 
-  // nanoを置くdivを作成
-  const nano = document.createElement('div');
-  nano.className = 'm43-nano';
-  nano.style.backgroundImage = "url('./nano0.png')";
-
-  // tablesの直前に追加
-  const tables = document.getElementById('tables');
-  if(tables){
-    tables.classList.add('m43-shift');
-    tables.parentNode.insertBefore(nano, tables);
-  }
-}
   
 /* ▼▼ ここから追加：ミッション49（配布＆譲渡：プールなし） ▼▼ */
  async function renderM49(v){
