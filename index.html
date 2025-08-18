@@ -2409,9 +2409,8 @@ async function ensureM55MetaInit(vNow){
     // c8が含まれているなら左右の数値を1枚ずつランダムに決める（1..12）
     let c8Sides = null;
     if (shown.some(s => /c8\.(png|jpg)$/i.test(s))) {
-      const L = MATERIALS.numbers[(Math.random()*12)|0];
-      const R = MATERIALS.numbers[(Math.random()*12)|0];
-      c8Sides = [L, R];
+  const [L, R] = pickK(MATERIALS.numbers, 2); // ← ユニーク抽選
+  c8Sides = [L, R];
     }
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
       m55_deck: deck,
