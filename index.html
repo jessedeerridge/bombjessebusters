@@ -3888,16 +3888,18 @@ function openConstraintZoom(letter, myIdx){
       };
       m.appendChild(btnOut);
       }
-        const btnPick = document.createElement('button');
-      btnPick.textContent = '選ぶ';
-btnPick.onclick = async (ev)=>{
-  ev.stopPropagation();
-  // ★ DBに選択カードを保存（全員に同期）
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Selected: letter });
-  closeConstraintZoom();
-};
-
-      m.appendChild(btnPick);
+// ★ ミッション31・34では「選ぶ」を出さない
+const mid = (state.watching?.mission?.id|0);
+if (mid !== 31 && mid !== 34) {
+  const btnPick = document.createElement('button');
+  btnPick.textContent = '選ぶ';
+  btnPick.onclick = async (ev)=>{
+    ev.stopPropagation();
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Selected: letter });
+    closeConstraintZoom();
+  };
+  m.appendChild(btnPick);
+}
 
 
       
