@@ -3867,6 +3867,15 @@ function openConstraintZoom(letter, myIdx){
 
    
       m.appendChild(btnOut);
+const btnPick = document.createElement('button');
+btnPick.textContent = '選ぶ';
+btnPick.onclick = async(ev)=>{
+  ev.stopPropagation();
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Pick: letter });
+  closeConstraintZoom();
+};
+m.appendChild(btnPick);
+      
       wrap.appendChild(m);
     });
 
