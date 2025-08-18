@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>qｒew</title>
+<title>あ</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -87,15 +87,6 @@
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
   }
 
-.m57-grid{ 
-  display:grid; grid-template-columns:repeat(4, max-content);
-  grid-template-rows:repeat(3, auto);
-  gap:4px 6px; align-items:start; margin:4px 0;  /* ← 行/列の隙間を縮小 */
-}
-.m57-pair{ display:flex; gap:0px; align-items:center; } /* ← ペア内の隙間を縮小 */
-
-
-  
   #conZoomOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.4);
     display:flex; align-items:center; justify-content:center;
@@ -738,14 +729,6 @@ document.querySelectorAll('.numlane').forEach(n => {
   });
   
   NUMCARD_REG.clear();
-  const g57 = document.getElementById('m57Grid');
-  if (g57) g57.remove();
-  const sel57 = document.getElementById('m57Selected');
-if (sel57) sel57.remove();
-// DB上の値もクリア
-update(ref(db, `rooms/${state.roomCode}/meta`), { m57Selected: null });
-
-  
 }
 
 /** mountParent配下に n のカードを「新規作成 or 既存に重ね」 */
@@ -1198,13 +1181,9 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
-if ((v?.mission?.id|0) === 57) {
-   renderM57(v);   // 席に座っていなくても描画
-} else {
-   if (state.seatedTable == null && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
-      btnSit.onclick();
-   }
-}
+if (state.seatedTable == null && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
+   btnSit.onclick();
+    }
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
@@ -2460,76 +2439,6 @@ function openChallengeZoom(id){
   }catch(e){ console.error(e); }
 }
 
-/* ===== #57：数値(1..12) × 制約(a..l) をペアで3×4表示（全員同期） ===== */
-function renderM57(v){
-  const isM57 = ((v?.mission?.id|0) === 57) && v?.started;
-  const gid = 'm57Grid';
-  const old = document.getElementById(gid);
-  if (!isM57){ if (old) old.remove(); return; }
-
-  // コンテナ確保
-  let grid = old;
-  if (!grid){
-    grid = document.createElement('div');
-    grid.id = gid;
-    grid.className = 'm57-grid';
-    const tablesWrap = document.getElementById('tables');
-    if (tablesWrap) tablesWrap.prepend(grid);
-  }
-
-  // 並び順の同期（ホストが初回決定）
-  let pairs = v?.meta?.m57Pairs; // 1..12（制約の並びを数字で保持）
-  if (!Array.isArray(pairs) || pairs.length !== 12){
-    if (state.isHost){
-      const base = Array.from({length:12}, (_,i)=>i+1);
-      shuffle(base);
-      pairs = base;
-      update(ref(db, `rooms/${state.roomCode}/meta`), { m57Pairs: pairs });
-    }else{
-      grid.innerHTML = '';
-      return;
-    }
-  }
-
-  // 数字→英字（a..l）にマップして imgConstraint(letter) で .jpg を解決
-  const letters = ['a','b','c','d','e','f','g','h','i','j','k','l'];
-  grid.innerHTML = '';
-  for (let i=0; i<12; i++){
-    const wrap = document.createElement('div');
-    wrap.className = 'm57-pair';
-wrap.style.gap = ' 0px';
-
-    // 左：数値（1..12）
-    const numSlot = document.createElement('div');
-    placeNumberCard(i+1, numSlot);
-
-    // 右：制約（pairs[i] を a..l に変換して .jpg を確実に参照）
-    const ch = letters[(pairs[i]-1+12)%12];
-    const con = document.createElement('div');
-    con.className = 'concard';
-    con.style.backgroundImage = `url('${imgConstraint(ch)}')`; // ← ./a.jpg 〜 ./l.jpg
-
-    wrap.appendChild(numSlot);
-    wrap.appendChild(con);
-    grid.appendChild(wrap);
-con.onclick = ()=> openConstraintZoom(ch, i);
-const oldSel = document.getElementById('m57Selected');
-if (oldSel) oldSel.remove();
-
-const picked = v?.meta?.m57Selected;
-if (picked){
-  const img = document.createElement('div');
-  img.id = 'm57Selected';
-  img.className = 'concard';
-  img.style.backgroundImage = `url('${imgConstraint(picked)}')`;
-  diEl.insertAdjacentElement('beforebegin', img);
-}
-
-    
-  }
-}
-
-  
 /* ===== #55：チャレンジ札（人数分）。c8 のときだけ左右に数値1枚ずつ表示 ===== */
 function renderM55(v){
   const isM55 = ((v?.mission?.id|0) === 55);
@@ -3869,7 +3778,6 @@ function openConstraintZoom(letter, myIdx){
       m = document.createElement('div');
       m.className = 'conzoom-menu';
 
-      if ((state.watching?.mission?.id|0) !== 57) {
       const btnOut = document.createElement('button');
       btnOut.textContent = '場に出す';
       btnOut.onclick = async (ev)=>{
@@ -3886,23 +3794,9 @@ function openConstraintZoom(letter, myIdx){
         }catch(err){ console.error(err); }
         closeConstraintZoom();
       };
+
+   
       m.appendChild(btnOut);
-      }
-// ★ ミッション31・34では「選ぶ」を出さない
-const mid = (state.watching?.mission?.id|0);
-if (mid !== 31 && mid !== 34) {
-  const btnPick = document.createElement('button');
-  btnPick.textContent = '選ぶ';
-  btnPick.onclick = async (ev)=>{
-    ev.stopPropagation();
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Selected: letter });
-    closeConstraintZoom();
-  };
-  m.appendChild(btnPick);
-}
-
-
-      
       wrap.appendChild(m);
     });
 
