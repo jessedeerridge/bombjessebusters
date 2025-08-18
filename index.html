@@ -88,7 +88,8 @@
   }
 
   .m57-grid{ 
-    display:grid; grid-template-columns:repeat(6, max-content);
+    display:grid; grid-template-columns:repeat(4, max-content);
+    grid-template-rows:repeat(3, auto);
     gap:6px 10px; align-items:start; margin:6px 0;
   }
   .m57-pair{ display:flex; gap:6px; align-items:center; }
@@ -2452,17 +2453,15 @@ function openChallengeZoom(id){
   }catch(e){ console.error(e); }
 }
 
-/* ミッション57：数値(1..12) × 制約12枚（ランダム）を2×6で、ペアでくっつけて表示 */
+/* ミッション57：数値(1..12) × 制約12枚（ランダム）を3×4で、ペアでくっつけて表示 */
 function renderM57(v){
   const mid = v?.mission?.id|0;
-  // ミッション外 or 未開始 → UI除去
   if (mid !== 57 || !v?.started){
     const old = document.getElementById('m57Grid');
     if (old) old.remove();
     return;
   }
 
-  // 既存があれば再利用。無ければ作る（tables の先頭に置く）
   let grid = document.getElementById('m57Grid');
   if (!grid){
     grid = document.createElement('div');
@@ -2472,40 +2471,32 @@ function renderM57(v){
     if (tablesWrap) tablesWrap.prepend(grid);
   }
 
-  // --- 同期：ホストが初回だけ並び順を決めてDBへ、以後全員はDBを参照 ---
   let pairs = v?.meta?.m57Pairs;
   if (!Array.isArray(pairs) || pairs.length !== 12){
     if (state.isHost){
-      const base = Array.from({length:12}, (_,i)=>i+1); // 1..12
-      shuffle(base); // 12枚の「制約」順をシャッフル
+      const base = Array.from({length:12}, (_,i)=>i+1);
+      shuffle(base);
       pairs = base;
       update(ref(db, `rooms/${state.roomCode}/meta`), { m57Pairs: pairs });
     }else{
-      // 反映待ち：一旦クリアして終了（次の onValue で描画される）
       grid.innerHTML = '';
       return;
     }
   }
 
-  // 再描画
   grid.innerHTML = '';
 
-  // 左の数値は 1..12 をそのまま順番に、右に対応する制約カード（pairs[i] の順）
+  // 3x4 に整列するため、12回ループはそのまま
   for (let i=0; i<12; i++){
     const wrap = document.createElement('div');
     wrap.className = 'm57-pair';
 
-    // 左：数値カード（1..12 を見たまま順番に）
     const numSlot = document.createElement('div');
-    // placeNumberCard は「同一数字のホルダーを一意管理」する既存ユーティリティ
     placeNumberCard(i+1, numSlot);
 
-    // 右：制約カード（画像は任意。ここでは背面=白のままでもOK）
     const con = document.createElement('div');
     con.className = 'concard';
-    // 画像がある場合はここで設定してください（例）:
-    // con.style.backgroundImage = `url('./con${pairs[i]}.jpg')`;
-    // 未指定なら白地のまま
+    // con.style.backgroundImage = `url('./con${pairs[i]}.jpg')`; // 画像があれば設定
 
     wrap.appendChild(numSlot);
     wrap.appendChild(con);
