@@ -4523,10 +4523,20 @@ function renderM23(v){
 }  
 
 // #48：黄コード3枚をランダム抽選し、隊長／次／次の次のテーブルに配布（ホストのみ・一度だけ）
-if ((v.mission?.id|0) === 48) {
-  const done = v?.meta?.m48_dealt === true;
-  if (!done && state.isHost) {
-    performM48Deal();
+if ((v.mission?.id|0) === 48 && state.isHost) {
+  const tables = v.tables || [];
+  const T = tables.length|0;
+  // 隊長indexが無い時のフォールバック：最初に着席しているテーブル
+  let capIdx = (v?.captainTable ?? -1)|0;
+  if (capIdx < 0) capIdx = Math.max(0, tables.findIndex(t => !!t?.playerId));
+  if (capIdx >= 0 && T > 0) {
+    const targets = [0,1,2].map(d => (capIdx + d) % T);
+    // 既に対象テーブルに黄が1枚ずつあるかを確認（自己修復）
+    const hasAll = targets.every(i => (tables[i]?.hand||[]).some(c => c?.kind === 'yellow'));
+    if (!hasAll) {
+      // 既存のフラグに関わらず、足りなければ配る（配布後フラグを立て直す）
+      performM48Deal({ force: true });
+    }
   }
 }
   
@@ -5161,39 +5171,51 @@ function renderM16(v){
   }catch(e){ console.error('performM39Deal', e); }
 }
 
-async function performM48Deal(){
+async function performM48Deal(opts = {}){
   const v = state.watching;
   if (!v) return;
 
   const tables = v.tables || [];
-  const T = tables.length | 0;
+  const T = tables.length|0;
   if (T === 0) return;
 
-  // 隊長テーブル index（0始まり）
-  const capIdx = (v?.captainTable ?? -1) | 0;
+  // 隊長index（0始まり）フォールバックあり
+  let capIdx = (v?.captainTable ?? -1)|0;
+  if (capIdx < 0) capIdx = Math.max(0, tables.findIndex(t => !!t?.playerId));
   if (capIdx < 0) return;
 
-  // 抽選：黄コード3枚（重複なし）
-  const pool = MATERIALS.yellowCodes.slice();
+  const done = v?.meta?.m48_dealt === true;
+  if (done && !opts.force) return; // 通常は一度だけ。自己修復時はforceで上書き
+
+  // 配布先：隊長→次→次の次
+  const targets = [0,1,2].map(d => (capIdx + d) % T);
+
+  // 既に黄を持っているテーブルを除外し、不足分だけ配る
+  const needTargets = targets.filter(i => !(tables[i]?.hand||[]).some(c => c?.kind === 'yellow'));
+  if (needTargets.length === 0) {
+    // もう揃っているならフラグだけ整える
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { m48_dealt: true });
+    return;
+  }
+
+  // 黄コード抽選（重複なし）
+  const pool = MATERIALS.yellowCodes.slice(); // 例：[1.1,2.1,…]:contentReference[oaicite:3]{index=3}
   shuffle(pool);
-  const picks = pool.slice(0, 3);
+  const picks = pool.slice(0, needTargets.length);
 
-  // 配布先：隊長／次／次の次（%T でループ）
-  const targets = [0, 1, 2].map(d => (capIdx + d) % T);
-
-  // まとめて更新
-  for (let i = 0; i < 3; i++) {
-    const ti = targets[i];
+  // 不足分を配る
+  for (let i = 0; i < needTargets.length; i++) {
+    const ti = needTargets[i];
     const yn = picks[i];
     const hand = (tables[ti]?.hand || []).slice();
     hand.push({ kind: 'yellow', num: yn, open: false });
     await update(ref(db, `rooms/${state.roomCode}/tables/${ti}`), { hand });
   }
 
-  // 二重実行ガード
+  // フラグ
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m48_dealt: true });
 }
-  
+
 
 // #23：残りのアイテム山札を“アイテム欄”に並べる（メタへ確定保存）
 async function performM23Spread(){
