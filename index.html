@@ -3102,7 +3102,7 @@ function renderM44(v){
 /* ▲▲ ここまで追加：ミッション44（酸素トークン） ▲▲ */
 
 /* ▼▼ ここから追加：ミッション49（配布＆譲渡：プールなし） ▼▼ */
-function renderM49(v){
+ async function renderM49(v){
   try{
     const isM49 = ((v?.mission?.id|0) === 49);
     // ミッション49でなければ終了（残り物も特に無し）
@@ -3126,11 +3126,11 @@ function renderM49(v){
       for (let i=0;i<n;i++) by[i] = per;
 
       // ミッション44で使っていた oxItem（プール）は使わないので 0 に
-      await update(ref(db, `rooms/${state.roomCode}/meta`), {
+  update(ref(db, `rooms/${state.roomCode}/meta`), {
         oxByTable: by,
         oxItem: 0,
         m49_init: true
-      });
+  }).catch(console.error);
       return; // 次回 onValue で描画
     }
 
