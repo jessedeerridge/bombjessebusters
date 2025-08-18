@@ -2510,21 +2510,6 @@ wrap.style.gap = ' 0px';
     wrap.appendChild(con);
     grid.appendChild(wrap);
 con.onclick = ()=> openConstraintZoom(ch, i);
-
-const oldSel = document.getElementById('m57Selected');
-if (oldSel) oldSel.remove();
-
-const picked = v?.meta?.m57Selected;
-if (picked){
-  const img = document.createElement('div');
-  img.id = 'm57Selected';
-  img.className = 'concard';
-  img.style.backgroundImage = `url('${imgConstraint(picked)}')`;
-  img.onclick = ()=> openConstraintZoom(picked); // ★クリックで拡大（ポップなし）
-  diEl.insertAdjacentElement('beforebegin', img);
-}
-
-      
 const oldSel = document.getElementById('m57Selected');
 if (oldSel) oldSel.remove();
 
