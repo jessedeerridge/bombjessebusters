@@ -3058,7 +3058,7 @@ function renderM43(v){
 /* ：ミッション43 */
 
 /* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
-function renderM54(v){
+async function renderM54(v){
   const isM54 = ((v?.mission?.id|0) === 54);
   // 画面要素の片付け
   if (!isM54){
@@ -3080,13 +3080,14 @@ function renderM54(v){
     const deck = Array.from({length:11}, (_,i)=> i+1);
     shuffle(deck);
 
-    await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      m54_init: true,
-      m54_byTable: by,
-      m54_pool: pool,
-      m54_redDeck: deck,
-      m54_redUsed: []
-    });
+update(ref(db, `rooms/${state.roomCode}/meta`), {
+  m54_init: true,
+  m54_byTable: by,
+  m54_pool: pool,
+  m54_redDeck: deck,
+  m54_redUsed: []
+}).catch(console.error);
+
     return; // 次の onValue で描画
   }
 
