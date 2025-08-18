@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>5</title>
+<title>6</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3045,14 +3045,12 @@ function renderM52(v){
       const wrap = row.querySelectorAll('.card-wrap')[cIndex];
       if (!wrap) return;
 
-      const alpha = wrap.querySelector('.alpha');   // アルファ要素（通常コード用）
-      const cardDiv = wrap.querySelector('.card');  // カード本体（赤コード用）
+      const alpha = wrap.querySelector('.alpha');   // 通常コード用クリック領域
+      const cardDiv = wrap.querySelector('.card');  // 赤コード用クリック領域
 
-      // 共通ハンドラ
       const addHandler = (target, candidateNums)=>{
         if (!target || target.dataset.m52) return;
         target.dataset.m52 = "1";
-
         target.onclick = (ev)=>{
           ev.stopPropagation();
           openMenu(ev.clientX, ev.clientY,
@@ -3068,15 +3066,15 @@ function renderM52(v){
         };
       };
 
-      // ▼ 赤コード判定：小数点あり
-      if (typeof card?.num === "number" && !Number.isInteger(card.num)) {
-        // 赤コードなら 1〜12 全部
-        addHandler(cardDiv, MATERIALS.numbers.slice());
-      }
-      // ▼ 通常コード（整数）
-      else {
-        const baseNum = card.num|0;
+      // ▼ 整数（1〜12）の場合
+      if (Number.isInteger(card?.num) && card.num >= 1 && card.num <= 12) {
+        const baseNum = card.num;
         addHandler(alpha, MATERIALS.numbers.filter(n => n !== baseNum));
+      }
+
+      // ▼ 小数点付き（.5）の場合（赤コード）
+      else if (typeof card?.num === "number" && card.num >= 1.5 && card.num <= 12.5 && (card.num % 1 === 0.5)) {
+        addHandler(cardDiv, MATERIALS.numbers.slice()); // 1〜12 全部
       }
     });
   });
@@ -3089,6 +3087,7 @@ function renderM52(v){
     if (!row) return;
     const wrap = row.querySelectorAll('.card-wrap')[cIndex];
     if (!wrap) return;
+
     let tokCol = wrap.querySelector('.tok-col');
     if (!tokCol){
       tokCol = document.createElement('div');
