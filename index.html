@@ -1400,6 +1400,15 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
+  if (v?.meta?.diLeft) {
+    diEl.style.borderLeft = `40px solid transparent`;
+    diEl.style.backgroundImage = 
+      `url('${imgConstraint(v.meta.diLeft)}'), url("./di${val}.png")`;
+    diEl.style.backgroundPosition = 'left center, center';
+    diEl.style.backgroundSize = 'contain, contain';
+  }
+
+  
   diEl.onclick=(ev)=>{
     openMenu(ev.clientX, ev.clientY, [
       {label:'進める', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
@@ -3848,6 +3857,15 @@ function openConstraintZoom(letter, myIdx){
       m = document.createElement('div');
       m.className = 'conzoom-menu';
 
+  const btnPick = document.createElement('button'); // ★ここから追加
+       btnPick.textContent = '選ぶ';
+       btnPick.onclick = async (ev)=>{
+         ev.stopPropagation();
+         await update(ref(db, `rooms/${state.roomCode}/meta`), { diLeft: letter });
+         closeConstraintZoom();
+       };
+       m.appendChild(btnPick);    
+      
       const btnOut = document.createElement('button');
       btnOut.textContent = '場に出す';
       btnOut.onclick = async (ev)=>{
