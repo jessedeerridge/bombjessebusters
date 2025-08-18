@@ -3176,11 +3176,24 @@ function renderM44(v){
       box.style.setProperty('--table-h', `${Math.max(baseH, baseH + extra)}px`);
 
       // --- 3) 譲渡メニュー：自分“以外”の行だけクリック可 ---
-      const myIdx = (state.seatedTable|0);
-      if ((myIdx|0) !== (ti|0)){
+      // 自分のテーブル番号を安全に特定する
+      const myIdx = (() => {
+        const s = state?.seatedTable;
+        if (Number.isInteger(s) && s >= 0 && s < n) return s;
+        // v.tables から uid で推定（プロジェクトの実データに合わせて or 条件を増やす）
+        const alt = (v.tables || []).findIndex(t =>
+          t?.uid === state?.uid ||
+          t?.playerId === state?.uid ||
+          t?.id === state?.tableId
+        );
+        return (alt >= 0 ? alt : null);
+      })();
+
+      if (myIdx !== null && myIdx !== ti){
+
         row.onclick = (ev)=>{
           const mine = Math.max(0, v?.meta?.oxByTable?.[myIdx]||0);
-          if (myIdx==null || mine<=0) return;
+          if (mine<=0) return;
 
           // 自分の所持枚数ぶんの数字 1..mine を出す
           const entries = Array.from({length: mine}, (_,i)=> i+1).map(k=>({
