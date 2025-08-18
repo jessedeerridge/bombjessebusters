@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ｆs</title>
+<title>bombbusters</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -1128,7 +1128,7 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
-if (state.seatedTable == null && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
+ if (!state.seatedTable && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
    btnSit.onclick();
     }
     
@@ -1136,7 +1136,7 @@ if (state.seatedTable == null && v?.started && !state.gameStarted && seatPop.cla
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
    const midNow  = (v?.mission?.id|0);
     const midPrev = (state._lastMissionId|0);
-if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classList.contains('hidden')) {
+    if (!state.seatedTable && midNow && midNow !== midPrev && seatPop.classList.contains('hidden')) {
      btnSit.onclick();
     }
     state.gameStarted=!!v?.started;
@@ -2529,7 +2529,7 @@ function renderM42(v){
     const clearEx = ()=>{ const ex=document.getElementById('m42Ex'); if(ex) ex.remove(); };
 
     const findMySeat = (vv)=>{
-  if (state.seatedTable != null) return Number(state.seatedTable);
+      if (state.seatedTable!=null) return state.seatedTable|0;
       const i = (vv?.tables||[]).findIndex(t=> t?.playerId===state.userId);
       return (i>=0? i : null);
     };
@@ -2941,7 +2941,6 @@ function renderM43(v){
 /* ここまで追加：ミッション43 */
 
 
-  
 /* ▼▼ ここから追加：ミッション44（酸素トークン） ▼▼ */
 function renderM44(v){
   if ((v?.mission?.id|0) !== 44) { const x=document.getElementById('m44OxPool'); if(x) x.remove(); return; }
@@ -3058,23 +3057,6 @@ function renderM44(v){
         (hand || box).appendChild(ownRow);
       }
     }
-
-
-  box.onclick = (ev)=>{
-      if (ev.target.closest('.card,.token,.alpha,.char-card,.numcard,.concard,.name')) return;
-      if ((state.seatedTable|0)!==(ti|0)) return;
-      const y = ev.clientY, c = box.querySelector('.t-content').getBoundingClientRect();
-      const r = ownRow.getBoundingClientRect();
-      if (y < Math.min(r.top, r.bottom) || y > c.bottom) return;
-
-      const n = (v.meta?.oxByTable?.[ti]|0), pool = (v.meta?.oxItem||0);
-      const entries = [1,2,3].filter(k=>n>=k).map(k=>({
-        label:String(k),
-        action:()=>update(ref(db,`rooms/${state.roomCode}/meta`),{ oxItem:pool+k, [`oxByTable/${ti}`]:n-k })
-      }));
-      entries.length && openMenu(ev.clientX, ev.clientY, entries);
-    };
-    
     // 再描画
     ownRow.innerHTML = '';
     const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
@@ -3096,7 +3078,7 @@ function renderM44(v){
   
 
     // 自分の所持酸素をクリック → 1/2/3 を返却（プールへ）
-if (Number.isInteger(idx) && idx === ti){
+    if ((state.seatedTable|0) === (ti|0)){
       ownRow.onclick = (ev)=>{
         openMenu(ev.clientX, ev.clientY, [1,2,3].map(k=>({
           label:String(k),
@@ -3118,125 +3100,6 @@ if (Number.isInteger(idx) && idx === ti){
 }
 /* ▲▲ ここまで追加：ミッション44（酸素トークン） ▲▲ */
 
-/* ▼▼ ここから追加：ミッション49（配布＆譲渡：プールなし） ▼▼ */
- async function renderM49(v){
-  try{
-    const isM49 = ((v?.mission?.id|0) === 49);
-    // ミッション49でなければ終了（残り物も特に無し）
-    if (!isM49) return;
-
-    // --- 0) 安全ガード：tables が無い/空なら何もしない ---
-    const n = (v?.tables?.length|0);
-    if (!Array.isArray(v?.tables) || n <= 0) return;
-
-    // --- 1) 初期配布（ホストのみ・一度だけ） ---
-    // 人数→初期枚数：2人=7, 3人=6, 4人=5, 5人=4, 6人=4
-    if (state.isHost && v?.meta?.m49_init !== true){
-      const map = (m)=>{
-        if (m<=2) return 7;
-        if (m===3) return 6;
-        if (m===4) return 5;
-        return 4; // 5 or 6
-      };
-      const per = map(n);
-      const by  = {};
-      for (let i=0;i<n;i++) by[i] = per;
-
-      // ミッション44で使っていた oxItem（プール）は使わないので 0 に
-  update(ref(db, `rooms/${state.roomCode}/meta`), {
-        oxByTable: by,
-        oxItem: 0,
-        m49_init: true
-  }).catch(console.error);
-      return; // 次回 onValue で描画
-    }
-
-    // --- 2) 各テーブルに所持酸素を表示（位置は #44 と同じアンカー直下） ---
-    // #44 と同じクラス/見た目を再利用（.token.ox / .ox-row）
-    const tableNodes = document.querySelectorAll('.table'); // renderTables と同順
-    (v.tables||[]).forEach((T, ti)=>{
-      const box = tableNodes[ti];
-      if (!box) return;
-
-      // 既存行を再利用 or 生成
-      let row = box.querySelector('.ox-row[data-owner="1"]');
-      if (!row){
-        row = document.createElement('div');
-        row.className = 'ox-row';
-        row.dataset.owner = '1';
-
-        // #44 同様、「アルファベット直下」に固定配置
-        const anchor = box.querySelector('.badge-fixed');
-        if (anchor && anchor.parentElement){
-          const ah = anchor.parentElement.querySelector('.alpha')?.getBoundingClientRect().height || 18;
-          (anchor.parentElement).appendChild(row);
-          row.style.marginTop = `${Math.round(ah * 5)}px`;
-        }else{
-          // フォールバック：手札の直後
-          const hand = box.querySelector('.hand');
-          (hand || box).appendChild(row);
-        }
-      }
-
-      // 再描画
-      row.innerHTML = '';
-      const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
-      for (let i=0;i<cnt;i++){
-        const t = document.createElement('div');
-        t.className = 'token ox';
-        row.appendChild(t);
-      }
-
-      // テーブル高さを1行ぶんだけ拡張（#44の挙動と整合）
-      const baseH = 96;  // :root --table-h 既定
-      const extra = (cnt>0) ? (4 + 20) : 0;  // 4px + トークン20px
-      box.style.setProperty('--table-h', `${Math.max(baseH, baseH + extra)}px`);
-
-      // --- 3) 譲渡メニュー：自分“以外”の行だけクリック可 ---
-      // 自分のテーブル番号を安全に特定する
-      const myIdx = (() => {
-  const sNum = (state?.seatedTable == null) ? null : Number(state.seatedTable);
-  if (Number.isInteger(sNum) && sNum >= 0 && sNum < n) return sNum;
-
-  // フォールバック：playerId と自分の userId を照合
-  const alt = (v.tables || []).findIndex(t => t?.playerId === state.userId);
-  return (alt >= 0 ? alt : null);      })();
-
-      if (myIdx !== null && myIdx !== ti){
-
-        row.onclick = (ev)=>{
-          const mine = Math.max(0, v?.meta?.oxByTable?.[myIdx]||0);
-          if (mine<=0) return;
-
-          // 自分の所持枚数ぶんの数字 1..mine を出す
-          const entries = Array.from({length: mine}, (_,i)=> i+1).map(k=>({
-            label: String(k),
-            action: async ()=>{
-              // 二重ガード：最新値で検算
-              const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
-              const meta = snap.val()||{};
-              const curMine   = Math.max(0, meta?.oxByTable?.[myIdx]||0);
-              const curTarget = Math.max(0, meta?.oxByTable?.[ti]||0);
-              if (k > curMine) return;
-
-              const upd = {};
-              upd[`oxByTable/${myIdx}`] = curMine - k;
-              upd[`oxByTable/${ti}`]    = curTarget + k;
-              await update(ref(db, `rooms/${state.roomCode}/meta`), upd);
-            }
-          }));
-          if (entries.length>0) openMenu(ev.clientX, ev.clientY, entries);
-        };
-      }else{
-        row.onclick = null; // 自分の行はクリック不可（譲渡は相手側行から）
-      }
-    });
-  }catch(err){
-    // 入室不能事故を防ぐため、例外は握り潰してログだけ
-    console.error('[M49]', err);
-  }
-}
-/* ▲▲ ここまで追加：ミッション49 ▲▲ */
 
 
   
