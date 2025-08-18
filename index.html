@@ -963,7 +963,8 @@ function buildMixPlan(missionId){
     ],
     52: [  // 赤3
       {type:'redPick', k:3},
- ],
+      { type:'allNumbersExceptSelf' },
+    ],
     53: [  // 赤2
       {type:'redPick', k:2},
     ],
@@ -1046,6 +1047,14 @@ function executeMixPlan(planList){
       chooseLines.push(`<span style="color:gold;">▧</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
       const take = pickK(cand, p.take);
       take.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
+    }
+    if (p.type === 'allNumbersExceptSelf') {
+      // 候補リスト（通常・赤の両方）を toAdd に流し込む
+      MATERIALS.numbers.forEach(n=>{
+        toAdd.push({ num:n, kind:'normal' });
+        toAdd.push({ num:n, kind:'red' });
+      });
+      mixLines.push('通常＋赤：1～12（自カード番号はメニュー生成時に除外）');
     }
   });
 
