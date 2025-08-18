@@ -1209,6 +1209,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM43(v);
     renderM44(v);
     renderM49(v);
+    renderM52(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -5331,6 +5332,37 @@ function renderM39(v){
   missionFooter.insertAdjacentElement('beforebegin', row);
 }
 
+function renderM52(v){
+  const isM52 = ((v?.mission?.id|0) === 52);
+  const old = document.getElementById('m52Row');
+  if (!isM52){ if (old) old.remove(); return; }
+
+  if (old) old.remove();
+  const lane = document.createElement('div');
+  lane.id = 'm52Row';
+  lane.className = 'numlane';
+
+  const exclude = new Set();
+  (v?.tables||[]).forEach(T=>{
+    (T.hand||[]).forEach(c=>{
+      if (c?.kind === 'normal' || c?.kind === 'red'){
+        exclude.add(c.num|0);
+      }
+    });
+  });
+
+  for(let n=1;n<=12;n++){
+    if(!exclude.has(n)){
+      const tok=document.createElement('div');
+      tok.className='token black';
+      tok.textContent=String(n);
+      lane.appendChild(tok);
+    }
+  }
+  mountLaneUnderItemsBar(lane);
+}
+
+  
 /* ===== #16：数値3 + 右4（全員同期） ===== */
 function renderM16(v){
   const isM16 = ((v?.mission?.id|0) === 16);
