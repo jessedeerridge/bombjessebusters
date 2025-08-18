@@ -87,13 +87,12 @@
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
   }
 
-  .m57-grid{ 
-    display:grid; grid-template-columns:repeat(4, max-content);
-    grid-template-rows:repeat(3, auto);
-    gap:6px 10px; align-items:start; margin:6px 0;
-  }
-  .m57-pair{ display:flex; gap:6px; align-items:center; }
-  .m57-pair .numcard-holder{ width:32px; height:48px; }
+.m57-grid{ 
+  display:grid; grid-template-columns:repeat(4, max-content);
+  grid-template-rows:repeat(3, auto);
+  gap:4px 6px; align-items:start; margin:4px 0;  /* ← 行/列の隙間を縮小 */
+}
+.m57-pair{ display:flex; gap:2px; align-items:center; } /* ← ペア内の隙間を縮小 */
 
 
   
@@ -2504,6 +2503,7 @@ function renderM57(v){
     wrap.appendChild(numSlot);
     wrap.appendChild(con);
     grid.appendChild(wrap);
+    con.onclick = ()=> openConstraintZoom(ch);
   }
 }
 
