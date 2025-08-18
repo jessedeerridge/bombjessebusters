@@ -1212,6 +1212,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM49(v);
     renderM53(v);
     renderM54(v);
+    renderM57(v);
 renderM55(state.watching);
 
     // ▼ ホスト判定を最新化
@@ -2438,6 +2439,46 @@ function openChallengeZoom(id){
   }catch(e){ console.error(e); }
 }
 
+function renderM57(v){
+  if ((v?.mission?.id|0) !== 57) return;
+
+  clearMissionOverlays();
+  const lane = document.createElement('div');
+  lane.className = 'numlane';
+  tablesEl.appendChild(lane);
+
+  for (let n=1; n<=12; n++){
+    const wrap = document.createElement('div');
+    wrap.style.display='flex';
+    wrap.style.alignItems='center';
+    wrap.style.marginRight='-3px'; // 少し重ねる
+
+    // 数値カード（3x4）
+    placeNumberCard(n, wrap);
+
+    // 制約カード（右にランダム配置）
+    const c = document.createElement('div');
+    c.className='concard';
+    c.style.backgroundImage=`url('${imgConstraint(n)}')`;
+    c.onclick=(ev)=>{
+      openMenu(ev.clientX,ev.clientY,[{
+        label:'選ぶ', action: async ()=>{
+          await update(ref(db,`rooms/${state.roomCode}/meta`),{m57_choice:n});
+        }
+      }]);
+    };
+    wrap.appendChild(c);
+    lane.appendChild(wrap);
+  }
+
+  // di左に表示
+  const choice = v?.meta?.m57_choice;
+  if (choice){
+    diEl.style.backgroundImage=`url('${imgConstraint(choice)}')`;
+  }
+}
+
+  
 /* ===== #55：チャレンジ札（人数分）。c8 のときだけ左右に数値1枚ずつ表示 ===== */
 function renderM55(v){
   const isM55 = ((v?.mission?.id|0) === 55);
