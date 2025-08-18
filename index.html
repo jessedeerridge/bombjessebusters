@@ -2439,44 +2439,6 @@ function openChallengeZoom(id){
   }catch(e){ console.error(e); }
 }
 
-function renderM57(v){
-  if ((v?.mission?.id|0) !== 57) return;
-
-  clearMissionOverlays();
-  const lane = document.createElement('div');
-  lane.className = 'numlane';
-  tablesEl.appendChild(lane);
-
-  for (let n=1; n<=12; n++){
-    const wrap = document.createElement('div');
-    wrap.style.display='flex';
-    wrap.style.alignItems='center';
-    wrap.style.marginRight='-3px'; // 少し重ねる
-
-    // 数値カード（3x4）
-    placeNumberCard(n, wrap);
-
-    // 制約カード（右にランダム配置）
-    const c = document.createElement('div');
-    c.className='concard';
-    c.style.backgroundImage=`url('${imgConstraint(n)}')`;
-    c.onclick=(ev)=>{
-      openMenu(ev.clientX,ev.clientY,[{
-        label:'選ぶ', action: async ()=>{
-          await update(ref(db,`rooms/${state.roomCode}/meta`),{m57_choice:n});
-        }
-      }]);
-    };
-    wrap.appendChild(c);
-    lane.appendChild(wrap);
-  }
-
-  // di左に表示
-  const choice = v?.meta?.m57_choice;
-  if (choice){
-    diEl.style.backgroundImage=`url('${imgConstraint(choice)}')`;
-  }
-}
 
   
 /* ===== #55：チャレンジ札（人数分）。c8 のときだけ左右に数値1枚ずつ表示 ===== */
@@ -3208,6 +3170,89 @@ function renderM43(v){
 }
 /* ：ミッション43 */
 
+/* ===== Mission 57 ===== */
+function renderM57(v){
+  if((v?.mission?.id|0) !== 57) return;
+
+  // 既存の表示物を掃除
+  clearMissionOverlays();
+
+  // アイテムカードの下に3x4で1～12を並べる
+  const itemsBar = document.getElementById('itemsBar');
+  if(!itemsBar) return;
+  const lane = document.createElement('div');
+  lane.className = 'num-under m57-grid';
+  lane.style.display = 'grid';
+  lane.style.gridTemplateColumns = 'repeat(4, auto)';
+  lane.style.gap = '6px';
+  itemsBar.insertAdjacentElement('afterend', lane);
+
+  // 制約カード a~l.jpg をシャッフル
+  const cons = shuffle('abcdefghijkl'.split(''));
+  for(let n=1;n<=12;n++){
+    const wrap=document.createElement('div');
+    wrap.className='m57-pair';
+    wrap.style.display='flex';
+    wrap.style.alignItems='center';
+    wrap.style.marginRight='-3px'; // 少し重ねる
+
+    // 数値カード
+    placeNumberCard(n, wrap);
+
+    // 制約カード
+    const c=document.createElement('div');
+    c.className='concard';
+    c.style.backgroundImage=`url('${imgConstraint(cons[n-1])}')`;
+    c.onclick=(ev)=> openConZoom(cons[n-1], ev.clientX, ev.clientY);
+    wrap.appendChild(c);
+
+    lane.appendChild(wrap);
+  }
+}
+
+/* 拡大と「選ぶ」処理 */
+function openConZoom(letter, x, y){
+  const overlay=document.createElement('div');
+  overlay.id='conZoomOverlay';
+  overlay.onclick=()=>overlay.remove();
+  const wrap=document.createElement('div');
+  wrap.className='conzoom-wrap';
+  const card=document.createElement('div');
+  card.className='conzoom-card';
+  card.style.backgroundImage=`url('${imgConstraint(letter)}')`;
+
+  card.onclick=(ev)=>{
+    ev.stopPropagation();
+    openOneMini(ev.clientX, ev.clientY, '選ぶ', async ()=>{
+      // di左に表示（全員同期）
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m57_pick: letter });
+    });
+  };
+
+  wrap.appendChild(card);
+  overlay.appendChild(wrap);
+  document.body.appendChild(overlay);
+}
+
+/* di左に選ばれた制約カードを表示 */
+function renderM57Selected(v){
+  if((v?.mission?.id|0)!==57) return;
+  const di=document.getElementById('di');
+  if(!di) return;
+  const exist=document.getElementById('m57Selected');
+  if(exist) exist.remove();
+  const pick=v?.meta?.m57_pick;
+  if(pick){
+    const img=document.createElement('div');
+    img.id='m57Selected';
+    img.className='concard';
+    img.style.marginRight='4px';
+    img.style.backgroundImage=`url('${imgConstraint(pick)}')`;
+    di.insertAdjacentElement('beforebegin', img);
+  }
+}
+
+  
 /* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
 async function renderM54(v){
   const isM54 = ((v?.mission?.id|0) === 54);
