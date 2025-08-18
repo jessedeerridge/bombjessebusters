@@ -424,7 +424,6 @@
    width:max-content;              /* ← 中身幅に合わせる */
    flex:0 0 auto;
    align-self:flex-start;
-  min-height:22px; /* ← 追加：空でも高さを確保してクリック可 */
  }
 .ox-row.ox-pool{ align-items:center; gap:6px; max-width:none; }
 .ox-side{
@@ -3059,6 +3058,21 @@ function renderM44(v){
         (hand || box).appendChild(ownRow);
       }
     }
+   box.onclick = (ev)=>{
+      if (ev.target.closest('.card,.token,.alpha,.char-card,.numcard,.concard,.name')) return;
+      if ((state.seatedTable|0)!==(ti|0)) return;
+      const y = ev.clientY, c = box.querySelector('.t-content').getBoundingClientRect();
+      const r = ownRow.getBoundingClientRect();
+      if (y < Math.min(r.top, r.bottom) || y > c.bottom) return;
+
+      const n = (v.meta?.oxByTable?.[ti]|0), pool = (v.meta?.oxItem||0);
+      const entries = [1,2,3].filter(k=>n>=k).map(k=>({
+        label:String(k),
+        action:()=>update(ref(db,`rooms/${state.roomCode}/meta`),{ oxItem:pool+k, [`oxByTable/${ti}`]:n-k })
+      }));
+      entries.length && openMenu(ev.clientX, ev.clientY, entries);
+    };
+    
     // 再描画
     ownRow.innerHTML = '';
     const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
