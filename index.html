@@ -2489,7 +2489,8 @@ function renderM57(v){
   for (let i=0; i<12; i++){
     const wrap = document.createElement('div');
     wrap.className = 'm57-pair';
-wrap.style.gap = '-3px';         // ← ペア内の距離を詰める
+wrap.style.gap = ' 0px';
+wrap.style.marginRight = '-3px'; // ← 横方向に3px重ねる
 
     // 左：数値（1..12）
     const numSlot = document.createElement('div');
