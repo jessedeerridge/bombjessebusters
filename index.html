@@ -963,6 +963,7 @@ function buildMixPlan(missionId){
     ],
     52: [  // 赤3
       {type:'redPick', k:3},
+        { type:'infoAllExceptSelf' }
     ],
     53: [  // 赤2
       {type:'redPick', k:2},
@@ -1035,6 +1036,20 @@ function executeMixPlan(planList){
       cand.forEach(n => toAdd.push({ num:n, kind:'yellow' }));
       mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
     }
+  if(p.type==='infoAllExceptSelf'){
+      (state.watching?.tables||[]).forEach(T=>{
+        (T.hand||[]).forEach(c=>{
+          if (c.kind==='normal' || c.kind==='red'){
+            const allNums = MATERIALS.numbers.filter(n => n !== (c.num|0));
+            allNums.forEach(n=>{
+              toAdd.push({ num:n, kind:'info', targetCard: c });
+            });
+          }
+        });
+      });
+      mixLines.push('各通常/赤コードに1~12（ただし自分の数字を除く）情報トークンを付与');
+    }
+    
     if(p.type==='redChoose'){
       const cand = pickK(MATERIALS.redCodes, p.from);
       chooseLines.push(`<span style="color:red;">●</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
@@ -1209,6 +1224,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM43(v);
     renderM44(v);
     renderM49(v);
+    renderM52(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
