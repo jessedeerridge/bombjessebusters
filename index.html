@@ -3058,7 +3058,9 @@ function renderM44(v){
         (hand || box).appendChild(ownRow);
       }
     }
-   box.onclick = (ev)=>{
+
+
+  box.onclick = (ev)=>{
       if (ev.target.closest('.card,.token,.alpha,.char-card,.numcard,.concard,.name')) return;
       if ((state.seatedTable|0)!==(ti|0)) return;
       const y = ev.clientY, c = box.querySelector('.t-content').getBoundingClientRect();
