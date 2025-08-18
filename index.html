@@ -539,6 +539,7 @@
   <option value="11">#11 ccc</option>
   <option value="12">#12</option>
   <option value="42">#42</option><option value="43">#43</option>
+  <option value="49">#49</option>
 </select>
   </div>
   <div class="row" style="justify-content:flex-end">
@@ -1155,6 +1156,7 @@ if (v) {
     renderM42(v);
     renderM43(v);
     renderM44(v);
+    renderM49(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3098,6 +3100,83 @@ function renderM44(v){
 }
 /* ▲▲ ここまで追加：ミッション44（酸素トークン） ▲▲ */
 
+/* ===== Mission 49: Oxygen distribute & transfer (same UI as M44) ===== */
+function renderM49(v){
+  const isM49 = ((v?.mission?.id|0) === 49);
+  if (!isM49){ return; }
+
+  // ① 初期配布（ホスト一回だけ）
+  if (state.isHost && !v?.meta?.m49_inited && Array.isArray(v?.tables)) {
+    const seated = (v.tables||[]).filter(T => !!T.playerId);
+    const n = Math.max(2, Math.min(6, seated.length || v.tableCount || 0));
+    const initialMap = {2:7,3:6,4:5,5:4,6:4};
+    const give = initialMap[n] || 4;
+    const oxBy = {};
+    (v.tables||[]).forEach((T, idx)=>{ if (T?.playerId) oxBy[idx] = give; });
+
+    // #44 のメタを流用（プールは未使用）
+    const upd = { m49_inited: true, oxItem: 0, oxByTable: { ...(v.meta?.oxByTable||{}), ...oxBy } };
+    update(ref(db, `rooms/${state.roomCode}/meta`), upd);
+  }
+
+  // ② 各テーブルに酸素列を描画（#44 と同じ見た目）
+  const tableNodes = document.querySelectorAll('.table');
+  const myIdx = (v?.tables||[]).findIndex(T => T.playerId === state.userId);
+
+  (v.tables||[]).forEach((T, idx)=>{
+    const box = tableNodes[idx]; if (!box) return;
+    const content = box.querySelector('.t-content'); if (!content) return;
+
+    // 冪等化
+    const old = box.querySelector('.ox-row[data-m49="1"]');
+    if (old) old.remove();
+
+    // 行を作成
+    const row = document.createElement('div');
+    row.className = 'ox-row';
+    row.dataset.m49 = '1';
+
+    // 所持数ぶんのトークンを積む
+    const cnt = (v?.meta?.oxByTable?.[idx] | 0);
+    for (let k=0; k<cnt; k++){
+      const t = document.createElement('div');
+      t.className = 'token ox';
+      row.appendChild(t);
+    }
+    content.appendChild(row);
+
+    // ③ 交渉：自分以外の列をクリック → 自分の所持分 1..N をポップ → 転送
+    if (idx !== myIdx){
+      row.style.cursor = 'pointer';
+      row.onclick = (ev)=>{
+        const myCount = (v?.meta?.oxByTable?.[myIdx] | 0);
+        if (!myCount || myIdx < 0) return;
+
+        const entries = [];
+        for (let n=1; n<=myCount; n++){
+          entries.push({
+            label: String(n),
+            action: async ()=>{
+              const snap = await get(ref(db, `rooms/${state.roomCode}/meta/oxByTable`));
+              const cur = snap.val() || {};
+              const fromCnt = (cur[myIdx] | 0);
+              const toCnt   = (cur[idx]   | 0);
+              const take    = Math.min(n, fromCnt);
+              const upd     = {};
+              upd[myIdx] = Math.max(0, fromCnt - take);
+              upd[idx]   = toCnt + take;
+              await update(ref(db, `rooms/${state.roomCode}/meta/oxByTable`), upd);
+            }
+          });
+        }
+        openMenu(ev.clientX, ev.clientY, entries);
+      };
+    }else{
+      row.style.cursor = 'default';
+      row.onclick = null;
+    }
+  });
+}
   
   // #31：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
