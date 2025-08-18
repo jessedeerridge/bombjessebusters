@@ -1329,14 +1329,12 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
    }
   }
   
-    const _rawDi = (v?.di?.value ?? null);
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
-  const val    = ((v?.mission?.id|0) === 51 && (_rawDi === null || _rawDi === 0)) ? 1 : _base;
   diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
     openMenu(ev.clientX, ev.clientY, [
-      {label:'進める', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
-      {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
+      {label:'進める', action: async ()=>{ ... }},
+      {label:'戻す', action: async ()=>{ ... }},
     ]);
   };
 }
