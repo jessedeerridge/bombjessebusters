@@ -2453,25 +2453,25 @@ function openChallengeZoom(id){
   }catch(e){ console.error(e); }
 }
 
-/* ミッション57：数値(1..12) × 制約12枚（ランダム）を3×4で、ペアでくっつけて表示 */
+/* ===== #57：数値(1..12) × 制約(a..l) をペアで3×4表示（全員同期） ===== */
 function renderM57(v){
-  const mid = v?.mission?.id|0;
-  if (mid !== 57 || !v?.started){
-    const old = document.getElementById('m57Grid');
-    if (old) old.remove();
-    return;
-  }
+  const isM57 = ((v?.mission?.id|0) === 57) && v?.started;
+  const gid = 'm57Grid';
+  const old = document.getElementById(gid);
+  if (!isM57){ if (old) old.remove(); return; }
 
-  let grid = document.getElementById('m57Grid');
+  // コンテナ確保
+  let grid = old;
   if (!grid){
     grid = document.createElement('div');
-    grid.id = 'm57Grid';
+    grid.id = gid;
     grid.className = 'm57-grid';
     const tablesWrap = document.getElementById('tables');
     if (tablesWrap) tablesWrap.prepend(grid);
   }
 
-  let pairs = v?.meta?.m57Pairs;
+  // 並び順の同期（ホストが初回決定）
+  let pairs = v?.meta?.m57Pairs; // 1..12（制約の並びを数字で保持）
   if (!Array.isArray(pairs) || pairs.length !== 12){
     if (state.isHost){
       const base = Array.from({length:12}, (_,i)=>i+1);
@@ -2484,19 +2484,22 @@ function renderM57(v){
     }
   }
 
+  // 数字→英字（a..l）にマップして imgConstraint(letter) で .jpg を解決
+  const letters = ['a','b','c','d','e','f','g','h','i','j','k','l'];
   grid.innerHTML = '';
-
-  // 3x4 に整列するため、12回ループはそのまま
   for (let i=0; i<12; i++){
     const wrap = document.createElement('div');
     wrap.className = 'm57-pair';
 
+    // 左：数値（1..12）
     const numSlot = document.createElement('div');
     placeNumberCard(i+1, numSlot);
 
+    // 右：制約（pairs[i] を a..l に変換して .jpg を確実に参照）
+    const ch = letters[(pairs[i]-1+12)%12];
     const con = document.createElement('div');
     con.className = 'concard';
-    // con.style.backgroundImage = `url('./con${pairs[i]}.jpg')`; // 画像があれば設定
+    con.style.backgroundImage = `url('${imgConstraint(ch)}')`; // ← ./a.jpg 〜 ./l.jpg
 
     wrap.appendChild(numSlot);
     wrap.appendChild(con);
