@@ -3089,7 +3089,21 @@ function renderM52(v){
     if (!row) return;
     const wrap = row.querySelectorAll('.card-wrap')[cIndex];
     if (!wrap) return;
-
+    let tokCol = wrap.querySelector('.tok-col');
+    if (!tokCol){
+      tokCol = document.createElement('div');
+      tokCol.className = 'tok-col';
+      wrap.appendChild(tokCol);
+    }
+    if (!tokCol.querySelector(`[data-m52tok="${val}"]`)){
+      const tok = document.createElement('div');
+      tok.className = 'token black';
+      tok.dataset.m52tok = val;
+      tok.textContent = String(val);
+      tokCol.appendChild(tok);
+    }
+  });
+}
   
 /* ▼▼ ：ミッション44（酸素トークン） ▼▼ */
 function renderM44(v){
