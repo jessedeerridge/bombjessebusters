@@ -3032,41 +3032,76 @@ function renderM43(v){
 
   if (!node.isConnected) tablesEl.appendChild(node);
 }
-/* ここまで追加：ミッション43 */
+/* ：ミッション43 */
 
-function renderM52(v){
+  function renderM52(v){
   const isM52 = ((v?.mission?.id|0) === 52);
-  const rowId = 'm52Row';
-  const old   = document.getElementById(rowId);
-  if (!isM52){ if (old) old.remove(); return; }
+  // 52以外なら終わり
+  if (!isM52) return;
 
-  if (old) old.remove();
-  const row = document.createElement('div');
-  row.id = rowId;
-  row.className = 'm52-row';
+  // 全テーブルを走査
+  (v.tables||[]).forEach((T, tIndex)=>{
+    (T.hand||[]).forEach((card, cIndex)=>{
+      const row = document.querySelectorAll('.table')[tIndex];
+      if (!row) return;
+      const wrap = row.querySelectorAll('.card-wrap')[cIndex];
+      if (!wrap) return;
 
-  (v.tables||[]).forEach(T=>{
-    (T.hand||[]).forEach(card=>{
-      if(card.kind==='normal' || card.kind==='red'){
-        const wrap = document.createElement('div');
-        wrap.className = 'tok-col';
-        // 1~12 から card.num を除外
-        for(let n=1;n<=12;n++){
-          if(n === card.num) continue;
-          const tok = document.createElement('div');
-          tok.className = 'token black';
-          tok.textContent = n;
-          wrap.appendChild(tok);
-        }
-        row.appendChild(wrap);
+      // アルファ要素取得
+      const alpha = wrap.querySelector('.alpha');
+      if (!alpha) return;
+
+      // クリックイベント付与（重複防止）
+      if (!alpha.dataset.m52) {
+        alpha.dataset.m52 = "1";
+        alpha.onclick = (ev)=>{
+          ev.stopPropagation();
+          // 1～12の数字から自分のカード番号を除外
+          const nums = MATERIALS.numbers.filter(n => n !== (card.num|0));
+
+          // メニューとして表示
+          openBottomMenu(nums.map(n=>({
+            label: String(n),
+            action: async ()=>{
+              // DBに同期：m52_tokens に保存
+              await update(ref(db, `rooms/${state.roomCode}/meta/m52_tokens`), {
+                [`${card.num}_${tIndex}_${cIndex}`]: n
+              });
+            }
+          })));
+        };
       }
     });
   });
 
-  tablesEl.appendChild(row);
+  // DBにあるトークンを描画
+  const tokens = v?.meta?.m52_tokens || {};
+  Object.entries(tokens).forEach(([key, val])=>{
+    const [cnum, tIndex, cIndex] = key.split('_').map(x=>parseInt(x,10));
+    const row = document.querySelectorAll('.table')[tIndex];
+    if (!row) return;
+    const wrap = row.querySelectorAll('.card-wrap')[cIndex];
+    if (!wrap) return;
+
+    // トークン列を表示
+    let tokCol = wrap.querySelector('.tok-col');
+    if (!tokCol){
+      tokCol = document.createElement('div');
+      tokCol.className = 'tok-col';
+      wrap.appendChild(tokCol);
+    }
+    if (!tokCol.querySelector(`[data-m52tok="${val}"]`)){
+      const tok = document.createElement('div');
+      tok.className = 'token black';
+      tok.dataset.m52tok = val;
+      tok.textContent = String(val);
+      tokCol.appendChild(tok);
+    }
+  });
 }
+
   
-/* ▼▼ ここから追加：ミッション44（酸素トークン） ▼▼ */
+/* ▼▼ ：ミッション44（酸素トークン） ▼▼ */
 function renderM44(v){
   if ((v?.mission?.id|0) !== 44) { const x=document.getElementById('m44OxPool'); if(x) x.remove(); return; }
   // ミッション44描画前に各テーブルの高さを基準に戻す（前回の残りを消す）
