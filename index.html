@@ -4852,7 +4852,7 @@ async function ensureM15MetaInit(vNow){
 
 function renderM15(v){
  const mid   = (v?.mission?.id|0);
-  const isM15 = (mid === 15 || mid === 45); // ← #45でも動かす
+  const isM15 = (mid === 15 || mid === 45 || mid === 51); // ← #45でも動かす
   const rowId = 'm15Row';
   const old   = document.getElementById(rowId);
   if (!isM15){ if (old) old.remove(); return; }
