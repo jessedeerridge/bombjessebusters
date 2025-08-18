@@ -1209,6 +1209,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM43(v);
     renderM44(v);
     renderM49(v);
+    renderM53(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3193,6 +3194,30 @@ if (Number.isInteger(idx) && idx === ti){
 }
 /* ▲▲ ここまで追加：ミッション44（酸素トークン） ▲▲ */
 
+function renderM53(v){
+  const mid = v?.mission?.id|0;
+  // ミッション53以外では何もしない
+  if(mid !== 53) return;
+
+  // 既存の nano を掃除
+  document.querySelectorAll('.m53-nano').forEach(n => n.remove());
+  document.querySelectorAll('.tables').forEach(tb => tb.classList.remove('m53-shift'));
+
+  // 配置先の tables を取得
+  const tablesEl = document.getElementById('tables');
+  if(!tablesEl) return;
+
+  // nano を生成して tables の直上に配置
+  const nano = document.createElement('div');
+  nano.className = 'm53-nano m43-nano'; // 既存の m43-nano を流用
+  nano.style.backgroundImage = "url('./nano0.png')";
+  tablesEl.insertAdjacentElement('beforebegin', nano);
+
+  // tables 全体を少し下げる（43と同じ処理）
+  tablesEl.classList.add('m53-shift');
+}
+
+  
 /* ▼▼ ここから追加：ミッション49（配布＆譲渡：プールなし） ▼▼ */
  async function renderM49(v){
   try{
