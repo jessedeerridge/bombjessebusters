@@ -694,6 +694,7 @@ const imgBack   = `./numbercardback.jpg`;
 const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
 const imgConstraint = L => `./${String(L).toLowerCase()}.jpg`;
 
+const imgChallenge = id => `./${id}.png`;
 
 /* ===== 数値カード一意管理＆重ね表示ユーティリティ ===== */
 /* 同じ数字のカードが同時に存在しないように管理する */
@@ -1211,6 +1212,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM49(v);
     renderM53(v);
     renderM54(v);
+    renderM55(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -2381,6 +2383,74 @@ function renderM26(v){
   // 既にある場合は最新 state に合わせて再同期
   old._sync && old._sync();
 }
+
+  /* ここから追加：ミッション55（チャレンジカード） */
+// 初期化：ホストが一度だけデッキをシャッフルし、人数分を公開リストに確定
+async function ensureM55MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if ((v?.mission?.id|0) !== 55) return;                  // ミッション55以外
+  if (Array.isArray(v?.meta?.m55_shown)) return;          // 既に用意済み
+  if (!state.isHost) return;                              // 初期化はホストのみ
+  const n = v.tableCount|0; if (n <= 0) return;           // 人数未定の瞬間は見送り
+  const deck = Array.from({length:10}, (_,i)=>`c${i+1}`); // c1..c10
+  shuffle(deck);
+  const shown = deck.slice(0, n);
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    m55_deck: deck,        // 参照用（全10）
+    m55_shown: shown       // 表示する人数分
+  });
+}
+
+// タップ拡大（conZoomOverlayを流用）
+function openChallengeZoom(id){
+  try{
+    const old = document.getElementById('conZoomOverlay');
+    if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'conZoomOverlay';
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
+    const wrap = document.createElement('div'); wrap.className = 'conzoom-wrap';
+    const big  = document.createElement('div'); big.className  = 'conzoom-card';
+    big.style.backgroundImage = `url('${imgChallenge(id)}')`;
+    wrap.appendChild(big);
+    ov.appendChild(wrap);
+    document.body.appendChild(ov);
+  }catch(e){ console.error(e); }
+}
+
+// 描画：アイテム列の直下に、人数分のチャレンジカードを横並びで表示
+function renderM55(v){
+  const isM55 = ((v?.mission?.id|0) === 55);
+  const rowId = 'm55Row';
+  const old   = document.getElementById(rowId);
+  if (!isM55){ if (old) old.remove(); return; }
+
+  // 初回：meta未準備ならホスト初期化を促して次tickへ
+  if (!Array.isArray(v?.meta?.m55_shown)){
+    ensureM55MetaInit(v);
+    if (old) old.remove();
+    return;
+  }
+
+  if (old) old.remove();
+  const lane = document.createElement('div');
+  lane.id = rowId;
+  lane.className = 'conlane';  // 既存の制約カード用レーン（アイテムと同サイズ）
+
+  const arr = (v.meta?.m55_shown||[]).slice(0, v.tableCount|0);
+  arr.forEach(id=>{
+    const card = document.createElement('div');
+    card.className = 'concard';                              // 既存CSS（サイズ=アイテム）
+    card.style.backgroundImage = `url('${imgChallenge(id)}')`;
+    card.title = '拡大';
+    card.onclick = (ev)=>{ ev.stopPropagation(); openChallengeZoom(id); };
+    lane.appendChild(card);
+  });
+
+  // アイテム列の直下に設置（ユーティリティを再利用）
+  mountLaneUnderItemsBar(lane);
+}
+/* ここまで追加 */
 
   
 /* ここから追加：#31 描画・操作ロジック */
@@ -6413,9 +6483,12 @@ function missionInfo(id, opts={}){
         id:43, name:'#43', desc:'',
         display:[
           '#43',...linesForMix,
-          '1の位置にナノロボットを',
-          '',
-          '',
+          'ロボットのナノをボード上のスペース1に置く。',
+          'コードを配る時、ナノに指定の数のコードを置く。',
+          'プレイヤーの手番終了時にナノは1マス進み、12で方向転換する。',
+          'ナノがいるスペースの数値に対応するコードを切断した時に、ナノのコードを1枚回収できる。',
+          '爆弾を解除するには全てのコードを回収して切断しなければならない。',
+          '※いつでもコーヒーを使っても、ナノは1マス進む。',
        ],
         flags:{  }
       };
@@ -6425,9 +6498,9 @@ function missionInfo(id, opts={}){
         id:44, name:'#44', desc:'',
         display:[
           '#44',...linesForMix,
-          '',
-          '',
-          '',
+          '手番プレイヤーは切断する直前に、切断するコードの数値に対応する枚数の酸素をリザーブから取らなければならない。',
+          '隊長の手番開始時に全ての酸素トークンをリザーブエリアに戻す。',
+          '切断できない場合、起爆ダイヤルを1進める。',
        ],
         flags:{  }
       };
