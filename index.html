@@ -3161,14 +3161,26 @@ if (Number.isInteger(idx) && idx === ti){
         }
       }
 
-      // 再描画
-      row.innerHTML = '';
-      const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
-      for (let i=0;i<cnt;i++){
-        const t = document.createElement('div');
-        t.className = 'token ox';
-        row.appendChild(t);
-      }
+  // 再描画
+row.innerHTML = '';
+const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
+
+if (cnt > 0) {
+  // 通常：所持数ぶんの酸素トークンを表示
+  for (let i=0; i<cnt; i++){
+    const t = document.createElement('div');
+    t.className = 'token ox';
+    row.appendChild(t);
+  }
+} else {
+  // 0枚のとき：nano4left.png を2枚並べて表示（クリック判定は row に付く）
+  for (let i=0; i<2; i++){
+    const t = document.createElement('div');
+    t.className = 'token ox';                     // 既存サイズ/containを流用
+    t.style.backgroundImage = "url('./nano4left.png')";  // 画像だけ差し替え
+    row.appendChild(t);
+  }
+}
 
     
       // テーブル高さを1行ぶんだけ拡張（#44の挙動と整合）
