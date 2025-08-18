@@ -3038,68 +3038,94 @@ function renderM52(v){
   const isM52 = ((v?.mission?.id|0) === 52);
   if (!isM52) return;
 
-  (v.tables||[]).forEach((T, tIndex)=>{
-    (T.hand||[]).forEach((card, cIndex)=>{
-      const row = document.querySelectorAll('.table')[tIndex];
+  // 各テーブル/カードに対してハンドラを貼る
+  (v.tables || []).forEach((T, tIndex) => {
+    (T.hand || []).forEach((card, cIndex) => {
+      const row  = document.querySelectorAll('.table')[tIndex];
       if (!row) return;
       const wrap = row.querySelectorAll('.card-wrap')[cIndex];
       if (!wrap) return;
 
-      const alpha = wrap.querySelector('.alpha');   // 通常コード用クリック領域
-      const cardDiv = wrap.querySelector('.card');  // 赤コード用クリック領域
+      const alpha   = wrap.querySelector('.alpha');  // アルファ
+      const cardDiv = wrap.querySelector('.card');   // カード本体
 
-      const addHandler = (target, candidateNums)=>{
-        if (!target || target.dataset.m52) return;
-        target.dataset.m52 = "1";
-        target.onclick = (ev)=>{
+      // 毎回リバインド（古い挙動を確実に消す）
+      if (alpha)   alpha.onclick   = null;
+      if (cardDiv) cardDiv.onclick = null;
+
+      // 数値化して厳密に判定（"1.5" でも OK）
+      const num = +card?.num;
+      if (!Number.isFinite(num)) return;
+
+      // 条件：
+      // 1) 1〜12 の整数 → 自分以外(1..12)を候補、クリックはアルファ
+      // 2) 1〜12 + 0.5 の小数 → 1..12 すべてを候補、クリックはカード本体とアルファ両方
+      const isInt12 = Number.isInteger(num) && num >= 1 && num <= 12;
+      const isHalf  = !Number.isInteger(num) && num > 1 && num < 12 && Math.abs(num - Math.round(num) - 0.5) < 1e-9;
+
+      // 候補ビルダー
+      const buildEntries = (cands) => cands.map(n => ({
+        label: String(n),
+        action: async () => {
+          await update(ref(db, `rooms/${state.roomCode}/meta/m52_tokens`), {
+            // 例: "7.5_0_2": 4
+            [`${card.num}_${tIndex}_${cIndex}`]: n
+          });
+        }
+      }));
+
+      // 1) 整数：アルファにだけ付与（自分の数字を除外）
+      if (isInt12) {
+        if (alpha) {
+          const choices = MATERIALS.numbers.filter(n => n !== num);
+          alpha.onclick = (ev) => {
+            ev.stopPropagation();
+            openMenu(ev.clientX, ev.clientY, buildEntries(choices));
+          };
+        }
+        return;
+      }
+
+      // 2) 小数(.5)：カード本体とアルファ両方に付与（1..12 全部）
+      if (isHalf) {
+        const choices = MATERIALS.numbers.slice(); // 1..12 全部
+        const handler = (ev) => {
           ev.stopPropagation();
-          openMenu(ev.clientX, ev.clientY,
-            candidateNums.map(n=>({
-              label: String(n),
-              action: async ()=>{
-                await update(ref(db, `rooms/${state.roomCode}/meta/m52_tokens`), {
-                  [`${card.num}_${tIndex}_${cIndex}`]: n
-                });
-              }
-            }))
-          );
+          openMenu(ev.clientX, ev.clientY, buildEntries(choices));
         };
-      };
-
-      // ▼ 整数（1〜12）の場合
-      if (Number.isInteger(card?.num) && card.num >= 1 && card.num <= 12) {
-        const baseNum = card.num;
-        addHandler(alpha, MATERIALS.numbers.filter(n => n !== baseNum));
+        if (cardDiv) cardDiv.onclick = handler;
+        if (alpha)   alpha.onclick   = handler; // ← 取りこぼし防止
+        return;
       }
 
-      // ▼ 小数点付き（.5）の場合（赤コード）
-      else if (typeof card?.num === "number" && card.num >= 1.5 && card.num <= 12.5 && (card.num % 1 === 0.5)) {
-        addHandler(cardDiv, MATERIALS.numbers.slice()); // 1〜12 全部
-      }
+      // それ以外は何もしない
     });
   });
 
-  // ▼ DBにあるトークンを描画
+  // 保存済みトークンの描画（全員同期）
   const tokens = v?.meta?.m52_tokens || {};
-  Object.entries(tokens).forEach(([key, val])=>{
-    const [cnum, tIndex, cIndex] = key.split('_').map(x=>parseFloat(x));
-    const row = document.querySelectorAll('.table')[tIndex];
+  Object.entries(tokens).forEach(([key, val]) => {
+    const [/*cnumStr*/, tStr, cStr] = key.split('_');
+    const tIndex = parseInt(tStr, 10);
+    const cIndex = parseInt(cStr, 10);
+
+    const row  = document.querySelectorAll('.table')[tIndex];
     if (!row) return;
     const wrap = row.querySelectorAll('.card-wrap')[cIndex];
     if (!wrap) return;
 
-    let tokCol = wrap.querySelector('.tok-col');
-    if (!tokCol){
-      tokCol = document.createElement('div');
-      tokCol.className = 'tok-col';
-      wrap.appendChild(tokCol);
+    let col = wrap.querySelector('.tok-col');
+    if (!col) {
+      col = document.createElement('div');
+      col.className = 'tok-col';
+      wrap.appendChild(col);
     }
-    if (!tokCol.querySelector(`[data-m52tok="${val}"]`)){
+    if (!col.querySelector(`[data-m52tok="${val}"]`)) {
       const tok = document.createElement('div');
       tok.className = 'token black';
-      tok.dataset.m52tok = val;
+      tok.dataset.m52tok = String(val);
       tok.textContent = String(val);
-      tokCol.appendChild(tok);
+      col.appendChild(tok);
     }
   });
 }
