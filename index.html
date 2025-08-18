@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>いｙ</title>
+<title>ｑｙ</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -1333,8 +1333,8 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
     openMenu(ev.clientX, ev.clientY, [
-      {label:'進める', action: async ()=>{ ... }},
-      {label:'戻す', action: async ()=>{ ... }},
+      {label:'進める', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
+      {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
     ]);
   };
 }
@@ -4122,14 +4122,13 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
-    
-  di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
-
-    /* ▼▼ ：#29 センター初期化 ▼▼ */
+    di:{value:playerCount, max:6}, captainTable: captainIndex, mission: missionMeta,
+     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
+    /* ▲▲ ここまで追加 ▼▼ */
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
-  /* こ：#43 A群と nano 初期値を meta に保存 */
+  /* ここから追加：#43 A群と nano 初期値を meta に保存 */
   if (missionId === 43) {
     const initNano = (playerCount >= 5) ? 3 : 4; // スタート時の表示（仕様どおり）
     try{
@@ -4853,7 +4852,7 @@ async function ensureM15MetaInit(vNow){
 
 function renderM15(v){
  const mid   = (v?.mission?.id|0);
-  const isM15 = (mid === 15 || mid === 45 || mid === 51); // ← #45でも動かす
+  const isM15 = (mid === 15 || mid === 45); // ← #45でも動かす
   const rowId = 'm15Row';
   const old   = document.getElementById(rowId);
   if (!isM15){ if (old) old.remove(); return; }
