@@ -3170,6 +3170,34 @@ if (Number.isInteger(idx) && idx === ti){
         row.appendChild(t);
       }
 
+// 自分のテーブル index を事前に求める
+const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+
+if (ti !== myIdx) {
+  row.style.cursor = 'pointer';
+  row.onclick = (ev)=>{
+    const mine = v.meta?.oxByTable?.[myIdx] || 0;
+    if (mine <= 0) return; // 自分が0枚ならメニュー出さない
+    const max = Math.min(3, mine);
+    const entries = Array.from({length:max}, (_,i)=> i+1).map(k=>({
+      label:String(k),
+      action: async ()=>{
+        const me  = (v.meta?.oxByTable?.[myIdx]||0) - k;
+        const you = (v.meta?.oxByTable?.[ti]   ||0) + k;
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          [`oxByTable/${myIdx}`]: me,
+          [`oxByTable/${ti}`]   : you
+        });
+      }
+    }));
+    openMenu(ev.clientX, ev.clientY, entries);
+  };
+} else {
+  row.style.cursor = '';
+  row.onclick = null;
+}
+
+      
       // テーブル高さを1行ぶんだけ拡張（#44の挙動と整合）
       const baseH = 96;  // :root --table-h 既定
       const extra = (cnt>0) ? (4 + 20) : 0;  // 4px + トークン20px
