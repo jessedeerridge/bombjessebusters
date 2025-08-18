@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>6</title>
+<title>５</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -5030,19 +5030,29 @@ function renderM15(v){
   refresh();
 
   // 1枚めくって公開札へ → DB(meta.m15_discards) を更新（全員に即同期）
-  deckBtn.onclick = async ()=>{
-    try{
-      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-      const mSnap = await get(mRef);
-      const meta  = mSnap.val()||{};
-      const D = Array.isArray(meta.m15_deck) ? meta.m15_deck.slice() : [];
-      const Xs = Array.isArray(meta.m15_discards) ? meta.m15_discards.slice() : [];
-      const next = D.find(n=> !Xs.includes(n)); // 山札順で次
-      if (next==null) return;
-      Xs.push(next);
-      await update(mRef, { m15_discards: Xs });
-    }catch(e){ console.error(e); }
-  };
+// 1枚めくる。空なら「山札を作り直す」タブを出す（全員同期）
+deckBtn.onclick = async (ev)=>{
+  try{
+    const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+    const mSnap = await get(mRef);
+    const meta  = mSnap.val()||{};
+    const D = Array.isArray(meta.m15_deck) ? meta.m15_deck.slice() : [];
+    const Xs = Array.isArray(meta.m15_discards) ? meta.m15_discards.slice() : [];
+
+    const next = D.find(n=> !Xs.includes(n)); // 山札順で次
+    if (next==null){
+      // 山札切れ → 作り直しメニュー
+      openOneMini(ev.clientX, ev.clientY, '山札を作り直す', async ()=>{
+        const newDeck = MATERIALS.numbers.slice(); shuffle(newDeck);
+        await update(mRef, { m15_deck: newDeck, m15_discards: [] });
+      });
+      return;
+    }
+    Xs.push(next);
+    await update(mRef, { m15_discards: Xs });
+  }catch(e){ console.error(e); }
+};
+
 
   // DOM設置：アイテム列の直下
   mountLaneUnderItemsBar(lane);
