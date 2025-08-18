@@ -2470,6 +2470,10 @@ function renderM55(v){
     const cc = document.createElement('div');
     cc.className = 'concard';
     cc.style.backgroundImage = `url('${imgChallenge(fname)}')`;
+cc.onclick = (ev)=>{
+  ev.stopPropagation();
+  openConstraintZoom(fname.replace(/\.(png|jpg)$/,'')); 
+};
     lane.appendChild(cc);
 
     if (isC8 && Array.isArray(sides) && sides.length===2){
