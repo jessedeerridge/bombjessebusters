@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>１</title>
+<title>2</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3034,12 +3034,10 @@ function renderM43(v){
 }
 /* ：ミッション43 */
 
-  function renderM52(v){
+function renderM52(v){
   const isM52 = ((v?.mission?.id|0) === 52);
-  // 52以外なら終わり
   if (!isM52) return;
 
-  // 全テーブルを走査
   (v.tables||[]).forEach((T, tIndex)=>{
     (T.hand||[]).forEach((card, cIndex)=>{
       const row = document.querySelectorAll('.table')[tIndex];
@@ -3047,29 +3045,44 @@ function renderM43(v){
       const wrap = row.querySelectorAll('.card-wrap')[cIndex];
       if (!wrap) return;
 
-      // アルファ要素取得
+      // アルファ or 赤コードクリック検知
       const alpha = wrap.querySelector('.alpha');
-      if (!alpha) return;
+      const cardDiv = wrap.querySelector('.card');
 
-      // クリックイベント付与（重複防止）
-      if (!alpha.dataset.m52) {
-        alpha.dataset.m52 = "1";
-        alpha.onclick = (ev)=>{
+      const addHandler = (target, isRed)=>{
+        if (!target || target.dataset.m52) return;
+        target.dataset.m52 = "1";
+
+        target.onclick = (ev)=>{
           ev.stopPropagation();
-          // 1～12の数字から自分のカード番号を除外
-          const nums = MATERIALS.numbers.filter(n => n !== (card.num|0));
+          // 数字の候補を決定
+          let nums;
+          if (isRed){
+            nums = MATERIALS.numbers.slice(); // 1~12すべて
+          }else{
+            nums = MATERIALS.numbers.filter(n => n !== (card.num|0)); // 自分以外
+          }
 
-          // メニューとして表示
-          openBottomMenu(nums.map(n=>({
-            label: String(n),
-            action: async ()=>{
-              // DBに同期：m52_tokens に保存
-              await update(ref(db, `rooms/${state.roomCode}/meta/m52_tokens`), {
-                [`${card.num}_${tIndex}_${cIndex}`]: n
-              });
-            }
-          })));
+          // メニューをクリック位置に表示
+          openMenu(ev.clientX, ev.clientY,
+            nums.map(n=>({
+              label: String(n),
+              action: async ()=>{
+                await update(ref(db, `rooms/${state.roomCode}/meta/m52_tokens`), {
+                  [`${card.num}_${tIndex}_${cIndex}`]: n
+                });
+              }
+            }))
+          );
         };
+      };
+
+      // 通常用：アルファにイベント
+      addHandler(alpha, false);
+
+      // 赤コード用：カードが赤ならイベント
+      if (card?.kind === 'red'){
+        addHandler(cardDiv, true);
       }
     });
   });
@@ -3083,7 +3096,6 @@ function renderM43(v){
     const wrap = row.querySelectorAll('.card-wrap')[cIndex];
     if (!wrap) return;
 
-    // トークン列を表示
     let tokCol = wrap.querySelector('.tok-col');
     if (!tokCol){
       tokCol = document.createElement('div');
