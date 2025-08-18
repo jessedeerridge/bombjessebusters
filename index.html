@@ -4044,6 +4044,54 @@ async function setupMissionOnStart(code){
     await set(ref(db, `rooms/${code}/tables`), tbls);
   }
 
+/* ここから追加：#48 黄コード3枚を「隊長→次→次」へ直接配布 */
+if ((v.mission?.id|0) === 48) {
+  const tcount = v.tableCount|0;
+  const cap    = v.captainTable|0;
+  if (tcount >= 1 && cap >= 0) {                       // ← 安全ガード（入室不能バグ対策）
+    const targets = [cap, (cap+1)%tcount, (cap+2)%tcount];
+
+    // ランダムに黄コード 3 つ
+    const yList = MATERIALS.yellowCodes.slice(); shuffle(yList);
+    const pick  = yList.slice(0, 3);
+
+    // ミッション詳細の先頭に表示（▧[n] を1行差し込み）
+    try{
+      const dispSnap = await get(ref(db, `rooms/${code}/mission/display`));
+      const disp = dispSnap.val() || [];
+      const yellowLine = '<span style="color:gold;">▧</span>' + pick.map(n => `[${n}]`).join('');
+      await update(ref(db, `rooms/${code}/mission`), { display: [disp[0] || '#48', yellowLine, ...disp.slice(1)] });
+    }catch(_){}
+
+    // 直接配布（手札へ追加 → 昇順 → α再採番）
+    const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
+    const tbls = tablesSnap.val() || [];
+    const realpha = (hand)=>{
+      const alpha='abcdefghijklmnopqrstuvwxyz';
+      hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]);
+    };
+
+    targets.forEach((ti, idx)=>{
+      const hand = (tbls[ti]?.hand || []).slice();
+      hand.push({
+        id: crypto.randomUUID(),
+        num: pick[idx],
+        kind: 'yellow',
+        open: false,
+        ownerId: tbls[ti]?.playerId || null,
+        tokens: []
+      });
+      hand.sort((a,b)=> a.num - b.num);
+      realpha(hand);
+      if (tbls[ti]) tbls[ti].hand = hand;
+    });
+
+    await set(ref(db, `rooms/${code}/tables`), tbls);
+  }
+}
+/* ここまで追加：#48 */
+
+  
  // ===== #13：赤コード3枚を「隊長→次→次」へ直接配布＋名前右トークン設定 =====
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
     const tcount = v.tableCount|0;
