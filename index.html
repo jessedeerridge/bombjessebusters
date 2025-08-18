@@ -740,6 +740,11 @@ document.querySelectorAll('.numlane').forEach(n => {
   NUMCARD_REG.clear();
   const g57 = document.getElementById('m57Grid');
   if (g57) g57.remove();
+  const sel57 = document.getElementById('m57Selected');
+if (sel57) sel57.remove();
+// DB上の値もクリア
+update(ref(db, `rooms/${state.roomCode}/meta`), { m57Selected: null });
+
   
 }
 
@@ -2505,6 +2510,19 @@ wrap.style.gap = ' 0px';
     wrap.appendChild(con);
     grid.appendChild(wrap);
 con.onclick = ()=> openConstraintZoom(ch, i);
+const oldSel = document.getElementById('m57Selected');
+if (oldSel) oldSel.remove();
+
+const picked = v?.meta?.m57Selected;
+if (picked){
+  const img = document.createElement('div');
+  img.id = 'm57Selected';
+  img.className = 'concard';
+  img.style.backgroundImage = `url('${imgConstraint(picked)}')`;
+  diEl.insertAdjacentElement('beforebegin', img);
+}
+
+    
   }
 }
 
@@ -3848,6 +3866,7 @@ function openConstraintZoom(letter, myIdx){
       m = document.createElement('div');
       m.className = 'conzoom-menu';
 
+      if ((state.watching?.mission?.id|0) !== 57) {
       const btnOut = document.createElement('button');
       btnOut.textContent = '場に出す';
       btnOut.onclick = async (ev)=>{
@@ -3864,21 +3883,17 @@ function openConstraintZoom(letter, myIdx){
         }catch(err){ console.error(err); }
         closeConstraintZoom();
       };
-
-   
       m.appendChild(btnOut);
-      const btnPick = document.createElement('button');
+      }
+        const btnPick = document.createElement('button');
       btnPick.textContent = '選ぶ';
-      btnPick.onclick = (ev)=>{
-        ev.stopPropagation();
-        document.getElementById('m57Selected')?.remove(); // 古い選択を消す
-        const img = document.createElement('div');
-        img.id = 'm57Selected';
-        img.className = 'concard';
-        img.style.backgroundImage = `url('${imgConstraint(letter)}')`;
-        diEl.insertAdjacentElement('beforebegin', img);  // diの左に置く
-        closeConstraintZoom();
-      };
+btnPick.onclick = async (ev)=>{
+  ev.stopPropagation();
+  // ★ DBに選択カードを保存（全員に同期）
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Selected: letter });
+  closeConstraintZoom();
+};
+
       m.appendChild(btnPick);
 
 
