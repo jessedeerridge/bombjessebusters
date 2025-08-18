@@ -1384,6 +1384,32 @@ function renderTables(v){
       }
     });
   });
+
+ if ((v?.mission?.id|0) === 52) {
+    (v.tables||[]).forEach(T=>{
+      (T.hand||[]).forEach(c=>{
+        if (c.kind==='normal' || c.kind==='red') {
+          const cardWrap = tablesEl.querySelector(`[data-card-id="${c.id}"]`);
+          if (!cardWrap) return;
+          let badge = cardWrap.querySelector('.badge-fixed');
+          if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'badge-fixed';
+            cardWrap.appendChild(badge);
+          }
+          for (let n=1; n<=12; n++) {
+            if (n !== (c.num|0)) {
+              const tok = document.createElement('div');
+              tok.className = 'token black';
+              tok.textContent = n;
+              badge.appendChild(tok);
+            }
+          }
+        }
+      });
+    });
+  }
+  
 // #39：X が 4枚全体公開 → 自動配布（ホストのみ・一度だけ）
 if ((v.mission?.id|0) === 39) {
   const X = v?.meta?.m39_x|0;
