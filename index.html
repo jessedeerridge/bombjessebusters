@@ -953,7 +953,59 @@ function buildMixPlan(missionId){
     {type:'redPick', k:2},
     {type:'yellowPick', k:2},
   ],
-    
+     50: [  // 赤2 黄2
+      {type:'redPick', k:2},
+      {type:'yellowPick', k:2},
+    ],
+    // ▼▼ ここから追加 ▼▼
+    51: [  // 赤1
+      {type:'redPick', k:1},
+    ],
+    52: [  // 赤3
+      {type:'redPick', k:3},
+    ],
+    53: [  // 赤2
+      {type:'redPick', k:2},
+    ],
+    54: [  // （指定なし → 空配列）
+    ],
+    55: [  // 赤2
+      {type:'redPick', k:2},
+    ],
+    56: [  // 赤3-2
+      {type:'redChoose', from:3, take:2},
+    ],
+    57: [  // 赤1
+      {type:'redPick', k:1},
+    ],
+    58: [  // 赤2
+      {type:'redPick', k:2},
+    ],
+    59: [  // 赤3-2
+      {type:'redChoose', from:3, take:2},
+    ],
+    60: [  // 赤3-2
+      {type:'redChoose', from:3, take:2},
+    ],
+    61: [  // 赤1
+      {type:'redPick', k:1},
+    ],
+    62: [  // 赤2
+      {type:'redPick', k:2},
+    ],
+    63: [  // 赤2
+      {type:'redPick', k:2},
+    ],
+    64: [  // 赤1
+      {type:'redPick', k:1},
+    ],
+    65: [  // 赤3
+      {type:'redPick', k:3},
+    ],
+    66: [  // 赤2 黄2
+      {type:'redPick', k:2},
+      {type:'yellowPick', k:2},
+    ],
 };
 return plans[missionId] || [];
 
@@ -6120,6 +6172,198 @@ function missionInfo(id, opts={}){
         flags:{  }
       };
     }  
+case 51: {
+  return {
+    id:51, name:'#51', desc:'',
+    display:[
+      '#51',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 52: {
+  return {
+    id:52, name:'#52', desc:'',
+    display:[
+      '#52',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 53: {
+  return {
+    id:53, name:'#53', desc:'',
+    display:[
+      '#53',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 54: {
+  return {
+    id:54, name:'#54', desc:'',
+    display:[
+      '#54',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 55: {
+  return {
+    id:55, name:'#55', desc:'',
+    display:[
+      '#55',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 56: {
+  return {
+    id:56, name:'#56', desc:'',
+    display:[
+      '#56',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 57: {
+  return {
+    id:57, name:'#57', desc:'',
+    display:[
+      '#57',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 58: {
+  return {
+    id:58, name:'#58', desc:'',
+    display:[
+      '#58',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 59: {
+  return {
+    id:59, name:'#59', desc:'',
+    display:[
+      '#59',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 60: {
+  return {
+    id:60, name:'#60', desc:'',
+    display:[
+      '#60',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 61: {
+  return {
+    id:61, name:'#61', desc:'',
+    display:[
+      '#61',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 62: {
+  return {
+    id:62, name:'#62', desc:'',
+    display:[
+      '#62',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 63: {
+  return {
+    id:63, name:'#63', desc:'',
+    display:[
+      '#63',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 64: {
+  return {
+    id:64, name:'#64', desc:'',
+    display:[
+      '#64',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 65: {
+  return {
+    id:65, name:'#65', desc:'',
+    display:[
+      '#65',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
+case 66: {
+  return {
+    id:66, name:'#66', desc:'',
+    display:[
+      '#66',
+      ...linesForMix,
+      '',
+      '',
+    ],
+    flags:{}
+  };
+}
         
       
     default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
