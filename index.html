@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>2</title>
+<title>3</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3045,27 +3045,19 @@ function renderM52(v){
       const wrap = row.querySelectorAll('.card-wrap')[cIndex];
       if (!wrap) return;
 
-      // アルファ or 赤コードクリック検知
       const alpha = wrap.querySelector('.alpha');
       const cardDiv = wrap.querySelector('.card');
 
-      const addHandler = (target, isRed)=>{
+      // 通常クリック処理
+      const addHandler = (target, candidateNums)=>{
         if (!target || target.dataset.m52) return;
         target.dataset.m52 = "1";
 
         target.onclick = (ev)=>{
           ev.stopPropagation();
-          // 数字の候補を決定
-          let nums;
-          if (isRed){
-            nums = MATERIALS.numbers.slice(); // 1~12すべて
-          }else{
-            nums = MATERIALS.numbers.filter(n => n !== (card.num|0)); // 自分以外
-          }
-
-          // メニューをクリック位置に表示
+          // タブをクリックした位置に表示
           openMenu(ev.clientX, ev.clientY,
-            nums.map(n=>({
+            candidateNums.map(n=>({
               label: String(n),
               action: async ()=>{
                 await update(ref(db, `rooms/${state.roomCode}/meta/m52_tokens`), {
@@ -3077,20 +3069,21 @@ function renderM52(v){
         };
       };
 
-      // 通常用：アルファにイベント
-      addHandler(alpha, false);
-
-      // 赤コード用：カードが赤ならイベント
-      if (card?.kind === 'red'){
-        addHandler(cardDiv, true);
+      // ▼ 赤コード判定：num が 1.5 ~ 11.5 の場合
+      if (card?.num && (card.num % 1 === 0.5)) {
+        // 赤コード → 1~12すべて
+        addHandler(cardDiv, MATERIALS.numbers.slice());
+      } else {
+        // 通常コード → アルファクリックで「自分以外」
+        addHandler(alpha, MATERIALS.numbers.filter(n => n !== (card.num|0)));
       }
     });
   });
 
-  // DBにあるトークンを描画
+  // ▼ DBにあるトークンを描画
   const tokens = v?.meta?.m52_tokens || {};
   Object.entries(tokens).forEach(([key, val])=>{
-    const [cnum, tIndex, cIndex] = key.split('_').map(x=>parseInt(x,10));
+    const [cnum, tIndex, cIndex] = key.split('_').map(x=>parseFloat(x));
     const row = document.querySelectorAll('.table')[tIndex];
     if (!row) return;
     const wrap = row.querySelectorAll('.card-wrap')[cIndex];
