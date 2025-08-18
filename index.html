@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ええw</title>
+<title>qqqqew</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -2504,7 +2504,7 @@ wrap.style.gap = ' 0px';
     wrap.appendChild(numSlot);
     wrap.appendChild(con);
     grid.appendChild(wrap);
- con.onclick = ()=> openConstraintZoom(ch, state.seatedTable);
+    con.onclick = ()=> openConstraintZoom(ch);
   }
 }
 
@@ -3866,16 +3866,23 @@ function openConstraintZoom(letter, myIdx){
       };
 
    
-   const btnPick = document.createElement('button');   // ← ここから追加
-       btnPick.textContent = '選ぶ';
-       btnPick.onclick = (ev)=>{
-         ev.stopPropagation();
-         diEl.insertAdjacentHTML("beforebegin", `<div class="concard" style="background-image:url('${imgConstraint(letter)}')"></div>`);
+      m.appendChild(btnOut);
+      const btnPick = document.createElement('button');
+      btnPick.textContent = '選ぶ';
+      btnPick.onclick = (ev)=>{
+        ev.stopPropagation();
+        document.getElementById('m57Selected')?.remove(); // 古い選択を消す
+        const img = document.createElement('div');
+        img.id = 'm57Selected';
+        img.className = 'concard';
+        img.style.backgroundImage = `url('${imgConstraint(letter)}')`;
+        diEl.insertAdjacentElement('beforebegin', img);  // diの左に置く
         closeConstraintZoom();
-       };  // ← ここまで追加
- 
-       m.appendChild(btnOut);
-      m.appendChild(btnPick);   // ← 追加
+      };
+      m.appendChild(btnPick);
+
+
+      
       wrap.appendChild(m);
     });
 
