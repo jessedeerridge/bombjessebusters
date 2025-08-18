@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>4</title>
+<title>5</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3045,12 +3045,14 @@ function renderM52(v){
       const wrap = row.querySelectorAll('.card-wrap')[cIndex];
       if (!wrap) return;
 
-      const alpha = wrap.querySelector('.alpha');
-      const cardDiv = wrap.querySelector('.card');
+      const alpha = wrap.querySelector('.alpha');   // アルファ要素（通常コード用）
+      const cardDiv = wrap.querySelector('.card');  // カード本体（赤コード用）
 
+      // 共通ハンドラ
       const addHandler = (target, candidateNums)=>{
         if (!target || target.dataset.m52) return;
         target.dataset.m52 = "1";
+
         target.onclick = (ev)=>{
           ev.stopPropagation();
           openMenu(ev.clientX, ev.clientY,
@@ -3066,14 +3068,15 @@ function renderM52(v){
         };
       };
 
-      // ▼ 赤コード (1.5～11.5 のとき)
-      if (typeof card?.num === "number" && card.num >= 1.5 && card.num <= 11.5 && (card.num * 10) % 10 === 5) {
-        // → 1～12すべて
+      // ▼ 赤コード判定：小数点あり
+      if (typeof card?.num === "number" && !Number.isInteger(card.num)) {
+        // 赤コードなら 1〜12 全部
         addHandler(cardDiv, MATERIALS.numbers.slice());
       }
-      // ▼ 通常コード → 自分の数字を除いた 1～12
+      // ▼ 通常コード（整数）
       else {
-        addHandler(alpha, MATERIALS.numbers.filter(n => n !== (card.num|0)));
+        const baseNum = card.num|0;
+        addHandler(alpha, MATERIALS.numbers.filter(n => n !== baseNum));
       }
     });
   });
@@ -3086,22 +3089,6 @@ function renderM52(v){
     if (!row) return;
     const wrap = row.querySelectorAll('.card-wrap')[cIndex];
     if (!wrap) return;
-
-    let tokCol = wrap.querySelector('.tok-col');
-    if (!tokCol){
-      tokCol = document.createElement('div');
-      tokCol.className = 'tok-col';
-      wrap.appendChild(tokCol);
-    }
-    if (!tokCol.querySelector(`[data-m52tok="${val}"]`)){
-      const tok = document.createElement('div');
-      tok.className = 'token black';
-      tok.dataset.m52tok = val;
-      tok.textContent = String(val);
-      tokCol.appendChild(tok);
-    }
-  });
-}
 
   
 /* ▼▼ ：ミッション44（酸素トークン） ▼▼ */
