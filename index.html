@@ -2472,7 +2472,7 @@ function renderM55(v){
     cc.style.backgroundImage = `url('${imgChallenge(fname)}')`;
 cc.onclick = (ev)=>{
   ev.stopPropagation();
-  openConstraintZoom(fname.replace(/\.(png)$/,'')); 
+openChallengeZoom(fname.replace(/\.(png|jpg)$/,''));
 };
     lane.appendChild(cc);
 
