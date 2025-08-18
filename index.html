@@ -4943,19 +4943,27 @@ async function ensureM23MetaInit(){
     refresh();
 
     // 1枚めくって公開札へ → DB(meta.m18_discards) を更新（全員に即同期）
-   deckBtn.onclick = async ()=>{
-      try{
-        const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-        const mSnap = await get(mRef);
-        const meta  = mSnap.val()||{};
-        const D = Array.isArray(meta.m18_deck) ? meta.m18_deck.slice() : [];
-        const Xs = Array.isArray(meta.m18_discards) ? meta.m18_discards.slice() : [];
-        const next = D.find(n=> !Xs.includes(n)); // 山札順で次
-        if (next==null) return;
-        Xs.push(next);
-       await update(mRef, { m18_discards: Xs });
-      }catch(e){ console.error(e); }
-    };
+deckBtn.onclick = async (ev)=>{
+  try{
+    const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+    const mSnap = await get(mRef);
+    const meta  = mSnap.val()||{};
+    const D = Array.isArray(meta.m18_deck) ? meta.m18_deck.slice() : [];
+    const Xs = Array.isArray(meta.m18_discards) ? meta.m18_discards.slice() : [];
+
+    const next = D.find(n=> !Xs.includes(n)); // 山札順で次
+    if (next==null){
+      openOneMini(ev.clientX, ev.clientY, '山札を作り直す', async ()=>{
+        const newDeck = MATERIALS.numbers.slice(); shuffle(newDeck);
+        await update(mRef, { m18_deck: newDeck, m18_discards: [] });
+      });
+      return;
+    }
+    Xs.push(next);
+    await update(mRef, { m18_discards: Xs });
+  }catch(e){ console.error(e); }
+};
+
 
     // アイテム列の直下に設置（既存ユーティリティ使用）
     mountLaneUnderItemsBar(lane);
