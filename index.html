@@ -1198,9 +1198,13 @@ if (v) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
   refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
 }
-if (state.seatedTable == null && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
-   btnSit.onclick();
-    }
+if ((v?.mission?.id|0) === 57) {
+   renderM57(v);   // 席に座っていなくても描画
+} else {
+   if (state.seatedTable == null && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
+      btnSit.onclick();
+   }
+}
     
     renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
@@ -1230,7 +1234,6 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM53(v);
     renderM54(v);
 renderM55(state.watching);
-    renderM57(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
