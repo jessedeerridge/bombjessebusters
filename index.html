@@ -1329,10 +1329,9 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
    }
   }
   
+    const _rawDi = (v?.di?.value ?? null);
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
-    if ((v?.mission?.id|0) === 51 && (v.di?.value ?? null) === 0) {
-    val = 1;
-  }
+  const val    = ((v?.mission?.id|0) === 51 && (_rawDi === null || _rawDi === 0)) ? 1 : _base;
   diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
     openMenu(ev.clientX, ev.clientY, [
