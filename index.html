@@ -1700,15 +1700,19 @@ wrap.dataset.cardId = String(c.id||'');
       if (!seated) {
         if (!c.open) card.classList.add('back'); // 数字は .back CSS で隠れる
       } else {
-        /* ▼▼ 着席後のみ #38 特別表示を適用 ▼▼ */
-        const isM38 = ((state.watching?.mission?.id|0) === 38);
+        /* ▼▼ 着席後のみ #38/#56 特別表示を適用 ▼▼ */
+        const mid = (state.watching?.mission?.id|0);
+        const isM38 = (mid === 38);
+        const isM56 = (mid === 56);
         const isCaptainTable = (idx === (state.watching?.captainTable|0));
         const isRightmost = (ci === (t.hand||[]).length - 1);
         const hasX = Array.isArray(c.tokens) && c.tokens.some(tk => String(tk.type) === 'xmark');
         const m38Special = isM38 && isCaptainTable && isRightmost && hasX;
+        const m56Special = isM56 && isRightmost && hasX; // 全テーブル対象
+        const ownerBlindSpecial = (m38Special || m56Special);
 
         if (!c.open) {
-          if (m38Special) {
+          if (ownerBlindSpecial) {
             if (t.playerId === state.userId) {
               // 隊長本人：裏（黒背景）
               card.classList.add('back');
@@ -6547,9 +6551,12 @@ function missionInfo(id, opts={}){
         id:45, name:'#45', desc:'',
         display:[
           '#45',...linesForMix,
-          '',
-          '',
-          '',
+          '切断するたびに、数値カードを1枚めくり、その数値のコードを切断しなければならない。',
+          '時計回り順ではプレイせず、最初に「チョキン！」と言ったプレイヤーが切断する。',
+          'チョキン！と言ったのに切断できなかったり、手掛かりを与える発言（「その数値のコードは切断したくない」など）があった場合は起爆ダイヤルが1進む。',
+          '誰もチョキン！と言わない場合は隊長が一人選ぶ。',
+          'そのプレイヤーがいかなる理由でも切断できなければ起爆ダイヤルが1進む。',
+          '赤コードしか持っていないプレイヤーはいつでもチョキン！と言って赤コードを公開できる。',
        ],
         flags:{  }
       };
@@ -6683,7 +6690,7 @@ case 56: {
       '',
       '',
     ],
-    flags:{}
+    flags:{ m20_rightmostX:true }
   };
 }
 case 57: {
