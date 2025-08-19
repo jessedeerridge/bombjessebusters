@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ち</title>
+<title>e</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -727,7 +727,7 @@ document.querySelectorAll('.numlane').forEach(n => {
   document.querySelectorAll('.m57-grid').forEach(n=>n.remove()); // 互換
   document.getElementById('m57Sel')?.remove();        // di左の選択表示
   // ★ M59：数値帯＆nanoを掃除
-  document.getElementById('m59Nums')?.remove();
+document.querySelectorAll('.m59-row').forEach(n => n.remove());
   document.getElementById('m59Nano')?.remove();
 
 
@@ -3185,23 +3185,23 @@ function renderM43(v){
   if (!node.isConnected) tablesEl.appendChild(node);
 }
 
-/* ここから追加：ミッション59 */
-/* ==== ミッション59：checklistの真上に12数値カード＋nano ==== */
+/* ==== ミッション59：各 checklistbox の直上に 12 数値カード（ゲームごと固定）＋ nano ==== */
 async function renderM59(v){
   const isM59 = ((v?.mission?.id|0) === 59);
   if (!isM59){
-    document.getElementById('m59Nums')?.remove();
+    document.querySelectorAll('.m59-row').forEach(n => n.remove());
     document.getElementById('m59Nano')?.remove();
     return;
   }
 
-  // checklist が作られた後に差し込みたいので存在チェック
-  const cl = tablesEl.querySelector('.checklist');
-  if (!cl) return; // 次フレームでまた呼ばれる
+  // checklist の「各ボックス」を列挙（無ければ .checklist をフォールバック）
+  const boxes = Array.from(tablesEl.querySelectorAll('.checklistbox'));
+  const targets = boxes.length ? boxes : Array.from(tablesEl.querySelectorAll('.checklist'));
+  if (!targets.length) return; // まだ生成前なら次フレームで
 
-  // 1) 「ゲームごと固定」の並びを meta に保存（初回はホストが保存）
+  // 1) 「ゲームごと固定」順を meta に保存（初回はホストが保存）
   let nums = v?.meta?.m59Nums;
-  if (!Array.isArray(nums) || nums.length!==12){
+  if (!Array.isArray(nums) || nums.length !== 12){
     nums = MATERIALS.numbers.slice();
     shuffle(nums);
     if (state.isHost){
@@ -3209,86 +3209,97 @@ async function renderM59(v){
     }
   }
 
-  // 既存の帯を1個化
-  document.getElementById('m59Nums')?.remove();
+  // 既存をクリーン（複数行に対応）
+  document.querySelectorAll('.m59-row').forEach(n => n.remove());
 
-  // 2) 数値カード帯を checklist の直前に挿入（「真上」）
-  const row = document.createElement('div');
-  row.id = 'm59Nums';
-  row.className = 'numlane';
-  // 「いつもより2px小さく」→ 32x48 → 30x46
-  row.style.marginTop = '6px';
-row.style.display = 'flex';
-row.style.gap = '0px';   // 数値カードの間隔を狭める
+  // 2) 各 checklistbox の直前に 1 本ずつ 12 等分レーンを作る（横幅は box と同じ 100%）
+  targets.forEach((boxEl, rowIdx) => {
+    const lane = document.createElement('div');
+    lane.className = 'm59-row';
+    lane.style.display = 'grid';
+    lane.style.gridTemplateColumns = 'repeat(12, 1fr)'; // ボックス幅に対して均等割り
+    lane.style.columnGap = '2px';
+    lane.style.width = '100%';
+    lane.style.marginBottom = '6px'; // 「真上」に見える余白
 
-  nums.forEach((n, idx)=>{
-    const card = document.createElement('div');
-    card.className = 'numcard';
-    card.style.width = '28px';
-    card.style.height = '43px';
-    card.style.backgroundImage = `url('${imgNumber(n)}')`;
-    card.style.marginLeft = '8px';   // ★ 右にずらす（例: 4px）
-    card.title = String(n);
+    nums.forEach((n, idx) => {
+      // 各セル（1fr）の中央に小さめカードを置く（59だけ 2px 小さく）
+      const cell = document.createElement('div');
+      cell.style.display = 'grid';
+      cell.style.placeItems = 'center';
 
-    card.onclick = async (ev)=>{
-      // クリックされた位置に nano を出す（他は消える）
-      const prev = v?.meta?.m59_pos|0;
-      const next = (idx+1)|0; // 1..12
-      await update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m59_pos: next,
-        m59_prevPos: prev||0,
-        m59_updatedAt: Date.now()
-      });
-      // 視覚反映は onValue → 本関数の後段「nano描画」で行う
-    };
+      const card = document.createElement('div');
+      card.className = 'numcard m59num';
+      card.style.width = '30px';   // 通常より 2px 小さい
+      card.style.height = '46px';
+      card.style.backgroundImage = `url('${imgNumber(n)}')`;
+      card.title = String(n);
 
-    row.appendChild(card);
+      card.onclick = async () => {
+        // どのレーン(rowIdx)の何番目(idx)かを保存（全員同期）
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          m59_row: rowIdx,      // 0..(targets.length-1)
+          m59_pos: (idx + 1),   // 1..12
+          m59_updatedAt: Date.now()
+        });
+      };
+
+      cell.appendChild(card);
+      lane.appendChild(cell);
+    });
+
+    boxEl.parentNode.insertBefore(lane, boxEl); // 「各 box の真上」に差し込む
   });
 
-  tablesEl.insertBefore(row, cl);
+  // 3) nano を描画（選択されたレーンの該当カードの「上半分」に重ねる）
+  const rowIndex = (v?.meta?.m59_row ?? 0) | 0;
+  const posIndex = (v?.meta?.m59_pos | 0);  // 1..12
+  const goLeft   = !!(v?.meta?.m59_left);
 
-  // 3) nano を描画（1箇所のみ）
-  const old = document.getElementById('m59Nano');
-  const posIndex = (v?.meta?.m59_pos|0);  // 1..12
-  const goLeft   = !!(v?.meta?.m59_left); // true=左向き
-  if (!posIndex){
-    old?.remove();
+  const lanes = Array.from(tablesEl.querySelectorAll('.m59-row'));
+  if (!posIndex || !lanes.length || !lanes[rowIndex]){
+    document.getElementById('m59Nano')?.remove();
     return;
   }
 
-  // 対応カードの座標を取って、その直上へ
-  const cards = row.querySelectorAll('.numcard');
-  const target = cards[posIndex-1];
-  if (!target){ old?.remove(); return; }
+  const targetCard = lanes[rowIndex].querySelectorAll('.m59num')[posIndex - 1];
+  if (!targetCard){
+    document.getElementById('m59Nano')?.remove();
+    return;
+  }
 
   const tb = tablesEl.getBoundingClientRect();
-  const rb = target.getBoundingClientRect();
+  const rb = targetCard.getBoundingClientRect();
 
-  const node = old || document.createElement('div');
+  const node = document.getElementById('m59Nano') || document.createElement('div');
   node.id = 'm59Nano';
-  node.className = 'm43-nano'; // 既存スタイルを流用（56x56）
+  node.className = 'm43-nano'; // 56x56（既存クラス流用）
+  node.style.backgroundImage = `url("${goLeft ? './nano0left.png' : './nano0.png'}")`;
 
-  const img = goLeft ? './nano0left.png' : './nano0.png';
-  node.style.backgroundImage = `url("${img}")`;
+  // 「カードの上半分に重ねる」：nano の中心をカード上辺に合わせるイメージ
+  const x = rb.left - tb.left + (rb.width / 2) - (56 / 2);
+  const y = rb.top  - tb.top  - (56 / 2);
 
-  // クリックで向きトグルのポップ
+  node.style.left = `${Math.max(0, x)}px`;
+  node.style.top  = `${Math.max(0, y)}px`;
+
+  // クリックで向きトグルの簡易ポップ
   node.onclick = (ev)=>{
     openMenu(ev.clientX, ev.clientY, [
-      { label: (goLeft ? '右向きにする' : '左向きにする'), action: async ()=>{
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { m59_left: !goLeft, m59_updatedAt: Date.now() });
+      { label: (goLeft ? '右向きにする' : '左向きにする'),
+        action: async ()=>{
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            m59_left: !goLeft,
+            m59_updatedAt: Date.now()
+          });
         }
       }
     ]);
   };
 
-  // 位置：カードのちょうど上（tables 内基準）
-  const x = rb.left - tb.left + (rb.width/2) - (56/2);
-const y = rb.top - tb.top - (56/2);  // ← 高さ半分だけ上にずらす
-  node.style.left = `${Math.max(0, x)}px`;
-  node.style.top  = `${Math.max(0, y)}px`;
-
   if (!node.isConnected) tablesEl.appendChild(node);
 }
+
 
 
   
