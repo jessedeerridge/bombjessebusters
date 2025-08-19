@@ -748,6 +748,7 @@ document.querySelectorAll('.m59-row').forEach(n => n.remove());
   // ★ M44：酸素UIを完全掃除（プール=ox2 と各テーブル所持行）
   const m44 = document.getElementById('m44OxPool');
   if (m44) m44.remove();               // 左の ox2 を含むプール行
+  const m63 = document.getElementById('m63Pool');   if (m63) m63.remove(); // ← #63のリザーブ帯も掃除
   document.querySelectorAll('.ox-row').forEach(n => n.remove()); // 各テーブルの所持行
   
   // テーブルの高さを基準に戻す（M44で上げたものを解除）
@@ -1175,6 +1176,7 @@ function baseRoom(hostId){
       /* ▼▼ ：ミッション44用 状態 ▼▼ */
       oxItem: 0,         // アイテム列の下（全体プール）の酸素トークン数
       oxByTable: {}      // 各テーブルごとの酸素トークン所持数 { [tableIndex]: number }
+  m63_pool: 0         // #63：items 下のリザーブ総数
       /* ▲▲ ：ミッション44用 状態 ▲▲ */
     },
     lastActiveAt: Date.now()
@@ -3642,6 +3644,179 @@ function renderM63(v){
   });
 }
 
+/* ここから追加：#63 リザーブ＋隊長配布＋譲渡 */
+async function ensureM63MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if ((v?.mission?.id|0) !== 63) return;
+
+  const n = (v?.tables?.length|0); if (n <= 0) return;
+  if (!state.isHost) return;
+  if (v?.meta?.m63_init === true) return;
+
+  // 隊長テーブル index（未設定なら 0 を採用）
+  let cap = Number(v?.captainTable);
+  if (!Number.isInteger(cap) || cap < 0 || cap >= n) cap = 0;
+
+  // 人数→初期枚数：2=14 / 3=18 / 4=24 / 5=30 / 6=30
+  const map = {2:14, 3:18, 4:24, 5:30, 6:30};
+  const give = map[n] || 0;
+
+  // まず全員0、隊長だけ初期枚数
+  const by = {}; for (let i=0;i<n;i++) by[i] = 0;
+  by[cap] = give;
+
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    oxByTable: by,
+    m63_pool: 0,
+    m63_init: true
+  });
+}
+
+function renderM63(v){
+  const isM63 = ((v?.mission?.id|0) === 63);
+  let poolRow = document.getElementById('m63Pool');
+  if (!isM63){ if (poolRow) poolRow.remove(); return; }
+
+  // 初回配布（隊長へ）をホストが一度だけ
+  ensureM63MetaInit(v);
+
+  // --- 1) items の直下にリザーブ帯を生成（ox2画像は出さない） ---
+  const itemsBar = document.getElementById('itemsBar');
+  if (!itemsBar) return;
+
+  if (!poolRow){
+    poolRow = document.createElement('div');
+    poolRow.id = 'm63Pool';
+    poolRow.className = 'ox-row ox-pool'; // CSS再利用（見た目は wrap のみ）
+    itemsBar.insertAdjacentElement('afterend', poolRow);
+  }
+  poolRow.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'ox-wrap';
+  poolRow.appendChild(wrap);
+
+  const poolCnt = Math.max(0, v?.meta?.m63_pool|0);
+  for (let i=0;i<poolCnt;i++){
+    const t = document.createElement('div');
+    t.className = 'token ox';
+    wrap.appendChild(t);
+  }
+
+  // 隊長だけ：リザーブをクリック → 「回収」ポップ（全て隊長へ）
+  poolRow.onclick = (ev)=>{
+    const my = Number(state.seatedTable);
+    const cap = Number(v?.captainTable);
+    if (Number.isInteger(my) && my === cap && poolCnt > 0){
+      openOneMini(ev.clientX, ev.clientY, '回収', async ()=>{
+        const mine = (v?.meta?.oxByTable?.[cap]|0) + poolCnt;
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          m63_pool: 0,
+          [`oxByTable/${cap}`]: mine
+        });
+      });
+    }
+  };
+
+  // --- 2) 各テーブルに所持酸素を表示（手札の直下・10列で折返し） ---
+  const idx = Number.isInteger(state.seatedTable) ? Number(state.seatedTable) : null;
+  const cap = Number(v?.captainTable);
+
+  const tableNodes = document.querySelectorAll('.table'); // renderTables と同順
+  (v.tables||[]).forEach((T, ti)=>{
+    const box = tableNodes[ti]; if (!box) return;
+
+    // 所持行（ox-row）を取得/生成
+    let row = box.querySelector('.ox-row[data-owner="1"][data-m63="1"]');
+    if (!row){
+      row = document.createElement('div');
+      row.className = 'ox-row';
+      row.dataset.owner = '1';
+      row.dataset.m63 = '1';
+
+      // #44と同じアンカー（アルファベット帯の直下）に固定配置
+      const anchor = box.querySelector('.badge-fixed');
+      if (anchor && anchor.parentElement){
+        const ah = anchor.parentElement.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        (anchor.parentElement).appendChild(row);
+        row.style.marginTop = `${Math.round(ah * 5)}px`;
+      }else{
+        const hand = box.querySelector('.hand');
+        (hand || box).appendChild(row);
+      }
+    }
+
+    // 再描画（wrap 内で 10列折返し）
+    row.innerHTML = '';
+    const inner = document.createElement('div');
+    inner.className = 'ox-wrap'; // これで 10 列ごとに自動改行
+    row.appendChild(inner);
+
+    const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
+    if (cnt > 0){
+      for (let i=0;i<cnt;i++){
+        const t = document.createElement('div');
+        t.className = 'token ox';
+        inner.appendChild(t);
+      }
+    }else{
+      // 0枚の時は 0ox を 3 個（クリック判定は row 自身に付与）
+      for (let i=0;i<3;i++){
+        const t = document.createElement('div');
+        t.className = 'token ox';
+        t.style.backgroundImage = "url('./0ox.png')";
+        inner.appendChild(t);
+      }
+    }
+
+    // テーブル高さを枚数（行数）に応じて伸縮
+    const baseH = 96;      // 既定
+    const rows  = Math.max(1, Math.ceil(Math.max(cnt, (cnt>0?cnt:3)) / 10));
+    const extra = 4 + rows*20 + Math.max(0, rows-1)*2; // 先頭余白+行高+行間
+    box.style.setProperty('--table-h', `${Math.max(baseH, baseH + extra)}px`);
+
+    // クリック挙動：
+    // ① 自分の行 → 1~12 選択してリザーブへ移す（+N を2秒表示）
+    if (idx !== null && idx === ti){
+      row.onclick = (ev)=>{
+        const maxK = Math.min(12, cnt);
+        if (maxK <= 0) return;
+        const entries = Array.from({length:maxK}, (_,i)=> i+1).map(k=>({
+          label:String(k),
+          action: async ()=>{
+            const mine = cnt - k;
+            const pool = (v?.meta?.m63_pool|0) + k;
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              m63_pool: pool,
+              [`oxByTable/${ti}`]: mine
+            });
+            // 2秒だけ「+N」フラッシュ（ローカル表示）
+            const flash = document.createElement('div');
+            flash.textContent = `+${k}`;
+            flash.style.cssText = 'margin-left:6px;font-size:12px;opacity:.95;transform:translateY(-2px);transition:opacity 1.6s ease';
+            poolRow?.appendChild(flash);
+            setTimeout(()=>{ flash.style.opacity='0'; setTimeout(()=>flash.remove(), 600); }, 1400);
+          }
+        }));
+        openMenu(ev.clientX, ev.clientY, entries);
+      };
+    }else{
+      // ② 他テーブルをクリック → 「渡す」（自分の全酸素をそのテーブルへ）
+      row.onclick = (ev)=>{
+        if (idx === null) return; // 観戦は不可
+        const myCnt = Math.max(0, v?.meta?.oxByTable?.[idx]||0);
+        if (myCnt <= 0) return;
+        openOneMini(ev.clientX, ev.clientY, '渡す', async ()=>{
+          const tgt = Math.max(0, v?.meta?.oxByTable?.[ti]||0) + myCnt;
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            [`oxByTable/${idx}`]: 0,
+            [`oxByTable/${ti}`]: tgt
+          });
+        });
+      };
+    }
+  });
+}
+/* ここまで追加：#63 */
 
   
   
