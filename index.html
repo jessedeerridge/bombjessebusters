@@ -453,8 +453,20 @@
   max-width:calc(20px * 15 + 2px * 14);
 }
 
-  
- /* ▲▲ ：ミッション44（酸素トークン） ▲▲ */
+.mission-49 .table {
+  height: auto;
+  min-height: 0;
+}
+
+.mission-49 .ox-row {
+  display: flex;
+  flex-wrap: wrap;    /* トークンが多いとき自動折返し */
+  gap: 4px;
+}
+
+.mission-49 .ox-row:empty {
+  display: none;      /* 0個のとき行を消す＝高さ詰める */
+}  
   
 </style>
 </head>
@@ -4479,10 +4491,8 @@ if (Number.isInteger(idx) && idx === ti){
     row.appendChild(t);
   }
     
-      // テーブル高さを1行ぶんだけ拡張（#44の挙動と整合）
-      const baseH = 96;  // :root --table-h 既定
-      const extra = (cnt>0) ? (4 + 20) : 0;  // 4px + トークン20px
-      box.style.setProperty('--table-h', `${Math.max(baseH, baseH + extra)}px`);
+     box.style.removeProperty('--table-h');  // もし以前使っていたら念のため解除
+box.style.removeProperty('height');     // 直接 height を指定していた場合も解除
 
       // --- 3) 譲渡メニュー：自分“以外”の行だけクリック可 ---
       // 自分のテーブル番号を安全に特定する
