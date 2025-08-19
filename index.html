@@ -3483,8 +3483,9 @@ function renderM61(v){
       con.style.cursor = 'pointer';
       con.onclick = ()=> openConstraintZoom61(ch, ti);
    }else{
-     con.onclick = null;
-      con.style.cursor = 'default';
+      // 自分以外：拡大のみ（交換などのポップなし）
+      con.style.cursor = 'pointer';
+      con.onclick = ()=> openConstraintZoomView(ch);
     }
   });
 
@@ -4152,6 +4153,25 @@ function closeConstraintZoom(){
   if (ov) ov.remove();
 }
 
+// #61：閲覧専用の拡大（ボタン・ポップなし）
+function openConstraintZoomView(letter){
+  try{
+    const old = document.getElementById('conZoomOverlay');
+    if (old) old.remove();
+   const ov = document.createElement('div');
+    ov.id = 'conZoomOverlay';
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
+   const wrap = document.createElement('div');
+    wrap.className = 'conzoom-wrap';
+    const big = document.createElement('div');
+    big.className = 'conzoom-card';
+    big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
+    wrap.appendChild(big);
+    ov.appendChild(wrap);
+    document.body.appendChild(ov);
+  }catch(e){ console.error(e); }
+}
+  
 // ★ #61専用：拡大→「交換」→「本当に？」→B(F/G)から差し替え
 function openConstraintZoom61(letter, myIdx){
   try{
