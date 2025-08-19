@@ -6520,7 +6520,7 @@ function renderM19Audio(v){
     backBtn.className = 'btn small'; backBtn.textContent = '⏪ 10秒戻し';
     const playBtn = document.createElement('button');
     playBtn.className = 'btn small';
-    playBtn.textContent = m30Audio.paused ? '▶ 再生' : '⏸ 一時停止';
+    playBtn.textContent = m30Audio.paused ? '⏸ 一時停止' : '▶ 再生';
 
     m30HostBox.append(backBtn, playBtn);
     H(m30HostBox, false);
