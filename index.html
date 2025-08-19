@@ -3773,22 +3773,6 @@ function renderM62(v){
 }
 
 
-// ===== /M65 =====
-
-function renderM65(v){
-  const isM65 = ((v?.mission?.id|0) === 65);
-  const rowId = 'm65Row';
-  const old   = document.getElementById(rowId);
-  if (!isM65){ if (old) old.remove(); return; }
-
-  // 初期配布（未生成ならホストが一度だけ）
-  if (!Array.isArray(v?.meta?.m65_byTable)){ ensureM65MetaInit(v); if (old) old.remove(); return; }
-
-  // 自分が未着席なら表示しない
-  const tables = v.tables || [];
-  const myIdx  = tables.findIndex(T => T?.playerId === state.userId);
-  if (myIdx < 0){ if (old) old.remove(); return; }
-
   /* ===== ここから追加：#66 ステージ＆制約（十字） ===== */
 
 /** 初回メタ生成（ホストのみ） */
