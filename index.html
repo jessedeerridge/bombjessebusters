@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>e</title>
+<title>eｒｒ</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3817,6 +3817,7 @@ function renderM65(v){
     const needBack = (openCountByNum[n]|0) >= 4;
     if (needBack){
       nc.classList.add('back'); // 裏面表示（クリック可）
+      nc.style.backgroundImage = `url('${imgBack}')`; // ★ 数値カード専用の裏面
     }else{
       nc.style.backgroundImage = `url('${imgNumber(n)}')`;
     }
