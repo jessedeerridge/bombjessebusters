@@ -3429,23 +3429,6 @@ async function renderM57(v){
     state._m57Rendering = false;
   }
 }
-// renderM61 の先頭あたりに一度だけ差し込む（存在チェック付き）
- if (!document.getElementById('m61ExtraStyle')) {
-   const st = document.createElement('style');
-   st.id = 'm61ExtraStyle';
-   st.textContent = `
-     /* M61: 制約カードの下に“極小キャラ”を縦積み */
-     .m61-col{ display:flex; flex-direction:column; align-items:center; gap:2px; margin-right:6px; }
-     .m61-char{
-      width:24px; height:32px;                     /* とても小さく */
-       border:1px solid #ddd; border-radius:4px;
-       background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
-     }
-     /* クリックで裏返し → codeback を流用（既存アセット） */
-     .m61-char.back{ background-image:url('./codeback.jpg'); }
-   `;
-   document.head.appendChild(st);
- }
 
 /* ここから追加：ミッション61（制約A~E配布＆交換/B=F~G、隊長の↑↓回し） */
 async function ensureM61MetaInit(vNow){
@@ -3479,59 +3462,60 @@ function renderM61(v){
   const tableEls = Array.from(document.querySelectorAll('#tables .table'));
   tableEls.forEach((tbEl, ti)=>{
     // 既存ノードを掃除して1個化
-       tbEl.querySelectorAll('.m61-con').forEach(n=>n.remove());
+    tbEl.querySelectorAll('.m61-con').forEach(n=>n.remove());
     const content = tbEl.querySelector('.t-content');
     const charCol = tbEl.querySelector('.char-col');
     if (!content || !charCol) return;
     const ch = by[ti];
     if (!ch) return;
 
- 
-  // ▼▼ ここから：制約カードの「下」に極小キャラを縦積み ▼▼
-    // 元の大きいキャラカードは非表示（既存 .hidden を利用）
-    const origChar = charCol.querySelector('.char-card');
-    if (origChar) origChar.classList.add('hidden');  /* ← 元キャラ非表示 */  /* 既存の .hidden を使用 */ /*  */
+    // ▼▼ M61：制約カードの“下”に超小型キャラカードを縦積み表示し、元の大キャラは削除 ▼▼
+    // 元の大きいキャラカードを削除（ラッパー char-col は残す）
+   charCol.querySelector('.char-card')?.remove();
+    // スタック（制約カード ↑ / 小型キャラ ↓）
+    const stack = document.createElement('div');
+    stack.className = 'm61-con';        // 掃除に使う既存フラグ
+    stack.style.display = 'flex';
+   stack.style.flexDirection = 'column';
+    stack.style.alignItems = 'center';
+    stack.style.gap = '2px';
+    stack.style.marginRight = '6px';
 
-    // M61用の縦カラム（制約→極小キャラ）
-    const col = document.createElement('div');
-    col.className = 'm61-con m61-col';  // ← 掃除ロジック互換（.m61-con を残す）
-
-    // 制約カード（サイズは従来のキャラサイズのまま）
+    // 制約カード（サイズ＝元キャラと同じ）
     const con = document.createElement('div');
-    con.className = 'concard';
+  con.className = 'concard';
     con.style.width  = 'var(--char-w)';
     con.style.height = 'var(--char-h)';
-   con.style.backgroundImage = `url('${imgConstraint(ch)}')`;
-    col.appendChild(con);
+    con.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+    stack.appendChild(con);
 
-    // 極小キャラ（絵柄は元キャラの backgroundImage を流用）
-  const tiny = document.createElement('div');
-    tiny.className = 'm61-char';
-    const bg = origChar?.style?.backgroundImage;
-    if (bg) tiny.style.backgroundImage = bg;
+   // 小型キャラカード（とても小さく）
+    const mini = document.createElement('div');
+    mini.className = 'char-card';
+    // 超小型サイズ（必要なら数値はお好みで調整）
+    mini.style.width  = '20px';
+    mini.style.height = '30px';
+    // 画像：flipped に応じて face / battery を切替
+    const t = (v.tables||[])[ti] || {};
+  const flipped = !!t?.character?.flipped;
+    const faceUrl = flipped ? './battery.jpg' : `./${t?.character?.face || 'member (1).jpg'}`;
+    mini.style.backgroundImage = `url("${faceUrl}")`;
+    // クリックで裏返し（battery）にトグル
+    mini.style.cursor = 'pointer';
+    mini.onclick = async () => {
+      await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !flipped });
+    };
+    stack.appendChild(mini);
 
-    // 初期の裏表状態をDBから反映
-    const backMap = (v?.meta?.m61_charBackByTable) || {};
-    if (backMap[ti]) tiny.classList.add('back');
+    // キャラ列の“左”に、縦積み（制約↑／小型キャラ↓）を差し込む
+   content.insertBefore(stack, charCol);
 
-    // クリックで裏返し（全員同期）
-    tiny.onclick = async ()=>{
-      const willBeBack = !tiny.classList.contains('back');
-      tiny.classList.toggle('back', willBeBack);
-     // /meta/m61_charBackByTable に { [ti]: boolean } で保存
-      await update(ref(db, `rooms/${state.roomCode}/meta/m61_charBackByTable`), { [ti]: willBeBack });
-   };
-    col.appendChild(tiny);
-
-    // 位置：キャラ列の直前に差し込む → 見た目は「制約の下に極小キャラ」
-   content.insertBefore(col, charCol);
-    // 自分のテーブルだけ「拡大→交換」可能
+    // 制約カードの動作：自席のみ「拡大→交換」、他席は拡大のみ
     if (ti === myIdx){
       con.style.cursor = 'pointer';
-      con.onclick = ()=> openConstraintZoom61(ch, ti);
-   }else{
-      // 自分以外：拡大のみ（交換などのポップなし）
-      con.style.cursor = 'pointer';
+     con.onclick = ()=> openConstraintZoom61(ch, ti);
+    }else{
+     con.style.cursor = 'pointer';
       con.onclick = ()=> openConstraintZoomView(ch);
     }
   });
