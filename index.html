@@ -3584,38 +3584,35 @@ function renderM63(v){
   (v.tables||[]).forEach((T, ti)=>{
     const box = tableNodes[ti]; if (!box) return;
 
- const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
-
-  // 0個なら行を撤去して余白を作らない
-  if (cnt <= 0){
-    const ex = box.querySelector('.ox-row[data-owner="1"]');
-    if (ex) ex.remove();
-    // 高さも追加しない（リセットは描画冒頭で実施済み）
-    return;
- }
-
-  // 1個以上あるときだけ行を用意して配置
-  let ownRow = box.querySelector('.ox-row[data-owner="1"]');
-  if (!ownRow){
-    ownRow = document.createElement('div');
-    ownRow.className = 'ox-row';
-  ownRow.dataset.owner = '1';
-    const anchor = box.querySelector('.badge-fixed');
-    if (anchor) {
-      anchor.insertAdjacentElement('afterend', ownRow);
-      const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
-      ownRow.style.marginTop = `${Math.round(ah * 5)}px`;
-  } else {
-      (box.querySelector('.hand') || box).appendChild(ownRow);
+    // 既存の行を再利用 or 生成（#44流用）
+    let row = box.querySelector('.ox-row[data-owner="1"][data-m63="1"]');
+    if (!row){
+      row = document.createElement('div');
+      row.className = 'ox-row';
+      row.dataset.owner = '1';
+      row.dataset.m63 = '1';
+      // #44 と同じアンカー（アルファベット直下） :contentReference[oaicite:4]{index=4}
+      const anchor = box.querySelector('.badge-fixed');
+      if (anchor){
+        anchor.insertAdjacentElement('afterend', row);
+        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        row.style.marginTop = `${Math.round(ah * 5)}px`;
+      }else{
+        (box.querySelector('.hand') || box).appendChild(row);
+      }
     }
-  }
- // 再描画
-  ownRow.innerHTML = '';
-  for (let i=0; i<cnt; i++){
-    const t = document.createElement('div');
-    t.className = 'token ox';
-    ownRow.appendChild(t);
-  }
+
+ // 再描画（必ず .ox-wrap を挟む）
+ row.innerHTML = '';
+ let w = document.createElement('div');
+ w.className = 'ox-wrap';
+ row.appendChild(w);
+ const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
+ for (let i=0;i<cnt;i++){
+   const t = document.createElement('div');
+   t.className = 'token ox';
+   w.appendChild(t);                // ← .ox-wrap 内に追加
+ }
 
     // テーブル高さを所持数に応じて拡張（15個ごとに1行追加）
     const baseH = 96;       // 標準の高さ
@@ -3970,10 +3967,7 @@ async function renderM54(v){
     const y = document.getElementById('m54RedBox'); if (y) y.remove();
     return;
   }
-  // --- A) テーブル高さを一括リセット（前ミッションの残りを消す）---
-  document.querySelectorAll('.table').forEach(tb=>{
-    tb.style.removeProperty('--table-h');
-  });
+
   // --- 0) 初期化（ホストのみ・1回） ---
   // ②配布：人数別 {2:9,3:6,4:3,5:2,6:2} を各テーブルに配布
   // ③リザーブ： 30 - (人数×配布数)
@@ -4049,39 +4043,30 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
   const n = (v?.tables?.length|0);
   (v.tables||[]).forEach((T, ti)=>{
     const box = tableNodes[ti]; if (!box) return;
-  // 先にカウント
- const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
 
-  // 0個なら行を撤去して余白を作らない
-  if (cnt <= 0){
-    const ex = box.querySelector('.ox-row[data-owner="1"]');
-    if (ex) ex.remove();
-    // 高さも追加しない（リセットは描画冒頭で実施済み）
-    return;
- }
-
-  // 1個以上あるときだけ行を用意して配置
-  let ownRow = box.querySelector('.ox-row[data-owner="1"]');
-  if (!ownRow){
-    ownRow = document.createElement('div');
-    ownRow.className = 'ox-row';
-  ownRow.dataset.owner = '1';
-    const anchor = box.querySelector('.badge-fixed');
-    if (anchor) {
-      anchor.insertAdjacentElement('afterend', ownRow);
-      const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
-      ownRow.style.marginTop = `${Math.round(ah * 5)}px`;
-  } else {
-      (box.querySelector('.hand') || box).appendChild(ownRow);
+    let row = box.querySelector('.ox-row[data-owner="1"][data-m54="1"]');
+    if (!row){
+      row = document.createElement('div');
+      row.className = 'ox-row';
+      row.dataset.owner = '1';
+      row.dataset.m54 = '1';
+      const anchor = box.querySelector('.badge-fixed');
+      if (anchor){
+        anchor.insertAdjacentElement('afterend', row);
+        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        row.style.marginTop = `${Math.round(ah * 5)}px`;
+      }else{
+        (box.querySelector('.hand') || box).appendChild(row);
+      }
     }
-  }
- // 再描画
-  ownRow.innerHTML = '';
-  for (let i=0; i<cnt; i++){
-    const t = document.createElement('div');
-    t.className = 'token ox';
-    ownRow.appendChild(t);
-  }
+    // 再描画
+    row.innerHTML = '';
+    const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
+    for (let i=0;i<cnt;i++){
+      const t = document.createElement('div');
+      t.className = 'token ox';
+      row.appendChild(t);
+    }
     // テーブルの高さ（1行ぶんだけ拡張）
     const baseH = 96;
     const extra = (cnt>0)? (4+20) : 0;
@@ -4359,38 +4344,35 @@ function renderM44(v){
     const box = tableNodes[ti];
     if (!box) return;
 
- const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
-
-  // 0個なら行を撤去して余白を作らない
-  if (cnt <= 0){
-    const ex = box.querySelector('.ox-row[data-owner="1"]');
-    if (ex) ex.remove();
-    // 高さも追加しない（リセットは描画冒頭で実施済み）
-    return;
- }
-
-  // 1個以上あるときだけ行を用意して配置
-  let ownRow = box.querySelector('.ox-row[data-owner="1"]');
-  if (!ownRow){
-    ownRow = document.createElement('div');
-    ownRow.className = 'ox-row';
-  ownRow.dataset.owner = '1';
-    const anchor = box.querySelector('.badge-fixed');
-    if (anchor) {
-      anchor.insertAdjacentElement('afterend', ownRow);
-      const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
-      ownRow.style.marginTop = `${Math.round(ah * 5)}px`;
-  } else {
-      (box.querySelector('.hand') || box).appendChild(ownRow);
+    // 既存の行を再利用 or 生成
+    let ownRow = box.querySelector('.ox-row[data-owner="1"]');
+    if (!ownRow){
+      ownRow = document.createElement('div');
+      ownRow.className = 'ox-row';
+      ownRow.dataset.owner = '1';
+      // ★変更：情報トークン有無に依らず、常に「アルファベット直下」に置く
+      const anchor = box.querySelector('.badge-fixed'); // ← 1枚目の .alpha を含む
+      if (anchor) {
+        anchor.insertAdjacentElement('afterend', ownRow);
+        // 「アルファベット二個分」だけ下げる（文字高を動的取得）
+        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        ownRow.style.marginTop = `${Math.round(ah * 5)}px`;
+      } else {
+        // フォールバック：手札の直後に置く
+        const hand = box.querySelector('.hand');
+        (hand || box).appendChild(ownRow);
+      }
     }
-  }
- // 再描画
-  ownRow.innerHTML = '';
-  for (let i=0; i<cnt; i++){
-    const t = document.createElement('div');
-    t.className = 'token ox';
-    ownRow.appendChild(t);
-  }
+    // 再描画
+    ownRow.innerHTML = '';
+    const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
+    for (let i=0; i<cnt; i++){
+      const t = document.createElement('div');
+      t.className = 'token ox';
+      ownRow.appendChild(t);
+    }
+
+
     // ▼▼ テーブル高さを所持酸素の行数に合わせて自動調整（スクロール抑止）
     // 横一列固定（折返しなし）：所持があれば 1 行ぶんだけ高さを足す
     const baseH = 96;                        // CSS :root の --table-h 既定（96px）
@@ -4429,17 +4411,19 @@ if (Number.isInteger(idx) && idx === ti){
 /* ▼▼ ここから追加：ミッション49（配布＆譲渡：プールなし） ▼▼ */
  async function renderM49(v){
   try{
-    const isM49 = ((v?.mission?.id|0) === 49);
-    // ミッション49でなければ終了（残り物も特に無し）
-    if (!isM49) return;
+      const isM49 = ((v?.mission?.id|0) === 49);
+      // ミッション49でなければ、前回の高さ上書きを元に戻して終了
+      if (!isM49) {
+        document.querySelectorAll('.table').forEach(tb=>{
+          tb.style.removeProperty('--table-h');
+       });
+        return;
+      }
 
     // --- 0) 安全ガード：tables が無い/空なら何もしない ---
     const n = (v?.tables?.length|0);
     if (!Array.isArray(v?.tables) || n <= 0) return;
-    // --- A) テーブル高さを一括リセット（前ミッションの残りを消す）---
-    document.querySelectorAll('.table').forEach(tb=>{
-      tb.style.removeProperty('--table-h');
-    });
+
     // --- 1) 初期配布（ホストのみ・一度だけ） ---
     // 人数→初期枚数：2人=7, 3人=6, 4人=5, 5人=4, 6人=4
     if (state.isHost && v?.meta?.m49_init !== true){
@@ -4499,7 +4483,16 @@ if (Number.isInteger(idx) && idx === ti){
     t.className = 'token ox';
     row.appendChild(t);
   }
-    
+     // ▼▼ テーブル高さ：所持酸素の行数に合わせて自動調整（#63相当の計算）
+  {
+    const baseH = 96;           // :root の --table-h 既定値（CSS） :contentReference[oaicite:4]{index=4}
+    const perRow = 15;          // .ox-wrap の1行あたり個数（CSSと一致） :contentReference[oaicite:5]{index=5}
+    const rows = Math.ceil(cnt / perRow);
+    // 行の縦サイズ：先頭余白4px + トークン(20px) * 行数 + 行間(2px) * (行数-1)
+    const extra = rows > 0 ? (4 + rows * 20 + Math.max(0, rows - 1) * 2) : 0;
+    const needH = Math.max(baseH, baseH + extra);
+    box.style.setProperty('--table-h', `${needH}px`);
+  }
       // テーブル高さを1行ぶんだけ拡張（#44の挙動と整合）
       const baseH = 96;  // :root --table-h 既定
       const extra = (cnt>0) ? (4 + 20) : 0;  // 4px + トークン20px
