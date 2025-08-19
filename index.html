@@ -3225,6 +3225,7 @@ async function renderM59(v){
     card.style.width = '28px';
     card.style.height = '43px';
     card.style.backgroundImage = `url('${imgNumber(n)}')`;
+    card.style.marginLeft = '4px';   // ★ 右にずらす（例: 4px）
     card.title = String(n);
 
     card.onclick = async (ev)=>{
