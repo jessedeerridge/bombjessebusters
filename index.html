@@ -3169,46 +3169,80 @@ function renderM43(v){
   if (!node.isConnected) tablesEl.appendChild(node);
 }
 /* ：ミッション43 */
-
-/* ===== Mission 57 ===== */
 function renderM57(v){
-  if((v?.mission?.id|0) !== 57) return;
+  if((v?.mission?.id|0)!==57) return;
 
-  // 既存の表示物を掃除
-  clearMissionOverlays();
+  // 既存の残骸を消す
+  document.querySelectorAll('.m57-grid').forEach(n=>n.remove());
 
-  // アイテムカードの下に3x4で1～12を並べる
-  const itemsBar = document.getElementById('itemsBar');
+  const itemsBar=document.getElementById('itemsBar');
   if(!itemsBar) return;
-  const lane = document.createElement('div');
-  lane.className = 'num-under m57-grid';
-  lane.style.display = 'grid';
-  lane.style.gridTemplateColumns = 'repeat(4, auto)';
-  lane.style.gap = '6px';
-  itemsBar.insertAdjacentElement('afterend', lane);
+  const grid=document.createElement('div');
+  grid.className='m57-grid';
+  grid.style.display='grid';
+  grid.style.gridTemplateColumns='repeat(4, auto)';
+  grid.style.gap='6px';
+  grid.style.marginTop='6px';
 
-  // 制約カード a~l.jpg をシャッフル
-  const cons = shuffle('abcdefghijkl'.split(''));
-  for(let n=1;n<=12;n++){
+  // 数値1~12と制約a~lをシャッフル
+  const letters=shuffle("abcdefghijkl".split(''));
+  for(let i=1;i<=12;i++){
     const wrap=document.createElement('div');
-    wrap.className='m57-pair';
+    wrap.style.position='relative';
     wrap.style.display='flex';
     wrap.style.alignItems='center';
-    wrap.style.marginRight='-3px'; // 少し重ねる
+    wrap.style.marginRight='-6px'; // 少し重ねる
 
     // 数値カード
-    placeNumberCard(n, wrap);
+    const num=document.createElement('div');
+    num.className='numcard';
+    num.style.backgroundImage=`url('${imgNumber(i)}')`;
 
     // 制約カード
-    const c=document.createElement('div');
-    c.className='concard';
-    c.style.backgroundImage=`url('${imgConstraint(cons[n-1])}')`;
-    c.onclick=(ev)=> openConZoom(cons[n-1], ev.clientX, ev.clientY);
-    wrap.appendChild(c);
+    const con=document.createElement('div');
+    con.className='concard';
+    con.style.marginLeft='-12px'; // 重なり
+    con.style.backgroundImage=`url('${imgConstraint(letters[i-1])}')`;
 
-    lane.appendChild(wrap);
+    // 拡大クリック
+    con.onclick=(ev)=>{
+      const overlay=document.createElement('div');
+      overlay.id='conZoomOverlay';
+      overlay.innerHTML=`
+        <div class="conzoom-wrap">
+          <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[i-1])}')"></div>
+          <div class="conzoom-menu"><button id="m57ChooseBtn">選ぶ</button></div>
+        </div>`;
+      overlay.onclick=(e)=>{ if(e.target===overlay) overlay.remove(); };
+      document.body.appendChild(overlay);
+      document.getElementById('m57ChooseBtn').onclick=async()=>{
+        await update(ref(db,`rooms/${state.roomCode}/meta`),{m57Chosen:letters[i-1]});
+        overlay.remove();
+      };
+    };
+
+    wrap.appendChild(num);
+    wrap.appendChild(con);
+    grid.appendChild(wrap);
+  }
+
+  itemsBar.insertAdjacentElement('afterend',grid);
+
+  // di左側に選ばれた制約を同期表示
+  const di=document.getElementById('di');
+  const old=document.getElementById('m57Sel');
+  if(old) old.remove();
+  const sel=v?.meta?.m57Chosen;
+  if(sel){
+    const img=document.createElement('div');
+    img.id='m57Sel';
+    img.className='concard';
+    img.style.backgroundImage=`url('${imgConstraint(sel)}')`;
+    img.style.marginRight='6px';
+    di.insertAdjacentElement('beforebegin',img);
   }
 }
+
 
 /* 拡大と「選ぶ」処理 */
 function openConZoom(letter, x, y){
