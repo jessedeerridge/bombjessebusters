@@ -730,7 +730,8 @@ document.querySelectorAll('.numlane').forEach(n => {
 document.querySelectorAll('.m59-row').forEach(n => n.remove());
   document.getElementById('m59Nano')?.remove();
 
-
+  // ★ M61：各テーブル左の制約カードを掃除
+  document.querySelectorAll('.m61-con').forEach(n => n.remove());
 
   
   // ★ M44：酸素UIを完全掃除（プール=ox2 と各テーブル所持行）
@@ -1230,6 +1231,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM57(v);
 renderM55(state.watching);
     renderM59(v);
+    renderM61(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3428,7 +3430,85 @@ async function renderM57(v){
   }
 }
 
+/* ここから追加：ミッション61（制約A~E配布＆交換/B=F~G、隊長の↑↓回し） */
+async function ensureM61MetaInit(vNow){
+  const v = vNow || state.watching; if(!v) return;
+  if ((v?.mission?.id|0) !== 61) return;
+  const n = (v?.tables?.length|0); if (n<=0) return;
+  // 既に配り済みなら何もしない
+  if (Array.isArray(v?.meta?.m61_byTable) && v.meta.m61_byTable.length === n) return;
+  if (!state.isHost) return;
+  // デッキA = A..E をシャッフルして人数分に配る（人数が5超なら循環）
+  const A = ['A','B','C','D','E']; shuffle(A);
+  const by = Array.from({length:n}, (_,i)=> A[i % A.length]);
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m61_byTable: by, m61_rotAt: Date.now() });
+}
 
+function renderM61(v){
+  const isM61 = ((v?.mission?.id|0) === 61);
+  // 片付け（#61以外になったら痕跡を消す）
+  if (!isM61){
+    document.querySelectorAll('.m61-con').forEach(n=>n.remove());
+    if (document.getElementById('conZoomOverlay')) closeConstraintZoom();
+    return;
+  }
+  // 初期配布
+  if (!Array.isArray(v?.meta?.m61_byTable)) { ensureM61MetaInit(v); return; }
+
+  const by = v.meta.m61_byTable.slice();
+  const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+
+  // 各テーブルのキャラカード「左」に、キャラカードと同サイズで表示
+  const tableEls = Array.from(document.querySelectorAll('#tables .table'));
+  tableEls.forEach((tbEl, ti)=>{
+    // 既存ノードを掃除して1個化
+    tbEl.querySelectorAll('.m61-con').forEach(n=>n.remove());
+    const content = tbEl.querySelector('.t-content');
+    const charCol = tbEl.querySelector('.char-col');
+    if (!content || !charCol) return;
+    const ch = by[ti];
+    if (!ch) return;
+
+    const con = document.createElement('div');
+    con.className = 'concard m61-con';
+    con.style.width  = 'var(--char-w)';
+    con.style.height = 'var(--char-h)';
+    con.style.marginRight = '6px';
+    con.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+    // キャラ左に差し込む
+    content.insertBefore(con, charCol);
+
+    // 自分のテーブルだけ「拡大→交換」可能
+    if (ti === myIdx){
+      con.style.cursor = 'pointer';
+      con.onclick = ()=> openConstraintZoom61(ch, ti);
+   }else{
+     con.onclick = null;
+      con.style.cursor = 'default';
+    }
+  });
+
+  // ▼ 隊長の画面下に ↑/↓ ポップ（自分が隊長＝face: member (5).jpg かつ自席）
+  const capIdx = (v.tables||[]).findIndex(T => (T?.character?.face||'').includes('member (5).jpg'));
+  if (capIdx >= 0 && capIdx === myIdx){
+    const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+    const rotate = async (dir)=>{ // dir:+1=次へ, -1=前へ
+      try{
+        const snap = await get(mRef);
+        const meta = snap.val()||{};
+        const arr = Array.isArray(meta.m61_byTable) ? meta.m61_byTable.slice() : [];
+        if (arr.length===0) return;
+       const n = arr.length;
+       const next = Array.from({length:n}, (_,i)=> arr[(i - dir + n)%n]); // ↓=+1で「次のテーブルへ」
+        await update(mRef, { m61_byTable: next, m61_rotAt: Date.now() });
+     }catch(e){ console.error('[M61 rotate]', e); }
+    };
+    openBottomMenu([
+      { label:'↑（前のテーブルへ）', action: ()=> rotate(-1) },
+      { label:'↓（次のテーブルへ）', action: ()=> rotate(+1) }
+    ]);
+  }
+}
   
 /* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
 async function renderM54(v){
@@ -4072,6 +4152,60 @@ function closeConstraintZoom(){
   if (ov) ov.remove();
 }
 
+// ★ #61専用：拡大→「交換」→「本当に？」→B(F/G)から差し替え
+function openConstraintZoom61(letter, myIdx){
+  try{
+    const old = document.getElementById('conZoomOverlay');
+    if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'conZoomOverlay';
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
+    const wrap = document.createElement('div');
+    wrap.className = 'conzoom-wrap';
+    const big = document.createElement('div');
+    big.className = 'conzoom-card';
+    big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
+    wrap.appendChild(big);
+    ov.appendChild(wrap);
+    document.body.appendChild(ov);
+    // 最初は「交換」ボタンだけ
+    const menu = document.createElement('div');
+    menu.className = 'conzoom-menu';
+    const btnSwap = document.createElement('button');
+   btnSwap.textContent = '交換';
+    btnSwap.onclick = (ev)=>{
+      ev.stopPropagation();
+      // 確認段階へ置き換え
+      menu.innerHTML = '';
+      const btnOk = document.createElement('button');
+      btnOk.textContent = '本当に？';
+      btnOk.onclick = async (ev2)=>{
+        ev2.stopPropagation();
+        try{
+          const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+          const snap = await get(mRef);
+          const meta = snap.val()||{};
+          const arr  = Array.isArray(meta.m61_byTable) ? meta.m61_byTable.slice() : [];
+          if (myIdx<0 || myIdx>=arr.length) { closeConstraintZoom(); return; }
+          // デッキB = F or G をランダム
+          const B = (Math.random()<0.5)? 'F' : 'G';
+          arr[myIdx] = B;
+          await update(mRef, { m61_byTable: arr, m61_swapAt: Date.now() });
+        }catch(e){ console.error('[M61 swap]', e); }
+        closeConstraintZoom();
+      };
+      const btnCancel = document.createElement('button');
+      btnCancel.textContent = 'やめる';
+      btnCancel.onclick = (e3)=>{ e3.stopPropagation(); closeConstraintZoom(); };
+      menu.appendChild(btnOk);
+      menu.appendChild(btnCancel);
+    };
+    menu.appendChild(btnSwap);
+   wrap.appendChild(menu);
+  }catch(e){ console.error(e); }
+}
+
+  
 /* ：アイテム拡大ポップ */
 function openItemZoom(itemNo, itemIdx, opt={}){
   try{
