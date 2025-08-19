@@ -410,6 +410,9 @@
    margin-top: 0;        /* アイテム列との外側余白を0に */
    padding-top: 56px;    /* 内側に nano の高さぶんスペースを確保 */
  }
+
+
+  
  /* ▼▼ ミッション44（酸素トークン） ▼▼ */
 .token.ox{
   background:none;   /* ← 背景色を消す */
@@ -723,6 +726,11 @@ document.querySelectorAll('.numlane').forEach(n => {
   document.getElementById('m57Grid')?.remove();       // 3×4グリッド
   document.querySelectorAll('.m57-grid').forEach(n=>n.remove()); // 互換
   document.getElementById('m57Sel')?.remove();        // di左の選択表示
+  // ★ M59：数値帯＆nanoを掃除
+  document.getElementById('m59Nums')?.remove();
+  document.getElementById('m59Nano')?.remove();
+
+
 
   
   // ★ M44：酸素UIを完全掃除（プール=ox2 と各テーブル所持行）
@@ -3178,105 +3186,106 @@ function renderM43(v){
 }
 
 /* ここから追加：ミッション59 */
-function renderM59(v){
+/* ==== ミッション59：checklistの真上に12数値カード＋nano ==== */
+async function renderM59(v){
   const isM59 = ((v?.mission?.id|0) === 59);
-  const rowId = 'm59Row';
-  const nanoId= 'm59Nano';
-  const oldRow = document.getElementById(rowId);
-  const oldNano= document.getElementById(nanoId);
-
   if (!isM59){
-    if (oldRow) oldRow.remove();
-    if (oldNano) oldNano.remove();
-    tablesEl.classList.remove('m43-shift');
+    document.getElementById('m59Nums')?.remove();
+    document.getElementById('m59Nano')?.remove();
     return;
   }
 
-  // 1) 「チェックリスト直上」に 12枚ナンバー行を用意（毎フレーム再生成）
-  const checklist = tablesEl.querySelector('.checklist');
-  if (!checklist) return; // checklistは renderTables で作られる
-  if (oldRow) oldRow.remove();
+  // checklist が作られた後に差し込みたいので存在チェック
+  const cl = tablesEl.querySelector('.checklist');
+  if (!cl) return; // 次フレームでまた呼ばれる
 
-  const lane = document.createElement('div');
-  lane.id = rowId;
-  lane.className = 'numlane';      // 既存スタイルを流用
-  // 2px小さく（既定 32x48 相当を 30x46 に）
-  const shrink = (el)=>{ el.style.width='30px'; el.style.height='46px'; };
+  // 1) 「ゲームごと固定」の並びを meta に保存（初回はホストが保存）
+  let nums = v?.meta?.m59Nums;
+  if (!Array.isArray(nums) || nums.length!==12){
+    nums = MATERIALS.numbers.slice();
+    shuffle(nums);
+    if (state.isHost){
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m59Nums: nums });
+    }
+  }
 
-  // 12枚をランダム順で並べる
-  const nums = Array.from({length:12},(_,i)=>i+1);
-  shuffle(nums);
-  nums.forEach(n=>{
-    const holder = document.createElement('div');
-    holder.className = 'numcard-holder';
+  // 既存の帯を1個化
+  document.getElementById('m59Nums')?.remove();
+
+  // 2) 数値カード帯を checklist の直前に挿入（「真上」）
+  const row = document.createElement('div');
+  row.id = 'm59Nums';
+  row.className = 'numlane';
+  // 「いつもより2px小さく」→ 32x48 → 30x46
+  row.style.marginTop = '6px';
+
+  nums.forEach((n, idx)=>{
     const card = document.createElement('div');
     card.className = 'numcard';
+    card.style.width = '30px';
+    card.style.height = '46px';
     card.style.backgroundImage = `url('${imgNumber(n)}')`;
-    shrink(card);
-    holder.appendChild(card);
-    lane.appendChild(holder);
+    card.title = String(n);
 
-    // クリックでその位置へナノ移動（全員同期）
-    holder.onclick = async ()=>{
-      if (!state.roomCode) return;
-      const prev = (v?.meta?.m59_pos|0) || 0;
+    card.onclick = async (ev)=>{
+      // クリックされた位置に nano を出す（他は消える）
+      const prev = v?.meta?.m59_pos|0;
+      const next = (idx+1)|0; // 1..12
       await update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m59_prevPos: prev, m59_pos: n, m59_updatedAt: Date.now()
+        m59_pos: next,
+        m59_prevPos: prev||0,
+        m59_updatedAt: Date.now()
       });
+      // 視覚反映は onValue → 本関数の後段「nano描画」で行う
     };
+
+    row.appendChild(card);
   });
 
-  // checklist の「直前」に挿入＝“真上”
-  checklist.insertAdjacentElement('beforebegin', lane);
+  tablesEl.insertBefore(row, cl);
 
-  // 2) ナノの表示・位置決め
-  const pos = v?.meta?.m59_pos|0;
-  if (!pos){ if (oldNano) oldNano.remove(); tablesEl.classList.remove('m43-shift'); return; }
-
-  const goingLeft = !!(v?.meta?.m59_left); // true=左向き
-  const img = goingLeft ? './nano0left.png' : './nano0.png';
-
-  const node = oldNano || document.createElement('div');
-  node.id = nanoId;
-  node.className = 'm43-nano';              // #43 のCSSを共用
-  node.style.backgroundImage = `url("${img}")`;
-
-  // 参照位置は「m59Row 内の pos 番のカード」
-  const cards = lane.querySelectorAll('.numcard-holder');
-  // ランダム順なので「数字=インデックス」ではない → 対応する数字の要素を探す
-  const target = Array.from(cards).find(h=>{
-    const nc = h.querySelector('.numcard');
-    return !!nc && (nc.style.backgroundImage||'').includes(`/${pos}.`);
-  }) || null;
-
-  if (!target){
-    if (node.isConnected) node.remove();
-    tablesEl.classList.remove('m43-shift');
+  // 3) nano を描画（1箇所のみ）
+  const old = document.getElementById('m59Nano');
+  const posIndex = (v?.meta?.m59_pos|0);  // 1..12
+  const goLeft   = !!(v?.meta?.m59_left); // true=左向き
+  if (!posIndex){
+    old?.remove();
     return;
   }
 
-  tablesEl.classList.add('m43-shift'); // 上端合わせ（#43と同じ）
+  // 対応カードの座標を取って、その直上へ
+  const cards = row.querySelectorAll('.numcard');
+  const target = cards[posIndex-1];
+  if (!target){ old?.remove(); return; }
+
   const tb = tablesEl.getBoundingClientRect();
   const rb = target.getBoundingClientRect();
-  const x = rb.left - tb.left + (rb.width/2) - (56/2);
-  const y = 0; // tables 上端固定（#43と同じ運用）
-  node.style.left = `${Math.max(0, x)}px`;
-  node.style.top  = `${y}px`;
 
-  // クリックで「方向転換」ポップ（openBottomMenuは既存）
-  node.onclick = ()=>{
-    openBottomMenu([
-      { label:'方向転換', action: async ()=>{
-          const cur = !!(state.watching?.meta?.m59_left);
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { m59_left: !cur, m59_updatedAt: Date.now() });
+  const node = old || document.createElement('div');
+  node.id = 'm59Nano';
+  node.className = 'm43-nano'; // 既存スタイルを流用（56x56）
+
+  const img = goLeft ? './nano0left.png' : './nano0.png';
+  node.style.backgroundImage = `url("${img}")`;
+
+  // クリックで向きトグルのポップ
+  node.onclick = (ev)=>{
+    openMenu(ev.clientX, ev.clientY, [
+      { label: (goLeft ? '右向きにする' : '左向きにする'), action: async ()=>{
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m59_left: !goLeft, m59_updatedAt: Date.now() });
         }
       }
     ]);
   };
 
+  // 位置：カードのちょうど上（tables 内基準）
+  const x = rb.left - tb.left + (rb.width/2) - (56/2);
+  const y = (rb.top - tb.top) - 56 - 2; // 少しだけ上に余白
+  node.style.left = `${Math.max(0, x)}px`;
+  node.style.top  = `${Math.max(0, y)}px`;
+
   if (!node.isConnected) tablesEl.appendChild(node);
 }
-/* ここまで追加：ミッション59 */
 
 
   
