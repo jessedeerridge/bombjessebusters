@@ -432,6 +432,13 @@
   background-size:contain;
   background-repeat:no-repeat;
 }
+
+  /* M63: 0ox の代替表現（画像不要） */
+.token.ox0{
+  background:none;
+  color:#666;
+  border:1px dashed #ccc;
+}
  .ox-row{
    display:flex; flex-wrap:nowrap; gap:2px; margin-top:0; /* ← 横一列＆縦位置はJSで制御 */
    max-width:none;                 /* ← 折り返し禁止 */
@@ -1244,6 +1251,7 @@ renderM55(state.watching);
     renderM59(v);
     renderM61(v);
     renderM62(v);
+    renderM63(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1491,13 +1499,7 @@ if ((v.mission?.id|0) === 23) {
   }
 }
 
- // #64：初回だけ2枚を選んで左右端に固定（ホストのみ実行）
-if ((v.mission?.id|0) === 64 && state.isHost && v?.meta?.m64_done !== true) {
-  // 非同期だが await せずにキック（onValue 再発火で再描画）
-  ensureM64Init(v);
-  return;
-}
- 
+  
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
@@ -1748,12 +1750,6 @@ wrap.dataset.cardId = String(c.id||'');
         const m56Special = isM56 && isRightmost && hasX; // 全テーブル対象
         const ownerBlindSpecial = (m38Special || m56Special);
 
-const isM64 = (mid === 64);
-const pair64 = (isM64 ? (state.watching?.meta?.m64_pairs?.[idx] || null) : null);
-const m64Special = !!(pair64 && (pair64.left === c.id || pair64.right === c.id));
-
-const ownerBlindSpecial = (m38Special || m56Special || m64Special);
-        
         if (!c.open) {
           if (ownerBlindSpecial) {
             if (t.playerId === state.userId) {
@@ -3468,50 +3464,164 @@ async function ensureM61MetaInit(vNow){
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m61_byTable: by, m61_rotAt: Date.now() });
 }
 
-/* ▼▼ ここから追加：ミッション64 初期化 ▼▼ */
-async function ensureM64Init(v){
-  if ((v?.mission?.id|0) !== 64) return;
-  if (!state.isHost) return;
-  if (v?.meta?.m64_done === true) return;
+/* ▼▼ ：ミッション63（酸素トークン：隊長配布／リザーブ回収） ▼▼ */
+async function renderM63(v){
+  const isM63 = ((v?.mission?.id|0) === 63);
 
-  const code = state.roomCode;
-  const tblRef = ref(db, `rooms/${code}/tables`);
-  const snap = await get(tblRef);
-  const tbls = snap.val() || [];
-  const pairs = {};
-  const alphaStr = 'abcdefghijklmnopqrstuvwxyz';
+  // ミッション外で残骸掃除
+  if (!isM63){
+    const x = document.getElementById('m63OxPool'); if (x) x.remove();
+    return;
+  }
 
-  tbls.forEach((T, ti)=>{
-    const hand = (T?.hand || []).slice();
-    // 数字を持つカードから抽選（通常／赤／黄いずれも num があれば対象）
-    const pool = hand.filter(c => typeof c?.num === 'number');
-    if (pool.length < 2) return;
+  // --- 0) 初期化（ホストのみ・一度だけ） ---
+  if (state.isHost && v?.meta?.m63_init !== true){
+    const n = (v?.tables?.length|0);
+    if (n <= 0) return;
+    const cap = (v?.captainTable|0);
 
-    // ランダムに2枚
-    shuffle(pool);
-    const a = pool[0], b = pool[1];
+    // 人数別：2→14, 3→18, 4→24, 5/6→30
+    const per = (n===2)?14 : (n===3)?18 : (n===4)?24 : 30;
 
-    // 小さい方→left / 大きい方→right（同値ならそのまま）
-    const small = ((a.num|0) <= (b.num|0)) ? a : b;
-    const large = ((a.num|0) <= (b.num|0)) ? b : a;
+    const by = {};
+    for (let i=0;i<n;i++) by[i] = 0;
+    by[cap] = per;
 
-    // 元の hand から2枚を一旦除去して、左端/右端に再配置
-    const rest = hand.filter(c => c.id !== small.id && c.id !== large.id);
-    const newHand = [small, ...rest, large];
+    // oxByTable / oxItem は M44/49 と同じフィールドを再利用
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m63_init: true,
+      oxByTable: by,
+      oxItem: 0
+    });
+    return; // 次回 onValue で描画
+  }
 
-    // αを振り直し
-    newHand.forEach((c,i)=> c.alpha = alphaStr[i % alphaStr.length]);
+  // --- 1) リザーブ（アイテム列の直下）を表示（※ox2画像は使わない） ---
+  const itemsBar = document.getElementById('itemsBar'); if (!itemsBar) return;
 
-    tbls[ti].hand = newHand;
-    pairs[ti] = { left: small.id, right: large.id };
+  let poolRow = document.getElementById('m63OxPool');
+  if (!poolRow){
+    poolRow = document.createElement('div');
+    poolRow.id = 'm63OxPool';
+    poolRow.className = 'ox-row ox-pool';
+    itemsBar.insertAdjacentElement('afterend', poolRow);
+  }
+  poolRow.innerHTML = '';
+
+  const poolWrap = document.createElement('div');
+  poolWrap.className = 'ox-wrap';   // 10個ごと改行の幅制御を流用
+  poolRow.appendChild(poolWrap);
+
+  const poolCnt = Math.max(0, v?.meta?.oxItem|0);
+  for (let i=0;i<poolCnt;i++){
+    const t = document.createElement('div');
+    t.className = 'token ox';
+    poolWrap.appendChild(t);
+  }
+
+  // リザーブクリック：隊長のみ「回収」を表示（全量を隊長へ）
+  poolRow.onclick = (ev)=>{
+    if ((v.captainTable|0) !== (state.seatedTable|0)) return;
+    const cnt = Math.max(0, v?.meta?.oxItem|0);
+    if (cnt <= 0) return;
+    openMenu(ev.clientX, ev.clientY, [{
+      label:'回収',
+      action: async ()=>{
+        const cap = (v.captainTable|0);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          oxItem: 0,
+          [`oxByTable/${cap}`]: (v.meta?.oxByTable?.[cap]|0) + cnt
+        });
+      }
+    }]);
+  };
+
+  // --- 2) 各テーブル：手札の直下に所持酸素を表示（10列で折り返し） ---
+  const tableNodes = document.querySelectorAll('.table');
+  (v.tables||[]).forEach((T, ti)=>{
+    const box = tableNodes[ti]; if (!box) return;
+
+    // 行の確保（手札 .hand の“直後”に置く）
+    let ownRow = box.querySelector('.ox-row[data-owner="1"]');
+    if (!ownRow){
+      ownRow = document.createElement('div');
+      ownRow.className = 'ox-row';
+      ownRow.dataset.owner = '1';
+      const hand = box.querySelector('.hand');
+      (hand || box).insertAdjacentElement('afterend', ownRow);
+    }
+
+    // 折り返し＆幅（10個×20px + 隙間）
+    ownRow.style.flexWrap = 'wrap';
+    ownRow.style.maxWidth = 'calc(20px * 10 + 2px * 9)';
+
+    // 再描画
+    ownRow.innerHTML = '';
+    const cnt = Math.max(0, v.meta?.oxByTable?.[ti]|0);
+
+    if (cnt === 0){
+      // 0ox 代替：0トークン3つ（クリック反応は通常トークンと同じ）
+      for (let k=0;k<3;k++){
+        const z = document.createElement('div');
+        z.className = 'token ox0';
+        z.textContent = '0';
+        ownRow.appendChild(z);
+      }
+    }else{
+      for (let i=0;i<cnt;i++){
+        const t = document.createElement('div');
+        t.className = 'token ox';
+        ownRow.appendChild(t);
+      }
+    }
+
+    // 自分の行 → 1〜12 ポップでリザーブへ移動（選べるのは所持数以内）
+    if ((state.seatedTable|0) === ti){
+      ownRow.onclick = (ev)=>{
+        const mine = Math.max(0, v.meta?.oxByTable?.[ti]|0);
+        const choices = Array.from({length:12}, (_,i)=> i+1).filter(k => k <= mine);
+        if (choices.length === 0) return;
+
+        openMenu(ev.clientX, ev.clientY, choices.map(k => ({
+          label:String(k),
+          action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              [`oxByTable/${ti}`]: mine - k,
+              oxItem: (v.meta?.oxItem|0) + k
+            });
+            // 2秒だけ「+k」をリザーブの右上に表示
+            const flash = document.createElement('div');
+            flash.textContent = `+${k}`;
+            flash.style.cssText = 'position:absolute; right:0; transform:translateY(-120%); font-size:12px; background:#fff; border:1px solid #ddd; border-radius:8px; padding:2px 6px;';
+            poolRow.appendChild(flash);
+            setTimeout(()=> flash.remove(), 2000);
+          }
+        })));
+      };
+    }else{
+      // 他人の行 → 「渡す」：自分の全トークンを相手へ譲渡
+      ownRow.onclick = (ev)=>{
+        const me = state.seatedTable;
+        if (me == null || me === ti) return;
+        const mine = Math.max(0, v.meta?.oxByTable?.[me]|0);
+        if (mine <= 0) return;
+
+        openOneMini(ev.clientX, ev.clientY, '渡す', async ()=>{
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            [`oxByTable/${me}`]: 0,
+            [`oxByTable/${ti}`]: (v.meta?.oxByTable?.[ti]|0) + mine
+          });
+        });
+      };
+    }
+
+    // --- 3) テーブル高さを所持数に応じて拡張 ---
+    const rows = Math.ceil(Math.max(cnt, 3) / 10);   // 0 のときも 3列分の余白
+    const extra = rows * 24;                          // 1列 ≒ 24px
+    box.style.setProperty('--table-h', `${96 + extra}px`);
   });
-
-  await Promise.all([
-    set(tblRef, tbls),
-    update(ref(db, `rooms/${code}/meta`), { m64_pairs: pairs, m64_done: true })
-  ]);
 }
-/* ▲▲ ここまで追加：ミッション64 初期化 ▲▲ */
+/* ▲▲ ：ミッション63（酸素） ▲▲ */
 
   
 /* ここから追加：#62 人数分の数値カード（同期） */
