@@ -3185,7 +3185,8 @@ function renderM43(v){
   if (!node.isConnected) tablesEl.appendChild(node);
 }
 
-/* ==== ミッション59：各 checklistbox の直上に12数値カード（固定ランダム）＋ nano（上半分重ね） ==== */
+/* ==== ミッション59：各 checklistbox の直上に12数値カード（固定ランダム）
+   ＋ nano（カード上半分に重ねる：セル内相対配置版） ==== */
 async function renderM59(v){
   const isM59 = ((v?.mission?.id|0) === 59);
   if (!isM59){
@@ -3194,12 +3195,12 @@ async function renderM59(v){
     return;
   }
 
-  // checklist の「各ボックス」を列挙（無ければ .checklist をフォールバック）
-  const boxes = Array.from(tablesEl.querySelectorAll('.checklistbox'));
+  // 対象行（checklistbox が無ければ .checklist をフォールバック）
+  const boxes   = Array.from(tablesEl.querySelectorAll('.checklistbox'));
   const targets = boxes.length ? boxes : Array.from(tablesEl.querySelectorAll('.checklist'));
-  if (!targets.length) return; // まだ生成前なら次フレームで
+  if (!targets.length) return;
 
-  // ゲームごと固定の順序を meta に保存（初回はホスト）
+  // ゲームごと固定の12枚（初回はホストが保存）
   let nums = v?.meta?.m59Nums;
   if (!Array.isArray(nums) || nums.length !== 12){
     nums = MATERIALS.numbers.slice();
@@ -3209,37 +3210,39 @@ async function renderM59(v){
     }
   }
 
-  // 既存行をクリーン（複数行対応）
+  // 既存レーンを掃除
   document.querySelectorAll('.m59-row').forEach(n => n.remove());
 
-  // 各 checklistbox の直前に 1 本ずつ等分レーンを作成（幅は box と同じ100%）
+  // 各 checklistbox の直前に12枚レーンを新設
   targets.forEach((boxEl, rowIdx) => {
     const lane = document.createElement('div');
     lane.className = 'm59-row';
     lane.style.display = 'grid';
-    lane.style.gridTemplateColumns = 'repeat(12, 1fr)'; // ボックス幅に対して均等割り
+    lane.style.gridTemplateColumns = 'repeat(12, 1fr)';
     lane.style.columnGap = '2px';
     lane.style.width = '100%';
-    lane.style.marginBottom = '6px'; // 「真上」に見える余白
+    // チェックリストの左マージンに合わせてずらす（横幅見た目一致）
+    lane.style.margin = '0 0 6px 10px';
+    lane.style.overflow = 'visible';
 
     nums.forEach((n, idx) => {
-      // セル中央に #59 だけ小さめの数値カード
       const cell = document.createElement('div');
-      cell.style.display = 'grid';
+      cell.className = 'm59-cell';
+      cell.style.position = 'relative';
+      cell.style.display  = 'grid';
       cell.style.placeItems = 'center';
 
       const card = document.createElement('div');
       card.className = 'numcard m59num';
-      card.style.width = '30px';   // 通常より2px小さく
+      card.style.width  = '30px'; // #59 は少し小さく
       card.style.height = '46px';
       card.style.backgroundImage = `url('${imgNumber(n)}')`;
       card.title = String(n);
 
       card.onclick = async () => {
-        // クリックされたレーン(rowIdx)と位置(idx)を同期保存
         await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          m59_row: rowIdx,     // 0..(targets.length-1)
-          m59_pos: (idx + 1),  // 1..12
+          m59_row: rowIdx,        // 0-based
+          m59_pos: (idx + 1),     // 1..12
           m59_updatedAt: Date.now()
         });
       };
@@ -3248,44 +3251,35 @@ async function renderM59(v){
       lane.appendChild(cell);
     });
 
-    boxEl.parentNode.insertBefore(lane, boxEl); // 「各 box の直上」に差し込む
+    boxEl.parentNode.insertBefore(lane, boxEl); // 真上に差し込む
   });
 
-  // ===== nano を描画：選択されたレーンの該当カードの「上半分」に重ねる =====
+  // === nano を描画（セル内相対配置） ===
   const rowIndex = (v?.meta?.m59_row ?? 0) | 0;
   const posIndex = (v?.meta?.m59_pos | 0);  // 1..12
   const goLeft   = !!(v?.meta?.m59_left);
 
   const lanes = Array.from(tablesEl.querySelectorAll('.m59-row'));
-  if (!posIndex || !lanes.length || !lanes[rowIndex]){
-    document.getElementById('m59Nano')?.remove();
-    return;
-  }
+  if (!posIndex || !lanes[rowIndex]){ document.getElementById('m59Nano')?.remove(); return; }
 
-  const targetCard = lanes[rowIndex].querySelectorAll('.m59num')[posIndex - 1];
-  if (!targetCard){
-    document.getElementById('m59Nano')?.remove();
-    return;
-  }
+  const targetCell = lanes[rowIndex].children[posIndex - 1];
+  if (!targetCell){ document.getElementById('m59Nano')?.remove(); return; }
 
-  const tb = tablesEl.getBoundingClientRect();
-  const rb = targetCard.getBoundingClientRect();
+  // 既存を確実に一掃（常に1つだけ）
+  document.getElementById('m59Nano')?.remove();
 
-  const node = document.getElementById('m59Nano') || document.createElement('div');
+  const node = document.createElement('div');
   node.id = 'm59Nano';
-  node.className = 'm43-nano'; // 56x56 既存流用
+  node.className = 'm43-nano'; // 56x56 既存CSSを流用
   node.style.backgroundImage = `url("${goLeft ? './nano0left.png' : './nano0.png'}")`;
 
-  // ★ ここが「上半分重ね」：nano 高さの半分だけ上にずらす
-  //    nano の中心 ≒ カード上辺付近に来る配置
-  const nanoSize = 56; // m43-nano の想定サイズ（変更しているなら合わせて）
-  const x = rb.left - tb.left + (rb.width / 2) - (nanoSize / 2);
-  const y = rb.top  - tb.top  - (nanoSize / 2);
+  // ★ここが「上半分重ね」：セル内基準で上辺に中心を合わせる
+  node.style.left   = '50%';
+  node.style.top    = '0';
+  node.style.transform = 'translate(-50%, -50%)';
+  node.style.pointerEvents = 'auto';
 
-  node.style.left = `${Math.max(0, x)}px`;
-  node.style.top  = `${Math.max(0, y)}px`;
-
-  // クリックで向きトグル（ポップメニュー）
+  // クリックで向きトグル
   node.onclick = (ev)=>{
     openMenu(ev.clientX, ev.clientY, [
       { label: (goLeft ? '右向きにする' : '左向きにする'),
@@ -3299,11 +3293,8 @@ async function renderM59(v){
     ]);
   };
 
-  if (!node.isConnected) tablesEl.appendChild(node);
+  targetCell.appendChild(node);
 }
-
-
-
 
   
 // ミッション57：二重描画/二重保存対策込みで全面書き直し
