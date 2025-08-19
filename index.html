@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ｒ</title>
+<title>eｒｒ</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -38,21 +38,6 @@
   .btn.big{padding:12px 14px;font-size:16px}
   .btn.ghost{background:transparent}
   .hidden{display:none!important}
-/* === M30: 再生パネル & 音量バー === */
-.m30-audio-host{
-  position:fixed; left:50%; bottom:12px; transform:translateX(-50%);
-  display:flex; gap:8px; align-items:center;
-  background:#111; color:#fff; border-radius:999px; padding:8px 12px;
-  box-shadow:0 10px 24px rgba(0,0,0,.18); z-index:2147483603; pointer-events:auto;
-}
-.m30-audio-host .btn{ background:#fff; color:#111; border-color:#fff; }
-.m30-volume{
-  position:fixed; left:50%; bottom:12px; transform:translateX(-50%);
-  display:flex; gap:8px; align-items:center;
-  background:#fff; color:#111; border:1px solid #eee; border-radius:999px; padding:6px 10px;
-  box-shadow:0 10px 24px rgba(0,0,0,.12); z-index:2147483602; pointer-events:auto;
-}
-.m30-volume input[type="range"]{ width:220px; }
 
   .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:10}
   .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08);z-index:11}
@@ -547,8 +532,7 @@
 <div id="globalReveal" class="global-reveal hidden"></div>
 <!-- ★ ホスト左下 工具アイコン -->
 <button id="hostTool" class="host-tool hidden" title="工具">🔧</button>
-<div id="m30HostAudio" class="m30-audio-host hidden"></div>
-<div id="m30Volume" class="m30-volume hidden"></div>
+
 <div id="restartPop" class="restart-pop hidden">
   <div style="font-size:14px">やり直しますか？</div>
   <div class="restart-actions">
@@ -686,46 +670,6 @@ const popLayer = document.getElementById('popLayer');
 const globalReveal = document.getElementById('globalReveal');
 /* host tool */
 const hostTool = document.getElementById('hostTool');
-/* M30 audio */
-const m30HostBox = document.getElementById('m30HostAudio');
-const m30VolBox  = document.getElementById('m30Volume');
-let   m30Audio   = null, m30Src = './mi19.mp3',
-      m30Vol     = +(localStorage.getItem('m19Vol') ?? 0.8);
-
-let m19Ctx = null, m19SrcNode = null, m19Gain = null;
-
-/* ここから差し替え：WebAudio 初期化（非再帰・素の出力をミュート） */
-function ensureM19WebAudio(){
-  if (!m19Ctx){
-    m19Ctx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (!m30Audio){
-    m30Audio = new Audio(m30Src);
-    m30Audio.preload = 'auto';
-    m30Audio.crossOrigin = 'anonymous';
-    m30Audio.playsInline = true;
-    // 素の出力は使わず、WebAudio経由だけを鳴らす
-    m30Audio.volume = 0;
-    m30Audio.muted  = true;
-  }
-  if (!m19SrcNode){
-    m19SrcNode = m19Ctx.createMediaElementSource(m30Audio);
-  }
-  if (!m19Gain){
-    m19Gain = m19Ctx.createGain();
-    m19Gain.gain.value = Math.max(0, Math.min(1, m30Vol));
-    m19SrcNode.connect(m19Gain).connect(m19Ctx.destination);
-  }
-}
-/* ここまで差し替え：WebAudio 初期化 */
-
-  if (!m19SrcNode) m19SrcNode = m19Ctx.createMediaElementSource(m30Audio);
-  if (!m19Gain){
-    m19Gain = m19Ctx.createGain();
-    m19Gain.gain.value = Math.max(0, Math.min(1, m30Vol));
-    m19SrcNode.connect(m19Gain).connect(m19Ctx.destination);
-  }
-}
 
 /* helpers */
 function hiragana(len=4){
@@ -1297,7 +1241,6 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM15(v);
     renderM16(v);
     renderM30(v);
-    renderM19Audio(v);
     renderM32(v);
     renderM36(v);
     renderM37(v);
@@ -4411,9 +4354,9 @@ function renderM44(v){
       const anchor = box.querySelector('.badge-fixed'); // ← 1枚目の .alpha を含む
       if (anchor) {
         anchor.insertAdjacentElement('afterend', ownRow);
-        // 「アルファベット二個分」だけ下げる（文字高を動的取得）
-        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
-        ownRow.style.marginTop = `${Math.round(ah * 5)}px`;
+   // 「アルファベット二個分」だけ下げる（文字高を動的取得）
+ const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+ ownRow.style.marginTop = `${Math.round(ah * 2)}px`;
       } else {
         // フォールバック：手札の直後に置く
         const hand = box.querySelector('.hand');
@@ -6538,91 +6481,6 @@ function renderM30(v){
   mountLaneUnderItemsBar(lane);
 }
 
-// === M30: mi19 再生・戻し（ホスト）＋ 全員音量バー ===
-function renderM19Audio(v){
-  const isM30 = ((v?.mission?.id|0) === 19);
-  if (!isM30){ H(m30HostBox, true); H(m30VolBox, true); return; }
-
-  /* ここから差し替え：WebAudio 初期化を呼ぶ */
-  ensureM19WebAudio();
-  /* ここまで差し替え */
-
-
-  if (state.isHost){
-    m30HostBox.innerHTML = '';
-    const backBtn = document.createElement('button');
-    backBtn.className = 'btn small'; backBtn.textContent = '⏪ 10秒戻し';
-    const playBtn = document.createElement('button');
-    playBtn.className = 'btn small';
-    playBtn.textContent = m30Audio.paused ? '⏸ 一時停止' : '▶ 再生';
-
-    m30HostBox.append(backBtn, playBtn);
-    H(m30HostBox, false);
-
-    const sendCmd = async (type, posSec)=>{
-      const cmd = { type, pos: Math.max(0, posSec|0), at: Date.now() };
-      await update(ref(db, `rooms/${state.roomCode}/meta`), { m30_audioCmd: cmd });
-    };
-
-     playBtn.onclick = async ()=>{
-      /* ここから追加 */
-      if (m19Ctx && m19Ctx.state === 'suspended'){ try{ await m19Ctx.resume(); }catch(e){} }
-      /* ここまで追加 */
-      const cur = Math.floor(m30Audio.currentTime||0);
-      if (m30Audio.paused) await sendCmd('play', cur);
-      else                 await sendCmd('pause', cur);
-    };
-    backBtn.onclick = async ()=>{
-      /* ここから追加 */
-      if (m19Ctx && m19Ctx.state === 'suspended'){ try{ await m19Ctx.resume(); }catch(e){} }
-      /* ここまで追加 */
-      const cur = Math.floor(m30Audio.currentTime||0);
-      await sendCmd('seek', Math.max(0, cur - 10));
-    };
-
-  }else{
-    H(m30HostBox, true);
-  }
-
-  const cmd = v?.meta?.m30_audioCmd || null;
-  if (cmd){
-    const want = (cmd.pos|0);
-    const now  = Math.floor(m30Audio.currentTime||0);
-    if (Math.abs(now - want) >= 1){
-      try{ m30Audio.currentTime = want; }catch(_){}
-    }
-    if (cmd.type === 'play'){
-      if (m19Ctx && m19Ctx.state === 'suspended'){ m19Ctx.resume().catch(()=>{}); }
-      m30Audio.play().catch(()=>{});
-    }else if (cmd.type === 'pause'){
-      m30Audio.pause();
-    }
-  }
-
-  const playing = !m30Audio.paused;
-  if (playing){
-m30VolBox.innerHTML = '';
-const label = document.createElement('span'); label.textContent = '🔊 音量';
-const range = document.createElement('input');
-range.type='range'; range.min='0'; range.max='1'; range.step='0.01';
-
-/* ここから差し替え：GainNode 初期値＆制御 */
-range.value = String(m19Gain?.gain?.value ?? m30Vol);
-range.oninput = async ()=>{
-  if (m19Ctx && m19Ctx.state === 'suspended'){ try{ await m19Ctx.resume(); }catch(e){} }
-  m30Vol = Math.max(0, Math.min(1, parseFloat(range.value||'0.8')));
-  if (m19Gain) m19Gain.gain.value = m30Vol;
-  try{ localStorage.setItem('m19Vol', String(m30Vol)); }catch(e){}
-};
-/* ここまで差し替え：GainNode 初期値＆制御 */
-
-    m30VolBox.append(label, range);
-    H(m30VolBox, false);
-  }else{
-    H(m30VolBox, true);
-  }
-}
-  
 /* ここから追加：#36 数値5枚＋左2/右2（同期表示） */
 async function ensureM36MetaInit(vNow){
   const v = vNow || state.watching; if (!v) return;
