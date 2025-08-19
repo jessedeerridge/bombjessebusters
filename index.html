@@ -448,7 +448,8 @@
 }
 .ox-wrap{
   display:flex; flex-wrap:wrap; gap:2px;
-  max-width:calc(20px * 10 + 2px * 9);
+  /* 1行あたり15個（幅20px×15 + ギャップ2px×14） */
+  max-width:calc(20px * 15 + 2px * 14);
 }
 
   
@@ -3588,14 +3589,17 @@ function renderM63(v){
       }
     }
 
-    // 再描画
-    row.innerHTML = '';
-    const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
-    for (let i=0;i<cnt;i++){
-      const t = document.createElement('div');
-      t.className = 'token ox';
-      row.appendChild(t);
-    }
+ // 再描画（必ず .ox-wrap を挟む）
+ row.innerHTML = '';
+ let w = document.createElement('div');
+ w.className = 'ox-wrap';
+ row.appendChild(w);
+ const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
+ for (let i=0;i<cnt;i++){
+   const t = document.createElement('div');
+   t.className = 'token ox';
+   w.appendChild(t);                // ← .ox-wrap 内に追加
+ }
 
     // テーブル高さを1行ぶんだけ拡張（#44準拠） :contentReference[oaicite:5]{index=5}
     const baseH = 96;
