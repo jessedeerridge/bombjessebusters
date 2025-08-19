@@ -3518,7 +3518,7 @@ function renderM61(v){
       // 顔 or battery を表示（顔が未設定でも必ずフォールバック）
       const flipped = !!t?.character?.flipped;
       const faceName = t?.character?.face || 'member (1).jpg'; // フォールバック
-      const faceUrl  = flipped ? './battery.jpg' : `./${faceName}`;
+      const faceUrl  = flipped ? '/img/battery.jpg' : `/img/members/${faceName}`;
       mini.style.backgroundImage = `url("${faceUrl}")`;
       mini.style.cursor = 'pointer';
      mini.title = '';
