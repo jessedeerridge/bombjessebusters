@@ -152,6 +152,17 @@
     width:var(--char-w);height:var(--char-h);background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
+  /* ▼ M61: 制約カードの下に置く極小キャラ */
+  .m61-mini{
+    width:18px; height:28px;            /* とても小さく */
+    border:1px solid #ddd; border-radius:4px;
+    background:#f3f4f6 center/cover no-repeat;
+    margin:2px auto 0; user-select:none; cursor:pointer;
+  }
+  .m61-mini.blank{ background:#f3f4f6; border:1px dashed #d1d5db; cursor:default; }
+  /* 縦積みラッパー */
+  .m61-stack{ display:flex; flex-direction:column; align-items:center; width:var(--char-w); }
+
   /* ★ #13：キャラと下部トークンを縦積みするためのラッパー */
   .char-col{
     display:flex; flex-direction:column; align-items:center; gap:2px;
@@ -3448,7 +3459,7 @@ function renderM61(v){
   const isM61 = ((v?.mission?.id|0) === 61);
   // 片付け（#61以外になったら痕跡を消す）
   if (!isM61){
-    document.querySelectorAll('.m61-con').forEach(n=>n.remove());
+    document.querySelectorAll('.m61-con, .m61-stack').forEach(n=>n.remove());
     if (document.getElementById('conZoomOverlay')) closeConstraintZoom();
     return;
   }
@@ -3462,83 +3473,52 @@ function renderM61(v){
   const tableEls = Array.from(document.querySelectorAll('#tables .table'));
   tableEls.forEach((tbEl, ti)=>{
     // 既存ノードを掃除して1個化
-    tbEl.querySelectorAll('.m61-con').forEach(n=>n.remove());
+    tbEl.querySelectorAll('.m61-con, .m61-stack').forEach(n=>n.remove());
     const content = tbEl.querySelector('.t-content');
     const charCol = tbEl.querySelector('.char-col');
     if (!content || !charCol) return;
     const ch = by[ti];
     if (!ch) return;
 
-    // ▼▼ M61：制約カードの“下”に超小型キャラカードを縦積み表示し、元の大キャラは削除 ▼▼
-    // 元の大きいキャラカードを削除（ラッパー char-col は残す）
-    // スタック（制約カード ↑ / 小型キャラ ↓）
+    // ▼ M61 専用スタック（制約の下に極小キャラ）
     const stack = document.createElement('div');
-    stack.className = 'm61-con';        // 掃除に使う既存フラグ
-    stack.style.display = 'flex';
-   stack.style.flexDirection = 'column';
-    stack.style.alignItems = 'center';
-    stack.style.gap = '2px';
-    stack.style.marginRight = '6px';
-
-    // 制約カード（サイズ＝元キャラと同じ）
+    stack.className = 'm61-stack';
+    // 制約カード
     const con = document.createElement('div');
-  con.className = 'concard';
+    con.className = 'concard m61-con';
     con.style.width  = 'var(--char-w)';
-    con.style.height = 'var(--char-h)';
+   con.style.height = 'var(--char-h)';
     con.style.backgroundImage = `url('${imgConstraint(ch)}')`;
-    stack.appendChild(con);
-
-   // 小型キャラカード（とても小さく）
+    // ミニキャラ
     const mini = document.createElement('div');
-    mini.className = 'char-card';
-    // 超小型サイズ（必要なら数値はお好みで調整）
-    mini.style.width  = '20px';
-    mini.style.height = '30px';
-    // 着席判定：席に人がいなければ“完全ブランク & クリック不可”
+   mini.className = 'm61-mini';
     const t = (v.tables||[])[ti] || {};
-   // --- 着席判定を“ゆるく”する：どれか1つでもあれば座っているとみなす ---
-    const hasSeat = !!(
-      t?.member?.uid || t?.member?.id || t?.member?.name ||
-      t?.ownerUid || t?.joinedAt ||
-      t?.character?.face || t?.character?.id
-    );
-
-    // 表示のベース指定（見えないトラブル防止）
-    mini.style.backgroundSize    = 'cover';
-    mini.style.backgroundPosition= 'center';
-   mini.style.backgroundRepeat  = 'no-repeat';
-
-    if (!hasSeat){
-      // ブランク：完全に何も表示しない＆クリック不可
-      mini.style.backgroundImage = 'none';
-     mini.style.pointerEvents   = 'none';
-     mini.removeAttribute('onclick');
-      mini.title = '空席';
-    } else {
-      // 顔 or battery を表示（顔が未設定でも必ずフォールバック）
-      const flipped = !!t?.character?.flipped;
-      const faceName = t?.character?.face || 'member (1).jpg'; // フォールバック
-      const faceUrl  = flipped ? '/img/battery.jpg' : `/img/members/${faceName}`;
-      mini.style.backgroundImage = `url("${faceUrl}")`;
-      mini.style.cursor = 'pointer';
-     mini.title = '';
-      mini.onclick = async () => {
-        await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), {
-          flipped: !flipped
-        });
-      };
-    }
+    const seatEmpty = !t.playerId;
+    const amSeatedHere = (t.playerId && t.playerId === state.userId);
+    if (seatEmpty){
+      mini.classList.add('blank');
+      mini.onclick = null;
+    }else{
+      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+      mini.style.backgroundImage = `url("${face}")`;
+     // 既存の大キャラ同様、本人のみ裏表トグル
+      mini.onclick = amSeatedHere ? (async ()=> {
+        await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
+      }) : null;
+      if (!amSeatedHere) mini.style.cursor = 'default';
+   }
+    stack.appendChild(con);
     stack.appendChild(mini);
-
-    // キャラ列の“左”に、縦積み（制約↑／小型キャラ↓）を差し込む
-    const parent = charCol.parentNode;
-    if (parent) parent.replaceChild(stack, charCol);
-    // 制約カードの動作：自席のみ「拡大→交換」、他席は拡大のみ
+    // 旧 .char-col を物理削除して詰める
+    content.insertBefore(stack, charCol);
+    charCol.remove();
+    // 自分のテーブルだけ「拡大→交換」可能
     if (ti === myIdx){
       con.style.cursor = 'pointer';
-     con.onclick = ()=> openConstraintZoom61(ch, ti);
-    }else{
-     con.style.cursor = 'pointer';
+      con.onclick = ()=> openConstraintZoom61(ch, ti);
+   }else{
+      // 自分以外：拡大のみ（交換などのポップなし）
+      con.style.cursor = 'pointer';
       con.onclick = ()=> openConstraintZoomView(ch);
     }
   });
@@ -7037,9 +7017,9 @@ function missionInfo(id, opts={}){
         id:46, name:'#46', desc:'',
         display:[
           '#46',...linesForMix,
-          '',
-          '',
-          '',
+          '7のコードは最後に切断しなければならない。',
+          '手札に7しかない場合、4本の7を同時に切断しなければならず、失敗すれば爆発する。',
+          'それより前の段階で7が見つかった場合、起爆ダイアルが1進む。',
        ],
         flags:{  }
       };
