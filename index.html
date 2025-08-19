@@ -3895,9 +3895,25 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
         (box.querySelector('.hand') || box).appendChild(row);
       }
     }
-    // 再描画
- row.innerHTML = '';
-const cnt = Math.max(0, v?.meta?.oxByTable?.[ti] || 0);
+// 再描画（10で改行するため常に .ox-wrap を挿入…はやめ、>0のときだけ作る）
+row.innerHTML = '';
+
+// oxByTable の取り出しを頑健化（将来の構造変更にも耐える）
+const oxByTable =
+  (v && v.meta && v.meta.oxByTable) ||
+  (v && v.meta && v.meta.m63 && v.meta.m63.oxByTable) ||
+  {};
+
+// ti は数値でも文字列でもアクセスできるように両方試す
+const keyA = ti;
+const keyB = String(ti);
+const raw = (oxByTable != null && (oxByTable[keyA] ?? oxByTable[keyB])) ?? 0;
+
+// 数値化（"12" でも OK にする）
+const cnt = Number.isFinite(+raw) ? Math.max(0, +raw) : 0;
+
+// デバッグ：必要なら一時的に有効化
+// console.debug('M63 OX render', { ti, raw, cnt, oxByTable });
 
 if (cnt > 0) {
   const w = document.createElement('div');
@@ -3910,6 +3926,8 @@ if (cnt > 0) {
     w.appendChild(t);
   }
 }
+// 0枚なら一切UIを作らない（0oxもwrapも作らない）
+
 // 0枚なら一切UIを作らない
     // テーブルの高さ（1行ぶんだけ拡張）
     const baseH = 96;
