@@ -3169,97 +3169,113 @@ function renderM43(v){
   if (!node.isConnected) tablesEl.appendChild(node);
 }
 /* ：ミッション43 */
-function renderM57(v){
-  if((v?.mission?.id|0)!==57) return;
-  // 既存の残骸を消す
-  document.querySelectorAll('.m57-grid').forEach(n=>n.remove());
+// ミッション57：二重描画/二重保存対策込みで全面書き直し
+async function renderM57(v){
+  if ((v?.mission?.id|0) !== 57) return;
 
-  const itemsBar=document.getElementById('itemsBar');
-  if(!itemsBar) return;
-  const grid=document.createElement('div');
-  grid.className='m57-grid';
-  grid.style.display='grid';
-  grid.style.gridTemplateColumns='repeat(4, auto)';
-  grid.style.gap='6px';
-  grid.style.marginTop='6px';
+  // 再入防止（同フレーム二重実行を遮断）
+  if (state._m57Rendering) return;
+  state._m57Rendering = true;
 
-  // ★ 修正：letters は DB に保存して再利用
-  let letters = v?.meta?.m57Letters;
-  if(!letters){
-    letters = shuffle("abcdefghijkl".split(''));
-    // ホストだけが初回に保存
-    if(state.isHost){
-      update(ref(db,`rooms/${state.roomCode}/meta`), { m57Letters: letters });
+  try {
+    // 既存ノードを必ず1個化
+    document.getElementById('m57Grid')?.remove();
+    document.querySelectorAll('.m57-grid').forEach(n=>n.remove()); // 互換用
+
+    const itemsBar = document.getElementById('itemsBar');
+    if (!itemsBar) return;
+
+    // letters は初回のみホストが保存して全員で再利用
+    let letters = v?.meta?.m57Letters;
+    if (!letters) {
+      letters = shuffle("abcdefghijkl".split(''));
+      if (state.isHost) {
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Letters: letters });
+      }
     }
-  }
 
-  for(let i=1;i<=12;i++){
-    const wrap=document.createElement('div');
-    wrap.style.position='relative';
-    wrap.style.display='flex';
-    wrap.style.alignItems='center';
-    wrap.style.marginRight='-6px'; // 少し重ねる
+    // グリッド生成
+    const grid = document.createElement('div');
+    grid.id = 'm57Grid';
+    grid.className = 'm57-grid';
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(4, auto)';
+    grid.style.gap = '6px';
+    grid.style.marginTop = '6px';
 
-    // 数値カード
-    const num=document.createElement('div');
-    num.className='numcard';
-    num.style.backgroundImage=`url('${imgNumber(i)}')`;
+    for (let i = 1; i <= 12; i++) {
+      const wrap = document.createElement('div');
+      wrap.style.position = 'relative';
+      wrap.style.display = 'flex';
+      wrap.style.alignItems = 'center';
+      wrap.style.marginRight = '-6px'; // 少し重ねる
 
-    // 制約カード
-    const con=document.createElement('div');
-    con.className='concard';
-    con.style.marginLeft='-6px'; // 重なり
-    con.style.backgroundImage=`url('${imgConstraint(letters[i-1])}')`;
+      // 数値カード
+      const num = document.createElement('div');
+      num.className = 'numcard';
+      num.style.backgroundImage = `url('${imgNumber(i)}')`;
 
-    // 拡大クリック
-    con.onclick=(ev)=>{
-      const overlay=document.createElement('div');
-      overlay.id='conZoomOverlay';
-      overlay.innerHTML=`
-        <div class="conzoom-wrap">
-          <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[i-1])}')"></div>
-          <div class="conzoom-menu"><button id="m57ChooseBtn">選ぶ</button></div>
-        </div>`;
-      overlay.onclick=(e)=>{ if(e.target===overlay) overlay.remove(); };
-      document.body.appendChild(overlay);
-      document.getElementById('m57ChooseBtn').onclick=async()=>{
-        await update(ref(db,`rooms/${state.roomCode}/meta`),{m57Chosen:letters[i-1]});
-        overlay.remove();
+      // 制約カード
+      const con = document.createElement('div');
+      con.className = 'concard';
+      con.style.marginLeft = '-6px'; // 重なり
+      con.style.backgroundImage = `url('${imgConstraint(letters[i-1])}')`;
+
+      // 拡大（選ぶ付き）
+      con.onclick = () => {
+        // 既存の拡大を消してから出す（多重ポップ防止）
+        document.getElementById('conZoomOverlay')?.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'conZoomOverlay';
+        overlay.innerHTML = `
+          <div class="conzoom-wrap">
+            <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[i-1])}')"></div>
+            <div class="conzoom-menu"><button id="m57ChooseBtn">選ぶ</button></div>
+          </div>`;
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        document.body.appendChild(overlay);
+
+        document.getElementById('m57ChooseBtn').onclick = async () => {
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Chosen: letters[i-1] });
+          overlay.remove();
+        };
       };
-    };
 
-    wrap.appendChild(num);
-    wrap.appendChild(con);
-    grid.appendChild(wrap);
-  }
+      wrap.appendChild(num);
+      wrap.appendChild(con);
+      grid.appendChild(wrap);
+    }
 
-  itemsBar.insertAdjacentElement('afterend',grid);
+    itemsBar.insertAdjacentElement('afterend', grid);
 
-  // di左側に選ばれた制約を同期表示
-  const di=document.getElementById('di');
-  const old=document.getElementById('m57Sel');
-  if(old) old.remove();
-  const sel=v?.meta?.m57Chosen;
-  if(sel){
-    const img=document.createElement('div');
-    img.id='m57Sel';
-    img.className='concard';
-    img.style.backgroundImage=`url('${imgConstraint(sel)}')`;
-    img.style.marginRight='6px';
-
-    // di左カードも拡大可（ポップなし）
-    img.onclick=()=>{
-      const overlay=document.createElement('div');
-      overlay.id='conZoomOverlay';
-      overlay.innerHTML=`
-        <div class="conzoom-wrap">
-          <div class="conzoom-card" style="background-image:url('${imgConstraint(sel)}')"></div>
-        </div>`;
-      overlay.onclick=(e)=>{ if(e.target===overlay) overlay.remove(); };
-      document.body.appendChild(overlay);
-    };
-
-    di.insertAdjacentElement('beforebegin',img);
+    // di 左側に選択中カードを同期表示（クリックで拡大のみ・ポップなし）
+    const di = document.getElementById('di');
+    if (di) {
+      document.getElementById('m57Sel')?.remove();
+      const sel = v?.meta?.m57Chosen;
+      if (sel) {
+        const img = document.createElement('div');
+        img.id = 'm57Sel';
+        img.className = 'concard';
+        img.style.backgroundImage = `url('${imgConstraint(sel)}')`;
+        img.style.marginRight = '6px';
+        img.onclick = () => {
+          document.getElementById('conZoomOverlay')?.remove();
+          const overlay = document.createElement('div');
+          overlay.id = 'conZoomOverlay';
+          overlay.innerHTML = `
+            <div class="conzoom-wrap">
+              <div class="conzoom-card" style="background-image:url('${imgConstraint(sel)}')"></div>
+            </div>`;
+          overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+          document.body.appendChild(overlay);
+        };
+        di.insertAdjacentElement('beforebegin', img);
+      }
+    }
+  } finally {
+    state._m57Rendering = false;
   }
 }
 
