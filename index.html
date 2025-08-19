@@ -3524,25 +3524,39 @@ function renderM61(v){
   });
 
   // ▼ 隊長の画面下に ↑/↓ ポップ（自分が隊長＝face: member (5).jpg かつ自席）
+   // ▼ 隊長の画面下に ↑/↓ ポップ（自分が隊長＝face: member (5).jpg かつ自席）
   const capIdx = (v.tables||[]).findIndex(T => (T?.character?.face||'').includes('member (5).jpg'));
+  const zoneId = 'm61TapZone';
+  document.getElementById(zoneId)?.remove();
   if (capIdx >= 0 && capIdx === myIdx){
+    const zone = document.createElement('div');
+    zone.id = zoneId;
+    Object.assign(zone.style, {
+      position:'fixed', left:'0', right:'0', bottom:'0', height:'56px',
+      zIndex:'2147483602', background:'transparent', pointerEvents:'auto'
+    });
     const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-    const rotate = async (dir)=>{ // dir:+1=次へ, -1=前へ
+    const rotate = async (dir)=>{
       try{
         const snap = await get(mRef);
         const meta = snap.val()||{};
         const arr = Array.isArray(meta.m61_byTable) ? meta.m61_byTable.slice() : [];
         if (arr.length===0) return;
-       const n = arr.length;
-       const next = Array.from({length:n}, (_,i)=> arr[(i - dir + n)%n]); // ↓=+1で「次のテーブルへ」
+        const n = arr.length;
+        const next = Array.from({length:n}, (_,i)=> arr[(i - dir + n)%n]);
         await update(mRef, { m61_byTable: next, m61_rotAt: Date.now() });
-     }catch(e){ console.error('[M61 rotate]', e); }
+      }catch(e){ console.error('[M61 rotate]', e); }
     };
-    openBottomMenu([
-      { label:'↑（前のテーブルへ）', action: ()=> rotate(-1) },
-      { label:'↓（次のテーブルへ）', action: ()=> rotate(+1) }
-    ]);
+    zone.onclick = (ev)=>{
+      ev.stopPropagation();
+      openBottomMenu([
+        { label:'制約カードを↑', action: ()=> rotate(-1) },
+        { label:'制約カードを↓', action: ()=> rotate(1) }
+      ]);
+    };
+    document.body.appendChild(zone);
   }
+
 }
   
 /* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
