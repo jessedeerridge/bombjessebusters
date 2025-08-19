@@ -4354,9 +4354,9 @@ function renderM44(v){
       const anchor = box.querySelector('.badge-fixed'); // ← 1枚目の .alpha を含む
       if (anchor) {
         anchor.insertAdjacentElement('afterend', ownRow);
-   // 「アルファベット二個分」だけ下げる（文字高を動的取得）
- const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
- ownRow.style.marginTop = `${Math.round(ah * 2)}px`;
+        // 「アルファベット二個分」だけ下げる（文字高を動的取得）
+        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        ownRow.style.marginTop = `${Math.round(ah * 5)}px`;
       } else {
         // フォールバック：手札の直後に置く
         const hand = box.querySelector('.hand');
