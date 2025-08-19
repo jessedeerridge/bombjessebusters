@@ -477,8 +477,8 @@
 /* ステージ本体：カード2倍＆横向き表示（rotate） */
 .m66-stagebox{ position:relative; }
 .m66-stage{
-  width: calc(var(--con-w) * 4.5);
-  height: calc(var(--con-h) * 2);
+  width: calc(var(--con-w) * 3.5);
+  height: calc(var(--con-h) * 1.6);
   border-radius:12px; border:1px solid #ddd;
   background:#fff center/cover no-repeat;
   user-select:none;
@@ -3824,10 +3824,16 @@ function renderM66(v){
       // ドラッグ＆ドロップ入替
       bindM66Drag(byDi, 'bydi');
       byDi.title = '拡大';
-      byDi.addEventListener('click', (ev)=>{ ev.stopPropagation(); openConstraintZoomView(slots[0]); });
+      byDi.addEventListener('click', (ev)=>{ 
+        ev.stopPropagation();
+        const cur = Array.isArray(state?.watching?.meta?.m66_slots) ? state.watching.meta.m66_slots : slots;
+        openConstraintZoomView(cur[0]);
+      });
     }
+    // 表示は今回の描画スナップショットでOK
     byDi.style.backgroundImage = `url('${imgConstraint(slots[0])}')`;
   }
+
 
   // ── アイテム列の直下：十字レイアウト（top / left stage right / bottom）
   let layer = document.getElementById('m66Layer');
@@ -3865,17 +3871,24 @@ function renderM66(v){
   function mkSlot(name){
     const slot = document.createElement('div'); slot.className = 'm66-slot';
     const cc = document.createElement('div'); cc.className = 'concard'; cc.draggable = true;
-    // 背景は refreshM66 内でセット
-    // 拡大（ポップ無し）
+
+    // 拡大（常に最新metaから参照）
     cc.addEventListener('click', (ev)=>{
       ev.stopPropagation();
-      const letter = getLetterBy(name);
+      const map = { bydi:0, top:1, bottom:2, left:3, right:4 };
+      const idx = map[name];
+      const cur = Array.isArray(state?.watching?.meta?.m66_slots) ? state.watching.meta.m66_slots : slots;
+      const letter = cur?.[idx];
       if (letter) openConstraintZoomView(letter);
     });
+
     bindM66Drag(cc, name);
     slot.appendChild(cc);
     return slot;
   }
+
+  // （getLetterBy は不要になったら削除OK）
+
 
   function mkStageBox(){
     const box = document.createElement('div');
@@ -3909,10 +3922,7 @@ function renderM66(v){
     return box;
   }
 
-  function getLetterBy(name){
-    const map = { bydi:0, top:1, bottom:2, left:3, right:4 };
-    return slots[ map[name] ];
-  }
+
 
  function refreshM66(layer, slots, v){
     const ccTop = layer.querySelector('.m66-line:nth-child(1) .concard');
@@ -3920,11 +3930,11 @@ function renderM66(v){
     const ccLeft  = mid?.querySelector('.m66-slot:nth-child(1) .concard');
     const ccRight = mid?.querySelector('.m66-slot:nth-child(3) .concard');
     const ccBot = layer.querySelector('.m66-line:nth-child(3) .concard');
-    if (ccTop)  ccTop.style.backgroundImage   = `url('${imgConstraint(slots[1])}')`;
-    if (ccLeft) ccLeft.style.backgroundImage  = `url('${imgConstraint(slots[3])}')`;
-    if (ccRight)ccRight.style.backgroundImage = `url('${imgConstraint(slots[4])}')`;
-    if (ccBot)  ccBot.style.backgroundImage   = `url('${imgConstraint(slots[2])}')`;
 
+    if (ccTop){   ccTop.style.backgroundImage   = `url('${imgConstraint(slots[1])}')`; ccTop.dataset.letter = slots[1]; }
+    if (ccLeft){  ccLeft.style.backgroundImage  = `url('${imgConstraint(slots[3])}')`; ccLeft.dataset.letter = slots[3]; }
+    if (ccRight){ ccRight.style.backgroundImage = `url('${imgConstraint(slots[4])}')`; ccRight.dataset.letter = slots[4]; }
+    if (ccBot){   ccBot.style.backgroundImage   = `url('${imgConstraint(slots[2])}')`; ccBot.dataset.letter = slots[2]; }
     // ステージ面（1=表 2=裏）
     const stage = layer.querySelector('.m66-stage');
     const face  = (v?.meta?.m66_face|0)===2 ? './2stage.jpg' : './1stage.jpg';
