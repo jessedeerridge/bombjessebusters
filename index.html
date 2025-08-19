@@ -2405,34 +2405,33 @@ function renderM26(v){
   old._sync && old._sync();
 }
 
-/* ===== #55：チャレンジ10枚から人数分を確定。c8が含まれたら左右の数値2枚も確定 ===== */
-async function ensureM55MetaInit(vNow){
+async function ensureMxMetaInit(mid, vNow){
   const v = vNow || state.watching; if(!v) return;
-  if ((v?.mission?.id|0) !== 55) return;
+  if (![55,60].includes((v?.mission?.id|0))) return;
   const M = v.meta || {};
+ const P = `m${mid}_`;                           // 例）"m55_" or "m60_"
 
   // まだ確定していなければ、ホストが山札と公開札を確定
-  if (!Array.isArray(M.m55_shown)) {
-    if (!state.isHost) return;
-    // 画像ファイル名（拡張子混在のまま扱う）
+  if (!Array.isArray(M[`${P}shown`])) {
+   if (!state.isHost) return;
     const deck = [
       'c1.png','c2.png','c3.png','c4.png','c5.png',
       'c6.png','c7.png','c8.png','c9.png','c10.png'
     ].slice();
     shuffle(deck);
     const n = v.tableCount|0;
-    const shown = deck.slice(0, Math.max(1,n)); // 人数分
+   const shown = deck.slice(0, Math.max(1,n)); // 人数分
 
-    // c8が含まれているなら左右の数値を1枚ずつランダムに決める（1..12）
+    // c8 が含まれていれば左右の数値をユニーク抽選
     let c8Sides = null;
     if (shown.some(s => /c8\.(png|jpg)$/i.test(s))) {
-  const [L, R] = pickK(MATERIALS.numbers, 2); // ← ユニーク抽選
-  c8Sides = [L, R];
+      const [L, R] = pickK(MATERIALS.numbers, 2);
+      c8Sides = [L, R];
     }
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      m55_deck: deck,
-      m55_shown: shown,
-      m55_c8Sides: c8Sides
+      [`${P}deck`]: deck,
+      [`${P}shown`]: shown,
+      [`${P}c8Sides`]: c8Sides
     });
   }
 }
@@ -2459,14 +2458,21 @@ function openChallengeZoom(id){
   
 /* ===== #55：チャレンジ札（人数分）。c8 のときだけ左右に数値1枚ずつ表示 ===== */
 function renderM55(v){
-  const isM55 = ((v?.mission?.id|0) === 55);
-  const rowId = 'm55Row';
+  const mid  = (v?.mission?.id|0);
+  const isM  = (mid === 55 || mid === 60);
+  const rowId = `m${mid}Row`;              // ミッションごとにIDを分ける
   const old   = document.getElementById(rowId);
-  if (!isM55){ if (old) old.remove(); return; }
+  if (!isM){ if (old) old.remove(); return; }
 
-  // 初回はメタを用意させる
-  if (!Array.isArray(v?.meta?.m55_shown)) { ensureM55MetaInit(v); if (old) old.remove(); return; }
+  // ミッション別メタキー（m55_shown / m60_shown）
+  const metaKey = (mid === 60 ? 'm60_shown' : 'm55_shown');
 
+  // 初回はメタを用意
+  if (!Array.isArray(v?.meta?.[metaKey])) {
+    await ensureMxMetaInit(mid, v);  // ← これだけで55/60対応
+    if (old) old.remove();
+    return;
+  }
   if (old) old.remove();
   const lane = document.createElement('div');
   lane.id = rowId;
