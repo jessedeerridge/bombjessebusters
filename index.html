@@ -1244,6 +1244,7 @@ renderM55(state.watching);
     renderM59(v);
     renderM61(v);
     renderM62(v);
+    renderM63(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3456,6 +3457,196 @@ async function ensureM61MetaInit(vNow){
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m61_byTable: by, m61_rotAt: Date.now() });
 }
 
+<!-- ここから追加：ミッション63（酸素トークン：隊長配布→各自→リザーブ→回収/譲渡） -->
+<script>
+async function ensureM63MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if ((v?.mission?.id|0) !== 63) return;
+
+  const n   = (v?.tables?.length|0);
+  const cap = (v?.captainTable);
+  if (n <= 0 || !Number.isInteger(cap)) return;
+
+  // 既に初期化済みなら何もしない（人数が変わった／配列長が不一致なら作り直し）
+  if (v?.meta?.m63_init === true && Array.isArray(v?.meta?.m63_byTable) && v.meta.m63_byTable.length === n) return;
+  if (!state.isHost) return;
+
+  const initial = (m)=>{
+    if (m <= 2) return 14;
+    if (m === 3) return 18;
+    if (m === 4) return 24;
+    return 30; // 5 or 6
+  };
+  const by = Array.from({length:n}, ()=>0);
+  by[cap] = initial(n);
+
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    m63_byTable: by,
+    m63_reserve: 0,
+    m63_init: true
+  });
+}
+
+function renderM63(v){
+  const isM63 = ((v?.mission?.id|0) === 63);
+
+  // 後片付け
+  if (!isM63){
+    const pool = document.getElementById('m63OxPool'); if (pool) pool.remove();
+    document.querySelectorAll('.m63-ox').forEach(n=>n.remove());
+    // table高さを戻す
+    document.querySelectorAll('.table').forEach(tb=> tb.style.removeProperty('--table-h'));
+    return;
+  }
+
+  // 初期配布
+  if (!Array.isArray(v?.meta?.m63_byTable)) { ensureM63MetaInit(v); return; }
+
+  const myIdx   = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+  const capIdx  = (v?.captainTable|0);
+  const isCap   = (myIdx >= 0 && myIdx === capIdx);
+  const by      = v.meta.m63_byTable.slice();
+  const reserve = Math.max(0, v.meta?.m63_reserve|0);
+
+  // --- リザーブ（アイテム列の直下） ---
+  const itemsBar = document.getElementById('itemsBar');
+  if (itemsBar){
+    let poolRow = document.getElementById('m63OxPool');
+    if (!poolRow){
+      poolRow = document.createElement('div');
+      poolRow.id = 'm63OxPool';
+      poolRow.className = 'ox-row ox-pool';
+      poolRow.style.position = 'relative'; // ＋Nフラッシュ表示用
+      itemsBar.insertAdjacentElement('afterend', poolRow);
+    }
+    let wrap = poolRow.querySelector('.ox-wrap');
+    if (!wrap){
+      poolRow.innerHTML = '';
+      const side = document.createElement('div'); side.className = 'ox-side';
+      poolRow.appendChild(side);
+      wrap = document.createElement('div'); wrap.className = 'ox-wrap';
+      poolRow.appendChild(wrap);
+    }else{
+      wrap.innerHTML = '';
+    }
+    for (let i=0;i<reserve;i++){
+      const t=document.createElement('div'); t.className='token ox'; wrap.appendChild(t);
+    }
+
+    // 隊長だけ「回収」メニュー
+    poolRow.onclick = (ev)=>{
+      if (!isCap) return;
+      if (reserve <= 0) return;
+      openMenu(ev.clientX, ev.clientY, [
+        { label:'回収', action: async ()=>{
+          const latest = state.watching || v;
+          const curBy  = (latest?.meta?.m63_byTable||[]).slice();
+          const curRes = Math.max(0, latest?.meta?.m63_reserve|0);
+          const add = curRes;
+          curBy[capIdx] = (curBy[capIdx]|0) + add;
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            m63_reserve: 0,
+            [`m63_byTable/${capIdx}`]: curBy[capIdx]
+          });
+        }}]);
+    };
+  }
+
+  // --- 各テーブル：キャラカードの「下」に横並び（10で改行） ---
+  const tables = Array.from(document.querySelectorAll('#tables .table'));
+  tables.forEach((tbEl, ti)=>{
+    // ノード確保
+    let row = tbEl.querySelector('.m63-ox');
+    if (!row){
+      row = document.createElement('div');
+      row.className = 'ox-row m63-ox';          // 見た目は #44 と同じ行
+      const wrap = document.createElement('div');
+      wrap.className = 'ox-wrap';               // ★10個で改行
+      row.appendChild(wrap);
+
+      // 置き場所：キャラ列の直後（＝キャラカードの下）
+      const charCol = tbEl.querySelector('.char-col');
+      if (charCol && charCol.parentElement){
+        charCol.insertAdjacentElement('afterend', row);
+      }else{
+        // フォールバック：テーブル末尾
+        tbEl.appendChild(row);
+      }
+    }
+
+    // 再描画
+    const wrap = row.querySelector('.ox-wrap'); wrap.innerHTML = '';
+    const cnt  = Math.max(0, by[ti]|0);
+    if (cnt > 0){
+      for (let i=0; i<cnt; i++){
+        const t=document.createElement('div'); t.className='token ox'; wrap.appendChild(t);
+      }
+    }else{
+      // 0ox を3つ表示（クリック判定は通常トークンと同じ）
+      for (let i=0; i<3; i++){
+        const img = document.createElement('img');
+        img.src = './0ox.png'; img.width = 20; img.height = 20;
+        wrap.appendChild(img);
+      }
+    }
+
+    // テーブル高さ：所持枚数に応じて伸縮（10で改行）
+    const baseH = 96; // 既定
+    const rows  = Math.max(1, Math.ceil(Math.max(1, cnt) / 10)); // 0枚でも 0ox の1行
+    const extra = 4 + rows * 22; // 4px上余白 + 行×(20px + 2px近似)
+    const needH = Math.max(baseH, baseH + extra);
+    tbEl.style.setProperty('--table-h', `${needH}px`);
+
+    // クリック挙動
+    if (myIdx === ti){
+      // 自分：1〜12ポップ → その数だけ自分からリザーブへ（不足なら持ってる分だけ）
+      row.onclick = (ev)=>{
+        const entries = Array.from({length:12}, (_,i)=> i+1).map(k=>({
+          label: String(k),
+          action: async ()=>{
+            const latest = state.watching || v;
+            const mine = Math.max(0, latest?.meta?.m63_byTable?.[ti]|0);
+            const add  = Math.min(k, mine);
+            if (add <= 0) return;
+            const curRes = Math.max(0, latest?.meta?.m63_reserve|0);
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              m63_reserve: curRes + add,
+              [`m63_byTable/${ti}`]: mine - add
+            });
+            // ＋N を2秒だけフラッシュ（ローカル表示）
+            const pool = document.getElementById('m63OxPool');
+            if (pool){
+              const m = document.createElement('div');
+              m.className = 'marker'; m.textContent = `+${add}`;
+              pool.appendChild(m);
+              setTimeout(()=>{ if (m.isConnected) m.remove(); }, 2000);
+            }
+          }
+        }));
+        openMenu(ev.clientX, ev.clientY, entries);
+      };
+    }else{
+      // 他人：渡すポップ → 自分の所持を全て相手に渡す
+      row.onclick = (ev)=>{
+        openMenu(ev.clientX, ev.clientY, [
+          { label:'渡す', action: async ()=>{
+            const latest = state.watching || v;
+            const my  = Math.max(0, latest?.meta?.m63_byTable?.[myIdx]|0);
+            if (my <= 0) return;
+            const his = Math.max(0, latest?.meta?.m63_byTable?.[ti]|0);
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              [`m63_byTable/${myIdx}`]: 0,
+              [`m63_byTable/${ti}`]: his + my
+            });
+          }}]);
+      };
+    }
+  });
+}
+
+
+  
+  
 /* ここから追加：#62 人数分の数値カード（同期） */
 async function ensureM62MetaInit(vNow){
   const v = vNow || state.watching; if (!v) return;
@@ -3475,6 +3666,8 @@ async function ensureM62MetaInit(vNow){
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m62_nums: picks });
 }
 
+
+  
 function renderM62(v){
   const isM62 = ((v?.mission?.id|0) === 62);
   const rowId = 'm62Row';
