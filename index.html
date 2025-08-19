@@ -3185,7 +3185,7 @@ function renderM43(v){
   if (!node.isConnected) tablesEl.appendChild(node);
 }
 
-/* ==== ミッション59：各 checklistbox の直上に 12 数値カード（ゲームごと固定）＋ nano ==== */
+/* ==== ミッション59：各 checklistbox の直上に12数値カード（固定ランダム）＋ nano（上半分重ね） ==== */
 async function renderM59(v){
   const isM59 = ((v?.mission?.id|0) === 59);
   if (!isM59){
@@ -3199,7 +3199,7 @@ async function renderM59(v){
   const targets = boxes.length ? boxes : Array.from(tablesEl.querySelectorAll('.checklist'));
   if (!targets.length) return; // まだ生成前なら次フレームで
 
-  // 1) 「ゲームごと固定」順を meta に保存（初回はホストが保存）
+  // ゲームごと固定の順序を meta に保存（初回はホスト）
   let nums = v?.meta?.m59Nums;
   if (!Array.isArray(nums) || nums.length !== 12){
     nums = MATERIALS.numbers.slice();
@@ -3209,10 +3209,10 @@ async function renderM59(v){
     }
   }
 
-  // 既存をクリーン（複数行に対応）
+  // 既存行をクリーン（複数行対応）
   document.querySelectorAll('.m59-row').forEach(n => n.remove());
 
-  // 2) 各 checklistbox の直前に 1 本ずつ 12 等分レーンを作る（横幅は box と同じ 100%）
+  // 各 checklistbox の直前に 1 本ずつ等分レーンを作成（幅は box と同じ100%）
   targets.forEach((boxEl, rowIdx) => {
     const lane = document.createElement('div');
     lane.className = 'm59-row';
@@ -3223,23 +3223,23 @@ async function renderM59(v){
     lane.style.marginBottom = '6px'; // 「真上」に見える余白
 
     nums.forEach((n, idx) => {
-      // 各セル（1fr）の中央に小さめカードを置く（59だけ 2px 小さく）
+      // セル中央に #59 だけ小さめの数値カード
       const cell = document.createElement('div');
       cell.style.display = 'grid';
       cell.style.placeItems = 'center';
 
       const card = document.createElement('div');
       card.className = 'numcard m59num';
-      card.style.width = '30px';   // 通常より 2px 小さい
+      card.style.width = '30px';   // 通常より2px小さく
       card.style.height = '46px';
       card.style.backgroundImage = `url('${imgNumber(n)}')`;
       card.title = String(n);
 
       card.onclick = async () => {
-        // どのレーン(rowIdx)の何番目(idx)かを保存（全員同期）
+        // クリックされたレーン(rowIdx)と位置(idx)を同期保存
         await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          m59_row: rowIdx,      // 0..(targets.length-1)
-          m59_pos: (idx + 1),   // 1..12
+          m59_row: rowIdx,     // 0..(targets.length-1)
+          m59_pos: (idx + 1),  // 1..12
           m59_updatedAt: Date.now()
         });
       };
@@ -3248,10 +3248,10 @@ async function renderM59(v){
       lane.appendChild(cell);
     });
 
-    boxEl.parentNode.insertBefore(lane, boxEl); // 「各 box の真上」に差し込む
+    boxEl.parentNode.insertBefore(lane, boxEl); // 「各 box の直上」に差し込む
   });
 
-  // 3) nano を描画（選択されたレーンの該当カードの「上半分」に重ねる）
+  // ===== nano を描画：選択されたレーンの該当カードの「上半分」に重ねる =====
   const rowIndex = (v?.meta?.m59_row ?? 0) | 0;
   const posIndex = (v?.meta?.m59_pos | 0);  // 1..12
   const goLeft   = !!(v?.meta?.m59_left);
@@ -3273,17 +3273,19 @@ async function renderM59(v){
 
   const node = document.getElementById('m59Nano') || document.createElement('div');
   node.id = 'm59Nano';
-  node.className = 'm43-nano'; // 56x56（既存クラス流用）
+  node.className = 'm43-nano'; // 56x56 既存流用
   node.style.backgroundImage = `url("${goLeft ? './nano0left.png' : './nano0.png'}")`;
 
-  // 「カードの上半分に重ねる」：nano の中心をカード上辺に合わせるイメージ
-  const x = rb.left - tb.left + (rb.width / 2) - (56 / 2);
-  const y = rb.top  - tb.top  - (56 / 2);
+  // ★ ここが「上半分重ね」：nano 高さの半分だけ上にずらす
+  //    nano の中心 ≒ カード上辺付近に来る配置
+  const nanoSize = 56; // m43-nano の想定サイズ（変更しているなら合わせて）
+  const x = rb.left - tb.left + (rb.width / 2) - (nanoSize / 2);
+  const y = rb.top  - tb.top  - (nanoSize / 2);
 
   node.style.left = `${Math.max(0, x)}px`;
   node.style.top  = `${Math.max(0, y)}px`;
 
-  // クリックで向きトグルの簡易ポップ
+  // クリックで向きトグル（ポップメニュー）
   node.onclick = (ev)=>{
     openMenu(ev.clientX, ev.clientY, [
       { label: (goLeft ? '右向きにする' : '左向きにする'),
@@ -3299,6 +3301,7 @@ async function renderM59(v){
 
   if (!node.isConnected) tablesEl.appendChild(node);
 }
+
 
 
 
