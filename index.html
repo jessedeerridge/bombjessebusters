@@ -1564,20 +1564,6 @@ if ((v.mission?.id|0) === 29) {
         ]);
      };
     }
-
-        const entries = [];
-        entries.push({ label:'キック', action: async ()=>{ await kickSeatAt(idx); } });
-
-        // #61：隊長の行なら 上下回転メニューを追加
-        if ((state.watching?.mission?.id|0) === 61 && idx === (state.watching?.captainTable|0)) {
-          entries.push(
-            { label:'↑（前のテーブルへ回す）', action: async ()=>{ await performM61Rotate(-1); } },
-            { label:'↓（次のテーブルへ回す）', action: async ()=>{ await performM61Rotate(+1); } },
-          );
-        }
-        openMenu(ev.clientX, ev.clientY, entries);
-
-
     
 // #13：初期情報トークン（数値）—— 表示はキャラ下、ここでは値と auto-hide だけ扱う
 let m13HeaderNum = null;
@@ -1641,41 +1627,8 @@ if (!amSeated || seatEmpty) {
   char.onclick = null;
   char.classList.add('blank');
 }
-
-// #61：各テーブルのキャラ左に「自分の制約カード（A〜E or 交換後）」を等サイズで表示
-if ((v?.mission?.id|0) === 61) {
-  const myCon = t.m61Con || null;
-  const left = document.createElement('div');
-  left.className = 'concard';
-  // キャラカードと同サイズ化
-  left.style.setProperty('--con-w','var(--char-w)');
-  left.style.setProperty('--con-h','var(--char-h)');
-  // 表示（未セットなら裏面 c0）
-  left.style.backgroundImage = `url('${myCon ? imgConstraint(myCon) : "./c0.jpg"}')`;
-
-  // 自分のテーブルだけ「交換」メニュー
-  left.onclick = (ev)=>{
-    if (t.playerId !== state.userId) return; // 自分の席だけ交換可
-    openMenu(ev.clientX, ev.clientY, [
-      { label:'交換', action: async ()=>{
-          openOneMini(ev.clientX, ev.clientY, '本当に？', async ()=>{
-            await performM61Exchange(idx); // ← 下で定義
-          });
-        } 
-      }
-    ]);
-  };
-
-  // charCol の「左」に配置
-  content.insertBefore(left, charCol);
-}
-
-    
 charCol.appendChild(char);
 
-
-
-    
 // ★ #13：初期情報トークンはキャラの「下」に小さく表示（meta.m13_header をそのまま使う）
 if (m13HeaderNum != null) {
   const tok = document.createElement('div');
@@ -2455,8 +2408,7 @@ function renderM26(v){
 /* ===== #55：チャレンジ10枚から人数分を確定。c8が含まれたら左右の数値2枚も確定 ===== */
 async function ensureM55MetaInit(vNow){
   const v = vNow || state.watching; if(!v) return;
-  const mid = (v?.mission?.id|0);
-  if (mid !== 55 && mid !== 60) return;
+  if ((v?.mission?.id|0) !== 55) return;
   const M = v.meta || {};
 
   // まだ確定していなければ、ホストが山札と公開札を確定
@@ -2507,7 +2459,7 @@ function openChallengeZoom(id){
   
 /* ===== #55：チャレンジ札（人数分）。c8 のときだけ左右に数値1枚ずつ表示 ===== */
 function renderM55(v){
-  const isM55 = [55, 60].includes((v?.mission?.id|0));
+  const isM55 = ((v?.mission?.id|0) === 55);
   const rowId = 'm55Row';
   const old   = document.getElementById(rowId);
   if (!isM55){ if (old) old.remove(); return; }
@@ -4189,60 +4141,6 @@ function openItemZoom(itemNo, itemIdx, opt={}){
   }catch(e){ console.error(e); }
 }
 
-// ===== #61 共通：デッキB（F/G）から1枚取り出す（空なら再生成）
-async function m61_drawFromDeckB() {
-  const rRef = ref(db, `rooms/${state.roomCode}`);
-  const snap = await get(rRef);
-  const R = snap.val() || {};
-  const meta = R.meta || {};
-  let deck = Array.isArray(meta.m61_deckB) ? meta.m61_deckB.slice() : [];
-  if (deck.length === 0) {
-    // 空になったら自動補充
-    deck = []; for(let i=0;i<64;i++) deck.push(Math.random()<0.5?'f':'g'); shuffle(deck);
-  }
-  const card = deck.shift() || 'f';
-  await update(rRef, { meta: { ...meta, m61_deckB: deck } });
-  return card;
-}
-
-// ===== #61：自分の制約カードをデッキBから「交換」する
-async function performM61Exchange(tableIndex){
-  try{
-    const rRef = ref(db, `rooms/${state.roomCode}`);
-    const tRef = ref(db, `rooms/${state.roomCode}/tables/${tableIndex}`);
-    const [rSnap, tSnap] = await Promise.all([get(rRef), get(tRef)]);
-    const R = rSnap.val()||{}; const T = tSnap.val()||{};
-    if ((R?.mission?.id|0) !== 61) return;
-    if (!T?.playerId || T.playerId !== state.userId) return; // 自分の席のみ
-
-    const newLetter = await m61_drawFromDeckB();
-    await update(tRef, { m61Con: newLetter });
-  }catch(e){ console.error('[M61 exchange]', e); }
-}
-
-// ===== #61：全テーブルの制約カードを一斉回転（dir: +1=次へ / -1=前へ）
-async function performM61Rotate(dir){
-  try{
-    const rRef = ref(db, `rooms/${state.roomCode}`);
-    const snap = await get(rRef);
-    const R = snap.val()||{};
-    if ((R?.mission?.id|0) !== 61) return;
-
-    const tbls = (R.tables||[]).slice();
-    const cons = tbls.map(t => t?.m61Con || null);
-    const n = cons.length; if (n<=1) return;
-
-    const rot = new Array(n);
-    for (let i=0;i<n;i++){
-      const to = (i + dir + n) % n;
-      rot[to] = cons[i];
-    }
-    // 反映
-    tbls.forEach((t,i)=> t.m61Con = rot[i]);
-    const nextRot = (R?.meta?.m61_rotCount|0) + (dir>0?+1:-1);
-    await update(rRef, { tables: tbls, meta: { ...(R.meta||{}), m61_rotCount: nextRot } });
-  }catch(e){ console.error('[M61 rotate]', e); }
-}
 
   
 /* === #22 用：数字トークンの使用数を集計 === */
@@ -4868,25 +4766,6 @@ async function startGame(playerCount, missionId){
   // ベースデッキ 1..12 x4 = 48（通常コード）
   const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
   shuffle(base);
-
-  // ★★★ #61 初期化：A~Eを各テーブルへ1枚ずつ（循環配布）、デッキB(F/G)をmetaへ
-  if (missionId === 61) {
-    // A〜E を人数に合わせて循環（6人目以降は A へ戻る）
-    const AE = ['a','b','c','d','e'];
-    for (let i = 0; i < playerCount; i++) {
-      const letter = AE[i % AE.length];
-      tables[i].m61Con = letter;  // ← テーブル固有の制約レター（UI左に表示）
-    }
-    // デッキB：F/G を十分量用意してシャッフル（使い切り→空なら自動再生成）
-    const genDeckB = (size=64)=>{
-      const arr=[]; for(let i=0;i<size;i++) arr.push(Math.random()<0.5?'f':'g'); shuffle(arr); return arr;
-    };
-    missionMeta = missionMeta || {};
-    missionMeta.m61_deckB = genDeckB(64);   // 64枚（F/Gランダム）
-    missionMeta.m61_rotCount = 0;           // 回転履歴（任意）
-    await update(ref(db, `rooms/${code}`), { tables, meta: { ...( (await (await get(ref(db,`rooms/${code}/meta`))).val()) || {} ), ...missionMeta } });
-  }
-
 
   // ▼ ミッション別：赤/黄の混入プランを取得＆実行
   const planList = buildMixPlan(missionId);
