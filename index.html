@@ -4516,6 +4516,16 @@ function renderM44(v){
   document.querySelectorAll('.table').forEach(tb=>{
     tb.style.removeProperty('--table-h');
   });
+  // ▼ 着席インデックスを安全に一度だけ取得（state.seatedTable が欠落していても拾う）
+  const idx = (()=>{
+    const n = (v?.tables?.length|0);
+    const s = (state?.seatedTable==null) ? null : Number(state.seatedTable);
+    if (Number.isInteger(s) && s>=0 && s<n) return s;
+    const alt = (v.tables||[]).findIndex(t => t?.playerId === state.userId);
+    return (alt>=0 ? alt : null);
+  })();
+
+  
   // --- 1) 初期セット（ホストのみ）：人数×2 を全体プールに用意 ---
   if (state.isHost && (!v.meta || typeof v.meta.oxItem !== 'number')) {
     const init = (v.tables?.length || 0) * 2;
@@ -4562,10 +4572,9 @@ function renderM44(v){
         label: String(k),
         action: async ()=>{
          const left = (v.meta?.oxItem|0) - k;
-          const idx  = state.seatedTable;
-          if (idx==null) return;
-          const mine = (v.meta?.oxByTable?.[idx]||0) + k;
-         if (left < 0) return;
+         if (idx==null){ alert('席に座ってから取得してください'); return; }
+         const mine = (v.meta?.oxByTable?.[idx]||0) + k;         
+          if (left < 0) return;
           await update(ref(db, `rooms/${state.roomCode}/meta`), {
             oxItem: left,
             [`oxByTable/${idx}`]: mine
@@ -7768,9 +7777,10 @@ function missionInfo(id, opts={}){
         id:47, name:'#47', desc:'',
         display:[
           '#47',...linesForMix,
-          '',
-          '',
-          '',
+          'コードを切断するために、プレイヤーは2枚選んだその和か差の数字のコードを切断できる。',
+          'その後、選んだカードを裏向きにする。',
+          '全て裏向きなら、表にする。',
+          '切断ができない場合、任意の2枚を裏にして、起爆ダイヤルを1進める。',
        ],
         flags:{  }
       };
@@ -7780,8 +7790,8 @@ function missionInfo(id, opts={}){
         id:48, name:'#48', desc:'',
         display:[
           '#48',...linesForMix,
-          '',
-          '',
+          'このミッションでは3本の黄コードを同時に切断しなければならない。',
+          '黄コードを持っていないプレイヤーもこれを実行できる。',
           '',
        ],
         flags:{  }
@@ -7792,9 +7802,10 @@ function missionInfo(id, opts={}){
         id:49, name:'#49', desc:'',
         display:[
           '#49',...linesForMix,
-          '',
-          '',
-          '',
+          'コードを切断するために、切断したい数字の枚数分の酸素トークンを他プレイヤー1人に渡さなければならない。',
+          '酸素トークンを渡すのは切断を行う相手じゃなくてよい。',
+          '切断が行えない場合、起爆ダイヤルを1進める。',
+          '水中にいるため意思疎通は難しい。',
        ],
         flags:{  }
       };
@@ -7804,7 +7815,7 @@ function missionInfo(id, opts={}){
         id:50, name:'#50', desc:'',
         display:[
           '#50',...linesForMix,
-          '',
+          '切断に失敗した時、指し示されたコードにではなく、コードの外側に情報トークンを置く。',
           '',
           '',
        ],
@@ -7817,8 +7828,12 @@ case 51: {
     display:[
       '#51',
       ...linesForMix,
-      '',
-      '',
+      '起爆ダイヤルを1まで進める。',
+      '手番プレイヤーは「サー」となる。',
+      '「サー」は数値カードをめくって、その数字で切断を行うプレイヤ－を決める。（自分でも可）',
+      '指名された人は「サー・イエス・サー！」と言い、切断アクションを行う。',
+      '切断を行えない場合は起爆ダイヤルを1進める。',
+      '「サー」の次の人が次の手番を行う。',
     ],
     flags:{}
   };
