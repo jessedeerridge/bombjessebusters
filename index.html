@@ -3457,8 +3457,6 @@ async function ensureM61MetaInit(vNow){
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m61_byTable: by, m61_rotAt: Date.now() });
 }
 
-<!-- ここから追加：ミッション63（酸素トークン：隊長配布→各自→リザーブ→回収/譲渡） -->
-<script>
 async function ensureM63MetaInit(vNow){
   const v = vNow || state.watching; if (!v) return;
   if ((v?.mission?.id|0) !== 63) return;
