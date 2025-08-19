@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ｑ</title>
+<title>え</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3556,7 +3556,7 @@ async function renderM63(v){
    // 再描画（10で改行するため常に .ox-wrap を挿入）
 row.innerHTML = '';
 const w = document.createElement('div'); w.className = 'ox-wrap'; row.appendChild(w);
-const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
+  row.appendChild(w);
 if (cnt>0){
   for (let i=0;i<cnt;i++){ const t=document.createElement('div'); t.className='token ox'; w.appendChild(t); }
 }
