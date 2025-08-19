@@ -3739,218 +3739,293 @@ function renderM62(v){
   mountLaneUnderItemsBar(lane);
 }
 
-/* ▼▼ ここから追加：#66 ステージ＆十字配置 ▼▼ */
+
+// =======================
+// Mission 66（完成版）
+// =======================
+
+// 1) CSS を一度だけ自動注入
+function ensureM66Css(){
+  if (document.getElementById('m66-style')) return;
+  const css = `
+/* ▼▼ Mission 66 ▼▼ */
+.m66-top{ display:flex; justify-content:center; margin-top:6px; position:relative; z-index:2147483600; }
+.m66-wrap{
+  position:fixed; left:50%; top:50%; transform:translate(-50%, -50%);
+  display:grid; grid-template-columns:auto auto auto; grid-template-rows:auto auto auto;
+  align-items:center; gap:8px; z-index:2147483600; pointer-events:none; /* 常に前面（checklistより上） */
+}
+.m66-wrap > *{ pointer-events:auto; }
+
+/* ステージカード：従来の2倍（例：192x128） */
+.stagecard{
+  width:192px; height:128px; border-radius:12px; border:1px solid #ddd;
+  background:#fff center/contain no-repeat; position:relative; box-shadow:0 6px 14px rgba(0,0,0,.15);
+}
+
+/* ラビット（常に1個） */
+.m66-rabbit{
+  position:absolute; width:22px; height:22px;
+  background:url('./rabit.png') center/contain no-repeat; pointer-events:none;
+}
+
+/* di左カード */
+.m66-di{ margin-right:6px; position:relative; z-index:2147483600; }
+
+/* 制約カード拡大オーバーレイ */
+.m66-zoom{
+  position:fixed; inset:0; background:rgba(0,0,0,.5);
+  display:grid; place-items:center; z-index:2147483700;
+}
+.m66-zoom-img{
+  width:min(80vw, 460px); height:min(80vh, 640px);
+  background:#fff center/contain no-repeat; border-radius:14px; box-shadow:0 10px 28px rgba(0,0,0,.38);
+}
+
+/* 小さなポップ（ステージ右上トグル用） */
+.m66-pop{
+  position:fixed; transform:translate(-50%,-100%); z-index:2147483800;
+  background:#111; color:#fff; padding:6px 10px; border-radius:8px; font-size:12px; white-space:nowrap;
+  box-shadow:0 8px 20px rgba(0,0,0,.35);
+}
+.m66-pop button{
+  appearance:none; border:0; background:#fff; color:#111; border-radius:6px; padding:4px 8px; margin-left:6px;
+  cursor:pointer;
+}
+/* ▲▲ Mission 66 ▲▲ */
+`;
+  const st = document.createElement('style');
+  st.id = 'm66-style';
+  st.textContent = css;
+  document.head.appendChild(st);
+}
+
+// 2) 画像ユーティリティ
+function m66ImgConstraint(letter){
+  if (typeof window.imgConstraint === 'function') return window.imgConstraint(letter);
+  return `./${String(letter).toUpperCase()}.jpg`; // フォールバック
+}
+function m66ImgStage(face){ return face===2 ? './2stage.jpg' : './1stage.jpg'; }
+
+// 3) 初期化（ホストが一度だけ）
 async function ensureM66MetaInit(vNow){
-  const v = vNow || state.watching; if(!v) return;
+  const v = vNow || (window.state && state.watching); if(!v) return;
   if ((v?.mission?.id|0) !== 66) return;
   if (v?.meta?.m66_init) return;
-  if (!state.isHost) return;
+  if (!window.state || !state.isHost) return;
 
-  // 制約A~Eをシャッフルし、5スロットに割当（di左 / 上=位置x / 左 / 右 / 下）
-  const deck = ['A','B','C','D','E']; shuffle(deck);
+  const deck = ['A','B','C','D','E']; if (typeof window.shuffle==='function') shuffle(deck);
   const slots = { di: deck[0], top: deck[1], left: deck[2], right: deck[3], bottom: deck[4] };
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
     m66_init: true,
     m66_slots: slots,
-    m66_face: 1,           // 1=表(1stage), 2=裏(2stage)
-    m66_rabbits: []        // {x:0..1, y:0..1} の配列
+    m66_face: 1,            // 1=表(1stage), 2=裏(2stage)
+    m66_rabbit: null,       // 単一ラビット {x,y}
+    m66_updatedAt: Date.now()
   });
 }
 
-function imgStage(face){ return face===2 ? './2stage.jpg' : './1stage.jpg'; }
+// 4) 制約拡大（クリックで表示／外側クリックで閉じる）
+function m66ZoomConstraint(bgImageCss){
+  try{
+    const m = /url\((['"]?)(.*?)\1\)/.exec(bgImageCss||'');
+    const img = m ? m[2] : null; if (!img) return;
+    const ov = document.createElement('div'); ov.className = 'm66-zoom';
+    const box = document.createElement('div'); box.className = 'm66-zoom-img';
+    box.style.backgroundImage = `url('${img}')`;
+    ov.appendChild(box); document.body.appendChild(ov);
+    ov.addEventListener('click', (ev)=>{ if (ev.target === ov) ov.remove(); });
+  }catch(e){ console.error(e); }
+}
 
+// 5) 小ポップ（右上角用）
+let m66PopNode = null;
+function m66ShowPop(x, y, label, onOk){
+  if (m66PopNode) { m66PopNode.remove(); m66PopNode=null; }
+  const p = document.createElement('div');
+  p.className = 'm66-pop';
+  p.style.left = x+'px'; p.style.top = y+'px';
+  p.innerHTML = `<span>${label}</span><button type="button">OK</button>`;
+  p.querySelector('button').onclick = ()=>{ try{ onOk && onOk(); }finally{ p.remove(); m66PopNode=null; } };
+  document.body.appendChild(p); m66PopNode = p;
+  setTimeout(()=>{
+    const closer = (ev)=>{ if(!p.contains(ev.target)){ p.remove(); m66PopNode=null; document.removeEventListener('mousedown', closer); } };
+    document.addEventListener('mousedown', closer);
+  },0);
+}
+
+// 6) ドラッグ＆スワップ
+function m66BindSwap(node, slotKey){
+  node.dataset.m66Slot = slotKey;
+  node.draggable = true;
+  node.addEventListener('dragstart', ev=>{
+    ev.dataTransfer.setData('text/plain', slotKey);
+    ev.dataTransfer.effectAllowed = 'move';
+  });
+  node.addEventListener('dragover', ev=>{ ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; });
+  node.addEventListener('drop', async ev=>{
+    ev.preventDefault();
+    const src = ev.dataTransfer.getData('text/plain');
+    const dst = node.dataset.m66Slot;
+    if (!src || !dst || src === dst) return;
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const snap = await get(mRef);
+      const meta = snap.val()||{};
+      const cur = Object.assign({}, meta.m66_slots||{});
+      const A = cur[src], B = cur[dst];
+      if (!A || !B) return;
+      cur[src] = B; cur[dst] = A;
+      await update(mRef, { m66_slots: cur, m66_updatedAt: Date.now() });
+    }catch(e){ console.error(e); }
+  });
+}
+
+// 7) 本体レンダー
 function renderM66(v){
+  ensureM66Css();
   const isM66 = ((v?.mission?.id|0) === 66);
   if (!isM66){
-    // 片付け
     document.getElementById('m66Top')?.remove();
     document.getElementById('m66Wrap')?.remove();
     document.querySelectorAll('.m66-di').forEach(n=>n.remove());
     return;
   }
-
-  // 初期メタ
   if (v?.meta?.m66_init !== true){ ensureM66MetaInit(v); return; }
 
-  const slots = v?.meta?.m66_slots || {};
-  const face  = (v?.meta?.m66_face|0)===2 ? 2 : 1;
-  const rabbits = Array.isArray(v?.meta?.m66_rabbits) ? v.meta.m66_rabbits : [];
+  const slots   = v?.meta?.m66_slots || {};
+  const face    = (v?.meta?.m66_face|0)===2 ? 2 : 1;
+  const rabbit  = v?.meta?.m66_rabbit || null;
 
   // --- di 左に1枚 ---
   {
     const di = document.getElementById('di');
     if (di){
-      // 同一ノード重複を避ける
       if (!di.previousElementSibling || !di.previousElementSibling.classList.contains('m66-di')){
         const con = document.createElement('div');
         con.className = 'concard m66-di';
-        con.draggable = true;
         di.insertAdjacentElement('beforebegin', con);
       }
       const node = di.previousElementSibling;
       if (node && node.classList.contains('m66-di')){
         node.style.width  = getComputedStyle(document.documentElement).getPropertyValue('--item-w') || '50px';
         node.style.height = getComputedStyle(document.documentElement).getPropertyValue('--item-h') || '75px';
-        node.style.backgroundImage = `url('${imgConstraint(slots.di)}')`;
-        bindConSwap(node, 'di');
+        node.style.backgroundImage = `url('${m66ImgConstraint(slots.di)}')`;
+        m66BindSwap(node, 'di');
+        node.onclick = ()=> m66ZoomConstraint(node.style.backgroundImage);
       }
     }
   }
 
-  // --- 上(位置x)：アイテム列の直下中央 ---
+  // --- 上(位置x)：itemsBarの直下。ただし checklist の直前に差し込んで最前面化 ---
   {
-    const itemsBar = document.getElementById('itemsBar');
+    const itemsBar  = document.getElementById('itemsBar');
+    const checklist = document.getElementById('checklist');
     if (itemsBar){
       let row = document.getElementById('m66Top');
       if (!row){
         row = document.createElement('div');
         row.id = 'm66Top';
         row.className = 'm66-top';
-        itemsBar.insertAdjacentElement('afterend', row);
+        if (checklist && checklist.parentElement){
+          checklist.parentElement.insertBefore(row, checklist);
+        }else{
+          itemsBar.insertAdjacentElement('afterend', row);
+        }
       }
       row.innerHTML = '';
       const card = document.createElement('div');
       card.className = 'concard';
-      card.style.backgroundImage = `url('${imgConstraint(slots.top)}')`;
-      card.draggable = true;
-      bindConSwap(card, 'top');
+      card.style.backgroundImage = `url('${m66ImgConstraint(slots.top)}')`;
+      m66BindSwap(card, 'top');
+      card.onclick = ()=> m66ZoomConstraint(card.style.backgroundImage);
       row.appendChild(card);
     }
   }
 
-  // --- 画面中央にステージ＋左右/下のカード（十字） ---
+  // --- 画面中央：十字（左・ステージ・右／下） ---
   let wrap = document.getElementById('m66Wrap');
   if (!wrap){
     wrap = document.createElement('div');
     wrap.id = 'm66Wrap';
     wrap.className = 'm66-wrap';
-    document.body.appendChild(wrap);
+    document.body.appendChild(wrap); // z-index で最前面
   }
   wrap.innerHTML = '';
 
   // 左カード
   const left = document.createElement('div');
   left.className = 'concard';
-  left.style.backgroundImage = `url('${imgConstraint(slots.left)}')`;
-  left.draggable = true;
-  bindConSwap(left, 'left');
+  left.style.backgroundImage = `url('${m66ImgConstraint(slots.left)}')`;
+  m66BindSwap(left, 'left');
+  left.onclick = ()=> m66ZoomConstraint(left.style.backgroundImage);
 
-  // ステージ
+  // ステージ（中央）
   const stage = document.createElement('div');
   stage.className = 'stagecard';
-  stage.style.backgroundImage = `url('${imgStage(face)}')`;
+  stage.style.backgroundImage = `url('${m66ImgStage(face)}')`;
 
-  // ラビットを再描画
-  const drawRabbits = ()=>{
+  // ラビット単一再描画
+  const drawRabbit = ()=>{
     stage.querySelectorAll('.m66-rabbit').forEach(n=>n.remove());
-    rabbits.forEach(p=>{
+    if (rabbit){
       const r = document.createElement('div');
       r.className = 'm66-rabbit';
-      r.style.left = (p.x*100)+'%';
-      r.style.top  = (p.y*100)+'%';
+      r.style.left = (rabbit.x*100)+'%';
+      r.style.top  = (rabbit.y*100)+'%';
       r.style.transform = 'translate(-50%, -50%)';
       stage.appendChild(r);
-    });
+    }
   };
-  drawRabbits();
+  drawRabbit();
 
-  // ステージクリック：右上数pxなら表裏メニュー／それ以外はラビット設置
+  // ステージクリック：右上12px→階切替ポップ／他→単一ラビットを新規設置（前のは消す）
   stage.onclick = (ev)=>{
     const rc = stage.getBoundingClientRect();
     const offX = ev.clientX - rc.left, offY = ev.clientY - rc.top;
-    const hitCorner = (rc.right - ev.clientX <= 12) && (offY <= 12);
-    if (hitCorner){
-      openMenu(ev.clientX, ev.clientY, [
-        { label: (face===1 ? '2階へ' : '1階へ'),
-          action: async ()=>{
-            await update(ref(db, `rooms/${state.roomCode}/meta`), { m66_face:(face===1?2:1) });
-          }}
-      ]);
+    const inTopRight = (rc.right - ev.clientX <= 12) && (offY <= 12);
+    if (inTopRight){
+      const nextFace = (face===1?2:1);
+      m66ShowPop(ev.clientX, ev.clientY, (nextFace===2?'2階へ':'1階へ'), async ()=>{
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m66_face: nextFace, m66_updatedAt: Date.now() });
+      });
     }else{
-      // クリック位置を正規化して保存
       const nx = Math.max(0, Math.min(1, offX / rc.width));
       const ny = Math.max(0, Math.min(1, offY / rc.height));
-      const arr = (Array.isArray(v?.meta?.m66_rabbits) ? v.meta.m66_rabbits.slice() : []);
-      arr.push({ x:nx, y:ny, t:Date.now() });
-      update(ref(db, `rooms/${state.roomCode}/meta`), { m66_rabbits: arr });
+      update(ref(db, `rooms/${state.roomCode}/meta`), { m66_rabbit: { x:nx, y:ny, t:Date.now() }, m66_updatedAt: Date.now() });
     }
   };
 
   // 右カード
   const right = document.createElement('div');
   right.className = 'concard';
-  right.style.backgroundImage = `url('${imgConstraint(slots.right)}')`;
-  right.draggable = true;
-  bindConSwap(right, 'right');
+  right.style.backgroundImage = `url('${m66ImgConstraint(slots.right)}')`;
+  m66BindSwap(right, 'right');
+  right.onclick = ()=> m66ZoomConstraint(right.style.backgroundImage);
 
-  // 下カード
+  // 下カード（中央下）
   const bottom = document.createElement('div');
   bottom.className = 'concard';
-  bottom.style.backgroundImage = `url('${imgConstraint(slots.bottom)}')`;
-  bottom.draggable = true;
-  bindConSwap(bottom, 'bottom');
+  bottom.style.backgroundImage = `url('${m66ImgConstraint(slots.bottom)}')`;
+  m66BindSwap(bottom, 'bottom');
+  bottom.onclick = ()=> m66ZoomConstraint(bottom.style.backgroundImage);
 
-  // グリッド配置（[row1]空 / [row2] 左-ステージ-右 / [row3] 中央に下）
-  // row1: 空 / 空 / 空（上は itemsBar 直下に表示済み）
+  // グリッド配置： [空/空/空] / [左/ステージ/右] / [空/下/空]
   wrap.appendChild(document.createElement('div'));           // (1,1)
   wrap.appendChild(document.createElement('div'));           // (1,2)
   wrap.appendChild(document.createElement('div'));           // (1,3)
   wrap.appendChild(left);                                    // (2,1)
   wrap.appendChild(stage);                                   // (2,2)
   wrap.appendChild(right);                                   // (2,3)
-  const spacer = document.createElement('div');              // (3,1)
-  wrap.appendChild(spacer);
+  wrap.appendChild(document.createElement('div'));           // (3,1)
   const bottomCell = document.createElement('div');          // (3,2)
   bottomCell.style.display='grid'; bottomCell.style.placeItems='center';
   bottomCell.appendChild(bottom);
   wrap.appendChild(bottomCell);                              // (3,2)
   wrap.appendChild(document.createElement('div'));           // (3,3)
-
-  // 画像反映のため、表裏変更やラビット更新で再描画要求
-  // （onValue の再呼出で自動的に反映される）
-
-  // --- ドラッグ＆交換（D&D + クリックメニューの両対応） ---
-  function bindConSwap(node, slotKey){
-    node.dataset.m66Slot = slotKey;
-    // D&D
-    node.addEventListener('dragstart', ev=>{
-      ev.dataTransfer.setData('text/plain', slotKey);
-      ev.dataTransfer.effectAllowed = 'move';
-    });
-    node.addEventListener('dragover', ev=>{ ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; });
-    node.addEventListener('drop', async ev=>{
-      ev.preventDefault();
-      const src = ev.dataTransfer.getData('text/plain');
-      const dst = node.dataset.m66Slot;
-      if (!src || !dst || src === dst) return;
-      await swapSlots(src, dst);
-    });
-    // クリック：交換先を選ぶ（スマホ用）
-    node.onclick ??= (ev)=>{
-      const entries = ['di','top','left','right','bottom']
-        .filter(k => k!==slotKey)
-        .map(k => ({ label:`${slotName(k)}と入れ替え`, action:()=> swapSlots(slotKey, k) }));
-      openMenu(ev.clientX, ev.clientY, entries);
-    };
-  }
-  function slotName(k){
-    return ({di:'di左', top:'上', left:'左', right:'右', bottom:'下'})[k] || k;
-  }
-  async function swapSlots(a, b){
-    try{
-      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-      const snap = await get(mRef);
-      const meta = snap.val()||{};
-      const cur = Object.assign({}, meta.m66_slots||{});
-      const A = cur[a], B = cur[b];
-      if (!A || !B) return;
-      cur[a] = B; cur[b] = A;
-      await update(mRef, { m66_slots: cur, m66_updatedAt: Date.now() });
-    }catch(e){ console.error(e); }
-  }
 }
-/* ▲▲ ここまで追加：#66 ▲▲ */
 
+  
   
 /* ここまで追加：#62 */
 // ===== M65 初期配布：隊長テーブルから全テーブルへラウンドロビン配布 =====
