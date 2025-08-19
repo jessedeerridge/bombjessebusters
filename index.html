@@ -19,6 +19,7 @@
   }
 
   *,*::before,*::after{box-sizing:border-box}
+  
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fff;color:#111}
   header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eee}
   h1{margin:0;font-size:18px}
@@ -3673,132 +3674,6 @@ function renderM63(v){
 }
 /* ここまで追加：ミッション63 */
 
-/* ここから追加：#65 隊長から配る→自分の数値カードを「渡す」→4枚公開で自動裏面 */
-async function ensureM65MetaInit(vNow){
-  const v = vNow || state.watching; if (!v) return;
-  if ((v?.mission?.id|0) !== 65) return;
-  const n = (v?.tables?.length|0); if (n <= 0) return;
-
-  // 既に席数ぶん配列がありゃOK／なければホストが一度だけ作る
-  const cur = Array.isArray(v?.meta?.m65_byTable) ? v.meta.m65_byTable : null;
-  if (Array.isArray(cur) && cur.length === n) return;
-  if (!state.isHost) return;
-
-  const picks = MATERIALS.numbers.slice(); shuffle(picks);  // 1..12 をシャッフル
-  const by = new Array(n).fill(null);
-  const cap = Math.max(0, v?.captainTable|0);
-
-  // 「隊長から」テーブル順に、着席者へ1枚ずつ配る（空席はスキップ）
-  let p = 0;
-  for (let k=0; k<n; k++){
-    const ti = (cap + k) % n;
-    if (v.tables?.[ti]?.playerId){
-      by[ti] = picks[p++ % picks.length];
-    }
-  }
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m65_byTable: by });
-}
-
-function renderM65(v){
-  const isM65 = ((v?.mission?.id|0) === 65);
-  const rowId = 'm65Row';
-  const old   = document.getElementById(rowId);
-  if (!isM65){ if (old) old.remove(); return; }
-
-  const nTable = (v?.tables?.length|0);
-  const by = Array.isArray(v?.meta?.m65_byTable) ? v.meta.m65_byTable : null;
-  if (!by || by.length !== nTable){ ensureM65MetaInit(v); if (old) old.remove(); return; }
-
-  if (old) old.remove();
-  const lane = document.createElement('div');
-  lane.id = rowId;
-  lane.className = 'numlane';
-
-  // 全体公開中の通常コードを「数字別」に集計（4枚で裏面化の判定に使用）
-  const openCountByNum = {};
-  (v.tables||[]).forEach(T=>{
-    (T.hand||[]).forEach(c=>{
-      if (c?.kind==='normal' && c.open===true){
-        const n = c.num|0;
-        openCountByNum[n] = (openCountByNum[n]||0) + 1;
-      }
-    });
-  });
-
-  // 画面下部に人数分を席順で並べる（既存の placeNumberCard を利用）
-  by.forEach(n=>{
-    if (n==null) return;
-    if (typeof placeNumberCard === 'function'){
-      placeNumberCard(n, lane);
-    }else{
-      const holder=document.createElement('div');
-      holder.className='numcard-holder';
-      const base=document.createElement('div');
-      base.className='numcard';
-      base.style.backgroundImage = `url('${imgNumber(n)}')`;
-      holder.appendChild(base);
-      lane.appendChild(holder);
-    }
-  });
-
-  // 4枚全体公開されている数値は自動で「裏面」に（ただしクリック渡し可）
-  by.forEach(n=>{
-    if (n==null) return;
-    const holder = NUMCARD_REG.get(n);
-    if (!holder) return;
-    const base = holder.querySelector('.numcard');
-    const cnt = openCountByNum[n]|0;
-    if (cnt >= 4){
-      base.classList.add('back');
-      base.style.backgroundImage = `url('./codeback.jpg')`; // 既存の裏面
-    }else{
-      base.classList.remove('back');
-      base.style.backgroundImage = `url('${imgNumber(n)}')`;
-    }
-  });
-
-  // 「自分の数値カード」はクリックで『渡す』→次の着席者へ移動
-  const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
-  if (myIdx >= 0){
-    const myN = by[myIdx];
-    if (myN != null){
-      const holder = NUMCARD_REG.get(myN);
-      if (holder){
-        holder.style.cursor = 'pointer';
-        holder.onclick = (ev)=>{
-          ev.stopPropagation();
-          openOneMini(ev.clientX, ev.clientY, '渡す', async ()=>{
-            try{
-              const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-              const snap = await get(mRef);
-              const meta = snap.val()||{};
-              const arr  = Array.isArray(meta.m65_byTable) ? meta.m65_byTable.slice() : [];
-              const tbls = v.tables||[];
-
-              // 次の「着席者」を席順で探索（自分の次から）
-              let to = -1;
-              for (let i=1; i<=tbls.length; i++){
-                const j = (myIdx + i) % tbls.length;
-                if (tbls[j]?.playerId){ to = j; break; }
-              }
-              if (to < 0) return;
-
-              const card = arr[myIdx];
-              arr[myIdx] = null;
-              arr[to]    = card;
-              await update(mRef, { m65_byTable: arr, m65_passAt: Date.now() });
-            }catch(e){ console.error('[M65 pass]', e); }
-          });
-        };
-      }
-    }
-  }
-
-  // いつも通り、アイテム列の直下へ
-  mountLaneUnderItemsBar(lane);
-}
-/* ここまで追加：#65 */
-
   
 /* ここから追加：#62 人数分の数値カード（同期） */
 async function ensureM62MetaInit(vNow){
@@ -3850,6 +3725,127 @@ function renderM62(v){
   mountLaneUnderItemsBar(lane);
 }
 /* ここまで追加：#62 */
+
+  /* ===== #65：数値カード 1..12 を隊長から順番配り → 自分の画面下部に表示／次へ渡せる ===== */
+async function ensureM65MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if ((v?.mission?.id|0) !== 65) return;
+  const N = (v?.tables?.length|0); if (N <= 0) return;
+  if (Array.isArray(v?.meta?.m65_byTable)) return;   // 既に初期化済み
+  if (!state.isHost) return;                         // 初期化はホストのみ
+
+  // 着席しているテーブルだけを対象に、隊長から順番配り（全部配る）
+  const cap = Math.max(0, v?.captainTable|0);
+  const seatedIdx = [];
+  for (let i=0;i<N;i++){
+    const j = (cap + i) % N;
+    if (v.tables?.[j]?.playerId) seatedIdx.push(j);
+  }
+  if (seatedIdx.length === 0) return;
+
+  const deck = MATERIALS.numbers.slice(); shuffle(deck);  // 1..12 シャッフル
+  const by = Array.from({length:N}, ()=> []);
+  for (let k=0; k<deck.length; k++){
+    const owner = seatedIdx[k % seatedIdx.length];
+    by[owner].push(deck[k]);
+  }
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m65_byTable: by });
+}
+
+function renderM65(v){
+  const isM65 = ((v?.mission?.id|0) === 65);
+  const rowId = 'm65Row';
+  const old   = document.getElementById(rowId);
+  if (!isM65){ if (old) old.remove(); return; }
+
+  // 初期配布（未生成ならホストが一度だけ）
+  if (!Array.isArray(v?.meta?.m65_byTable)){ ensureM65MetaInit(v); if (old) old.remove(); return; }
+
+  // 自分が未着席なら表示しない
+  const tables = v.tables || [];
+  const myIdx  = tables.findIndex(T => T?.playerId === state.userId);
+  if (myIdx < 0){ if (old) old.remove(); return; }
+
+  // 自分の持ち札（数値カード）を取得・昇順表示
+  const mine = Array.isArray(v.meta.m65_byTable?.[myIdx]) ? v.meta.m65_byTable[myIdx].slice() : [];
+  mine.sort((a,b)=>a-b);
+
+  // 全体公開の通常コード枚数を集計（各テーブル hand の open==true, kind:'normal'）→ 4枚以上で裏面
+  const openCountByNum = {};
+  (tables||[]).forEach(T=>{
+    (T.hand||[]).forEach(c=>{
+      if (c?.kind==='normal' && c.open===true){
+        const n = c.num|0;
+        openCountByNum[n] = (openCountByNum[n]||0) + 1;
+      }
+    });
+  });
+
+  const footer = document.getElementById('missionFooter');
+  if (!footer){ if (old) old.remove(); return; }
+  let row = old;
+  if (!row){
+    row = document.createElement('div');
+    row.id = rowId;
+    row.className = 'numlane';
+    footer.appendChild(row);
+  }
+  row.innerHTML = '';
+
+  // 次の着席者を求める
+  const findNextSeated = (fromIdx)=>{
+    if (tables.length===0) return -1;
+    for (let off=1; off<=tables.length; off++){
+      const i = (fromIdx + off) % tables.length;
+      if (tables[i]?.playerId) return i;
+    }
+    const any = tables.findIndex(T => T?.playerId);
+    return any >= 0 ? any : 0;
+  };
+  const nextIdx = findNextSeated(myIdx);
+  const nextName = tables[nextIdx]?.playerName || `#${(nextIdx|0)+1}`;
+
+  // カードDOM生成（裏面条件: その数が4枚以上 全体公開）
+  mine.forEach(n=>{
+    const holder = document.createElement('div');
+    holder.className = 'numcard-holder';
+    const nc = document.createElement('div');
+    nc.className = 'numcard';
+    const needBack = (openCountByNum[n]|0) >= 4;
+    if (needBack){
+      nc.classList.add('back'); // 裏面表示（クリック可）
+    }else{
+      nc.style.backgroundImage = `url('${imgNumber(n)}')`;
+    }
+    nc.title = `#${n}`;
+
+    nc.onclick = async (ev)=>{
+      openMenu(ev.clientX, ev.clientY, [
+        { label:`${nextName} に ${n} を渡す`, action: async ()=>{
+          try{
+            // 最新メタを取得して自分→次席へ1枚移動
+            const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+            const snap = await get(mRef);
+            const meta = snap.val() || {};
+            const by   = Array.isArray(meta.m65_byTable) ? meta.m65_byTable.slice() : [];
+            const myArr   = Array.isArray(by[myIdx]) ? by[myIdx].slice() : [];
+            const nextArr = Array.isArray(by[nextIdx]) ? by[nextIdx].slice() : [];
+            const pos = myArr.indexOf(n);
+            if (pos >= 0){
+              myArr.splice(pos,1);
+              nextArr.push(n);
+              by[myIdx]  = myArr;
+              by[nextIdx]= nextArr;
+              await update(mRef, { m65_byTable: by });
+            }
+          }catch(e){ console.error(e); }
+        }}]);
+    };
+    holder.appendChild(nc);
+    row.appendChild(holder);
+  });
+}
+/* ===== /#65 ===== */
 
   
 function renderM61(v){
