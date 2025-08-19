@@ -3218,6 +3218,8 @@ async function renderM59(v){
   row.className = 'numlane';
   // 「いつもより2px小さく」→ 32x48 → 30x46
   row.style.marginTop = '6px';
+row.style.display = 'flex';
+row.style.gap = '3px';   // 数値カードの間隔を狭める
 
   nums.forEach((n, idx)=>{
     const card = document.createElement('div');
@@ -3225,7 +3227,7 @@ async function renderM59(v){
     card.style.width = '28px';
     card.style.height = '43px';
     card.style.backgroundImage = `url('${imgNumber(n)}')`;
-    card.style.marginLeft = '4px';   // ★ 右にずらす（例: 4px）
+    card.style.marginLeft = '8px';   // ★ 右にずらす（例: 4px）
     card.title = String(n);
 
     card.onclick = async (ev)=>{
