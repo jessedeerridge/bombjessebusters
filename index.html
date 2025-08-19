@@ -1257,6 +1257,7 @@ renderM55(state.watching);
     renderM61(v);
     renderM62(v);
     renderM63(v);
+    renderM65(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3500,6 +3501,94 @@ async function ensureM63MetaInit(vNow){
   });
 }
 
+async function ensureM65MetaInit(vNow){
+  const v=vNow||state.watching; if(!v) return;
+  if((v?.mission?.id|0)!==65) return;
+  const M=v.meta||{};
+  if(M.m65Hands) return; // すでに配布済み
+
+  if(!state.isHost) return;
+  // シャッフルして人数分に配る
+  const deck=[...MATERIALS.numbers]; shuffle(deck);
+  const hands={};
+  const n=v.tableCount|0;
+  for(let i=0;i<n;i++){
+    hands[i]=[{num:deck[i], back:false}]; // 1枚ずつ配布
+  }
+  await update(ref(db,`rooms/${state.roomCode}/meta`), { m65Hands:hands });
+}
+
+
+  function renderM65(v){
+  if((v?.mission?.id|0)!==65) return;
+
+  // 既存UIを掃除
+  document.querySelectorAll('.m65-hand').forEach(n=>n.remove());
+
+  const tables = v?.tables||[];
+  tables.forEach((T, ti)=>{
+    const hand = document.createElement('div');
+    hand.className = 'm65-hand hand';
+    hand.style.marginTop = '4px';
+
+    // 配られたカードを描画
+    const myCards = (v.meta?.m65Hands?.[ti]||[]);
+    myCards.forEach((c, idx)=>{
+      const wrap = document.createElement('div');
+      wrap.className='card-wrap';
+      const card = document.createElement('div');
+      card.className='card' + (c.back?' back':'');
+      card.style.backgroundImage = c.back ? `url('${imgBack}')` : `url('${imgNumber(c.num)}')`;
+
+      // 自分の席のみクリック可能
+      if(state.seatedTable===ti){
+        card.onclick = (ev)=>{
+          openOneMini(ev.clientX, ev.clientY,'渡す', async ()=>{
+            const next = (ti+1) % tables.length;
+            // 次の人にカードを渡す
+            const myHand = [...myCards];
+            const [give] = myHand.splice(idx,1);
+            const nextHand = [...(v.meta?.m65Hands?.[next]||[])];
+            nextHand.push(give);
+            await update(ref(db,`rooms/${state.roomCode}/meta/m65Hands`), {
+              [ti]: myHand,
+              [next]: nextHand
+            });
+          });
+        };
+      }
+
+      wrap.appendChild(card);
+      hand.appendChild(wrap);
+    });
+
+    // テーブルに追加
+    const row = tablesEl.querySelectorAll('.table')[ti];
+    if(row) row.appendChild(hand);
+  });
+
+  // ★ 自動裏返し処理：同じ数字が4枚公開されていたら裏にする
+  const countByNum={};
+  (v.meta?.m65Hands||[]).forEach(arr=>{
+    arr?.forEach(c=>{
+      if(!c.back){ countByNum[c.num]=(countByNum[c.num]||0)+1; }
+    });
+  });
+  Object.keys(countByNum).forEach(n=>{
+    if(countByNum[n]>=4){
+      // 全て裏面化
+      const newHands = {...v.meta?.m65Hands};
+      for(const ti in newHands){
+        newHands[ti] = newHands[ti].map(c=>
+          (c.num==n ? {...c, back:true} : c)
+        );
+      }
+      update(ref(db,`rooms/${state.roomCode}/meta`), { m65Hands:newHands });
+    }
+  });
+}
+
+  
 // 描画・操作
 function renderM63(v){
   const isM63 = ((v?.mission?.id|0) === 63);
