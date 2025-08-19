@@ -732,7 +732,7 @@ document.querySelectorAll('.m59-row').forEach(n => n.remove());
 
   // ★ M61：各テーブル左の制約カードを掃除
   document.querySelectorAll('.m61-con').forEach(n => n.remove());
-
+  document.getElementById('m61PopOverlay')?.remove();
   
   // ★ M44：酸素UIを完全掃除（プール=ox2 と各テーブル所持行）
   const m44 = document.getElementById('m44OxPool');
@@ -3492,23 +3492,67 @@ function renderM61(v){
   // ▼ 隊長の画面下に ↑/↓ ポップ（自分が隊長＝face: member (5).jpg かつ自席）
   const capIdx = (v.tables||[]).findIndex(T => (T?.character?.face||'').includes('member (5).jpg'));
   if (capIdx >= 0 && capIdx === myIdx){
-    const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-    const rotate = async (dir)=>{ // dir:+1=次へ, -1=前へ
-      try{
-        const snap = await get(mRef);
-        const meta = snap.val()||{};
-        const arr = Array.isArray(meta.m61_byTable) ? meta.m61_byTable.slice() : [];
-        if (arr.length===0) return;
-       const n = arr.length;
-       const next = Array.from({length:n}, (_,i)=> arr[(i - dir + n)%n]); // ↓=+1で「次のテーブルへ」
-        await update(mRef, { m61_byTable: next, m61_rotAt: Date.now() });
-     }catch(e){ console.error('[M61 rotate]', e); }
-    };
-    openBottomMenu([
-      { label:'↑（前のテーブルへ）', action: ()=> rotate(-1) },
-      { label:'↓（次のテーブルへ）', action: ()=> rotate(+1) }
-    ]);
+    // 「ミッション詳細」トリガーにバインド（重複防止のため dataset フラグを使用）
+    const trigger = document.querySelector('#missionDetailBtn, [data-role="mission-detail"]');
+    if (trigger && !trigger.dataset.m61Bound){
+      trigger.dataset.m61Bound = '1';
+      trigger.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        openM61CaptainPopup();
+      });
+    }
+
   }
+}
+
+// ★ #61 隊長用：↑↓ポップ（“ミッション詳細”を押した時だけ開く／外側クリックで閉じる）
+function openM61CaptainPopup(){
+  // 既存があれば一旦消す
+  document.getElementById('m61PopOverlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'm61PopOverlay';
+  ov.className = 'overlay fadein';           // 既存のオーバーレイクラスがあれば流用
+  ov.addEventListener('click', (e)=>{ if(e.target===ov) ov.remove(); }); // 外側クリックで閉じる
+
+ const menu = document.createElement('div');
+  menu.className = 'popup-menu';
+  menu.addEventListener('click', (e)=> e.stopPropagation()); // 内側クリックはバブリング抑止
+  const title = document.createElement('div');
+  title.className = 'popup-title';
+  title.textContent = '制約カードローテーション';
+  menu.appendChild(title);
+  const btnUp = document.createElement('button');
+  btnUp.textContent = '↑（前のテーブルへ）';
+  btnUp.onclick = async ()=>{
+    await m61Rotate(-1);
+    ov.remove();
+  };
+
+  const btnDown = document.createElement('button');
+  btnDown.textContent = '↓（次のテーブルへ）';
+  btnDown.onclick = async ()=>{
+   await m61Rotate(+1);
+   ov.remove();
+  };
+
+  menu.appendChild(btnUp);
+  menu.appendChild(btnDown);
+  ov.appendChild(menu);
+  document.body.appendChild(ov);
+}
+
+// 共有：#61の配列を回すロジック本体
+async function m61Rotate(dir){
+ try{
+    const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+   const snap = await get(mRef);
+    const meta = snap.val()||{};
+    const arr = Array.isArray(meta.m61_byTable) ? meta.m61_byTable.slice() : [];
+   if (arr.length===0) return;
+    const n = arr.length;
+    const next = Array.from({length:n}, (_,i)=> arr[(i - dir + n)%n]); // dir:+1=次へ, -1=前へ
+    await update(mRef, { m61_byTable: next, m61_rotAt: Date.now() });
+  }catch(e){ console.error('[M61 rotate]', e); }
 }
   
 /* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
