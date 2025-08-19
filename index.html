@@ -2405,33 +2405,34 @@ function renderM26(v){
   old._sync && old._sync();
 }
 
-async function ensureMxMetaInit(mid, vNow){
+/* ===== #55：チャレンジ10枚から人数分を確定。c8が含まれたら左右の数値2枚も確定 ===== */
+async function ensureM55MetaInit(vNow){
   const v = vNow || state.watching; if(!v) return;
-  if (![55,60].includes((v?.mission?.id|0))) return;
+  if ((v?.mission?.id|0) !== 55) return;
   const M = v.meta || {};
- const P = `m${mid}_`;                           // 例）"m55_" or "m60_"
 
   // まだ確定していなければ、ホストが山札と公開札を確定
-  if (!Array.isArray(M[`${P}shown`])) {
-   if (!state.isHost) return;
+  if (!Array.isArray(M.m55_shown)) {
+    if (!state.isHost) return;
+    // 画像ファイル名（拡張子混在のまま扱う）
     const deck = [
       'c1.png','c2.png','c3.png','c4.png','c5.png',
       'c6.png','c7.png','c8.png','c9.png','c10.png'
     ].slice();
     shuffle(deck);
     const n = v.tableCount|0;
-   const shown = deck.slice(0, Math.max(1,n)); // 人数分
+    const shown = deck.slice(0, Math.max(1,n)); // 人数分
 
-    // c8 が含まれていれば左右の数値をユニーク抽選
+    // c8が含まれているなら左右の数値を1枚ずつランダムに決める（1..12）
     let c8Sides = null;
     if (shown.some(s => /c8\.(png|jpg)$/i.test(s))) {
-      const [L, R] = pickK(MATERIALS.numbers, 2);
-      c8Sides = [L, R];
+  const [L, R] = pickK(MATERIALS.numbers, 2); // ← ユニーク抽選
+  c8Sides = [L, R];
     }
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      [`${P}deck`]: deck,
-      [`${P}shown`]: shown,
-      [`${P}c8Sides`]: c8Sides
+      m55_deck: deck,
+      m55_shown: shown,
+      m55_c8Sides: c8Sides
     });
   }
 }
@@ -2458,21 +2459,14 @@ function openChallengeZoom(id){
   
 /* ===== #55：チャレンジ札（人数分）。c8 のときだけ左右に数値1枚ずつ表示 ===== */
 function renderM55(v){
-  const mid  = (v?.mission?.id|0);
-  const isM  = (mid === 55 || mid === 60);
-  const rowId = `m${mid}Row`;              // ミッションごとにIDを分ける
+  const isM55 = ((v?.mission?.id|0) === 55);
+  const rowId = 'm55Row';
   const old   = document.getElementById(rowId);
-  if (!isM){ if (old) old.remove(); return; }
+  if (!isM55){ if (old) old.remove(); return; }
 
-  // ミッション別メタキー（m55_shown / m60_shown）
-  const metaKey = (mid === 60 ? 'm60_shown' : 'm55_shown');
+  // 初回はメタを用意させる
+  if (!Array.isArray(v?.meta?.m55_shown)) { ensureM55MetaInit(v); if (old) old.remove(); return; }
 
-  // 初回はメタを用意
-  if (!Array.isArray(v?.meta?.[metaKey])) {
-    await ensureMxMetaInit(mid, v);  // ← これだけで55/60対応
-    if (old) old.remove();
-    return;
-  }
   if (old) old.remove();
   const lane = document.createElement('div');
   lane.id = rowId;
@@ -3191,69 +3185,54 @@ function renderM43(v){
   if (!node.isConnected) tablesEl.appendChild(node);
 }
 
-/* ==== ミッション59：各 checklistbox の直上に12数値カード（ゲーム固定順）＋ nano（上半分重ね） ==== */
+/* ==== ミッション59：各 checklistbox の直上に12数値カード（固定ランダム）＋ nano（上半分重ね） ==== */
 async function renderM59(v){
   const isM59 = ((v?.mission?.id|0) === 59);
-
-  // 参照コンテナ
-  const root = (typeof tablesEl !== 'undefined' && tablesEl) ? tablesEl : document.body;
-
-  // rootを絶対配置の基準にする
-  if (getComputedStyle(root).position === 'static') {
-    root.style.position = 'relative';
-  }
-
-  // 非59時 or 初期掃除
   if (!isM59){
-    root.querySelectorAll('.m59-row').forEach(n => n.remove());
-    root.querySelector('#m59Nano')?.remove();
+    document.querySelectorAll('.m59-row').forEach(n => n.remove());
+    document.getElementById('m59Nano')?.remove();
     return;
   }
 
-  // checklistボックス列挙（無ければ .checklist をフォールバック）
-  const boxes = Array.from(root.querySelectorAll('.checklistbox'));
-  const targets = boxes.length ? boxes : Array.from(root.querySelectorAll('.checklist'));
-  if (!targets.length) return; // まだ生成前なら次フレーム待ち
+  // checklist の「各ボックス」を列挙（無ければ .checklist をフォールバック）
+  const boxes = Array.from(tablesEl.querySelectorAll('.checklistbox'));
+  const targets = boxes.length ? boxes : Array.from(tablesEl.querySelectorAll('.checklist'));
+  if (!targets.length) return; // まだ生成前なら次フレームで
 
   // ゲームごと固定の順序を meta に保存（初回はホスト）
   let nums = v?.meta?.m59Nums;
   if (!Array.isArray(nums) || nums.length !== 12){
-    nums = (MATERIALS?.numbers ? MATERIALS.numbers.slice() : Array.from({length:12}, (_,i)=>i+1));
-    if (typeof shuffle === 'function') shuffle(nums);
+    nums = MATERIALS.numbers.slice();
+    shuffle(nums);
     if (state.isHost){
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m59Nums: nums });
     }
   }
 
-  // 既存の行をクリーン（多重描画防止）
-  root.querySelectorAll('.m59-row').forEach(n => n.remove());
+  // 既存行をクリーン（複数行対応）
+  document.querySelectorAll('.m59-row').forEach(n => n.remove());
 
-  // 各 checklistbox の直前に 12 等分レーンを作成（幅は box と同じ100%）
+  // 各 checklistbox の直前に 1 本ずつ等分レーンを作成（幅は box と同じ100%）
   targets.forEach((boxEl, rowIdx) => {
     const lane = document.createElement('div');
     lane.className = 'm59-row';
-    // 幅100%・均等12分割・間隔狭め
     lane.style.display = 'grid';
-    lane.style.gridTemplateColumns = 'repeat(12, 1fr)';
+    lane.style.gridTemplateColumns = 'repeat(12, 1fr)'; // ボックス幅に対して均等割り
     lane.style.columnGap = '2px';
     lane.style.width = '100%';
-    lane.style.marginBottom = '6px';
-    lane.style.boxSizing = 'border-box';
+    lane.style.marginBottom = '6px'; // 「真上」に見える余白
 
     nums.forEach((n, idx) => {
-      // セル内中央に #59小さめカードを配置
+      // セル中央に #59 だけ小さめの数値カード
       const cell = document.createElement('div');
       cell.style.display = 'grid';
       cell.style.placeItems = 'center';
 
       const card = document.createElement('div');
       card.className = 'numcard m59num';
-      card.style.width = '30px';     // #59だけ 2px小さく
+      card.style.width = '30px';   // 通常より2px小さく
       card.style.height = '46px';
-      card.style.backgroundImage = `url('${typeof imgNumber==='function' ? imgNumber(n) : ''}')`;
-      card.style.backgroundSize = 'cover';
-      card.style.backgroundPosition = 'center';
-      card.style.backgroundRepeat = 'no-repeat';
+      card.style.backgroundImage = `url('${imgNumber(n)}')`;
       card.title = String(n);
 
       card.onclick = async () => {
@@ -3269,75 +3248,59 @@ async function renderM59(v){
       lane.appendChild(cell);
     });
 
-    // 「各 box の直上」に差し込む
-    boxEl.parentNode.insertBefore(lane, boxEl);
+    boxEl.parentNode.insertBefore(lane, boxEl); // 「各 box の直上」に差し込む
   });
 
   // ===== nano を描画：選択されたレーンの該当カードの「上半分」に重ねる =====
   const rowIndex = (v?.meta?.m59_row ?? 0) | 0;
-  const posIndex = (v?.meta?.m59_pos | 0);   // 1..12
+  const posIndex = (v?.meta?.m59_pos | 0);  // 1..12
   const goLeft   = !!(v?.meta?.m59_left);
 
-  const lanes = Array.from(root.querySelectorAll('.m59-row'));
+  const lanes = Array.from(tablesEl.querySelectorAll('.m59-row'));
   if (!posIndex || !lanes.length || !lanes[rowIndex]){
-    root.querySelector('#m59Nano')?.remove();
+    document.getElementById('m59Nano')?.remove();
     return;
   }
 
   const targetCard = lanes[rowIndex].querySelectorAll('.m59num')[posIndex - 1];
   if (!targetCard){
-    root.querySelector('#m59Nano')?.remove();
+    document.getElementById('m59Nano')?.remove();
     return;
   }
 
-  // 位置計算：root基準（矩形差分＋rootのスクロール補正）
-  const nanoSize = 56; // 既定のnanoサイズ
-  const rRect = root.getBoundingClientRect();
-  const cRect = targetCard.getBoundingClientRect();
+  const tb = tablesEl.getBoundingClientRect();
+  const rb = targetCard.getBoundingClientRect();
 
-  const left = (cRect.left - rRect.left) + (root.scrollLeft || 0) + (cRect.width / 2) - (nanoSize / 2);
-  const top  = (cRect.top  - rRect.top ) + (root.scrollTop  || 0) - (nanoSize / 2); // ← 上半分に重ね
+  const node = document.getElementById('m59Nano') || document.createElement('div');
+  node.id = 'm59Nano';
+  node.className = 'm43-nano'; // 56x56 既存流用
+  node.style.backgroundImage = `url("${goLeft ? './nano0left.png' : './nano0.png'}")`;
 
-  // ノード生成/更新（CSS依存を避けてインラインで確定）
-  let nano = root.querySelector('#m59Nano');
-  if (!nano){
-    nano = document.createElement('div');
-    nano.id = 'm59Nano';
-    nano.style.position = 'absolute';
-    nano.style.width = nanoSize + 'px';
-    nano.style.height = nanoSize + 'px';
-    nano.style.pointerEvents = 'auto';
-    nano.style.backgroundRepeat = 'no-repeat';
-    nano.style.backgroundSize = 'contain';
-    nano.style.backgroundPosition = 'center';
-    nano.style.zIndex = '1000';
-    root.appendChild(nano);
-  }
-  nano.style.backgroundImage = `url("${goLeft ? './nano0left.png' : './nano0.png'}")`;
-  nano.style.left = Math.max(0, left) + 'px';
-  nano.style.top  = Math.max(0, top ) + 'px';
+  // ★ ここが「上半分重ね」：nano 高さの半分だけ上にずらす
+  //    nano の中心 ≒ カード上辺付近に来る配置
+  const nanoSize = 56; // m43-nano の想定サイズ（変更しているなら合わせて）
+  const x = rb.left - tb.left + (rb.width / 2) - (nanoSize / 2);
+  const y = rb.top  - tb.top  - (nanoSize / 2);
 
-  // クリックで向きトグル（openMenu が無ければ直接トグル）
-  nano.onclick = (ev)=>{
-    if (typeof openMenu === 'function'){
-      openMenu(ev.clientX, ev.clientY, [
-        { label: (goLeft ? '右向きにする' : '左向きにする'),
-          action: async ()=>{
-            await update(ref(db, `rooms/${state.roomCode}/meta`), {
-              m59_left: !goLeft, m59_updatedAt: Date.now()
-            });
-          }
+  node.style.left = `${Math.max(0, x)}px`;
+  node.style.top  = `${Math.max(0, y)}px`;
+
+  // クリックで向きトグル（ポップメニュー）
+  node.onclick = (ev)=>{
+    openMenu(ev.clientX, ev.clientY, [
+      { label: (goLeft ? '右向きにする' : '左向きにする'),
+        action: async ()=>{
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            m59_left: !goLeft,
+            m59_updatedAt: Date.now()
+          });
         }
-      ]);
-    } else {
-      // フォールバック：直接トグル
-      update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m59_left: !goLeft, m59_updatedAt: Date.now()
-      });
-    }
+      }
+    ]);
   };
-}
 
+  if (!node.isConnected) tablesEl.appendChild(node);
+}
 
 
 
