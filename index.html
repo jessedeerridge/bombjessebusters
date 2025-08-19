@@ -3496,25 +3496,24 @@ function renderM61(v){
     mini.style.height = '30px';
     // 着席判定：席に人がいなければ“完全ブランク & クリック不可”
     const t = (v.tables||[])[ti] || {};
-    const hasSeat = !!(t?.member?.uid || t?.character?.face); // なければブランク
-    if (hasSeat){
-     const flipped = !!t?.character?.flipped;
-      const faceUrl = flipped ? './battery.jpg' : `./${t?.character?.face || 'member (1).jpg'}`;
-      mini.style.backgroundImage = `url("${faceUrl}")`;
-      mini.style.cursor = 'pointer';
-      mini.onclick = async () => {
-        // 最新値を見ずにトグルしてOK（DBが真実）
-        await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), {
-          flipped: !flipped
-        });
-      };
-    }else{
-      // ブランク：背景なし・クリック無効
+    // 席に人がいなければ完全ブランク
+    const hasSeat = !!(t?.member?.uid);
+    if (!hasSeat){
       mini.style.backgroundImage = 'none';
       mini.style.pointerEvents = 'none';
       mini.title = '空席';
-    }
-    stack.appendChild(mini);
+    }else{
+      const flipped = !!t?.character?.flipped;
+      const faceUrl = flipped ? './battery.jpg'
+                              : `./${t?.character?.face || 'member (1).jpg'}`;
+      mini.style.backgroundImage = `url("${faceUrl}")`;
+      mini.style.cursor = 'pointer';
+      mini.onclick = async () => {
+        await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), {
+        flipped: !flipped
+        });
+      };
+    }    stack.appendChild(mini);
 
     // キャラ列の“左”に、縦積み（制約↑／小型キャラ↓）を差し込む
     const parent = charCol.parentNode;
