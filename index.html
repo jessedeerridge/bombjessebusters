@@ -719,10 +719,17 @@ document.querySelectorAll('.numlane').forEach(n => {
   ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
   const m44 = document.getElementById('m44OxPool'); if (m44) m44.remove(); // ← ox2の行を確実に掃除
   });
+
+  document.getElementById('m57Grid')?.remove();       // 3×4グリッド
+  document.querySelectorAll('.m57-grid').forEach(n=>n.remove()); // 互換
+  document.getElementById('m57Sel')?.remove();        // di左の選択表示
+
+  
   // ★ M44：酸素UIを完全掃除（プール=ox2 と各テーブル所持行）
   const m44 = document.getElementById('m44OxPool');
   if (m44) m44.remove();               // 左の ox2 を含むプール行
   document.querySelectorAll('.ox-row').forEach(n => n.remove()); // 各テーブルの所持行
+  
   // テーブルの高さを基準に戻す（M44で上げたものを解除）
   document.querySelectorAll('.table').forEach(tb=>{
     tb.style.removeProperty('--table-h');
