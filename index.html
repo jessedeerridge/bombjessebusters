@@ -4469,26 +4469,15 @@ if (Number.isInteger(idx) && idx === ti){
       }
 
   // 再描画
-row.innerHTML = '';
-const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
+  row.innerHTML = '';
+  const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
 
-if (cnt > 0) {
-  // 通常：所持数ぶんの酸素トークンを表示
+  // 所持数ぶんの酸素トークンのみ表示（0枚なら何も描かない＝詰める）
   for (let i=0; i<cnt; i++){
     const t = document.createElement('div');
     t.className = 'token ox';
     row.appendChild(t);
   }
-} else {
-  // 0枚のとき：nano4left.png を2枚並べて表示（クリック判定は row に付く）
-  for (let i=0; i<4; i++){
-    const t = document.createElement('div');
-    t.className = 'token ox';                     // 既存サイズ/containを流用
-    t.style.backgroundImage = "url('./0ox.png')";  // 画像だけ差し替え
-    row.appendChild(t);
-  }
-}
-
     
       // テーブル高さを1行ぶんだけ拡張（#44の挙動と整合）
       const baseH = 96;  // :root --table-h 既定
@@ -4505,34 +4494,45 @@ if (cnt > 0) {
   const alt = (v.tables || []).findIndex(t => t?.playerId === state.userId);
   return (alt >= 0 ? alt : null);      })();
 
-      if (myIdx !== null && myIdx !== ti){
+  if (myIdx !== null && myIdx !== ti){
 
-        row.onclick = (ev)=>{
-          const mine = Math.max(0, v?.meta?.oxByTable?.[myIdx]||0);
-          if (mine<=0) return;
+  // 共通ハンドラ：row/box から呼ぶ。二重発火防止のため stopPropagation
+  const openGiveMenu = async (ev)=>{
+    ev.stopPropagation();
+    const mine = Math.max(0, v?.meta?.oxByTable?.[myIdx]||0);
+    if (mine <= 0) return;
 
-          // 自分の所持枚数ぶんの数字 1..mine を出す
-          const entries = Array.from({length: mine}, (_,i)=> i+1).map(k=>({
-            label: String(k),
-            action: async ()=>{
-              // 二重ガード：最新値で検算
-              const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
-              const meta = snap.val()||{};
-              const curMine   = Math.max(0, meta?.oxByTable?.[myIdx]||0);
-              const curTarget = Math.max(0, meta?.oxByTable?.[ti]||0);
-              if (k > curMine) return;
-
-              const upd = {};
-              upd[`oxByTable/${myIdx}`] = curMine - k;
-              upd[`oxByTable/${ti}`]    = curTarget + k;
-              await update(ref(db, `rooms/${state.roomCode}/meta`), upd);
-            }
-          }));
-          if (entries.length>0) openMenu(ev.clientX, ev.clientY, entries);
-        };
-       }else{
-        row.onclick = null; // 自分の行はクリック不可（譲渡は相手側行から）
+    const entries = Array.from({length: mine}, (_,i)=> i+1).map(k=>({
+      label: String(k),
+      action: async ()=>{
+        const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
+        const meta = snap.val()||{};
+        const curMine   = Math.max(0, meta?.oxByTable?.[myIdx]||0);
+        const curTarget = Math.max(0, meta?.oxByTable?.[ti]||0);
+        if (k > curMine) return;
+        const upd = {};
+        upd[`oxByTable/${myIdx}`] = curMine - k;
+        upd[`oxByTable/${ti}`]    = curTarget + k;
+        await update(ref(db, `rooms/${state.roomCode}/meta`), upd);
       }
+    }));
+    if (entries.length > 0) openMenu(ev.clientX, ev.clientY, entries);
+  };
+
+  // 従来どおり酸素行（細帯）もクリック可
+  row.onclick = openGiveMenu;
+
+  // ★追加：テーブル枠（box）全体にも同じクリック判定を付与（1回だけ）
+  if (!box.dataset.m49Bind) {
+    box.dataset.m49Bind = '1';
+    box.addEventListener('click', openGiveMenu);
+  }
+
+}else{
+  // 自分の行はクリック不可（row / box とも付けない）
+  row.onclick = null;
+}
+
     });
   }catch(err){
     // 入室不能事故を防ぐため、例外は握り潰してログだけ
