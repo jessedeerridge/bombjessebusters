@@ -3222,7 +3222,7 @@ async function renderM59(v){
   nums.forEach((n, idx)=>{
     const card = document.createElement('div');
     card.className = 'numcard';
-    card.style.width = '25px';
+    card.style.width = '28px';
     card.style.height = '43px';
     card.style.backgroundImage = `url('${imgNumber(n)}')`;
     card.title = String(n);
@@ -3280,7 +3280,7 @@ async function renderM59(v){
 
   // 位置：カードのちょうど上（tables 内基準）
   const x = rb.left - tb.left + (rb.width/2) - (56/2);
-  const y = (rb.top - tb.top) - 56 - 2; // 少しだけ上に余白
+  const y = (rb.top - tb.top) - 56 - 2 - 12; // 少しだけ上に余白
   node.style.left = `${Math.max(0, x)}px`;
   node.style.top  = `${Math.max(0, y)}px`;
 
