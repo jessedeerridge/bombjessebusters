@@ -3725,8 +3725,7 @@ function renderM62(v){
   mountLaneUnderItemsBar(lane);
 }
 /* ここまで追加：#62 */
-
-  /* ===== #65：数値カード 1..12 を隊長から順番配り → 自分の画面下部に表示／次へ渡せる ===== */
+// ===== M65 初期配布：隊長テーブルから全テーブルへラウンドロビン配布 =====
 async function ensureM65MetaInit(vNow){
   const v = vNow || state.watching; if (!v) return;
   if ((v?.mission?.id|0) !== 65) return;
@@ -3734,23 +3733,27 @@ async function ensureM65MetaInit(vNow){
   if (Array.isArray(v?.meta?.m65_byTable)) return;   // 既に初期化済み
   if (!state.isHost) return;                         // 初期化はホストのみ
 
-  // 着席しているテーブルだけを対象に、隊長から順番配り（全部配る）
   const cap = Math.max(0, v?.captainTable|0);
-  const seatedIdx = [];
-  for (let i=0;i<N;i++){
-    const j = (cap + i) % N;
-    if (v.tables?.[j]?.playerId) seatedIdx.push(j);
-  }
-  if (seatedIdx.length === 0) return;
 
-  const deck = MATERIALS.numbers.slice(); shuffle(deck);  // 1..12 シャッフル
+  // 配布順：隊長テーブル → 右回りで「全テーブル」（未着席も含む）
+  const order = [];
+  for (let off=0; off<N; off++){
+    order.push((cap + off) % N);
+  }
+
+  // 1..12 をシャッフルして、order にラウンドロビン配布
+  const deck = MATERIALS.numbers.slice(); // 想定: [1..12]
+  shuffle(deck);
+
   const by = Array.from({length:N}, ()=> []);
   for (let k=0; k<deck.length; k++){
-    const owner = seatedIdx[k % seatedIdx.length];
+    const owner = order[k % order.length];
     by[owner].push(deck[k]);
   }
+
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m65_byTable: by });
 }
+// ===== /M65 =====
 
 function renderM65(v){
   const isM65 = ((v?.mission?.id|0) === 65);
