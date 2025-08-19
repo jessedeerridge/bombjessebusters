@@ -1221,6 +1221,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM54(v);
     renderM57(v);
 renderM55(state.watching);
+    renderM59(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3175,7 +3176,110 @@ function renderM43(v){
 
   if (!node.isConnected) tablesEl.appendChild(node);
 }
-/* ：ミッション43 */
+
+/* ここから追加：ミッション59 */
+function renderM59(v){
+  const isM59 = ((v?.mission?.id|0) === 59);
+  const rowId = 'm59Row';
+  const nanoId= 'm59Nano';
+  const oldRow = document.getElementById(rowId);
+  const oldNano= document.getElementById(nanoId);
+
+  if (!isM59){
+    if (oldRow) oldRow.remove();
+    if (oldNano) oldNano.remove();
+    tablesEl.classList.remove('m43-shift');
+    return;
+  }
+
+  // 1) 「チェックリスト直上」に 12枚ナンバー行を用意（毎フレーム再生成）
+  const checklist = tablesEl.querySelector('.checklist');
+  if (!checklist) return; // checklistは renderTables で作られる
+  if (oldRow) oldRow.remove();
+
+  const lane = document.createElement('div');
+  lane.id = rowId;
+  lane.className = 'numlane';      // 既存スタイルを流用
+  // 2px小さく（既定 32x48 相当を 30x46 に）
+  const shrink = (el)=>{ el.style.width='30px'; el.style.height='46px'; };
+
+  // 12枚をランダム順で並べる
+  const nums = Array.from({length:12},(_,i)=>i+1);
+  shuffle(nums);
+  nums.forEach(n=>{
+    const holder = document.createElement('div');
+    holder.className = 'numcard-holder';
+    const card = document.createElement('div');
+    card.className = 'numcard';
+    card.style.backgroundImage = `url('${imgNumber(n)}')`;
+    shrink(card);
+    holder.appendChild(card);
+    lane.appendChild(holder);
+
+    // クリックでその位置へナノ移動（全員同期）
+    holder.onclick = async ()=>{
+      if (!state.roomCode) return;
+      const prev = (v?.meta?.m59_pos|0) || 0;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), {
+        m59_prevPos: prev, m59_pos: n, m59_updatedAt: Date.now()
+      });
+    };
+  });
+
+  // checklist の「直前」に挿入＝“真上”
+  checklist.insertAdjacentElement('beforebegin', lane);
+
+  // 2) ナノの表示・位置決め
+  const pos = v?.meta?.m59_pos|0;
+  if (!pos){ if (oldNano) oldNano.remove(); tablesEl.classList.remove('m43-shift'); return; }
+
+  const goingLeft = !!(v?.meta?.m59_left); // true=左向き
+  const img = goingLeft ? './nano0left.png' : './nano0.png';
+
+  const node = oldNano || document.createElement('div');
+  node.id = nanoId;
+  node.className = 'm43-nano';              // #43 のCSSを共用
+  node.style.backgroundImage = `url("${img}")`;
+
+  // 参照位置は「m59Row 内の pos 番のカード」
+  const cards = lane.querySelectorAll('.numcard-holder');
+  // ランダム順なので「数字=インデックス」ではない → 対応する数字の要素を探す
+  const target = Array.from(cards).find(h=>{
+    const nc = h.querySelector('.numcard');
+    return !!nc && (nc.style.backgroundImage||'').includes(`/${pos}.`);
+  }) || null;
+
+  if (!target){
+    if (node.isConnected) node.remove();
+    tablesEl.classList.remove('m43-shift');
+    return;
+  }
+
+  tablesEl.classList.add('m43-shift'); // 上端合わせ（#43と同じ）
+  const tb = tablesEl.getBoundingClientRect();
+  const rb = target.getBoundingClientRect();
+  const x = rb.left - tb.left + (rb.width/2) - (56/2);
+  const y = 0; // tables 上端固定（#43と同じ運用）
+  node.style.left = `${Math.max(0, x)}px`;
+  node.style.top  = `${y}px`;
+
+  // クリックで「方向転換」ポップ（openBottomMenuは既存）
+  node.onclick = ()=>{
+    openBottomMenu([
+      { label:'方向転換', action: async ()=>{
+          const cur = !!(state.watching?.meta?.m59_left);
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m59_left: !cur, m59_updatedAt: Date.now() });
+        }
+      }
+    ]);
+  };
+
+  if (!node.isConnected) tablesEl.appendChild(node);
+}
+/* ここまで追加：ミッション59 */
+
+
+  
 // ミッション57：二重描画/二重保存対策込みで全面書き直し
 async function renderM57(v){
   const isM57 = ((v?.mission?.id|0) === 57);
