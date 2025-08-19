@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>e</title>
+<title>ｑ</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3553,14 +3553,15 @@ async function renderM63(v){
       }
 
       // 再描画（10で改行するため常に .ox-wrap を挿入）
-      row.innerHTML = '';
-      const w = document.createElement('div'); w.className = 'ox-wrap'; row.appendChild(w);
-      const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
-      if (cnt>0){
-        for (let i=0;i<cnt;i++){ const t=document.createElement('div'); t.className='token ox'; w.appendChild(t); }
-      }else{
-        for (let i=0;i<3;i++){ const t=document.createElement('div'); t.className='token ox'; t.style.backgroundImage="url('./0ox.png')"; w.appendChild(t); }
-      }
+   // 再描画（10で改行するため常に .ox-wrap を挿入）
+row.innerHTML = '';
+const w = document.createElement('div'); w.className = 'ox-wrap'; row.appendChild(w);
+const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
+if (cnt>0){
+  for (let i=0;i<cnt;i++){ const t=document.createElement('div'); t.className='token ox'; w.appendChild(t); }
+}
+// ← 0枚なら何も表示しない（0ox廃止）
+
 
       // テーブル高さ：1行ぶん拡張（0ox表示時も1行扱い）
       const baseH = 96;            // :root --table-h
@@ -3568,52 +3569,63 @@ async function renderM63(v){
       box.style.setProperty('--table-h', `${Math.max(baseH, baseH + extra)}px`);
 
       // クリック：自分の行→1..12 をリザーブへ、他人の行→「渡す」で全量譲渡
-      if (myIdx !== null && myIdx === ti){
-        row.onclick = (ev)=>{
-          const mine = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
-          const limit = Math.min(12, mine);
-          if (limit<=0) return; // 0oxでも判定は通すがメニューは出さない
-          const entries = Array.from({length:limit}, (_,i)=> i+1).map(k=>({
-            label:String(k),
-            action: async ()=>{
-              const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
-              const meta = snap.val()||{};
-              const curMine = Math.max(0, meta?.oxByTable?.[ti]||0);
-              if (k>curMine) return;
-              const curPool = Math.max(0, meta?.oxItem|0);
-              await update(ref(db, `rooms/${state.roomCode}/meta`), {
-                oxItem: curPool + k,
-                [`oxByTable/${ti}`]: curMine - k
-              });
-              // 「+k」を2秒だけ表示（リザーブ行の末尾にバッジ）
-              const badge = document.createElement('div');
-              badge.textContent = `+${k}`;
-              badge.style.fontSize='12px';
-              badge.style.marginLeft='6px';
-              badge.style.opacity='0.85';
-              document.getElementById('m63OxPool')?.appendChild(badge);
-              setTimeout(()=>{ if(badge.isConnected) badge.remove(); }, 2000);
-            }
-          }));
-          openMenu(ev.clientX, ev.clientY, entries);
-        };
-      }else if (myIdx !== null && myIdx !== ti){
-        row.onclick = (ev)=>{
-          const mine = Math.max(0, v?.meta?.oxByTable?.[myIdx]||0);
-          if (mine<=0) return;
-          openOneMini(ev.clientX, ev.clientY, '渡す', async ()=>{
-            const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
-            const meta = snap.val()||{};
-            const curMine   = Math.max(0, meta?.oxByTable?.[myIdx]||0);
-            if (curMine<=0) return;
-            const curTarget = Math.max(0, meta?.oxByTable?.[ti]||0);
-            const upd = {}; upd[`oxByTable/${myIdx}`]=0; upd[`oxByTable/${ti}`]=curTarget + curMine;
-            await update(ref(db, `rooms/${state.roomCode}/meta`), upd);
-          });
-        };
-      }else{
-        row.onclick = null;
+   // クリック：自分の行→1..12（据え置き）／ 他人はテーブル全体クリックで「渡す」
+if (myIdx !== null && myIdx === ti){
+  row.onclick = (ev)=>{
+    ev.stopPropagation(); // ← 自分席の行クリックが box.onclick に波及しないように
+    const mine = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
+    const limit = Math.min(12, mine);
+    if (limit<=0) return;
+    const entries = Array.from({length:limit}, (_,i)=> i+1).map(k=>({
+      label:String(k),
+      action: async ()=>{
+        const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
+        const meta = snap.val()||{};
+        const curMine = Math.max(0, meta?.oxByTable?.[ti]||0);
+        if (k>curMine) return;
+        const curPool = Math.max(0, meta?.oxItem|0);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          oxItem: curPool + k,
+          [`oxByTable/${ti}`]: curMine - k
+        });
+        const badge = document.createElement('div');
+        badge.textContent = `+${k}`;
+        badge.style.fontSize='12px';
+        badge.style.marginLeft='6px';
+        badge.style.opacity='0.85';
+        document.getElementById('m63OxPool')?.appendChild(badge);
+        setTimeout(()=>{ if(badge.isConnected) badge.remove(); }, 2000);
       }
+    }));
+    openMenu(ev.clientX, ev.clientY, entries);
+  };
+  // 自分のテーブル全体クリックは無効化（他UI干渉防止）
+  box.onclick = null;
+
+} else if (myIdx !== null && myIdx !== ti){
+  // 他プレイヤー：テーブル全体をクリック判定にする
+  row.onclick = null; // ← 行の判定は止める
+  box.onclick = (ev)=>{
+    const mine = Math.max(0, v?.meta?.oxByTable?.[myIdx]||0);
+    if (mine<=0) return; // 所持0ならポップを出さない（クリックは通す）
+    openOneMini(ev.clientX, ev.clientY, '渡す', async ()=>{
+      const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
+      const meta = snap.val()||{};
+      const curMine   = Math.max(0, meta?.oxByTable?.[myIdx]||0);
+      if (curMine<=0) return;
+      const curTarget = Math.max(0, meta?.oxByTable?.[ti]||0);
+      const upd = {};
+      upd[`oxByTable/${myIdx}`] = 0;
+      upd[`oxByTable/${ti}`]    = curTarget + curMine;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), upd);
+    });
+  };
+
+} else {
+  row.onclick = null;
+  box.onclick = null;
+}
+
     });
 
   }catch(err){
