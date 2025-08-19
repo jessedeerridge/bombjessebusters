@@ -1244,7 +1244,6 @@ renderM55(state.watching);
     renderM59(v);
     renderM61(v);
     renderM62(v);
-    renderM64(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1492,7 +1491,13 @@ if ((v.mission?.id|0) === 23) {
   }
 }
 
-  
+ // #64：初回だけ2枚を選んで左右端に固定（ホストのみ実行）
+if ((v.mission?.id|0) === 64 && state.isHost && v?.meta?.m64_done !== true) {
+  // 非同期だが await せずにキック（onValue 再発火で再描画）
+  ensureM64Init(v);
+  return;
+}
+ 
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
@@ -1743,6 +1748,12 @@ wrap.dataset.cardId = String(c.id||'');
         const m56Special = isM56 && isRightmost && hasX; // 全テーブル対象
         const ownerBlindSpecial = (m38Special || m56Special);
 
+const isM64 = (mid === 64);
+const pair64 = (isM64 ? (state.watching?.meta?.m64_pairs?.[idx] || null) : null);
+const m64Special = !!(pair64 && (pair64.left === c.id || pair64.right === c.id));
+
+const ownerBlindSpecial = (m38Special || m56Special || m64Special);
+        
         if (!c.open) {
           if (ownerBlindSpecial) {
             if (t.playerId === state.userId) {
@@ -3457,58 +3468,51 @@ async function ensureM61MetaInit(vNow){
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m61_byTable: by, m61_rotAt: Date.now() });
 }
 
-async function ensureM64MetaInit(v){
+/* ▼▼ ここから追加：ミッション64 初期化 ▼▼ */
+async function ensureM64Init(v){
   if ((v?.mission?.id|0) !== 64) return;
   if (!state.isHost) return;
-  if (v.meta?.m64Assigned) return;  // 既に決定済みならスキップ
+  if (v?.meta?.m64_done === true) return;
 
-  const tables = v.tables || [];
-  const assigned = {};
-  for(const T of tables){
-    if(!T.playerId) continue;
-    const hand = (T.hand || []).slice();
-    if(hand.length < 2) continue;
-    shuffle(hand);
-    const [a,b] = hand.slice(0,2).sort((x,y)=>x-y);
-    assigned[T.playerId] = { left:a, right:b };
-  }
+  const code = state.roomCode;
+  const tblRef = ref(db, `rooms/${code}/tables`);
+  const snap = await get(tblRef);
+  const tbls = snap.val() || [];
+  const pairs = {};
+  const alphaStr = 'abcdefghijklmnopqrstuvwxyz';
 
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m64Assigned: assigned });
-}
+  tbls.forEach((T, ti)=>{
+    const hand = (T?.hand || []).slice();
+    // 数字を持つカードから抽選（通常／赤／黄いずれも num があれば対象）
+    const pool = hand.filter(c => typeof c?.num === 'number');
+    if (pool.length < 2) return;
 
-function renderM64(v){
-  if((v?.mission?.id|0)!==64) return;
-  const assigned = v.meta?.m64Assigned || {};
-  const tables = document.querySelectorAll('.table');
-  (v.tables||[]).forEach((T,idx)=>{
-    const wrap = tables[idx]?.querySelector('.hand');
-    if(!wrap) return;
-    const asn = assigned[T.playerId];
-    if(!asn) return;
+    // ランダムに2枚
+    shuffle(pool);
+    const a = pool[0], b = pool[1];
 
-    // 左端
-    const leftCard = document.createElement('div');
-    leftCard.className = 'card';
-    if(T.playerId===state.userId){  // 自分は裏
-      leftCard.classList.add('back');
-    }else{
-      leftCard.style.backgroundImage = `url('${imgNumber(asn.left)}')`;
-    }
-    wrap.insertBefore(leftCard, wrap.firstChild);
+    // 小さい方→left / 大きい方→right（同値ならそのまま）
+    const small = ((a.num|0) <= (b.num|0)) ? a : b;
+    const large = ((a.num|0) <= (b.num|0)) ? b : a;
 
-    // 右端
-    const rightCard = document.createElement('div');
-    rightCard.className = 'card';
-    if(T.playerId===state.userId){
-      rightCard.classList.add('back');
-    }else{
-      rightCard.style.backgroundImage = `url('${imgNumber(asn.right)}')`;
-    }
-    wrap.appendChild(rightCard);
+    // 元の hand から2枚を一旦除去して、左端/右端に再配置
+    const rest = hand.filter(c => c.id !== small.id && c.id !== large.id);
+    const newHand = [small, ...rest, large];
+
+    // αを振り直し
+    newHand.forEach((c,i)=> c.alpha = alphaStr[i % alphaStr.length]);
+
+    tbls[ti].hand = newHand;
+    pairs[ti] = { left: small.id, right: large.id };
   });
-}
 
-  
+  await Promise.all([
+    set(tblRef, tbls),
+    update(ref(db, `rooms/${code}/meta`), { m64_pairs: pairs, m64_done: true })
+  ]);
+}
+/* ▲▲ ここまで追加：ミッション64 初期化 ▲▲ */
+
   
 /* ここから追加：#62 人数分の数値カード（同期） */
 async function ensureM62MetaInit(vNow){
@@ -3529,9 +3533,6 @@ async function ensureM62MetaInit(vNow){
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m62_nums: picks });
 }
 
-  
-
-  
 function renderM62(v){
   const isM62 = ((v?.mission?.id|0) === 62);
   const rowId = 'm62Row';
