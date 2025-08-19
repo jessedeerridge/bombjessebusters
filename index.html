@@ -3206,7 +3206,21 @@ async function renderM57(v){
         await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Letters: letters });
       }
     }
-
+ // ▼ 全体公開中の通常コードを数字別に集計し、4枚そろった数字を抽出
+ const openCountByNum = {};
+ (v.tables || []).forEach(T => {
+   (T.hand || []).forEach(c => {
+     if (c?.kind === 'normal' && c.open === true) {
+       const n = c.num | 0; // 1..12
+       openCountByNum[n] = (openCountByNum[n] || 0) + 1;
+     }
+   });
+ });
+ const hideNums = new Set(
+   Object.entries(openCountByNum)
+     .filter(([, cnt]) => (cnt | 0) >= 4)
+     .map(([n]) => Number(n))
+ );
     // グリッド生成
     const grid = document.createElement('div');
     grid.id = 'm57Grid';
@@ -3217,6 +3231,7 @@ async function renderM57(v){
     grid.style.marginTop = '6px';
 
     for (let i = 1; i <= 12; i++) {
+        if (hideNums.has(i)) continue;
       const wrap = document.createElement('div');
       wrap.style.position = 'relative';
       wrap.style.display = 'flex';
