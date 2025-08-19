@@ -3171,6 +3171,7 @@ function renderM43(v){
 /* ：ミッション43 */
 function renderM57(v){
   if((v?.mission?.id|0)!==57) return;
+  if(document.querySelector('.m57-grid')) return;
 
   // 既存の残骸を消す
   document.querySelectorAll('.m57-grid').forEach(n=>n.remove());
