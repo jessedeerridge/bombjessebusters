@@ -3471,7 +3471,6 @@ function renderM61(v){
 
     // ▼▼ M61：制約カードの“下”に超小型キャラカードを縦積み表示し、元の大キャラは削除 ▼▼
     // 元の大きいキャラカードを削除（ラッパー char-col は残す）
-   charCol.querySelector('.char-card')?.remove();
     // スタック（制約カード ↑ / 小型キャラ ↓）
     const stack = document.createElement('div');
     stack.className = 'm61-con';        // 掃除に使う既存フラグ
@@ -3495,21 +3494,31 @@ function renderM61(v){
     // 超小型サイズ（必要なら数値はお好みで調整）
     mini.style.width  = '20px';
     mini.style.height = '30px';
-    // 画像：flipped に応じて face / battery を切替
+    // 着席判定：席に人がいなければ“完全ブランク & クリック不可”
     const t = (v.tables||[])[ti] || {};
-  const flipped = !!t?.character?.flipped;
-    const faceUrl = flipped ? './battery.jpg' : `./${t?.character?.face || 'member (1).jpg'}`;
-    mini.style.backgroundImage = `url("${faceUrl}")`;
-    // クリックで裏返し（battery）にトグル
-    mini.style.cursor = 'pointer';
-    mini.onclick = async () => {
-      await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !flipped });
-    };
+    const hasSeat = !!(t?.member?.uid || t?.character?.face); // なければブランク
+    if (hasSeat){
+     const flipped = !!t?.character?.flipped;
+      const faceUrl = flipped ? './battery.jpg' : `./${t?.character?.face || 'member (1).jpg'}`;
+      mini.style.backgroundImage = `url("${faceUrl}")`;
+      mini.style.cursor = 'pointer';
+      mini.onclick = async () => {
+        // 最新値を見ずにトグルしてOK（DBが真実）
+        await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), {
+          flipped: !flipped
+        });
+      };
+    }else{
+      // ブランク：背景なし・クリック無効
+      mini.style.backgroundImage = 'none';
+      mini.style.pointerEvents = 'none';
+      mini.title = '空席';
+    }
     stack.appendChild(mini);
 
     // キャラ列の“左”に、縦積み（制約↑／小型キャラ↓）を差し込む
-   content.insertBefore(stack, charCol);
-
+    const parent = charCol.parentNode;
+    if (parent) parent.replaceChild(stack, charCol);
     // 制約カードの動作：自席のみ「拡大→交換」、他席は拡大のみ
     if (ti === myIdx){
       con.style.cursor = 'pointer';
