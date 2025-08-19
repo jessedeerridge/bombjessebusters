@@ -1261,7 +1261,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM15(v);
     renderM16(v);
     renderM30(v);
-    renderM30Audio(v);
+    renderM19Audio(v);
     renderM32(v);
     renderM36(v);
     renderM37(v);
@@ -6503,8 +6503,8 @@ function renderM30(v){
 }
 
 // === M30: mi19 再生・戻し（ホスト）＋ 全員音量バー ===
-function renderM30Audio(v){
-  const isM30 = ((v?.mission?.id|0) === 30);
+function renderM19Audio(v){
+  const isM30 = ((v?.mission?.id|0) === 19);
   if (!isM30){ H(m30HostBox, true); H(m30VolBox, true); return; }
 
   if (!m30Audio){
