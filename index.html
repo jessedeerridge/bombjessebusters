@@ -690,6 +690,19 @@ const hostTool = document.getElementById('hostTool');
 const m30HostBox = document.getElementById('m30HostAudio');
 const m30VolBox  = document.getElementById('m30Volume');
 let   m30Audio   = null, m30Src = './mi19.mp3', m30Vol = 0.8;
+let m19Ctx = null, m19SrcNode = null, m19Gain = null;
+function ensureM19WebAudio(){
+  if (!m19Ctx) m19Ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+  ensureM19WebAudio();
+
+  if (!m19SrcNode) m19SrcNode = m19Ctx.createMediaElementSource(m30Audio);
+  if (!m19Gain){
+    m19Gain = m19Ctx.createGain();
+    m19Gain.gain.value = Math.max(0, Math.min(1, m30Vol));
+    m19SrcNode.connect(m19Gain).connect(m19Ctx.destination);
+  }
+}
 
 /* helpers */
 function hiragana(len=4){
@@ -6530,15 +6543,22 @@ function renderM19Audio(v){
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m30_audioCmd: cmd });
     };
 
-    playBtn.onclick = async ()=>{
+     playBtn.onclick = async ()=>{
+      /* ここから追加 */
+      if (m19Ctx && m19Ctx.state === 'suspended'){ try{ await m19Ctx.resume(); }catch(e){} }
+      /* ここまで追加 */
       const cur = Math.floor(m30Audio.currentTime||0);
       if (m30Audio.paused) await sendCmd('play', cur);
       else                 await sendCmd('pause', cur);
     };
     backBtn.onclick = async ()=>{
+      /* ここから追加 */
+      if (m19Ctx && m19Ctx.state === 'suspended'){ try{ await m19Ctx.resume(); }catch(e){} }
+      /* ここまで追加 */
       const cur = Math.floor(m30Audio.currentTime||0);
       await sendCmd('seek', Math.max(0, cur - 10));
     };
+
   }else{
     H(m30HostBox, true);
   }
@@ -6551,6 +6571,7 @@ function renderM19Audio(v){
       try{ m30Audio.currentTime = want; }catch(_){}
     }
     if (cmd.type === 'play'){
+      if (m19Ctx && m19Ctx.state === 'suspended'){ m19Ctx.resume().catch(()=>{}); }
       m30Audio.play().catch(()=>{});
     }else if (cmd.type === 'pause'){
       m30Audio.pause();
@@ -6563,10 +6584,12 @@ function renderM19Audio(v){
     const label = document.createElement('span'); label.textContent = '🔊 音量';
     const range = document.createElement('input');
     range.type='range'; range.min='0'; range.max='1'; range.step='0.01';
-    range.value = String(m30Audio.volume);
-    range.oninput = ()=>{
-      m30Vol = parseFloat(range.value||'0.8');
-      m30Audio.volume = m30Vol;
+    range.value = String(m19Gain?.gain?.value ?? m30Vol);
+    range.oninput = async ()=>{
+      if (m19Ctx && m19Ctx.state === 'suspended'){ try{ await m19Ctx.resume(); }catch(e){} }
+      m30Vol = Math.max(0, Math.min(1, parseFloat(range.value||'0.8')));
+      if (m19Gain) m19Gain.gain.value = m30Vol;
+      try{ localStorage.setItem('m19Vol', String(m30Vol)); }catch(e){}
     };
     m30VolBox.append(label, range);
     H(m30VolBox, false);
