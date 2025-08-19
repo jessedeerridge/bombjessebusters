@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ｆｒ</title>
+<title>e</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -1244,7 +1244,6 @@ renderM55(state.watching);
     renderM59(v);
     renderM61(v);
     renderM62(v);
-    renderM63(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3459,183 +3458,6 @@ async function ensureM61MetaInit(vNow){
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m61_byTable: by, m61_rotAt: Date.now() });
 }
 
-/* ▼▼ ここから追加：ミッション63（酸素：隊長配布・リザーブ・譲渡） ▼▼ */
-async function renderM63(v){
-  try{
-    const isM63 = ((v?.mission?.id|0) === 63);
-
-    // 片付け
-    if (!isM63){
-      document.getElementById('m63OxPool')?.remove();
-      // 他ミッションで高さが残らないようにリセット
-      document.querySelectorAll('.table').forEach(tb=> tb.style.removeProperty('--table-h'));
-      return;
-    }
-
-    // 安全ガード
-    const n = (v?.tables?.length|0);
-    if (!Array.isArray(v?.tables) || n <= 0) return;
-
-    // 初期化：ホストのみ・一度だけ（隊長にだけ配布）
-    if (state.isHost && v?.meta?.m63_init !== true){
-      const cap = (v?.captainTable|0);
-      const give = (n<=2)?14 : (n===3)?18 : (n===4)?24 : 30;
-      const by = {}; for (let i=0;i<n;i++) by[i]=0;
-      if (cap>=0 && cap<n) by[cap] = give;
-      await update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m63_init:true, oxByTable: by, oxItem: 0
-      });
-      return; // 次の onValue で描画
-    }
-
-    // 自席インデックス（#49準拠の二段判定）
-    const myIdx = (() => {
-      const sNum = (state?.seatedTable == null) ? null : Number(state.seatedTable);
-      if (Number.isInteger(sNum) && sNum>=0 && sNum<n) return sNum;
-      const alt = (v.tables||[]).findIndex(t => t?.playerId === state.userId);
-      return (alt >= 0 ? alt : null);
-    })();
-
-    // 1) リザーブ（アイテム列の直下。ox2画像は置かない）
-    const itemsBar = document.getElementById('itemsBar'); if (!itemsBar) return;
-    let poolRow = document.getElementById('m63OxPool');
-    if (!poolRow){
-      poolRow = document.createElement('div');
-      poolRow.id = 'm63OxPool';
-      poolRow.className = 'ox-row ox-pool';
-      const wrap = document.createElement('div'); wrap.className = 'ox-wrap';
-      poolRow.appendChild(wrap);
- itemsBar.insertAdjacentElement('afterend', poolRow); // ← itemsBar の直下＝アイテムカードの下に出す
-    }
-    const wrapPool = poolRow.querySelector('.ox-wrap'); wrapPool.innerHTML = '';
-    const poolCnt = Math.max(0, v?.meta?.oxItem|0);
-    for (let i=0;i<poolCnt;i++){ const t=document.createElement('div'); t.className='token ox'; wrapPool.appendChild(t); }
-
-    // 隊長だけ：リザーブをタップ→「回収」全量を隊長へ
-    const capIdx = (v?.captainTable==null)? null : Number(v.captainTable);
-    if (myIdx !== null && capIdx === myIdx && poolCnt>0){
-      poolRow.onclick = (ev)=>{
-        openOneMini(ev.clientX, ev.clientY, '回収', async ()=>{
-          const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
-          const meta = snap.val()||{};
-          const nowPool = Math.max(0, meta?.oxItem|0);
-          if (nowPool<=0) return;
-          const nowCap  = Math.max(0, meta?.oxByTable?.[capIdx]||0);
-          await update(ref(db, `rooms/${state.roomCode}/meta`), {
-            oxItem: 0,
-            [`oxByTable/${capIdx}`]: nowCap + nowPool
-          });
-        });
-      };
-    }else{
-      poolRow.onclick = null;
-    }
-
-    // 2) 各テーブル下：所持酸素（10枚で改行、0枚なら 0ox×3）
-    const tableNodes = document.querySelectorAll('.table'); // renderTables と同順
-    (v.tables||[]).forEach((T, ti)=>{
-      const box = tableNodes[ti]; if (!box) return;
-
-      let row = box.querySelector('.ox-row[data-owner="1"][data-m63="1"]');
-      if (!row){
-        row = document.createElement('div');
-        row.className = 'ox-row';
-        row.dataset.owner='1'; row.dataset.m63='1';
-        // #44と同じくアルファベット直下をアンカーに（無ければ手札の後ろ）
-        const anchor = box.querySelector('.badge-fixed');
-        if (anchor && anchor.parentElement){
-          anchor.parentElement.appendChild(row);
-          const ah = anchor.parentElement.querySelector('.alpha')?.getBoundingClientRect().height || 18;
-          row.style.marginTop = `${Math.round(ah * 5)}px`;
-        }else{
-          (box.querySelector('.hand') || box).appendChild(row);
-        }
-      }
-
-      // 再描画（10で改行するため常に .ox-wrap を挿入）
-   // 再描画（10で改行するため常に .ox-wrap を挿入）
-row.innerHTML = '';
-const w = document.createElement('div'); w.className = 'ox-wrap'; row.appendChild(w);
-  row.appendChild(w);
-if (cnt>0){
-  for (let i=0;i<cnt;i++){ const t=document.createElement('div'); t.className='token ox'; w.appendChild(t); }
-}
-// ← 0枚なら何も表示しない（0ox廃止）
-
-
-      // テーブル高さ：1行ぶん拡張（0ox表示時も1行扱い）
-      const baseH = 96;            // :root --table-h
-      const extra = (4 + 20);      // 先頭4px + トークン20px
-      box.style.setProperty('--table-h', `${Math.max(baseH, baseH + extra)}px`);
-
-      // クリック：自分の行→1..12 をリザーブへ、他人の行→「渡す」で全量譲渡
-   // クリック：自分の行→1..12（据え置き）／ 他人はテーブル全体クリックで「渡す」
-if (myIdx !== null && myIdx === ti){
-  row.onclick = (ev)=>{
-    ev.stopPropagation(); // ← 自分席の行クリックが box.onclick に波及しないように
-    const mine = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
-    const limit = Math.min(12, mine);
-    if (limit<=0) return;
-    const entries = Array.from({length:limit}, (_,i)=> i+1).map(k=>({
-      label:String(k),
-      action: async ()=>{
-        const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
-        const meta = snap.val()||{};
-        const curMine = Math.max(0, meta?.oxByTable?.[ti]||0);
-        if (k>curMine) return;
-        const curPool = Math.max(0, meta?.oxItem|0);
-        await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          oxItem: curPool + k,
-          [`oxByTable/${ti}`]: curMine - k
-        });
-        const badge = document.createElement('div');
-        badge.textContent = `+${k}`;
-        badge.style.fontSize='12px';
-        badge.style.marginLeft='6px';
-        badge.style.opacity='0.85';
-        document.getElementById('m63OxPool')?.appendChild(badge);
-        setTimeout(()=>{ if(badge.isConnected) badge.remove(); }, 2000);
-      }
-    }));
-    openMenu(ev.clientX, ev.clientY, entries);
-  };
-  // 自分のテーブル全体クリックは無効化（他UI干渉防止）
-  box.onclick = null;
-
-} else if (myIdx !== null && myIdx !== ti){
-  // 他プレイヤー：テーブル全体をクリック判定にする
-  row.onclick = null; // ← 行の判定は止める
-  box.onclick = (ev)=>{
-    const mine = Math.max(0, v?.meta?.oxByTable?.[myIdx]||0);
-    if (mine<=0) return; // 所持0ならポップを出さない（クリックは通す）
-    openOneMini(ev.clientX, ev.clientY, '渡す', async ()=>{
-      const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
-      const meta = snap.val()||{};
-      const curMine   = Math.max(0, meta?.oxByTable?.[myIdx]||0);
-      if (curMine<=0) return;
-      const curTarget = Math.max(0, meta?.oxByTable?.[ti]||0);
-      const upd = {};
-      upd[`oxByTable/${myIdx}`] = 0;
-      upd[`oxByTable/${ti}`]    = curTarget + curMine;
-      await update(ref(db, `rooms/${state.roomCode}/meta`), upd);
-    });
-  };
-
-} else {
-  row.onclick = null;
-  box.onclick = null;
-}
-
-    });
-
-  }catch(err){
-    // 入室不能事故を防ぐため、例外は握り潰してログのみ
-    console.error('[M63]', err);
-  }
-}
-/* ▲▲ ここまで追加：ミッション63 ▲▲ */
-
-  
 /* ここから追加：#62 人数分の数値カード（同期） */
 async function ensureM62MetaInit(vNow){
   const v = vNow || state.watching; if (!v) return;
@@ -3895,40 +3717,14 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
         (box.querySelector('.hand') || box).appendChild(row);
       }
     }
-// 再描画（10で改行するため常に .ox-wrap を挿入…はやめ、>0のときだけ作る）
-row.innerHTML = '';
-
-// oxByTable の取り出しを頑健化（将来の構造変更にも耐える）
-const oxByTable =
-  (v && v.meta && v.meta.oxByTable) ||
-  (v && v.meta && v.meta.m63 && v.meta.m63.oxByTable) ||
-  {};
-
-// ti は数値でも文字列でもアクセスできるように両方試す
-const keyA = ti;
-const keyB = String(ti);
-const raw = (oxByTable != null && (oxByTable[keyA] ?? oxByTable[keyB])) ?? 0;
-
-// 数値化（"12" でも OK にする）
-const cnt = Number.isFinite(+raw) ? Math.max(0, +raw) : 0;
-
-// デバッグ：必要なら一時的に有効化
-// console.debug('M63 OX render', { ti, raw, cnt, oxByTable });
-
-if (cnt > 0) {
-  const w = document.createElement('div');
-  w.className = 'ox-wrap';
-  row.appendChild(w);
-
-  for (let i = 0; i < cnt; i++) {
-    const t = document.createElement('div');
-    t.className = 'token ox';
-    w.appendChild(t);
-  }
-}
-// 0枚なら一切UIを作らない（0oxもwrapも作らない）
-
-// 0枚なら一切UIを作らない
+    // 再描画
+    row.innerHTML = '';
+    const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
+    for (let i=0;i<cnt;i++){
+      const t = document.createElement('div');
+      t.className = 'token ox';
+      row.appendChild(t);
+    }
     // テーブルの高さ（1行ぶんだけ拡張）
     const baseH = 96;
     const extra = (cnt>0)? (4+20) : 0;
