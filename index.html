@@ -1243,6 +1243,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
 renderM55(state.watching);
     renderM59(v);
     renderM61(v);
+    renderM62(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -3455,6 +3456,58 @@ async function ensureM61MetaInit(vNow){
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m61_byTable: by, m61_rotAt: Date.now() });
 }
 
+/* ここから追加：#62 人数分の数値カード（同期） */
+async function ensureM62MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if ((v?.mission?.id|0) !== 62) return;
+  const need = (v?.tables?.length|0); if (need <= 0) return;
+
+  // 既に人数分そろっていれば何もしない（不足/過多なら作り直し）
+  const cur = Array.isArray(v?.meta?.m62_nums) ? v.meta.m62_nums : null;
+  if (Array.isArray(cur) && cur.length === need) return;
+  if (!state.isHost) return;
+
+  // 場に未使用の数字から人数分を抽選（重複回避ユーティリティ）
+  const picks = (typeof pickUnusedNumbers === 'function')
+    ? pickUnusedNumbers(need)
+    : MATERIALS.numbers.slice().sort(()=>Math.random()-0.5).slice(0, need);
+
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m62_nums: picks });
+}
+
+function renderM62(v){
+  const isM62 = ((v?.mission?.id|0) === 62);
+  const rowId = 'm62Row';
+  const old   = document.getElementById(rowId);
+  if (!isM62){ if (old) old.remove(); return; }
+
+  const need = (v?.tables?.length|0);
+  const nums = Array.isArray(v?.meta?.m62_nums) ? v.meta.m62_nums : null;
+  if (!nums || nums.length !== need){ ensureM62MetaInit(v); if (old) old.remove(); return; }
+
+  if (old) old.remove();
+  const lane = document.createElement('div');
+  lane.id = rowId;
+  lane.className = 'numlane';
+
+  // placeNumberCard は既存の同じ数字の表示を一ヵ所に集約（重複防止＆移動）してくれます
+  nums.forEach(n => {
+    if (typeof placeNumberCard === 'function'){
+      placeNumberCard(n, lane);
+    }else{
+      const nc = document.createElement('div');
+      nc.className = 'numcard';
+      nc.style.backgroundImage = `url('${imgNumber(n)}')`;
+      lane.appendChild(nc);
+    }
+  });
+
+  // アイテム列の直下に設置（既存ユーティリティ）
+  mountLaneUnderItemsBar(lane);
+}
+/* ここまで追加：#62 */
+
+  
 function renderM61(v){
   const isM61 = ((v?.mission?.id|0) === 61);
   // 片付け（#61以外になったら痕跡を消す）
