@@ -3914,11 +3914,11 @@ function renderM66(v){
     return slots[ map[name] ];
   }
 
-  function refreshM66(layer, slots, v){
-    // 各スロットの背景
+ function refreshM66(layer, slots, v){
     const ccTop = layer.querySelector('.m66-line:nth-child(1) .concard');
-    const ccLeft= layer.querySelector('.m66-line:nth-child(2) .concard:nth-child(1)');
-    const ccRight=layer.querySelector('.m66-line:nth-child(2) .concard:nth-child(3)');
+    const mid   = layer.querySelector('.m66-line:nth-child(2)');
+    const ccLeft  = mid?.querySelector('.m66-slot:nth-child(1) .concard');
+    const ccRight = mid?.querySelector('.m66-slot:nth-child(3) .concard');
     const ccBot = layer.querySelector('.m66-line:nth-child(3) .concard');
     if (ccTop)  ccTop.style.backgroundImage   = `url('${imgConstraint(slots[1])}')`;
     if (ccLeft) ccLeft.style.backgroundImage  = `url('${imgConstraint(slots[3])}')`;
