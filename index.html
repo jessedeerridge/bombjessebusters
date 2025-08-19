@@ -4188,7 +4188,8 @@ function openConstraintZoom61(letter, myIdx){
           const arr  = Array.isArray(meta.m61_byTable) ? meta.m61_byTable.slice() : [];
           if (myIdx<0 || myIdx>=arr.length) { closeConstraintZoom(); return; }
           // デッキB = F or G をランダム
-          const B = (Math.random()<0.5)? 'F' : 'G';
+const deckB = ['F','G','H','I','J','K','L'];
+const B = deckB[Math.floor(Math.random() * deckB.length)];
           arr[myIdx] = B;
           await update(mRef, { m61_byTable: arr, m61_swapAt: Date.now() });
         }catch(e){ console.error('[M61 swap]', e); }
