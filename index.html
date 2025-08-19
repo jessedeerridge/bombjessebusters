@@ -3184,8 +3184,16 @@ function renderM57(v){
   grid.style.gap='6px';
   grid.style.marginTop='6px';
 
-  // 数値1~12と制約a~lをシャッフル
-  const letters=shuffle("abcdefghijkl".split(''));
+  // ★ 修正：letters は DB に保存して再利用
+  let letters = v?.meta?.m57Letters;
+  if(!letters){
+    letters = shuffle("abcdefghijkl".split(''));
+    // ホストだけが初回に保存
+    if(state.isHost){
+      update(ref(db,`rooms/${state.roomCode}/meta`), { m57Letters: letters });
+    }
+  }
+
   for(let i=1;i<=12;i++){
     const wrap=document.createElement('div');
     wrap.style.position='relative';
@@ -3239,52 +3247,23 @@ function renderM57(v){
     img.className='concard';
     img.style.backgroundImage=`url('${imgConstraint(sel)}')`;
     img.style.marginRight='6px';
+
+    // di左カードも拡大可（ポップなし）
+    img.onclick=()=>{
+      const overlay=document.createElement('div');
+      overlay.id='conZoomOverlay';
+      overlay.innerHTML=`
+        <div class="conzoom-wrap">
+          <div class="conzoom-card" style="background-image:url('${imgConstraint(sel)}')"></div>
+        </div>`;
+      overlay.onclick=(e)=>{ if(e.target===overlay) overlay.remove(); };
+      document.body.appendChild(overlay);
+    };
+
     di.insertAdjacentElement('beforebegin',img);
   }
 }
 
-
-/* 拡大と「選ぶ」処理 */
-function openConZoom(letter, x, y){
-  const overlay=document.createElement('div');
-  overlay.id='conZoomOverlay';
-  overlay.onclick=()=>overlay.remove();
-  const wrap=document.createElement('div');
-  wrap.className='conzoom-wrap';
-  const card=document.createElement('div');
-  card.className='conzoom-card';
-  card.style.backgroundImage=`url('${imgConstraint(letter)}')`;
-
-  card.onclick=(ev)=>{
-    ev.stopPropagation();
-    openOneMini(ev.clientX, ev.clientY, '選ぶ', async ()=>{
-      // di左に表示（全員同期）
-      await update(ref(db, `rooms/${state.roomCode}/meta`), { m57_pick: letter });
-    });
-  };
-
-  wrap.appendChild(card);
-  overlay.appendChild(wrap);
-  document.body.appendChild(overlay);
-}
-
-/* di左に選ばれた制約カードを表示 */
-function renderM57Selected(v){
-  if((v?.mission?.id|0)!==57) return;
-  const di=document.getElementById('di');
-  if(!di) return;
-  const exist=document.getElementById('m57Selected');
-  if(exist) exist.remove();
-  const pick=v?.meta?.m57_pick;
-  if(pick){
-    const img=document.createElement('div');
-    img.id='m57Selected';
-    img.className='concard';
-    img.style.marginRight='4px';
-    img.style.backgroundImage=`url('${imgConstraint(pick)}')`;
-    di.insertAdjacentElement('beforebegin', img);
-  }
-}
 
   
 /* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
