@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>え</title>
+<title>ｒえ</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3896,13 +3896,21 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
       }
     }
     // 再描画
-    row.innerHTML = '';
-    const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
-    for (let i=0;i<cnt;i++){
-      const t = document.createElement('div');
-      t.className = 'token ox';
-      row.appendChild(t);
-    }
+ row.innerHTML = '';
+const cnt = Math.max(0, v?.meta?.oxByTable?.[ti] || 0);
+
+if (cnt > 0) {
+  const w = document.createElement('div');
+  w.className = 'ox-wrap';
+  row.appendChild(w);
+
+  for (let i = 0; i < cnt; i++) {
+    const t = document.createElement('div');
+    t.className = 'token ox';
+    w.appendChild(t);
+  }
+}
+// 0枚なら一切UIを作らない
     // テーブルの高さ（1行ぶんだけ拡張）
     const baseH = 96;
     const extra = (cnt>0)? (4+20) : 0;
