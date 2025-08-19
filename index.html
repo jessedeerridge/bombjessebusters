@@ -3280,7 +3280,8 @@ async function renderM59(v){
 
   // 位置：カードのちょうど上（tables 内基準）
   const x = rb.left - tb.left + (rb.width/2) - (56/2);
-  const y = (rb.top - tb.top) - 56 - 2 - 12; // 少しだけ上に余白
+const x = rb.left - tb.left + (rb.width/2) - (56/2);
+const y = rb.top - tb.top - (56/2);  // ← 高さ半分だけ上にずらす
   node.style.left = `${Math.max(0, x)}px`;
   node.style.top  = `${Math.max(0, y)}px`;
 
