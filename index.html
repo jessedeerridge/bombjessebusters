@@ -137,7 +137,8 @@
   .table{
     position:relative;border:1px dashed #ddd;border-radius:10px;
     padding:0 8px;height:var(--table-h);display:block;background:#fff;
-    overflow:auto;width:max-content;z-index:0;
+    overflow:hidden;width:max-content;z-index:0;
+    transition: height .25s ease;  /* ← 高さ変更をアニメーション */
   }
   .table.elevated{ z-index:9999; }
 
@@ -4634,24 +4635,27 @@ function renderM44(v){
         (hand || box).appendChild(ownRow);
       }
     }
-    // 再描画
+    // 再描画（10個で改行するため常に .ox-wrap を挿入）
     ownRow.innerHTML = '';
     const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
+    const wrapSelf = document.createElement('div');
+    wrapSelf.className = 'ox-wrap';      // ← プールと同じ折返しルール（10で改行）
+    ownRow.appendChild(wrapSelf);
     for (let i=0; i<cnt; i++){
       const t = document.createElement('div');
-      t.className = 'token ox';
-      ownRow.appendChild(t);
+     t.className = 'token ox';
+      wrapSelf.appendChild(t);           // ← トークンは wrap 内に入れる
     }
 
-
-    // ▼▼ テーブル高さを所持酸素の行数に合わせて自動調整（スクロール抑止）
-    // 横一列固定（折返しなし）：所持があれば 1 行ぶんだけ高さを足す
-    const baseH = 96;                        // CSS :root の --table-h 既定（96px）
-    const rows  = (cnt > 0 ? 1 : 0);         // ← 常に 1 行 or 0 行
-    const extra = rows > 0 ? (4 + 20) : 0;   // 先頭4px + トークン高さ20px
-    const needH = Math.max(baseH, baseH + extra); // 既定より低くはしない
+    // ▼▼ テーブル高さを所持酸素の【行数】に合わせてスライド
+    const BASE   = 96;     // 基準高さ（座席のみ）
+    const PERROW = 10;     // 1行あたりのトークン数（.ox-wrap と揃える）
+    const ROWH   = 28;     // 1行ぶんの増分（見た目に合わせて微調整OK）
+   const GAP    = 0;      // 余白が必要なら調整
+    const rows   = (cnt>0) ? Math.ceil(cnt / PERROW) : 0;
+    const extra  = rows>0 ? (rows * ROWH + GAP) : 0;
+    const needH  = BASE + extra;
     box.style.setProperty('--table-h', `${needH}px`);
- 
   
 
     // 自分の所持酸素をクリック → 1/2/3 を返却（プールへ）
