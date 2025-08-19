@@ -4735,31 +4735,27 @@ if (Number.isInteger(idx) && idx === ti){
         }
       }
 
-  // 再描画
+  // 再描画（M63と同じく .ox-wrap を介して 15 個で改行）
   row.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'ox-wrap';     // CSS で 1 行あたり 15 個に折返し
+  row.appendChild(wrap);
   const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
-
-  // 所持数ぶんの酸素トークンのみ表示（0枚なら何も描かない＝詰める）
   for (let i=0; i<cnt; i++){
     const t = document.createElement('div');
     t.className = 'token ox';
-    row.appendChild(t);
+    wrap.appendChild(t);
   }
      // ▼▼ テーブル高さ：所持酸素の行数に合わせて自動調整（#63相当の計算）
   {
-    const baseH = 96;           // :root の --table-h 既定値（CSS） :contentReference[oaicite:4]{index=4}
-    const perRow = 15;          // .ox-wrap の1行あたり個数（CSSと一致） :contentReference[oaicite:5]{index=5}
+    const baseH = 96;           // CSS :root の --table-h 既定
+    const perRow = 15;          // 1 行あたりのトークン数（.ox-wrap と一致）
     const rows = Math.ceil(cnt / perRow);
-    // 行の縦サイズ：先頭余白4px + トークン(20px) * 行数 + 行間(2px) * (行数-1)
+    // 4px（前縁） + 20px（トークン高）×行数 + 2px（行間）×(行数-1)
     const extra = rows > 0 ? (4 + rows * 20 + Math.max(0, rows - 1) * 2) : 0;
     const needH = Math.max(baseH, baseH + extra);
     box.style.setProperty('--table-h', `${needH}px`);
   }
-      // テーブル高さを1行ぶんだけ拡張（#44の挙動と整合）
-      const baseH = 96;  // :root --table-h 既定
-      const extra = (cnt>0) ? (4 + 20) : 0;  // 4px + トークン20px
-      box.style.setProperty('--table-h', `${Math.max(baseH, baseH + extra)}px`);
-
       // --- 3) 譲渡メニュー：自分“以外”の行だけクリック可 ---
       // 自分のテーブル番号を安全に特定する
       const myIdx = (() => {
