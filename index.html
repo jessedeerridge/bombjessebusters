@@ -3498,13 +3498,13 @@ async function renderM63(v){
 
     // 1) リザーブ（アイテム列の直下。ox2画像は置かない）
     const itemsBar = document.getElementById('itemsBar'); if (!itemsBar) return;
- let poolRow = document.getElementById('m63OxPool');
+let poolRow = document.getElementById('m63OxPool');
 if (!poolRow){
   poolRow = document.createElement('div');
   poolRow.id = 'm63OxPool';
   poolRow.className = 'ox-row ox-pool';
-  // 修正：itemsBar の「中」に置く → アイテムカードの直下に表示される
-  itemsBar.appendChild(poolRow);
+  // ここが問題：itemsBar の「直後」に置いている
+  itemsBar.insertAdjacentElement('afterend', poolRow);
 }
 
     const wrapPool = poolRow.querySelector('.ox-wrap'); wrapPool.innerHTML = '';
