@@ -3496,24 +3496,39 @@ function renderM61(v){
     mini.style.height = '30px';
     // 着席判定：席に人がいなければ“完全ブランク & クリック不可”
     const t = (v.tables||[])[ti] || {};
-    // 席に人がいなければ完全ブランク
-    const hasSeat = !!(t?.member?.uid);
+   // --- 着席判定を“ゆるく”する：どれか1つでもあれば座っているとみなす ---
+    const hasSeat = !!(
+      t?.member?.uid || t?.member?.id || t?.member?.name ||
+      t?.ownerUid || t?.joinedAt ||
+      t?.character?.face || t?.character?.id
+    );
+
+    // 表示のベース指定（見えないトラブル防止）
+    mini.style.backgroundSize    = 'cover';
+    mini.style.backgroundPosition= 'center';
+   mini.style.backgroundRepeat  = 'no-repeat';
+
     if (!hasSeat){
+      // ブランク：完全に何も表示しない＆クリック不可
       mini.style.backgroundImage = 'none';
-      mini.style.pointerEvents = 'none';
+     mini.style.pointerEvents   = 'none';
+     mini.removeAttribute('onclick');
       mini.title = '空席';
-    }else{
+    } else {
+      // 顔 or battery を表示（顔が未設定でも必ずフォールバック）
       const flipped = !!t?.character?.flipped;
-      const faceUrl = flipped ? './battery.jpg'
-                              : `./${t?.character?.face || 'member (1).jpg'}`;
+      const faceName = t?.character?.face || 'member (1).jpg'; // フォールバック
+      const faceUrl  = flipped ? './battery.jpg' : `./${faceName}`;
       mini.style.backgroundImage = `url("${faceUrl}")`;
       mini.style.cursor = 'pointer';
+     mini.title = '';
       mini.onclick = async () => {
         await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), {
-        flipped: !flipped
+          flipped: !flipped
         });
       };
-    }    stack.appendChild(mini);
+    }
+    stack.appendChild(mini);
 
     // キャラ列の“左”に、縦積み（制約↑／小型キャラ↓）を差し込む
     const parent = charCol.parentNode;
