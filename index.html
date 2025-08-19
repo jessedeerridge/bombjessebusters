@@ -1102,8 +1102,19 @@ function openOneMini(x,y,label,cb){
 function openMenu(x,y, entries){
   const div=document.createElement('div'); div.className='mini-pop';
   div.addEventListener('click', e=>e.stopPropagation());
-  entries.forEach(ent=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=ent.label; b.onclick=async ()=>{ if(div.isConnected) div.remove(); await ent.action?.(); }; div.appendChild(b); });
-  placeInsideViewport(div, x, y);
+  entries.forEach(ent=>{
+    const b=document.createElement('button');
+    b.className='btn small';
+    b.textContent = ent.label;
+    if (ent && typeof ent.action === 'function') {
+      b.onclick = async ()=>{ if(div.isConnected) div.remove(); await ent.action(); };
+    } else {
+      // 非クリック（表示のみ）
+      b.disabled = true;
+      b.classList.add('ghost'); // 見た目を少し薄く
+    }
+    div.appendChild(b);
+  });  placeInsideViewport(div, x, y);
 }
 function openBottomMenu(entries){
   const div=document.createElement('div'); div.className='mini-pop bottom-pop';
@@ -3628,6 +3639,7 @@ function renderM63(v){
             flashPlus(k);
           }
         }));
+　　    entries.push({ label: `所持: ${mine}個` });
         openMenu(ev.clientX, ev.clientY, entries);
       };
     }else{
