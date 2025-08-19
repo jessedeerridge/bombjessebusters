@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>あ</title>
+<title>ち</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -3178,8 +3178,14 @@ function renderM43(v){
 /* ：ミッション43 */
 // ミッション57：二重描画/二重保存対策込みで全面書き直し
 async function renderM57(v){
-  if ((v?.mission?.id|0) !== 57) return;
-
+  const isM57 = ((v?.mission?.id|0) === 57);
+  if (!isM57){
+    // #57から離れた瞬間に確実に片付ける（ホットリロード/一時的な未呼出対策）
+    document.getElementById('m57Grid')?.remove();
+    document.getElementById('m57Sel')?.remove();
+    document.getElementById('conZoomOverlay')?.remove();
+    return;
+  }
   // 再入防止（同フレーム二重実行を遮断）
   if (state._m57Rendering) return;
   state._m57Rendering = true;
