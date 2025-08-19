@@ -689,12 +689,35 @@ const hostTool = document.getElementById('hostTool');
 /* M30 audio */
 const m30HostBox = document.getElementById('m30HostAudio');
 const m30VolBox  = document.getElementById('m30Volume');
-let   m30Audio   = null, m30Src = './mi19.mp3', m30Vol = 0.8;
-let m19Ctx = null, m19SrcNode = null, m19Gain = null;
-function ensureM19WebAudio(){
-  if (!m19Ctx) m19Ctx = new (window.AudioContext || window.webkitAudioContext)();
+let   m30Audio   = null, m30Src = './mi19.mp3',
+      m30Vol     = +(localStorage.getItem('m19Vol') ?? 0.8);
 
-  ensureM19WebAudio();
+let m19Ctx = null, m19SrcNode = null, m19Gain = null;
+
+/* ここから差し替え：WebAudio 初期化（非再帰・素の出力をミュート） */
+function ensureM19WebAudio(){
+  if (!m19Ctx){
+    m19Ctx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (!m30Audio){
+    m30Audio = new Audio(m30Src);
+    m30Audio.preload = 'auto';
+    m30Audio.crossOrigin = 'anonymous';
+    m30Audio.playsInline = true;
+    // 素の出力は使わず、WebAudio経由だけを鳴らす
+    m30Audio.volume = 0;
+    m30Audio.muted  = true;
+  }
+  if (!m19SrcNode){
+    m19SrcNode = m19Ctx.createMediaElementSource(m30Audio);
+  }
+  if (!m19Gain){
+    m19Gain = m19Ctx.createGain();
+    m19Gain.gain.value = Math.max(0, Math.min(1, m30Vol));
+    m19SrcNode.connect(m19Gain).connect(m19Ctx.destination);
+  }
+}
+/* ここまで差し替え：WebAudio 初期化 */
 
   if (!m19SrcNode) m19SrcNode = m19Ctx.createMediaElementSource(m30Audio);
   if (!m19Gain){
@@ -6520,12 +6543,10 @@ function renderM19Audio(v){
   const isM30 = ((v?.mission?.id|0) === 19);
   if (!isM30){ H(m30HostBox, true); H(m30VolBox, true); return; }
 
-  if (!m30Audio){
-    m30Audio = new Audio(m30Src);
-    m30Audio.preload = 'auto';
-    m30Audio.volume  = m30Vol;
-    m30Audio.addEventListener('error', ()=>console.warn('[M30] audio error'));
-  }
+  /* ここから差し替え：WebAudio 初期化を呼ぶ */
+  ensureM19WebAudio();
+  /* ここまで差し替え */
+
 
   if (state.isHost){
     m30HostBox.innerHTML = '';
@@ -6580,17 +6601,21 @@ function renderM19Audio(v){
 
   const playing = !m30Audio.paused;
   if (playing){
-    m30VolBox.innerHTML = '';
-    const label = document.createElement('span'); label.textContent = '🔊 音量';
-    const range = document.createElement('input');
-    range.type='range'; range.min='0'; range.max='1'; range.step='0.01';
-    range.value = String(m19Gain?.gain?.value ?? m30Vol);
-    range.oninput = async ()=>{
-      if (m19Ctx && m19Ctx.state === 'suspended'){ try{ await m19Ctx.resume(); }catch(e){} }
-      m30Vol = Math.max(0, Math.min(1, parseFloat(range.value||'0.8')));
-      if (m19Gain) m19Gain.gain.value = m30Vol;
-      try{ localStorage.setItem('m19Vol', String(m30Vol)); }catch(e){}
-    };
+m30VolBox.innerHTML = '';
+const label = document.createElement('span'); label.textContent = '🔊 音量';
+const range = document.createElement('input');
+range.type='range'; range.min='0'; range.max='1'; range.step='0.01';
+
+/* ここから差し替え：GainNode 初期値＆制御 */
+range.value = String(m19Gain?.gain?.value ?? m30Vol);
+range.oninput = async ()=>{
+  if (m19Ctx && m19Ctx.state === 'suspended'){ try{ await m19Ctx.resume(); }catch(e){} }
+  m30Vol = Math.max(0, Math.min(1, parseFloat(range.value||'0.8')));
+  if (m19Gain) m19Gain.gain.value = m30Vol;
+  try{ localStorage.setItem('m19Vol', String(m30Vol)); }catch(e){}
+};
+/* ここまで差し替え：GainNode 初期値＆制御 */
+
     m30VolBox.append(label, range);
     H(m30VolBox, false);
   }else{
