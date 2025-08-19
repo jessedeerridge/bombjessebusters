@@ -3498,15 +3498,15 @@ async function renderM63(v){
 
     // 1) リザーブ（アイテム列の直下。ox2画像は置かない）
     const itemsBar = document.getElementById('itemsBar'); if (!itemsBar) return;
-    let poolRow = document.getElementById('m63OxPool');
-    if (!poolRow){
-      poolRow = document.createElement('div');
-      poolRow.id = 'm63OxPool';
-      poolRow.className = 'ox-row ox-pool';
-      const wrap = document.createElement('div'); wrap.className = 'ox-wrap';
-      poolRow.appendChild(wrap);
-      itemsBar.appendChild(poolRow);
-    }
+ let poolRow = document.getElementById('m63OxPool');
+if (!poolRow){
+  poolRow = document.createElement('div');
+  poolRow.id = 'm63OxPool';
+  poolRow.className = 'ox-row ox-pool';
+  // 修正：itemsBar の「中」に置く → アイテムカードの直下に表示される
+  itemsBar.appendChild(poolRow);
+}
+
     const wrapPool = poolRow.querySelector('.ox-wrap'); wrapPool.innerHTML = '';
     const poolCnt = Math.max(0, v?.meta?.oxItem|0);
     for (let i=0;i<poolCnt;i++){ const t=document.createElement('div'); t.className='token ox'; wrapPool.appendChild(t); }
