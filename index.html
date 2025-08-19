@@ -1175,8 +1175,8 @@ function baseRoom(hostId){
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null,
       /* ▼▼ ：ミッション44用 状態 ▼▼ */
       oxItem: 0,         // アイテム列の下（全体プール）の酸素トークン数
-      oxByTable: {}      // 各テーブルごとの酸素トークン所持数 { [tableIndex]: number }
-  m63_pool: 0         // #63：items 下のリザーブ総数
+      oxByTable: {},      // 各テーブルごとの酸素トークン所持数 { [tableIndex]: number }
+  m63_pool: 0,         // #63：items 下のリザーブ総数
       /* ▲▲ ：ミッション44用 状態 ▲▲ */
     },
     lastActiveAt: Date.now()
