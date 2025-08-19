@@ -3612,11 +3612,13 @@ function renderM63(v){
    w.appendChild(t);                // ← .ox-wrap 内に追加
  }
 
-    // テーブル高さを1行ぶんだけ拡張（#44準拠） :contentReference[oaicite:5]{index=5}
-    const baseH = 96;
-    const extra = (cnt>0) ? (4 + 20) : 0;
-    box.style.setProperty('--table-h', `${Math.max(baseH, baseH+extra)}px`);
-
+    // テーブル高さを所持数に応じて拡張（15個ごとに1行追加）
+    const baseH = 96;       // 標準の高さ
+    const perRow = 15;      // 1行あたりのトークン数
+    const rowH = 24;        // 1行の高さ（20px + gap余白を考慮）
+    const rows = Math.ceil(cnt / perRow);
+    const extra = rows > 0 ? (4 + rowH * rows) : 0;
+    box.style.setProperty('--table-h', `${baseH + extra}px`);
     // 自分の所持酸素クリック → 1..12 をリザーブへ返却（+Nフラッシュ）
     if (Number.isInteger(myIdx) && myIdx === ti){
       row.onclick = (ev)=>{
