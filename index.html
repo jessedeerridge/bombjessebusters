@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>eee</title>
+<title>e</title>
 <style>
   :root{
     --card-w:24px; --card-h:40px; --card-gap:3px;
@@ -431,13 +431,6 @@
   background-image:url('./ox.png');
   background-size:contain;
   background-repeat:no-repeat;
-}
-
-  /* M63: 0ox の代替表現（画像不要） */
-.token.ox0{
-  background:none;
-  color:#666;
-  border:1px dashed #ccc;
 }
  .ox-row{
    display:flex; flex-wrap:nowrap; gap:2px; margin-top:0; /* ← 横一列＆縦位置はJSで制御 */
@@ -1251,7 +1244,6 @@ renderM55(state.watching);
     renderM59(v);
     renderM61(v);
     renderM62(v);
-    renderM63(v);
 
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
@@ -1743,12 +1735,14 @@ wrap.dataset.cardId = String(c.id||'');
         const mid = (state.watching?.mission?.id|0);
         const isM38 = (mid === 38);
         const isM56 = (mid === 56);
+        const isM64 = (mid === 64);
         const isCaptainTable = (idx === (state.watching?.captainTable|0));
         const isRightmost = (ci === (t.hand||[]).length - 1);
         const hasX = Array.isArray(c.tokens) && c.tokens.some(tk => String(tk.type) === 'xmark');
         const m38Special = isM38 && isCaptainTable && isRightmost && hasX;
         const m56Special = isM56 && isRightmost && hasX; // 全テーブル対象
-        const ownerBlindSpecial = (m38Special || m56Special);
+        const m64Special = isM64 && hasX;                // ★ 位置不問：xmark付きは「自分だけ裏」
+const ownerBlindSpecial = (m38Special || m56Special || m64Special);
 
         if (!c.open) {
           if (ownerBlindSpecial) {
@@ -3464,166 +3458,6 @@ async function ensureM61MetaInit(vNow){
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m61_byTable: by, m61_rotAt: Date.now() });
 }
 
-/* ▼▼ ：ミッション63（酸素トークン：隊長配布／リザーブ回収） ▼▼ */
-async function renderM63(v){
-  const isM63 = ((v?.mission?.id|0) === 63);
-
-  // ミッション外で残骸掃除
-  if (!isM63){
-    const x = document.getElementById('m63OxPool'); if (x) x.remove();
-    return;
-  }
-
-  // --- 0) 初期化（ホストのみ・一度だけ） ---
-  if (state.isHost && v?.meta?.m63_init !== true){
-    const n = (v?.tables?.length|0);
-    if (n <= 0) return;
-    const cap = (v?.captainTable|0);
-
-    // 人数別：2→14, 3→18, 4→24, 5/6→30
-    const per = (n===2)?14 : (n===3)?18 : (n===4)?24 : 30;
-
-    const by = {};
-    for (let i=0;i<n;i++) by[i] = 0;
-    by[cap] = per;
-
-    // oxByTable / oxItem は M44/49 と同じフィールドを再利用
-    await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      m63_init: true,
-      oxByTable: by,
-      oxItem: 0
-    });
-    return; // 次回 onValue で描画
-  }
-
-  // --- 1) リザーブ（アイテム列の直下）を表示（※ox2画像は使わない） ---
-  const itemsBar = document.getElementById('itemsBar'); if (!itemsBar) return;
-
-  let poolRow = document.getElementById('m63OxPool');
-  if (!poolRow){
-    poolRow = document.createElement('div');
-    poolRow.id = 'm63OxPool';
-    poolRow.className = 'ox-row ox-pool';
-    itemsBar.insertAdjacentElement('afterend', poolRow);
-  }
-  poolRow.innerHTML = '';
-
-  const poolWrap = document.createElement('div');
-  poolWrap.className = 'ox-wrap';   // 10個ごと改行の幅制御を流用
-  poolRow.appendChild(poolWrap);
-
-  const poolCnt = Math.max(0, v?.meta?.oxItem|0);
-  for (let i=0;i<poolCnt;i++){
-    const t = document.createElement('div');
-    t.className = 'token ox';
-    poolWrap.appendChild(t);
-  }
-
-  // リザーブクリック：隊長のみ「回収」を表示（全量を隊長へ）
-  poolRow.onclick = (ev)=>{
-    if ((v.captainTable|0) !== (state.seatedTable|0)) return;
-    const cnt = Math.max(0, v?.meta?.oxItem|0);
-    if (cnt <= 0) return;
-    openMenu(ev.clientX, ev.clientY, [{
-      label:'回収',
-      action: async ()=>{
-        const cap = (v.captainTable|0);
-        await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          oxItem: 0,
-          [`oxByTable/${cap}`]: (v.meta?.oxByTable?.[cap]|0) + cnt
-        });
-      }
-    }]);
-  };
-
-  // --- 2) 各テーブル：手札の直下に所持酸素を表示（10列で折り返し） ---
-  const tableNodes = document.querySelectorAll('.table');
-  (v.tables||[]).forEach((T, ti)=>{
-    const box = tableNodes[ti]; if (!box) return;
-
-    // 行の確保（手札 .hand の“直後”に置く）
-    let ownRow = box.querySelector('.ox-row[data-owner="1"]');
-    if (!ownRow){
-      ownRow = document.createElement('div');
-      ownRow.className = 'ox-row';
-      ownRow.dataset.owner = '1';
-      const hand = box.querySelector('.hand');
-      (hand || box).insertAdjacentElement('afterend', ownRow);
-    }
-
-    // 折り返し＆幅（10個×20px + 隙間）
-    ownRow.style.flexWrap = 'wrap';
-    ownRow.style.maxWidth = 'calc(20px * 10 + 2px * 9)';
-
-    // 再描画
-    ownRow.innerHTML = '';
-    const cnt = Math.max(0, v.meta?.oxByTable?.[ti]|0);
-
-    if (cnt === 0){
-      // 0ox 代替：0トークン3つ（クリック反応は通常トークンと同じ）
-      for (let k=0;k<3;k++){
-        const z = document.createElement('div');
-        z.className = 'token ox0';
-        z.textContent = '0';
-        ownRow.appendChild(z);
-      }
-    }else{
-      for (let i=0;i<cnt;i++){
-        const t = document.createElement('div');
-        t.className = 'token ox';
-        ownRow.appendChild(t);
-      }
-    }
-
-    // 自分の行 → 1〜12 ポップでリザーブへ移動（選べるのは所持数以内）
-    if ((state.seatedTable|0) === ti){
-      ownRow.onclick = (ev)=>{
-        const mine = Math.max(0, v.meta?.oxByTable?.[ti]|0);
-        const choices = Array.from({length:12}, (_,i)=> i+1).filter(k => k <= mine);
-        if (choices.length === 0) return;
-
-        openMenu(ev.clientX, ev.clientY, choices.map(k => ({
-          label:String(k),
-          action: async ()=>{
-            await update(ref(db, `rooms/${state.roomCode}/meta`), {
-              [`oxByTable/${ti}`]: mine - k,
-              oxItem: (v.meta?.oxItem|0) + k
-            });
-            // 2秒だけ「+k」をリザーブの右上に表示
-            const flash = document.createElement('div');
-            flash.textContent = `+${k}`;
-            flash.style.cssText = 'position:absolute; right:0; transform:translateY(-120%); font-size:12px; background:#fff; border:1px solid #ddd; border-radius:8px; padding:2px 6px;';
-            poolRow.appendChild(flash);
-            setTimeout(()=> flash.remove(), 2000);
-          }
-        })));
-      };
-    }else{
-      // 他人の行 → 「渡す」：自分の全トークンを相手へ譲渡
-      ownRow.onclick = (ev)=>{
-        const me = state.seatedTable;
-        if (me == null || me === ti) return;
-        const mine = Math.max(0, v.meta?.oxByTable?.[me]|0);
-        if (mine <= 0) return;
-
-        openOneMini(ev.clientX, ev.clientY, '渡す', async ()=>{
-          await update(ref(db, `rooms/${state.roomCode}/meta`), {
-            [`oxByTable/${me}`]: 0,
-            [`oxByTable/${ti}`]: (v.meta?.oxByTable?.[ti]|0) + mine
-          });
-        });
-      };
-    }
-
-    // --- 3) テーブル高さを所持数に応じて拡張 ---
-    const rows = Math.ceil(Math.max(cnt, 3) / 10);   // 0 のときも 3列分の余白
-    const extra = rows * 24;                          // 1列 ≒ 24px
-    box.style.setProperty('--table-h', `${96 + extra}px`);
-  });
-}
-/* ▲▲ ：ミッション63（酸素） ▲▲ */
-
-  
 /* ここから追加：#62 人数分の数値カード（同期） */
 async function ensureM62MetaInit(vNow){
   const v = vNow || state.watching; if (!v) return;
@@ -3779,6 +3613,8 @@ function renderM61(v){
   }
 
 }
+
+
   
 /* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
 async function renderM54(v){
@@ -5518,6 +5354,58 @@ try{
       }
     }
  }
+
+  /* === #64：各手札からランダム2枚→小さい方を左端／大きい方を右端（自分だけ裏） === */
+  if ((v.mission?.id|0) === 64) {
+    // 二重実行防止
+    if (v?.meta?.m64_init === true) { /* 既に完了 */ }
+    else if (state.isHost) {
+      try{
+        const tSnap = await get(ref(db, `rooms/${code}/tables`));
+        const tbls = tSnap.val() || [];
+        const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
+
+        for (let ti = 0; ti < tbls.length; ti++){
+          const T = tbls[ti] || {};
+          const hand = Array.isArray(T.hand) ? T.hand.slice() : [];
+          if (hand.length < 2) continue;
+
+          // ランダムに2枚抽出（重複なし）
+          const idxs = Array.from({length: hand.length}, (_,i)=>i);
+          shuffle(idxs);
+          const aIdx = idxs[0], bIdx = idxs[1];
+          const A = hand[aIdx], B = hand[bIdx];
+          if (!A || !B) continue;
+
+          // 小さい方→左端 / 大きい方→右端（同数なら抽出順）
+          const leftCard  = (A.num|0) < (B.num|0) ? A : (A.num|0) > (B.num|0) ? B : A;
+          const rightCard = (leftCard === A) ? B : A;
+
+          // 2枚を元の配列から除去
+          const leftId = leftCard.id, rightId = rightCard.id;
+          const rest = hand.filter(c => c && c.id !== leftId && c.id !== rightId);
+
+          // xmark 付与（重複防止）
+          const putX = (c)=>{
+            const tokens = Array.isArray(c.tokens) ? c.tokens.slice() : [];
+            if (!tokens.some(tk => tk?.type === 'xmark')) tokens.push({type:'xmark'});
+            return { ...c, tokens };
+          };
+
+          const newHand = [ putX(leftCard), ...rest, putX(rightCard) ];
+          realpha(newHand);
+          tbls[ti].hand = newHand;
+        }
+
+        await Promise.all([
+          set(ref(db, `rooms/${code}/tables`), tbls),
+          update(ref(db, `rooms/${code}/meta`), { m64_init: true })
+        ]);
+      }catch(e){ console.error('[M64 init]', e); }
+    }
+  }
+
+  
   /* ここまで追加 */
   // #39：初期化（task1〜3）
 if ((v.mission?.id|0) === 39) {
