@@ -3505,7 +3505,7 @@ async function renderM63(v){
       poolRow.className = 'ox-row ox-pool';
       const wrap = document.createElement('div'); wrap.className = 'ox-wrap';
       poolRow.appendChild(wrap);
-      itemsBar.appendChild(poolRow);
+ itemsBar.insertAdjacentElement('afterend', poolRow); // ← itemsBar の直下＝アイテムカードの下に出す
     }
     const wrapPool = poolRow.querySelector('.ox-wrap'); wrapPool.innerHTML = '';
     const poolCnt = Math.max(0, v?.meta?.oxItem|0);
