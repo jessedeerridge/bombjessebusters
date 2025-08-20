@@ -132,6 +132,18 @@
     position:relative;
     width:32px; height:48px;
   }
+
+.table.m54-autosize{
+  height:auto !important;
+  overflow:visible !important;
+}
+.ox-row.m54-height-dummy{
+  /* 49/63と同じ配置ロジックで置くので見た目は消す */
+}
+.ox-row.m54-height-dummy .ox-wrap .token.ox{
+  opacity:0;            /* 不可視 */
+  pointer-events:none;  /* クリック不能 */
+}
   
   .tables{display:flex;flex-direction:column;gap:8px;margin-top:6px;overflow:visible;position:relative;margin-left:-12px;}
   .table{
@@ -4220,247 +4232,94 @@ function renderM61(v){
 }
 
 
-  
-/* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
-async function renderM54(v){
-  const isM54 = ((v?.mission?.id|0) === 54);
-  // 画面要素の片付け
-  if (!isM54){
-    const x = document.getElementById('m54OxPool'); if (x) x.remove();
-    const y = document.getElementById('m54RedBox'); if (y) y.remove();
+/* ▼▼ ：ミッション54（高さだけ自動行を追加） ▼▼ */
+function renderM54(v){
+  const is54 = ((v?.mission?.id|0) === 54);
+
+  // 54以外になったら後処理（54が残したものを掃除）
+  if (!is54){
+    document.querySelectorAll('.table').forEach(tb=>{
+      tb.classList.remove('m54-autosize');
+      tb.style.removeProperty('--table-h'); // 念のため
+      const dummies = tb.querySelectorAll('.ox-row.m54-height-dummy');
+      dummies.forEach(d=>d.remove());
+    });
     return;
   }
 
-  // --- 0) 初期化（ホストのみ・1回） ---
-  // ②配布：人数別 {2:9,3:6,4:3,5:2,6:2} を各テーブルに配布
-  // ③リザーブ： 30 - (人数×配布数)
-  // ⑥赤デッキ：1..11 をシャッフルして m54_redDeck に、使用済みは m54_redUsed
-  if (state.isHost && v?.meta?.m54_init !== true){
-    const n = (v?.tables?.length|0);
-    const per = (n<=2)?9 : (n===3)?6 : (n===4)?3 : 2;
-    const by  = {}; for (let i=0;i<n;i++) by[i]=per;
-    const pool = Math.max(0, 30 - n*per);
+  // 54の描画：49/63と同じ置き場所（alpha直下基準）でダミー行を用意
+  const tableNodes = document.querySelectorAll('.table'); // renderTablesと同順
+  const nTables = (v?.tables?.length|0);
 
-const deck = Array.from({length:11}, (_,i)=> (i+1) + 0.5);
-    shuffle(deck);
+  // 49/63で使っている所持数の取得方法に合わせる
+  // 既存実装の汎用化：meta.oxByTable[ti] → フォールバックを多段
+  const getCnt = (ti)=>{
+    const byMeta = v?.meta?.oxByTable?.[ti];
+    if (typeof byMeta === 'number') return byMeta|0;
 
-update(ref(db, `rooms/${state.roomCode}/meta`), {
-  m54_init: true,
-  m54_byTable: by,
-  m54_pool: pool,
-  m54_redDeck: deck,
-  m54_redUsed: []
-}).catch(console.error);
+    // 予備：テーブル構造やプレイヤー所持から拾える場合
+    const t = v?.tables?.[ti];
+    if (t && typeof t.ox === 'number') return t.ox|0;
 
-    return; // 次の onValue で描画
-  }
-
-  // --- 1) アイテム列の直下に「リザーブ」を出す（左に ox2 画像） ---
-  const itemsBar = document.getElementById('itemsBar');
-  if (!itemsBar) return;
-
-  let poolRow = document.getElementById('m54OxPool');
-  if (!poolRow){
-    poolRow = document.createElement('div');
-    poolRow.id = 'm54OxPool';
-    poolRow.className = 'ox-row ox-pool';   // #44 と同じクラス
-    itemsBar.insertAdjacentElement('afterend', poolRow);
-  }
-  // 左側の ox2 と右側のラップ
-  let wrap = poolRow.querySelector('.ox-wrap');
-  if (!wrap){
-    poolRow.innerHTML = '';
-    const side = document.createElement('div');
-    side.className = 'ox-side';             // 背景は ox2.jpg（#44 と同じ）
-    poolRow.appendChild(side);
-    wrap = document.createElement('div');
-    wrap.className = 'ox-wrap';
-    poolRow.appendChild(wrap);
-  }else{
-    wrap.innerHTML = '';
-  }
-  const poolCnt = Math.max(0, v?.meta?.m54_pool|0);
-  for (let i=0;i<poolCnt;i++){
-    const t = document.createElement('div');
-    t.className = 'token ox';
-    wrap.appendChild(t);
-  }
-
-  // ④ リザーブクリック → 「補給」ポップ（1枚獲得）
-  poolRow.onclick = (ev)=>{
-    if ((v?.meta?.m54_pool|0) <= 0) return;
-    openOneMini(ev.clientX, ev.clientY, '補給', async ()=>{
-      const idx = (state?.seatedTable==null)? null : Number(state.seatedTable);
-      if (idx==null) return;
-      const mine = (v?.meta?.m54_byTable?.[idx]|0) + 1;
-      const left = (v?.meta?.m54_pool|0) - 1;
-      await update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m54_pool: left,
-        [`m54_byTable/${idx}`]: mine
-      });
-    });
+    // 何もなければ0
+    return 0;
   };
 
-  // --- 2) 各テーブル下に自分の酸素トークン表示（#44と同じ場所） ---
-  const tableNodes = document.querySelectorAll('.table'); // renderTables と同順
-  const n = (v?.tables?.length|0);
-  (v.tables||[]).forEach((T, ti)=>{
-    const box = tableNodes[ti]; if (!box) return;
+  for (let ti=0; ti<nTables; ti++){
+    const box = tableNodes[ti]; if (!box) continue;
 
-    let row = box.querySelector('.ox-row[data-owner="1"][data-m54="1"]');
+    // 54中はテーブルを自動高さモードに
+    box.classList.add('m54-autosize');
+    box.style.removeProperty('--table-h'); // 固定値を無効化
+    // 旧ミッションの「0oxプレースホルダ」等があれば除去
+    (box.querySelectorAll('.zero-ox, .m54-height-dummy-gc')||[]).forEach(x=>x.remove());
+
+    // ダミー行の確保（alpha直下＝badge-fixedの親にぶら下げる）
+    let row = box.querySelector('.ox-row.m54-height-dummy');
     if (!row){
       row = document.createElement('div');
-      row.className = 'ox-row';
-      row.dataset.owner = '1';
-      row.dataset.m54 = '1';
+      row.className = 'ox-row m54-height-dummy';
+      row.dataset.owner = 'spacer';
+
+      // 49/63と同じ“アルファベット直下”固定配置
       const anchor = box.querySelector('.badge-fixed');
-      if (anchor){
-        anchor.insertAdjacentElement('afterend', row);
-        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+      if (anchor && anchor.parentElement){
+        const host = anchor.parentElement;
+        host.appendChild(row);
+
+        // alphaの高さ基準に余白を確保（49の実装と同様の係数）
+        const ah = host.querySelector('.alpha')?.getBoundingClientRect()?.height || 18;
         row.style.marginTop = `${Math.round(ah * 5)}px`;
       }else{
-        (box.querySelector('.hand') || box).appendChild(row);
+        // フォールバック：手札直後
+        const hand = box.querySelector('.hand');
+        (hand || box).appendChild(row);
       }
     }
-    // 再描画
+
+    // cnt>0 のときだけ行を出す。0なら行ごと削除（余白ゼロ）
+    const cnt = Math.max(0, getCnt(ti));
+    if (cnt <= 0){
+      row.remove();
+      continue;
+    }
+
+    // 49/63同様に wrap→token を並べて“自然な折返し”で高さを作る
     row.innerHTML = '';
-    const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
-    for (let i=0;i<cnt;i++){
+    const wrap = document.createElement('div');
+    wrap.className = 'ox-wrap';   // CSS側で折返し（既存の定義を流用）
+    row.appendChild(wrap);
+
+    // 既存の表示規則に合わせて 15個で折返し想定（wrapのCSS次第）
+    for (let i=0; i<cnt; i++){
       const t = document.createElement('div');
       t.className = 'token ox';
-      row.appendChild(t);
-    }
-    // テーブルの高さ（1行ぶんだけ拡張）
-    const baseH = 96;
-    const extra = (cnt>0)? (4+20) : 0;
-    box.style.setProperty('--table-h', `${Math.max(baseH, baseH+extra)}px`);
-
-    // ⑤ 自分の行クリック → 1/2/3 を返却（リザーブに戻す）
-    //    （#44の返却 UI と同様の挙動）
-    const myIdx = (()=>{
-      const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
-      if (Number.isInteger(sNum) && sNum>=0 && sNum<n) return sNum;
-      const alt = (v.tables||[]).findIndex(t=> t?.playerId===state.userId);
-      return (alt>=0? alt : null);
-    })();
-
-    if (myIdx !== null && myIdx === ti){
-      row.onclick = (ev)=>{
-        const maxCan = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
-        const choices = [1,2,3].filter(k=> k<=maxCan).map(k=>({
-          label:String(k),
-          action: async ()=>{
-            const mine = (v?.meta?.m54_byTable?.[ti]||0) - k;
-            const pool = (v?.meta?.m54_pool||0) + k;
-            if (mine<0) return;
-            await update(ref(db, `rooms/${state.roomCode}/meta`), {
-              m54_pool: pool,
-              [`m54_byTable/${ti}`]: mine
-            });
-          }
-        }));
-        if (choices.length>0) openMenu(ev.clientX, ev.clientY, choices);
-      };
-    }else{
-      row.onclick = null;
-    }
-  });
-
-  // --- 3) 赤デッキ（diの左側に redcode.png ＋ 残枚数） ---
-  const di = document.getElementById('di');
-  if (di && !document.getElementById('m54RedBox')){
-    const box = document.createElement('div');
-    box.id = 'm54RedBox';
-    box.style.display = 'flex';
-    box.style.flexDirection = 'column';
-    box.style.alignItems = 'center';
-    // デッキ画像（numdeck見た目を流用しつつ背景だけ差し替え）
-    const deckBtn = document.createElement('div');
-    deckBtn.className = 'numdeck';
-    deckBtn.style.backgroundImage = "url('./redcode.png')";
-    deckBtn.title = '赤コード（追加）';
-    // 残枚数
-    const restLbl = document.createElement('span');
-    restLbl.className = 'numrest';
-    restLbl.style.marginTop = '2px';
-
-    box.appendChild(deckBtn);
-    box.appendChild(restLbl);
-    di.insertAdjacentElement('beforebegin', box);
-
-    // 残表示の更新
-    const refreshRed = ()=>{
-      const D = Array.isArray(v?.meta?.m54_redDeck)? v.meta.m54_redDeck : [];
-      const U = Array.isArray(v?.meta?.m54_redUsed)? v.meta.m54_redUsed : [];
-      const remain = D.filter(x=> !U.includes(x)).length;
-      restLbl.textContent = `残:${remain}`;
-    };
-    refreshRed();
-
-    // ⑥ クリック → 「追加」タブ → 山札の上から1枚を自分の手札に昇順挿入
-    deckBtn.onclick = (ev)=>{
-      openOneMini(ev.clientX, ev.clientY, '追加', async ()=>{
-        try{
-          const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-          const rRef = ref(db, `rooms/${state.roomCode}`);
-          const [mSnap, rSnap] = await Promise.all([get(mRef), get(rRef)]);
-          const meta = mSnap.val()||{};
-          const room = rSnap.val()||{};
-          const D = Array.isArray(meta.m54_redDeck)? meta.m54_redDeck.slice() : [];
-          const U = Array.isArray(meta.m54_redUsed)? meta.m54_redUsed.slice() : [];
-
-          // 次の1枚
-          const top = D.find(n=> !U.includes(n));
-          if (top==null) return;
-
-          // 自分のテーブル番号
-          const myTable = (()=>{
-            const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
-            if (Number.isInteger(sNum)) return sNum;
-            const idx = (room.tables||[]).findIndex(t=> t?.playerId===state.userId);
-            return idx>=0? idx : null;
-          })();
-          if (myTable==null || !Array.isArray(room.tables)) return;
-
-          // 手札へ（昇順・alpha再付番） — #43 の追加処理と同じ流儀
-          const tbls = room.tables.slice();
-          const T = tbls[myTable];
-          const hand = Array.isArray(T.hand)? T.hand.slice() : [];
-          hand.push({
-            id: crypto.randomUUID(),
-            num: top,
-            kind: 'red',     // ← 種別は red としておく（必要なら 'normal' に変更）
-            open: false,
-            ownerId: T.playerId || null,
-            tokens: [],
-            markUntil: Date.now() + 5000
-          });
-          hand.sort((a,b)=> a.num - b.num);
-          const alpha = 'abcdefghijklmnopqrstuvwxyz';
-          hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
-          T.hand = hand;
-
-          // 使用済みへ記録
-          U.push(top);
-
-          await Promise.all([
-            set(ref(db, `rooms/${state.roomCode}/tables`), tbls),
-            update(mRef, { m54_redUsed: U })
-          ]);
-        }catch(e){ console.error(e); }
-      });
-    };
-  }else{
-    // 既にあれば残表示だけ更新
-    const restLbl = document.querySelector('#m54RedBox .numrest');
-    if (restLbl){
-      const D = Array.isArray(v?.meta?.m54_redDeck)? v.meta.m54_redDeck : [];
-      const U = Array.isArray(v?.meta?.m54_redUsed)? v.meta.m54_redUsed : [];
-      restLbl.textContent = `残:${D.filter(x=>!U.includes(x)).length}`;
+      wrap.appendChild(t);
     }
   }
 }
-/* ここまで追加：ミッション54 */
+/* ▲▲ ：ミッション54 ▲▲ */
+
 
   
 /* ここから追加：ミッション53（nano0 固定） */
