@@ -7243,8 +7243,12 @@ function renderM36(v){
 function renderM39(v){
   const isM39 = ((v?.mission?.id|0) === 39);
   const old = document.getElementById('m39Row');
-  if (!isM39){ if (old) old.remove(); return; }
-
+  if (!isM39){
+    if (old) old.remove();                 // 上部の公開札レーンを掃除
+    const hand = document.getElementById('m39HandRow');
+    if (hand) hand.remove();               // 画面下部の手札帯も掃除 ← 追加
+    return;
+  }
   if (old) old.remove();
   const lane = document.createElement('div');
   lane.id = 'm39Row';
