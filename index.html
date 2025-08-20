@@ -2204,27 +2204,25 @@ if (canX1 && c.kind === 'normal'){
               box.classList.add('elevated');
             }});
           }
-          if(has('x1')){
-            entries.push({label:'x1', action: async ()=>{
-              openMenu(ev.clientX, ev.clientY, [
-                {label:'消す', action: async ()=>{
-                  const next = tokens.filter(tk=>tk.type!=='x1');
+          // x1 を既に持っている場合：
+          // 1) x1ポップは表示しない
+          // 2) 数字（num）を消すのみ表示（num がある時だけ）
+          if (has('x1')) {
+            const hasNum = tokens.some(tk => tk.type === 'num');
+            if (hasNum) {
+              entries.push({
+               label: String(c.num) + ' を消す',
+                action: async ()=>{
+                  const next = tokens.filter(tk => tk.type !== 'num');
                   await update(ref(db, cardPath), { tokens: next });
-                  await incToken('x1', -1);
-                  const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
+                  // x1 は残すので incToken('x1', ...) なし
+                const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length > 0);
                   box.classList.toggle('elevated', afterHas);
-                }},
-                {label:String(c.num), action: async ()=>{
-                  if(!has('num')){
-                    const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
-                    await update(ref(db, cardPath), { tokens: next });
-                    box.classList.add('elevated');
-                  }
-                }},
-              ]);
-            }});
+                }
+              });
+            }
+            // hasNum が無ければ何も出さない（= x1ポップ非表示）
           }
-
           if(tokens.length>0){
             tokens.forEach((tk,ti)=>{
               const label = tk.type==='equal' ? '＝を消す' : tk.type==='noteq' ? '≠を消す' : tk.type==='x1' ? 'x1を消す' : '数字を消す';
