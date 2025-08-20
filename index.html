@@ -4302,61 +4302,38 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
   };
 
   // --- 2) 各テーブル下に自分の酸素トークン表示（#44と同じ場所） ---
-// --- 2) 各テーブル下に自分の酸素トークン表示（#49/63と同じ思想） ---
-const tableNodes = document.querySelectorAll('.table'); // renderTables と同順
-const n = (v?.tables?.length|0);
-(v.tables||[]).forEach((T, ti)=>{
-  const box = tableNodes[ti]; if (!box) return;
+  const tableNodes = document.querySelectorAll('.table'); // renderTables と同順
+  const n = (v?.tables?.length|0);
+  (v.tables||[]).forEach((T, ti)=>{
+    const box = tableNodes[ti]; if (!box) return;
 
-  // 先に所持数を確認（>0 のときだけ行を出す）
-  const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti] | 0);
-
-  // 既存行の参照（あるかもしれない）
-  let row = box.querySelector('.ox-row[data-owner="1"][data-m54="1"]');
-
-  if (cnt <= 0){
-    // 0枚：行を消し、高さを基準に戻す
-    if (row){ row.remove(); }
-    box.style.removeProperty('--table-h');
-    return; // 次のテーブルへ
-  }
-
-  // >0：行を用意（無ければ作成）— アルファベット直下に固定
-  if (!row){
-    row = document.createElement('div');
-    row.className = 'ox-row';
-    row.dataset.owner = '1';
-    row.dataset.m54 = '1';
-    const anchor = box.querySelector('.badge-fixed');
-    if (anchor){
-      anchor.insertAdjacentElement('afterend', row);
-      const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
-      row.style.marginTop = `${Math.round(ah * 5)}px`;
-    }else{
-      (box.querySelector('.hand') || box).appendChild(row);
+    let row = box.querySelector('.ox-row[data-owner="1"][data-m54="1"]');
+    if (!row){
+      row = document.createElement('div');
+      row.className = 'ox-row';
+      row.dataset.owner = '1';
+      row.dataset.m54 = '1';
+      const anchor = box.querySelector('.badge-fixed');
+      if (anchor){
+        anchor.insertAdjacentElement('afterend', row);
+        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        row.style.marginTop = `${Math.round(ah * 5)}px`;
+      }else{
+        (box.querySelector('.hand') || box).appendChild(row);
+      }
     }
-  }
-
-  // 再描画（必ず .ox-wrap を挟む：1行=15個 で折返し）
-  row.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'ox-wrap';
-  row.appendChild(wrap);
-  for (let i=0; i<cnt; i++){
-    const t = document.createElement('div');
-    t.className = 'token ox';
-    wrap.appendChild(t);
-  }
-
-  // テーブル高さを所持酸素の行数ぶんだけ増やす（M63同等）
-  const BASE   = 96;   // .table の基準高さ（CSS --table-h 初期値）
-  const PERROW = 15;   // 1行あたりのトークン数（.ox-wrap と合わせる）
-  const ROWH   = 28;   // 1行ぶんの増分（見た目に応じて微調整可）
-  const GAP    = 0;    // 余白が欲しければここで調整
-  const rows   = Math.ceil(cnt / PERROW);
-  const needH  = BASE + (rows * ROWH + GAP);
-  box.style.setProperty('--table-h', `${needH}px`);
-});
+    // 再描画
+    row.innerHTML = '';
+    const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
+    for (let i=0;i<cnt;i++){
+      const t = document.createElement('div');
+      t.className = 'token ox';
+      row.appendChild(t);
+    }
+    // テーブルの高さ（1行ぶんだけ拡張）
+    const baseH = 96;
+    const extra = (cnt>0)? (4+20) : 0;
+    box.style.setProperty('--table-h', `${Math.max(baseH, baseH+extra)}px`);
 
     // ⑤ 自分の行クリック → 1/2/3 を返却（リザーブに戻す）
     //    （#44の返却 UI と同様の挙動）
