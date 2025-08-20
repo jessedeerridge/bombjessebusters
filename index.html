@@ -3447,17 +3447,14 @@ function renderM43(v){
     return;
   }
 
-  tablesEl.classList.add('m43-shift');
-
+tablesEl.classList.remove('m43-shift');
   const tb = tablesEl.getBoundingClientRect();
   const rb = target.getBoundingClientRect();
-  const cl = tablesEl.querySelector('.checklist');
- const cb = cl ? cl.getBoundingClientRect() : null;
-  const x  = rb.left - tb.left + (rb.width/2) - (56/2);
-  // checklist の直上に配置（56px は nano 高さ、2px は見た目の余白）
-  const y  = cb ? (cb.top - tb.top - 56 - 2) : 0;
+  const x = rb.left - tb.left + (rb.width / 2) - 28;   // 56/2
+  const y = rb.top  - tb.top  - 28 - 2;                // 56/2 + ちょい上げ
   node.style.left = `${Math.max(0, x)}px`;
   node.style.top  = `${Math.max(0, y)}px`;
+  node.style.transform = ''; // 念のため（#59 の書き方と混ざらないよう）
 
   if (!node.isConnected) tablesEl.appendChild(node);
 }
