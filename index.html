@@ -4253,16 +4253,16 @@ function renderM65(v){
   });
 
   const footer = document.getElementById('missionFooter');
-  if (!footer){ if (old) old.remove(); return; }
-  let row = old;
-  if (!row){
-    row = document.createElement('div');
-    row.id = rowId;
-    row.className = 'numlane';
-    footer.appendChild(row);
-  }
-  row.innerHTML = '';
-
+ if (!footer){ if (old) old.remove(); return; }
+ let row = old;
+ if (!row){
+   row = document.createElement('div');
+   row.id = rowId;
+   row.className = 'numlane';
+   // footer の前に差し込む（＝missionFooterの上に表示）
+   footer.insertAdjacentElement('beforebegin', row);
+ }
+ row.innerHTML = '';
   // 次の着席者を求める
   const findNextSeated = (fromIdx)=>{
     if (tables.length===0) return -1;
