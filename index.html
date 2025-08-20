@@ -1262,6 +1262,7 @@ if (v) {
   }
 }    
    renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
+    TableSizer.install();
      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
   showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
@@ -4115,7 +4116,7 @@ function renderM65(v){
 /* ===== /#65 ===== */
 
  // ▼▼ 共通：テーブル高さを“実測”で自動拡張（全ミッション） ▼▼
- function autoGrowTables(basePx = 70, padPx = 4){
+ function autoGrowTables(basePx = 96, padPx = 4){
    const tables = document.querySelectorAll('.table');
    tables.forEach(box=>{
      const rBox = box.getBoundingClientRect();
@@ -4133,6 +4134,65 @@ function renderM65(v){
  }
  // ▲▲ 共通：テーブル高さ自動拡張 ▲▲
     
+// ▼▼ テーブル高さ：変化があったテーブルだけ更新 ▼▼
+const TableSizer = (() => {
+  const last = new WeakMap();        // box -> 前回の高さ(px)
+  const ob   = new WeakMap();        // box -> MutationObserver
+  const tm   = new WeakMap();        // box -> debounce timer
+
+  const getBasePx = () => {
+    const root = getComputedStyle(document.documentElement);
+    const v = parseInt(root.getPropertyValue('--table-h').trim(), 10);
+    return Number.isFinite(v) ? v : 96; // CSS変数未定義時の安全値
+  };
+
+  const measureNeedPx = (box, padPx = 4) => {
+    const basePx = getBasePx();
+    const rBox = box.getBoundingClientRect();
+    let bottom = 0;
+    box.querySelectorAll(':scope *').forEach(el => {
+      const r = el.getBoundingClientRect?.();
+      if (!r) return;
+      bottom = Math.max(bottom, r.bottom - rBox.top);
+    });
+    if (bottom <= 0) return basePx;          // 何も無い → 基準のまま
+    return Math.max(basePx, Math.ceil(bottom + padPx));
+  };
+
+  const refresh = (box) => {
+    if (!box) return;
+    const need = measureNeedPx(box);
+    const prev = last.get(box);
+    if (prev === need) return;               // 高さが変わらなければ何もしない
+    last.set(box, need);
+    box.style.setProperty('--table-h', `${need}px`);
+    box.style.height = `${need}px`;
+  };
+
+  const attachObserver = (box) => {
+    if (!box || ob.has(box)) return;
+    const observer = new MutationObserver(() => {
+      clearTimeout(tm.get(box));
+      tm.set(box, setTimeout(() => refresh(box), 0)); // 変化を1回に束ねる
+    });
+    observer.observe(box, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['class','style'] // レイアウトに効きやすい変更だけ
+    });
+    ob.set(box, observer);
+  };
+
+  const install = () => {
+    document.querySelectorAll('.table').forEach(attachObserver);
+  };
+
+  return { install, refresh };
+})();
+// ▲▲ テーブル高さ：変化があったテーブルだけ更新 ▲▲
+
+
   
 function renderM61(v){
   const isM61 = ((v?.mission?.id|0) === 61);
