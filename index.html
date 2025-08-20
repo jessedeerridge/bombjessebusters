@@ -4768,34 +4768,6 @@ if (Number.isInteger(idx) && idx === ti){
     const rows = Math.ceil(cnt / perRow);
     const extra = rows > 0 ? (4 + rowH * rows) : 0;
     box.style.setProperty('--table-h', `${baseH + extra}px`);
-    // 自分の所持酸素クリック → 1..12 をリザーブへ返却（+Nフラッシュ）
-    if (Number.isInteger(myIdx) && myIdx === ti){
-      row.onclick = (ev)=>{
-        const mine = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
-        if (mine <= 0) return;
-        const maxK = Math.min(12, mine);
-        const entries = Array.from({length:maxK}, (_,i)=> i+1).map(k=>({
-          label:String(k),
-          action: async ()=>{
-            const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-            const snap = await get(mRef);
-            const meta = snap.val()||{};
-            const curMine = Math.max(0, meta?.oxByTable?.[ti]||0);
-            const curPool = Math.max(0, meta?.oxItem|0);
-            if (k > curMine) return;
-            const upd = {};
-            upd[`oxByTable/${ti}`] = curMine - k;
-            upd['oxItem'] = curPool + k;
-            await update(mRef, upd);
-            flashPlus(k);
-          }
-        }));
-　　    entries.push({ label: `/ ${mine}` });
-        openMenu(ev.clientX, ev.clientY, entries);
-      };
-    }else{
-      row.onclick = null;
-    }
 
       
       // --- 3) 譲渡メニュー：自分“以外”の行だけクリック可 ---
