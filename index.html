@@ -2407,6 +2407,51 @@ function renderM29(v){
   const oldCenter = document.getElementById('m29CenterRow');
   if (!isM29) { if (oldHand) oldHand.remove(); if (oldCenter) oldCenter.remove(); return; }
 
+   // ▼追加：通常コードが「同数4枚・全体公開」になったら、
+   // その数字の“数値カード（m29Hand と センター）”を消滅。
+   // 消滅で手札が1枚以下になったテーブルには、残り山札（1..12から未使用）から1枚補充。
+   // 実行は競合防止のためホストのみ。
+   if (state.isHost) {
+     // 全体公開の通常コードの枚数を集計
+     const openCountByNum = {};
+     (v.tables||[]).forEach(T=>{
+       (T.hand||[]).forEach(c=>{
+         if (c?.kind==='normal' && c.open===true){
+           const n = c.num|0;
+           openCountByNum[n] = (openCountByNum[n]||0) + 1;
+         }
+       });
+     });
+     // 4枚以上そろっている数字
+     const vanishNums = Object.keys(openCountByNum).map(x=>x|0).filter(n=> openCountByNum[n] >= 4);
+     if (vanishNums.length > 0){
+       const rRef = ref(db, `rooms/${state.roomCode}`);
+       const curCenter = Array.isArray(v.m29_center) ? v.m29_center.slice() : [];
+       // センターから対象数字を除去
+       const nextCenter = curCenter.filter(obj => !vanishNums.includes((obj?.n|0)));
+       const updates = { m29_center: nextCenter };
+       const tables = (v.tables||[]).slice();
+       // 残り山札 = 1..12 から「各テーブルの m29Hand」と「センター」を引いた集合
+       const used = new Set();
+       tables.forEach(T => (T.m29Hand||[]).forEach(n=> used.add(n|0)));
+       nextCenter.forEach(obj => used.add(obj?.n|0));
+       const rest = []; for (let n=1; n<=12; n++) if (!used.has(n)) rest.push(n);
+       // 各テーブル：対象数字を消滅 → 手札が≤1なら補充
+       tables.forEach((T,i)=>{
+         const before = Array.isArray(T.m29Hand) ? T.m29Hand : [];
+         const after  = before.filter(n => !vanishNums.includes(n|0));
+         if (after.length <= 1 && rest.length > 0){
+           after.push(rest.shift());
+         }
+         if (after.length !== before.length){
+           updates[`tables/${i}/m29Hand`] = after;
+         }
+       });
+       // 非同期でまとめて反映（await不要）
+       update(rRef, updates).catch(console.error);
+     }
+   }
+  
   // 自分の席
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
   const myHand = (myIdx>=0) ? (v.tables[myIdx]?.m29Hand||[]) : [];
@@ -7918,8 +7963,9 @@ case 52: {
     display:[
       '#52',
       ...linesForMix,
-      '',
-      '',
+      '最初に必ず偽の情報トークンを2枚置く。（数字コードでも赤コードでもよい。）',
+      'このミッションで使う情報トークンは全て偽の情報トークンを使う。',
+      '間違えて指し示された場合は宣言された数字の情報トークンを置く。',
     ],
     flags:{}
   };
@@ -7931,7 +7977,10 @@ case 53: {
       '#53',
       ...linesForMix,
       '',
-      '',
+      'コードの切断に成功した：+1',
+      'ナノがいるスペースの数字のコードの切断に成功した：-1',
+      'コードの切断に失敗した：-2',
+      'ナノがスペース12に到達した場合、ドカーン！',
     ],
     flags:{}
   };
