@@ -258,7 +258,7 @@
 /* ★ #50：キャラ下の情報トークン（4列で折返し） */
 .m50-under{
   display:grid;
- grid-template-columns:repeat(4, 20px);
+ grid-template-columns:repeat(3, 20px);
   gap:2px;
   margin-top:2px;
 }
@@ -1828,7 +1828,7 @@ if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
       charCol.appendChild(row);
 
       // 高さ調整：4列折返しに合わせて必要分だけテーブルを拡張
-      const BASE=96, PERROW=4;
+      const BASE=96, PERROW=3;
       const rows = Math.ceil(nums.length / PERROW);
       const extra = rows>0 ? (4 + rows*20 + Math.max(0, rows-1)*2) : 0; // 20px(トークン) + 行間
       applyTableHeight(box, Math.max(BASE, BASE + extra));  // ← 既存ユーティリティ
