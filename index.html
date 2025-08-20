@@ -73,6 +73,12 @@
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/70% no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
 
+  /* #54 赤デッキ */
+  .reddeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb;
+    background:#fff url('./redcode.png') center/70% no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
+  .redrest { font-size:11px; opacity:.7; margin-left:2px; }
+
+  
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
 
@@ -1297,6 +1303,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM44(v);
     renderM49(v);
     renderM53(v);
+    renderM54(v);
     renderM57(v);
 renderM55(state.watching);
     renderM59(v);
@@ -4218,244 +4225,211 @@ function renderM61(v){
 
 }
 
-/* ========= Mission 54 ========= */
-/*
-  要求:
-  ① アイテムカード下・左側に ox2 を表示
-  ② 人数に応じて各プレイヤーへ酸素トークン配布
-     2人=9, 3人=6, 4人=3, 5人=2, 6人=2
-  ③ (30 - ①で配った総枚数) をリザーブ(プール)に横並び表示
-  ④ リザーブクリック→補給ポップ→自分が+1枚
-  ⑤ 自分の酸素をクリック→ 1/2/3 を選んで消費→リザーブへ返却（+n 演出）
-  ⑥ 赤コード(.5 × 11種)の山を作り、di左に redcode.png を表示。
-     クリック→「追加」→山の上から1枚を“クリック中のプレイヤー”の手札へ昇順挿入。
-     山の残枚数を山札の下に表示。
-*/
-
-function startMission54(){
-  clearMissionOverlays(); // 既存UIを掃除（M44の酸素UIも掃除対象）  // ← 既存関数
-  // 1) テーブルと人数を取得
-  const tables = Array.from(document.querySelectorAll('.table'));
-  const P = tables.length || parseInt(selCount?.value||'4', 10);
-
-  // 2) 配布枚数テーブル
-  const distMap = {2:9,3:6,4:3,5:2,6:2};
-  const giveEach = distMap[P] ?? 3;
-
-  // 3) oxプール（左のox2＋リザーブ）を itemsBar のすぐ下に作成
-  const itemsBar = document.getElementById('itemsBar');
-  const poolRow = document.createElement('div');
-  poolRow.id = 'm44OxPool';                          // 既存の掃除ロジックが拾ってくれます
-  poolRow.className = 'ox-row ox-pool';
-  const side = document.createElement('div');        // 左のボード画像
-  side.className = 'ox-side';                        // 背景に ox2.jpg が出るCSS  :contentReference[oaicite:3]{index=3}
-  poolRow.appendChild(side);
-
-  const wrap = document.createElement('div');        // リザーブのトークン並べ
-  wrap.className = 'ox-wrap';
-  poolRow.appendChild(wrap);
-
-  // 4) 各プレイヤーの所持行をテーブルの最上段に生成し、配布
-  //    （M44のUIスタイルを再利用）                              :contentReference[oaicite:4]{index=4}
-  let totalGiven = 0;
-  tables.forEach((tb, idx)=>{
-    // テーブル高さが詰まらないよう少しだけ余裕（必要に応じて）
-    tb.style.setProperty('--table-h', '110px');
-
-    const row = document.createElement('div');
-    row.className = 'ox-row';
-    row.dataset.tableIndex = idx;
-    // テーブルコンテンツの先頭付近に差し込む
-    const tContent = tb.querySelector('.t-content') || tb;
-    tContent.prepend(row);
-
-    for (let i=0;i<giveEach;i++){ addOneOx(row); totalGiven++; }
-
-    // ⑤ 自分の酸素をクリック：1/2/3消費→リザーブに返却
-    row.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      // 観戦中防止・自分の席のみ反応（state.seatedTable を使用）
-      if (state.seatedTable == null || state.seatedTable !== idx) return;
-      openBottomMenu([
-        {label:'1 消費', action:()=>spendOx(row, 1)},
-        {label:'2 消費', action:()=>spendOx(row, 2)},
-        {label:'3 消費', action:()=>spendOx(row, 3)},
-      ]);
-    });
-  });
-
-  // 3) リザーブ = 30 - 配布総数 を作る（上限0未満は0扱い）
-  const reserveInit = Math.max(0, 30 - totalGiven);
-  for (let i=0;i<reserveInit;i++) addOneOx(wrap);
-
-  // リザーブクリック → ④ 補給ポップ（+1枚）
-  wrap.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    // 自分のテーブルへだけ補給
-    const myIdx = state.seatedTable;
-    if (myIdx == null) return;
-    openOneMini(e.clientX, e.clientY, '補給 (+1)', ()=>{
-      const myRow = document.querySelector(`.ox-row[data-table-index="${myIdx}"]`);
-      if (!myRow) return;
-      const ok = takeOneOxFromReserve();
-      if (ok) addOneOx(myRow);
-    });
-  });
-
-  // itemsBarの直下へ配置（左側にox2が来る）
-  itemsBar.insertAdjacentElement('afterend', poolRow);
-
-  // ⑥ 赤コード山のUI
-  setupRedDeckUI54();
-
-  /* ==== helpers (54専用) ==== */
-  function addOneOx(parent){
-    const t = document.createElement('div');
-    t.className = 'token ox';             // 酸素トークン見た目はCSS側  :contentReference[oaicite:5]{index=5}
-    t.textContent = 'ox';                 // 透明カラーなので表示は見えない
-    parent.appendChild(t);
-  }
-  function takeOneOxFromReserve(){
-    const last = wrap.querySelector('.token.ox:last-child');
-    if (!last) return false;
-    last.remove();
-    return true;
-  }
-  function spendOx(myRow, n){
-    const tokens = Array.from(myRow.querySelectorAll('.token.ox')).slice(-n);
-    if (tokens.length < n) return;
-    tokens.forEach(el=>el.remove());
-    // リザーブへ n 枚返却
-    for (let i=0;i<n;i++) addOneOx(wrap);
-    // (+n) 演出
-    showPlusEffect(wrap, `+${n}`);
-  }
-  function showPlusEffect(target, text){
-    const span = document.createElement('span');
-    span.textContent = text;
-    span.style.position='absolute';
-    span.style.fontSize='12px';
-    span.style.background='rgba(0,0,0,.7)';
-    span.style.color='#fff';
-    span.style.borderRadius='10px';
-    span.style.padding='2px 6px';
-    // ターゲットの位置へ
-    const r = target.getBoundingClientRect();
-    span.style.left = (r.left + r.width/2) + 'px';
-    span.style.top  = (r.top  - 10) + 'px';
-    span.style.transform='translate(-50%, -50%)';
-    span.style.zIndex='2147483602';
-    span.style.pointerEvents='none';
-    document.body.appendChild(span);
-    setTimeout(()=>{ span.style.transition='all .6s ease'; span.style.opacity='0'; span.style.top=(r.top - 30)+'px'; }, 0);
-    setTimeout(()=>span.remove(), 700);
-  }
-}
-
-/* di 左に赤デッキを置き、クリックで「追加」→山から1枚をクリック中プレイヤーに昇順追加 */
-function setupRedDeckUI54(){
-  const di = document.getElementById('di');
-  if (!di) return;
-
-  // 山データ：赤コード 11種（1.5～11.5）
-  let redDeck = MATERIALS.redCodes.slice(); // 既存定義  :contentReference[oaicite:6]{index=6}
-  shuffle(redDeck);                         // 既存ヘルパ
-
-  // UI本体
-  const box = document.createElement('div');
-  box.style.display='flex';
-  box.style.flexDirection='column';
-  box.style.alignItems='center';
-  box.style.gap='4px';
-  box.style.width='48px';
-
-  const deckBtn = document.createElement('div');
-  deckBtn.className='numdeck'; // 既存デザインを流用（裏山表現）  :contentReference[oaicite:7]{index=7}
-  // 見た目を redcode.png に差し替え
-  deckBtn.style.backgroundImage = "url('./redcode.png')";
-  deckBtn.style.backgroundSize  = 'contain';
-  deckBtn.style.backgroundRepeat= 'no-repeat';
-  deckBtn.style.backgroundColor = '#fff';
-
-  const rest = document.createElement('div');
-  rest.className='numrest';
-  rest.textContent = `残り ${redDeck.length}`;
-
-  box.appendChild(deckBtn);
-  box.appendChild(rest);
-
-  // di の左側に挿入
-  di.insertAdjacentElement('beforebegin', box);
-
-  // クリック→「追加」→上から1枚を“クリック中プレイヤー”へ
-  deckBtn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    openBottomMenu([
-      {label:'追加', action: async ()=>{
-        if (redDeck.length===0) return;
-        // 「クリックしたプレイヤー」を取る：直近クリックのテーブルindexを使う簡易実装
-        // 既存で「最後にクリックされたテーブル」を保持している場合はそれを参照。
-        const lastClickedTable = window._lastClickedTableIndex; // ない場合は自席
-        const targetIdx = (typeof lastClickedTable==='number') ? lastClickedTable : state.seatedTable;
-        if (targetIdx==null) return;
-        const n = redDeck.shift();
-        addRedToHandAscending(targetIdx, n);
-        rest.textContent = `残り ${redDeck.length}`;
-      }},
-    ]);
-  });
-
-  // テーブルクリックで “最後にクリック” を覚える（簡易ターゲット指定）
-  document.querySelectorAll('.table').forEach((tb, idx)=>{
-    tb.addEventListener('click', ()=>{ window._lastClickedTableIndex = idx; }, {capture:true});
-  });
-
-  // 手牌へ昇順挿入（.5を数値として扱い、小→大で並ぶように）
-  function addRedToHandAscending(tableIndex, value){
-    const tb = document.querySelectorAll('.table')[tableIndex];
-    if (!tb) return;
-    const hand = tb.querySelector('.hand') || tb.querySelector('.t-content');
-    // 表示カード（赤コード用の簡易サムネ）
-    const card = document.createElement('div');
-    card.className='card';
-    card.style.background='#fff url("./codeback.jpg") center/cover no-repeat'; // ベース
-    // 角丸帯だけ赤く
-    const num = document.createElement('div');
-    num.className='num';
-    num.style.color='#e11d48';
-    num.textContent = String(value);
-    card.appendChild(num);
-
-    // 挿入位置（昇順）を探す：既存手札内の .num を見て数値昇順で前に入れる
-    const cards = Array.from(hand.querySelectorAll('.card'));
-    const val = parseFloat(value);
-    let inserted = false;
-    for (let i=0;i<cards.length;i++){
-      const v = parseFloat(cards[i].querySelector('.num')?.textContent||'999');
-      if (isFinite(v) && val < v){
-        hand.insertBefore(wrapCard(card), cards[i].parentElement || cards[i]);
-        inserted = true; break;
-      }
+  /* ▼▼ ここから追加：ミッション54（リザーブ＋個人酸素＋赤デッキ） ▼▼ */
+async function renderM54(v){
+  try{
+    const isM54 = ((v?.mission?.id|0) === 54);
+    // #54以外 → 後片付け：高さを元に戻す＆UI撤去
+    if (!isM54){
+      document.querySelectorAll('.table').forEach(tb=> tb.style.removeProperty('--table-h'));
+      const oldPool = document.getElementById('m54OxPool'); if (oldPool) oldPool.remove();
+      const oldRed  = document.getElementById('m54RedLane'); if (oldRed) oldRed.remove();
+      return;
     }
-    if (!inserted) hand.appendChild(wrapCard(card));
-  }
-  function wrapCard(card){
-    const w = document.createElement('div');
-    w.className = 'card-wrap';
-    w.appendChild(card);
-    return w;
-  }
-}
 
-/* ミッション起動スイッチに54を追加 */
-function startMissionById(mid){
-  state._lastMissionId = mid;
-  if (mid===54) return startMission54();
-  // 既存：
-  // if (mid===49) return startMission49(); ... など
-}
+    // --- 0) セーフガード
+    const N = (v?.tables?.length|0);
+    if (!Array.isArray(v?.tables) || N<=0) return;
 
-  
+    // --- 1) 初期化（ホストのみ一度だけ）
+    if (state.isHost && v?.meta?.m54_init !== true){
+      // ② 初期配布：人数→各人の初期枚数
+      const perMap = (m)=>{
+        if (m<=2) return 9;
+        if (m===3) return 6;
+        if (m===4) return 3;
+        return 2; // 5 or 6
+      };
+      const per = perMap(N);
+      const by  = {}; for (let i=0;i<N;i++) by[i] = per;
+      // ③ リザーブ＝ 30 - 「配った数」
+      const reserve = Math.max(0, 30 - per);
+      // ⑥ 赤デッキ：1..11 を .5 付きでシャッフルして保存
+      const deck = (MATERIALS.redCodes||[]).slice().map(n => n + 0.5);
+      shuffle(deck);
+      await update(ref(db, `rooms/${state.roomCode}/meta`), {
+        oxByTable: by,
+        oxItem: reserve,
+        m54_redDeck: deck,
+        m54_init: true
+      });
+      return; // 次回 onValue で描画
+    }
+
+    // --- 2) リザーブ行（アイテム列の直下・左に ox2 画像）
+    const itemsBar = document.getElementById('itemsBar');
+    if (!itemsBar) return;
+    let poolRow = document.getElementById('m54OxPool');
+    if (!poolRow){
+      poolRow = document.createElement('div');
+      poolRow.id = 'm54OxPool';
+      poolRow.className = 'ox-row ox-pool';
+      itemsBar.insertAdjacentElement('afterend', poolRow);
+    }
+    // 左側に ox2 サイド、右に .ox-wrap（10で折返し）
+    let wrap = poolRow.querySelector('.ox-wrap');
+    if (!wrap){
+      poolRow.innerHTML = '';
+      const side = document.createElement('div');
+      side.className = 'ox-side';
+      poolRow.appendChild(side);
+      wrap = document.createElement('div');
+      wrap.className = 'ox-wrap';
+      poolRow.appendChild(wrap);
+    }else{
+      wrap.innerHTML = '';
+    }
+    // ③ リザーブ表示（oxItem個）
+    const poolCnt = Math.max(0, v?.meta?.oxItem|0);
+    for (let i=0;i<poolCnt;i++){
+      const t = document.createElement('div');
+      t.className = 'token ox';
+      wrap.appendChild(t);
+    }
+    // ④ クリック→補給ポップ（1枚取得）
+    const myIdx = (()=>{
+      const s = state?.seatedTable; if (Number.isInteger(s)) return s|0;
+      return (v.tables||[]).findIndex(T=> T?.playerId===state.userId);
+    })();
+    poolRow.onclick = (ev)=>{
+      const entries = [];
+      if (poolCnt > 0){
+        entries.push({
+          label:'補給（+1）',
+          action: async ()=>{
+            const left = (v?.meta?.oxItem|0) - 1;
+            if (myIdx==null || myIdx<0){ alert('席に座ってから取得してください'); return; }
+            const mine = (v?.meta?.oxByTable?.[myIdx]||0) + 1;
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              oxItem: left, [`oxByTable/${myIdx}`]: mine
+            });
+            const badge = document.createElement('div');
+            badge.textContent = '+1';
+            Object.assign(badge.style,{ position:'absolute', right:'6px', top:'-10px', fontSize:'12px', opacity:'0.9' });
+            poolRow.appendChild(badge);
+            setTimeout(()=> badge.remove(), 2000);
+          }
+        });
+      }
+      if (entries.length>0) openMenu(ev.clientX, ev.clientY, entries);
+    };
+
+    // --- 3) 各テーブル：個人酸素の表示（#49と同じ高さ調整）
+    const tableNodes = document.querySelectorAll('.table');
+    (v.tables||[]).forEach((T, ti)=>{
+      const box = tableNodes[ti]; if (!box) return;
+      let row = box.querySelector('.ox-row[data-owner="1"]');
+      if (!row){
+        row = document.createElement('div');
+        row.className = 'ox-row'; row.dataset.owner = '1';
+        const anchor = box.querySelector('.badge-fixed');
+        if (anchor){
+          anchor.insertAdjacentElement('afterend', row);
+          const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+          row.style.marginTop = `${Math.round(ah * 5)}px`;
+        }else{
+          const hand = box.querySelector('.hand');
+          (hand || box).appendChild(row);
+        }
+      }
+      row.innerHTML = '';
+      const wrapSelf = document.createElement('div');
+      wrapSelf.className = 'ox-wrap';
+      row.appendChild(wrapSelf);
+      const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
+      for (let i=0;i<cnt;i++){
+        const t = document.createElement('div'); t.className = 'token ox'; wrapSelf.appendChild(t);
+      }
+      const BASE=96, PERROW=10, ROWH=28, GAP=0;
+      const rows = (cnt>0)? Math.ceil(cnt/PERROW) : 0;
+      const extra= rows>0 ? (rows*ROWH + GAP) : 0;
+      const needH= BASE + extra;
+      box.style.setProperty('--table-h', `${needH}px`);
+
+      if (Number.isInteger(myIdx) && myIdx===ti){
+        row.onclick = (ev)=>{
+          openMenu(ev.clientX, ev.clientY, [1,2,3].map(k=>({
+            label:String(k),
+            action: async ()=>{
+              const mine = (v?.meta?.oxByTable?.[ti]||0) - k;
+              const pool = (v?.meta?.oxItem||0) + k;
+              if (mine<0) return;
+              await update(ref(db, `rooms/${state.roomCode}/meta`), {
+                oxItem: pool, [`oxByTable/${ti}`]: mine
+              });
+              const badge = document.createElement('div');
+              badge.textContent = `+${k}`;
+              Object.assign(badge.style,{ position:'absolute', right:'6px', top:'-10px', fontSize:'12px', opacity:'0.9' });
+              poolRow.appendChild(badge);
+              setTimeout(()=> badge.remove(), 2000);
+            }
+          })));
+        };
+      }else{
+        row.onclick = null;
+      }
+    });
+
+    // --- 6) 赤コード山札
+    const footer = document.getElementById('missionFooter'); if (!footer) return;
+    let lane = document.getElementById('m54RedLane');
+    if (!lane){
+      lane = document.createElement('div');
+      lane.id = 'm54RedLane';
+      lane.className = 'numlane';
+      footer.appendChild(lane);
+    }
+    lane.innerHTML = '';
+    const redBtn = document.createElement('div'); redBtn.className='reddeck'; redBtn.title='赤デッキ';
+    const rest   = document.createElement('span'); rest.className='redrest';
+    lane.appendChild(redBtn);
+    lane.appendChild(rest);
+    const remain = Array.isArray(v?.meta?.m54_redDeck) ? v.meta.m54_redDeck.length : 0;
+    rest.textContent = `残:${remain}`;
+
+    redBtn.onclick = (ev)=>{
+      openMenu(ev.clientX, ev.clientY, [{
+        label:'追加',
+        action: async ()=>{
+          const code = state.roomCode;
+          const mRef  = ref(db, `rooms/${code}/meta`);
+          const tRef  = ref(db, `rooms/${code}/tables`);
+          const [mSnap, tSnap] = await Promise.all([ get(mRef), get(tRef) ]);
+          const meta = mSnap.val()||{}; const tbls = tSnap.val()||[];
+          const deck = Array.isArray(meta.m54_redDeck) ? meta.m54_redDeck.slice() : [];
+          if (deck.length<=0) return;
+          const n = deck.shift();
+          const i = (()=>{
+            const s = state?.seatedTable; if (Number.isInteger(s)) return s|0;
+            return (v.tables||[]).findIndex(T=> T?.playerId===state.userId);
+          })();
+          if (i==null || i<0 || !tbls[i]){ alert('席に座ってから操作してください'); return; }
+          const T = tbls[i];
+          const hand = Array.isArray(T.hand) ? T.hand.slice() : [];
+          hand.push({ id:crypto.randomUUID(), num:n, kind:'red', open:false, ownerId:T.playerId||null, tokens:[], markUntil:null });
+          hand.sort((a,b)=> (a.num||0) - (b.num||0));
+          await Promise.all([
+            update(mRef, { m54_redDeck: deck }),
+            update(ref(db, `rooms/${code}/tables/${i}`), { hand })
+          ]);
+        }
+      }]);
+    };
+
+  }catch(e){ console.error(e); }
+}
+/* ▲▲ ここまで追加：ミッション54 ▲▲ */
+
   
 /* ここから追加：ミッション53（nano0 固定） */
 function renderM53(v){
