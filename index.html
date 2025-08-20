@@ -139,7 +139,6 @@
     padding:0 8px;height:var(--table-h);display:block;background:#fff;
     overflow:hidden;width:max-content;z-index:0;
     transition: height .25s ease;  /* ← 高さ変更をアニメーション */
-     overflow: visible; 
   }
   .table.elevated{ z-index:9999; }
 
@@ -800,9 +799,16 @@ document.querySelectorAll('.m59-row').forEach(n => n.remove());
   document.querySelectorAll('.ox-row').forEach(n => n.remove()); // 各テーブルの所持行
   
   // テーブルの高さを基準に戻す（M44で上げたものを解除）
+(function resetTableHeightSafely(){
+  const mid = (state?.watching?.mission?.id|0);   // 現在のミッションID
+  // 酸素で高さを使うミッションは除外（44,49,54,63 など）
+  const usesOxHeight = [44,49,54,63].includes(mid);
+  if (usesOxHeight) return;
+
   document.querySelectorAll('.table').forEach(tb=>{
     tb.style.removeProperty('--table-h');
   });
+})();
   
   NUMCARD_REG.clear();
 }
