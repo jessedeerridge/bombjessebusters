@@ -1690,7 +1690,10 @@ const title=document.createElement('div');  title.className='title';
 title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
 /* ▼▼ ここから追加：#29 所持数表示 ▼▼ */
 if ((v.mission?.id|0) === 29) {
-  const cnt = (Array.isArray(t.m29Hand) ? t.m29Hand.length : 0);
+  const cnt = (Array.isArray(t.m29Hand) ? 
+    t.m29Hand.length : 0);
+
+  
   title.textContent += `（${cnt}）`;
 }
     
@@ -5855,7 +5858,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
     started:true, tableCount:playerCount, tables, items,
-  di:{ value: ((missionId===51 || missionId===55 || missionId===62) ? 1 : playerCount), max:6 },
+  di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : playerCount), max:6 },
   captainTable: captainIndex, mission: missionMeta,     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
     /* ▲▲ ここまで追加 ▼▼ */
