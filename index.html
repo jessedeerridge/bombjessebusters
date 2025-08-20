@@ -2686,7 +2686,7 @@ function renderM26(v){
 /* ===== #55：チャレンジ10枚から人数分を確定。c8が含まれたら左右の数値2枚も確定 ===== */
 async function ensureM55MetaInit(vNow){
   const v = vNow || state.watching; if(!v) return;
-  if ((v?.mission?.id|0) !== 55) return;
+  if (!(mid === 55 || mid === 60)) return;
   const M = v.meta || {};
 
   // まだ確定していなければ、ホストが山札と公開札を確定
@@ -2737,7 +2737,7 @@ function openChallengeZoom(id){
   
 /* ===== #55：チャレンジ札（人数分）。c8 のときだけ左右に数値1枚ずつ表示 ===== */
 function renderM55(v){
-  const isM55 = ((v?.mission?.id|0) === 55);
+  const isM55 = ((v?.mission?.id|0) === 55 || (v?.mission?.id|0) === 60);
   const rowId = 'm55Row';
   const old   = document.getElementById(rowId);
   if (!isM55){ if (old) old.remove(); return; }
