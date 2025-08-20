@@ -2233,7 +2233,6 @@ tokens.forEach((tk,ti)=>{
 
   const label = `${tokenText} を消す`;
             
-            const label: String(c.num) + ' を消す',
               entries.push({label, action: async ()=>{
                 const next = tokens.slice(); const removed = next.splice(ti,1)[0];
                 await update(ref(db, cardPath), { tokens: next });
