@@ -1451,7 +1451,7 @@ function renderMissionPanels(v){
       if (!missionDetailBody.dataset.m50Hooked) {
         missionDetailBody.dataset.m50Hooked = '1';
         missionDetailBody.addEventListener('click', (ev)=>{
-          // 既にボタンがあれば二重生成しない
+         if (((state?.watching?.mission?.id|0) !== 50)) return;
           if (document.getElementById('m50OkTab')) return;
           const okBtn = document.createElement('button');
           okBtn.id = 'm50OkTab';
