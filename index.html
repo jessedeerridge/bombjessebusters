@@ -4338,23 +4338,28 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
         anchor.insertAdjacentElement('afterend', row);
         const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
         row.style.marginTop = `${Math.round(ah * 5)}px`;
-      }else{
-        (box.querySelector('.hand') || box).appendChild(row);
-      }
-    }
-    // 再描画
-    row.innerHTML = '';
-    const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
-    for (let i=0;i<cnt;i++){
+    }else{
+     (box.querySelector('.hand') || box).appendChild(row);
+     }
+   }
+     // 再描画（.ox-wrap を介し 15 個/行で折返し：M49/M63と一致）
+   row.innerHTML = '';
+   const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
+    const wrap = document.createElement('div');
+    wrap.className = 'ox-wrap';
+     row.appendChild(wrap);
+     for (let i=0; i<cnt; i++){
       const t = document.createElement('div');
       t.className = 'token ox';
-      row.appendChild(t);
+     wrap.appendChild(t);
     }
-    // テーブルの高さ（1行ぶんだけ拡張）
-    const baseH = 96;
-    const extra = (cnt>0)? (4+20) : 0;
-    box.style.setProperty('--table-h', `${Math.max(baseH, baseH+extra)}px`);
-
+    // テーブル高さ：所持酸素の行数に合わせて拡張
+     const baseH = 96, perRow = 15, rowH = 24;
+    const rows  = (cnt>0) ? Math.ceil(cnt / perRow) : 0;
+    const extra = rows>0 ? (4 + rowH * rows) : 0;
+  const needH = Math.max(baseH, baseH + extra);
+   box.style.setProperty('--table-h', `${needH}px`);
+    box.style.height = `${needH}px`;  // ← 実高さも直指定
     // ⑤ 自分の行クリック → 1/2/3 を返却（リザーブに戻す）
     //    （#44の返却 UI と同様の挙動）
     const myIdx = (()=>{
