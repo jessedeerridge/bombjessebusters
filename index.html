@@ -2407,7 +2407,7 @@ function renderM29(v){
   const oldCenter = document.getElementById('m29CenterRow');
   if (!isM29) { if (oldHand) oldHand.remove(); if (oldCenter) oldCenter.remove(); return; }
 
- 
+
   
   // 自分の席
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
@@ -2430,8 +2430,8 @@ function renderM29(v){
          /* ここから追加：数値カードの表面は画像を使用 */
        c.style.backgroundImage = `url('${imgNumber(n)}')`;
        c.style.backgroundSize = 'cover';
-       c.style.backgroundPosition = 'center';
-        c.title = '場に出す';
+      c.style.backgroundPosition = 'center';
+       c.title = '場に出す';
         c.onclick = async (ev)=>{
           try{
             // DBから再取得して安全に更新
@@ -2443,8 +2443,28 @@ function renderM29(v){
             const hand = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
             const pos  = hand.indexOf(n);
             if (pos<0) return;
+
+            // ▼ 追加：センターに同数の「表」カードが4枚あるか？
+            const cNow = Array.isArray(R.m29_center) ? R.m29_center : [];
+           const openedSame = cNow.filter(o => o && o.faceUp === true && (o.n|0) === (n|0)).length;
+           if (openedSame >= 4){
+              // “捨てる”ポップを出して、選ばれたら手札から削除するだけ
+              openOneMini(ev.clientX, ev.clientY, '捨てる', async ()=>{
+                const tSnap2 = await get(tRef);                 // 念のため再取得
+                const T2     = tSnap2.val()||{};
+                const hand2  = Array.isArray(T2.m29Hand) ? T2.m29Hand.slice() : [];
+                const p2     = hand2.indexOf(n);
+                if (p2<0) return;
+                hand2.splice(p2,1);
+                await update(tRef, { m29Hand: hand2 });
+              });
+              return; // ポップ操作に委ねる
+            }
+
+            // 従来どおり：センターに出す
             hand.splice(pos,1);
-            const center = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
+           const center = Array.isArray(R.m29_center) ?    
+          R.m29_center.slice() : [];
             center.push({ n, by: myIdx, faceUp:false });
             await Promise.all([
               update(tRef, { m29Hand: hand }),
@@ -7952,8 +7972,6 @@ case 54: {
       'コードを切断する時は指定の数の酸素トークンをリザーブへ支払わなければならない。',
       '切断できない場合は起爆トークンが1進む。',
       '確定トークンを置くたびに各プレイヤーは酸素トークンを1つ得る。',
-      '',
-      '',
     ],
     flags:{}
   };
