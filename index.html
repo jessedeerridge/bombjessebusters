@@ -1414,6 +1414,10 @@ function renderMissionPanels(v){
 
   /* ここから追加：#50 専用 OKタブ＆赤/黄のみ [?] マスク（全員に同期） */
   if ((v?.mission?.id|0) === 50) {
+  document.querySelectorAll('.check-mark').forEach(el=>{
+    el.style.background = 'none';
+  });
+    
     const hidden = v?.meta?.m50_hidden === true;
 
     // 赤/黄の数値だけ [ ? ] にする関数（"●" or "▧" を含む行の [ ... ] だけ置換）
@@ -3484,9 +3488,6 @@ async function renderM59(v){
 // ミッション57：二重描画/二重保存対策込みで全面書き直し
 async function renderM57(v){
   const isM57 = ((v?.mission?.id|0) === 57);
-  document.querySelectorAll('.check-mark').forEach(el=>{
-    el.style.background = 'none';
-  });
   
   if (!isM57){
     // #57から離れた瞬間に確実に片付ける（ホットリロード/一時的な未呼出対策）
