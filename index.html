@@ -4327,8 +4327,8 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
   const wrap = document.createElement('div');
   wrap.className = 'ox-wrap';     // CSS で 1 行あたり 15 個に折返し
   row.appendChild(wrap);
-  const cnt = Math.max(0, v?.meta?.oxByTable?.[ti]||0);
- for (let i=0; i<cnt; i++){
+const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
+    for (let i=0; i<cnt; i++){
     const t = document.createElement('div');
     t.className = 'token ox';
     wrap.appendChild(t);
