@@ -2450,47 +2450,6 @@ function renderM29(v){
              update(tRef, { m29Hand: hand }),
               update(ref(db, `rooms/${state.roomCode}`), { m29_center: center })
            ]);
-            // ★追加：出した結果、手札が1枚以下なら補充（残りの数値デッキから1枚）
-            if (hand.length <= 1) {
-              try {
-                // 全テーブル＆センターを見て「未使用の数字」を算出
-                const [allTabsSnap, roomSnap2] = await Promise.all([
-                  get(ref(db, `rooms/${state.roomCode}/tables`)),
-                  get(ref(db, `rooms/${state.roomCode}`))
-                ]);
-                const allTabs = allTabsSnap.val() || [];
-                const room2   = roomSnap2.val() || {};
-               const center2 = Array.isArray(room2.m29_center) ? room2.m29_center : center;
-
-                const used = new Set<number>();
-                (allTabs || []).forEach(Ti => (Ti?.m29Hand || []).forEach(x => used.add(x)));
-                center2.forEach(obj => used.add(obj?.n|0));
-
-               const remain = MATERIALS.numbers.filter(x => !used.has(x));
-                if (remain.length > 0) {
-                  const give = remain[Math.random() * remain.length | 0];
-                 const after = hand.concat(give);
-                  await update(tRef, { m29Hand: after });
-
-                 // 「＋1」を名前横に3秒表示（該当テーブルタイトルに一時タグを付与）
-                  const tableNodes = document.querySelectorAll('.table');
-                  const myBox  = tableNodes[myIdx];
-                  const titleEl = myBox?.querySelector('.t-header .title');
-                 if (titleEl) {
-                    const tag = document.createElement('span');
-                    tag.textContent = '＋1';
-                    tag.style.marginLeft = '4px';
-                    tag.style.fontSize   = '12px';
-                    tag.style.fontWeight = '700';
-                   tag.style.opacity    = '1';
-                    titleEl.appendChild(tag);
-                    setTimeout(()=> tag.remove(), 3000);
-                  }
-               }
-              } catch (_e) { /* 補充失敗は無視（デッキ切れ等） */ }
-            }
-
-    
           }catch(e){ console.error(e); }
         };
         row.appendChild(c);
@@ -6930,6 +6889,11 @@ async function ensureM36MetaInit(vNow){
       m36_numbers: picks,
       m36_side: null    // ← 左右どちらもブランクで開始
     });
+     await update(ref(db, `rooms/${state.roomCode}/meta`), {
+       m36_numbers: picks,
+       m36_side: null,   // ← 左右どちらもブランクで開始
+       m36_faceDown: []  // ← 追加：裏向きにしている数値のリスト（同期）
+     });
     return;
   }
 
@@ -6980,7 +6944,25 @@ function renderM36(v){
   const n2 = mkCard(imgNumber(nums[2]));
   const n3 = mkCard(imgNumber(nums[3]));
   const n4 = mkCard(imgNumber(nums[4]));
-
+  // ★ 追加：裏向きトグル（同期）
+  const downs = new Set(Array.isArray(v?.meta?.m36_faceDown) ? v.meta.m36_faceDown : []);
+  const nodes = [n0, n1, n2, n3, n4];
+  nodes.forEach((node, i)=>{
+    const num = nums[i];
+    // 初期反映：裏向きなら裏面を表示
+    if (downs.has(num)) {
+      node.style.backgroundImage = `url('${imgBack}')`;
+    }
+    // クリックで表⇄裏トグル（全員同期）
+    node.onclick = async (ev)=>{
+      ev.stopPropagation();
+      const cur = state.watching?.meta?.m36_faceDown;
+      const arr = Array.isArray(cur) ? cur.slice() : [];
+      const idx = arr.indexOf(num);
+      if (idx >= 0) arr.splice(idx, 1); else arr.push(num);
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m36_faceDown: arr });
+    };
+  });
   // 右ブランク（クリックで右側に left2）
   const rightSlot = mkCard(null);
   rightSlot.classList.add('m36-slot','m36-right');
