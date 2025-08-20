@@ -799,16 +799,9 @@ document.querySelectorAll('.m59-row').forEach(n => n.remove());
   document.querySelectorAll('.ox-row').forEach(n => n.remove()); // 各テーブルの所持行
   
   // テーブルの高さを基準に戻す（M44で上げたものを解除）
-(function resetTableHeightSafely(){
-  const mid = (state?.watching?.mission?.id|0);   // 現在のミッションID
-  // 酸素で高さを使うミッションは除外（44,49,54,63 など）
-  const usesOxHeight = [44,49,54,63].includes(mid);
-  if (usesOxHeight) return;
-
   document.querySelectorAll('.table').forEach(tb=>{
     tb.style.removeProperty('--table-h');
   });
-})();
   
   NUMCARD_REG.clear();
 }
@@ -4235,9 +4228,6 @@ async function renderM54(v){
   if (!isM54){
     const x = document.getElementById('m54OxPool'); if (x) x.remove();
     const y = document.getElementById('m54RedBox'); if (y) y.remove();
-      document.querySelectorAll('.table').forEach(tb=>{
-    tb.style.removeProperty('--table-h');   // ← M49の冒頭と同じ動き
-  });
     return;
   }
 
@@ -4312,20 +4302,17 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
   };
 
   // --- 2) 各テーブル下に自分の酸素トークン表示（#44と同じ場所） ---
-/* ここから差し替え：M49と同じ描画・高さロジックに統一 */
 const tableNodes = document.querySelectorAll('.table'); // renderTables と同順
+const n = (v?.tables?.length|0);
 (v.tables||[]).forEach((T, ti)=>{
-  const box = tableNodes[ti];
-  if (!box) return;
+  const box = tableNodes[ti]; if (!box) return;
 
-  // 既存行を再利用 or 生成（M49と同じ置き場所＝アルファベット直下）
   let row = box.querySelector('.ox-row[data-owner="1"][data-m54="1"]');
   if (!row){
     row = document.createElement('div');
     row.className = 'ox-row';
     row.dataset.owner = '1';
-    row.dataset.m54   = '1';
-
+    row.dataset.m54 = '1';
     const anchor = box.querySelector('.badge-fixed');
     if (anchor){
       anchor.insertAdjacentElement('afterend', row);
@@ -4336,58 +4323,56 @@ const tableNodes = document.querySelectorAll('.table'); // renderTables と同�
     }
   }
 
-  // 再描画：常に .ox-wrap を挿入（M49と同じ運用）
+  // 再描画：必ず .ox-wrap を挟む（M49/63と同じ運用）
   row.innerHTML = '';
   const wrap = document.createElement('div');
-  wrap.className = 'ox-wrap';
+  wrap.className = 'ox-wrap';       // CSS：1行あたり15個に折返し
   row.appendChild(wrap);
 
-  const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti] || 0);
-  for (let i=0; i<cnt; i++){
+  const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
+  for (let i=0;i<cnt;i++){
     const t = document.createElement('div');
     t.className = 'token ox';
     wrap.appendChild(t);
   }
 
-  // ▼ 高さ：M49と同じ“行数ベース”で `--table-h` のみ上書き
-  const BASE   = 96;   // 基準高さ（座席のみ） M49と同じ
-  const PERROW = 10;   // 1行あたりのトークン数  M49と同じ
-  const ROWH   = 28;   // 1行ぶん増分               M49と同じ
-  const GAP    = 0;
+  // ▼ 高さを「行数ベース」で上書き（インライン height は使わない）
+  const BASE   = 96;   // 標準テーブル高
+  const PERROW = 15;   // .ox-wrap の設計（1行15個）
+  const ROWH   = 24;   // 1行ぶんの見込み（20px + ギャップ）
   const rows   = (cnt>0) ? Math.ceil(cnt / PERROW) : 0;
-  const extra  = rows>0 ? (rows * ROWH + GAP) : 0;
+  const extra  = (rows>0) ? (4 + ROWH * rows) : 0;
   box.style.setProperty('--table-h', `${BASE + extra}px`);
+    // ⑤ 自分の行クリック → 1/2/3 を返却（リザーブに戻す）
+    //    （#44の返却 UI と同様の挙動）
+    const myIdx = (()=>{
+      const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
+      if (Number.isInteger(sNum) && sNum>=0 && sNum<n) return sNum;
+      const alt = (v.tables||[]).findIndex(t=> t?.playerId===state.userId);
+      return (alt>=0? alt : null);
+    })();
 
-  // ▼ 自分の所持酸素クリック：1/2/3をリザーブへ返却（M49の返却UIと同等）
-  const myIdx = (()=>{
-    const s = (state?.seatedTable==null)? null : Number(state.seatedTable);
-    if (Number.isInteger(s) && s>=0 && s<(v?.tables?.length|0)) return s;
-    const alt = (v.tables||[]).findIndex(t=> t?.playerId === state.userId);
-    return (alt>=0 ? alt : null);
-  })();
-
-  if (myIdx !== null && myIdx === ti){
-    row.onclick = (ev)=>{
-      const maxCan = Math.max(0, v?.meta?.m54_byTable?.[ti] || 0);
-      const choices = [1,2,3].filter(k=>k<=maxCan).map(k=>({
-        label:String(k),
-        action: async ()=>{
-          const mine = (v?.meta?.m54_byTable?.[ti] || 0) - k;
-          const pool = (v?.meta?.m54_pool|0) + k;
-          await update(ref(db, `rooms/${state.roomCode}/meta`), {
-            m54_pool: pool,
-            [`m54_byTable/${ti}`]: mine
-          });
-        }
-      }));
-      openMenu(ev.clientX, ev.clientY, choices);
-    };
-  }else{
-    row.onclick = null;
-  }
-});
-/* ここまで差し替え */
-
+    if (myIdx !== null && myIdx === ti){
+      row.onclick = (ev)=>{
+        const maxCan = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
+        const choices = [1,2,3].filter(k=> k<=maxCan).map(k=>({
+          label:String(k),
+          action: async ()=>{
+            const mine = (v?.meta?.m54_byTable?.[ti]||0) - k;
+            const pool = (v?.meta?.m54_pool||0) + k;
+            if (mine<0) return;
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              m54_pool: pool,
+              [`m54_byTable/${ti}`]: mine
+            });
+          }
+        }));
+        if (choices.length>0) openMenu(ev.clientX, ev.clientY, choices);
+      };
+    }else{
+      row.onclick = null;
+    }
+  });
 
   // --- 3) 赤デッキ（diの左側に redcode.png ＋ 残枚数） ---
   const di = document.getElementById('di');
