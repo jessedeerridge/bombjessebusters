@@ -1701,7 +1701,10 @@ if ((v.mission?.id|0) === 23) {
 const header=document.createElement('div'); header.className='t-header';
 const title=document.createElement('div');  title.className='title';
 title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
-/* ▼▼ ここから追加：#29 所持数表示 ▼▼ */
+
+    
+    
+    /* ▼▼ ここから追加：#29 所持数表示 ▼▼ */
 if ((v.mission?.id|0) === 29) {
   const cnt = (Array.isArray(t.m29Hand) ? 
     t.m29Hand.length : 0);
@@ -2486,17 +2489,56 @@ function renderM29(v){
             const mRef = ref(db, `rooms/${state.roomCode}`);
             const [tSnap, rSnap] = await Promise.all([get(tRef), get(mRef)]);
             const T = tSnap.val()||{};
-            const R = rSnap.val()||{};
-            const hand = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
-            const pos  = hand.indexOf(n);
+           const R = rSnap.val()||{};
+            const hand0 = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
+            const pos   = hand0.indexOf(n);
             if (pos<0) return;
-            hand.splice(pos,1);
+            // 1) 出す：手札から抜いてセンターへ
+            hand0.splice(pos,1);
             const center = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
             center.push({ n, by: myIdx, faceUp:false });
+
+            // 2) 自動ドロー：手札が1枚以下なら残り山から1枚
+            let drew = false;
+            let nextHand = hand0.slice();
+            if (nextHand.length <= 1) {
+              // 既存のデッキがあれば使う。無ければ“残り”（1..12 から使用済みを除外）を生成
+              let deck = Array.isArray(R.m29_deck) ? R.m29_deck.slice() : null;
+              if (!Array.isArray(deck)) {
+                const used = new Set();
+                (R.tables||[]).forEach(TT => (TT?.m29Hand||[]).forEach(x => used.add(x)));
+                (Array.isArray(R.m29_center)?R.m29_center:[]).forEach(o => used.add(o?.n|0));
+                deck = MATERIALS.numbers.filter(x => !used.has(x));
+                shuffle(deck);
+              }
+              if (deck.length > 0) {
+                const d = deck.shift();
+                nextHand.push(d);
+                drew = true;
+                // m29_deck を書き戻す
+                await update(ref(db, `rooms/${state.roomCode}`), { m29_deck: deck });
+              }
+            }
+            // 3) DB 更新（手札・センター）
             await Promise.all([
-             update(tRef, { m29Hand: hand }),
+              update(tRef, { m29Hand: nextHand }),
               update(ref(db, `rooms/${state.roomCode}`), { m29_center: center })
-           ]);
+            ]);
+            // 4) UI：名前右の枚数表示の右に「+1」を3秒出す
+            if (drew) {
+              const id = `m29cnt-${myIdx}`;
+              const anchor = document.getElementById(id);
+              if (anchor && anchor.parentNode) {
+                const badge = document.createElement('span');
+                badge.textContent = '+1';
+                // 目立ちすぎない緑＆少し余白、3秒後フェードアウト
+                badge.style.marginLeft = '2px';
+                badge.style.color = '#22c55e';
+                badge.style.transition = 'opacity .3s linear';
+                anchor.after(badge);
+                setTimeout(()=>{ badge.style.opacity='0'; setTimeout(()=>badge.remove(), 300); }, 2700);
+              }
+            }
           }catch(e){ console.error(e); }
         };
         row.appendChild(c);
@@ -2547,6 +2589,9 @@ function renderM29(v){
        cell.style.backgroundSize = 'cover';
        cell.style.backgroundPosition = 'center';
      }
+
+
+      
       // ★変更：公開4枚成立時は「捨てる」表示
       const willDiscardOnly = obj.faceUp && ((openCountByNum[obj.n|0]||0) === 4);
       cell.title = obj.faceUp ? (willDiscardOnly ? '捨てる' : '出したプレイヤーの次のテーブルへ移す') : 'めくる';
