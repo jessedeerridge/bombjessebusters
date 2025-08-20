@@ -4311,20 +4311,22 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
   (v.tables||[]).forEach((T, ti)=>{
     const box = tableNodes[ti]; if (!box) return;
 
-    let row = box.querySelector('.ox-row[data-owner="1"][data-m54="1"]');
+    let row = box.querySelector(`.ox-row[data-owner="${ti}"][data-m54="1"]`);
     if (!row){
       row = document.createElement('div');
       row.className = 'ox-row';
-      row.dataset.owner = '1';
+      row.dataset.owner = String(ti);
       row.dataset.m54 = '1';
       const anchor = box.querySelector('.badge-fixed');
       if (anchor){
-        anchor.insertAdjacentElement('afterend', row);
-        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        const parent = anchor.parentElement || box;
+        parent.appendChild(row);
+        const ah = parent.querySelector('.alpha')?.getBoundingClientRect().height || 18;
         row.style.marginTop = `${Math.round(ah * 5)}px`;
       }else{
         (box.querySelector('.hand') || box).appendChild(row);
       }
+      row.style.minHeight = '22px';
     }
     // 再描画
     row.innerHTML = '';
@@ -4336,8 +4338,8 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
     }
     // テーブルの高さ（1行ぶんだけ拡張）
     const baseH = 96;
-    const extra = (cnt>0)? (4+20) : 0;
-    box.style.setProperty('--table-h', `${Math.max(baseH, baseH+extra)}px`);
+    const extra = 24; // 4px余白 + 20pxトークン行 相当
+    box.style.setProperty('--table-h', `${baseH + extra}px`);
 
     // ⑤ 自分の行クリック → 1/2/3 を返却（リザーブに戻す）
     //    （#44の返却 UI と同様の挙動）
