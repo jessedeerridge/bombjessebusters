@@ -1340,18 +1340,34 @@ renderM55(state.watching);
 
 
 // ▼ テーブル高さの差分適用（変化がある時だけ更新＆その時だけアニメ）
+// ▼ テーブル高さの差分適用（“直前論理値”で判定）
+// ・初回はアニメしない
+// ・同じ値なら何もしない
+// ・増える時だけアニメ（減る時は瞬時反映でチラつき防止）
 function applyTableHeight(box, needPx){
-  const curCss = getComputedStyle(box).getPropertyValue('--table-h').trim();
-  const cur = parseInt(curCss.replace('px','')) || 0;
-  if (cur === needPx) return;            // 変化なし → 何もしない（アニメもなし）
+  const prevStr = box.dataset.prevH || "";           // 直前論理値（文字列）
+  const prev = prevStr === "" ? null : parseInt(prevStr, 10);
 
-  // 変化あり：この更新時だけトランジションを有効化
-  box.classList.add('anim-h');
+  if (prev !== null && prev === needPx) return;      // 変化なし
+
+  const doAnimate = (prev !== null) && (needPx > prev);
+
+  if (doAnimate){
+    box.classList.add('anim-h');
+  } else {
+    box.classList.remove('anim-h');                  // 初回や縮む時は即時反映
+  }
+
   box.style.setProperty('--table-h', `${needPx}px`);
-  box.style.height = `${needPx}px`;      // 念のため実高さも
-  // 次回以降の不要アニメを防ぐため短時間で解除
-  setTimeout(()=> box.classList.remove('anim-h'), 300);
+  box.style.height = `${needPx}px`;
+
+  box.dataset.prevH = String(needPx);                // 次回比較用に保存
+
+  if (doAnimate){
+    setTimeout(()=> box.classList.remove('anim-h'), 300);
+  }
 }
+
 
   // ▼▼ カード下トークン（.tok-col）の“実測下端”に合わせて、必要時のみテーブルを伸ばす ▼▼
 // 対象：数字 / x1・x2・x3 / 偶数 / 奇数 / ＝ / ≠ （= .tok-col に並ぶ .token）
