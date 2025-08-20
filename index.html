@@ -2446,9 +2446,27 @@ function renderM29(v){
             const hand = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
             const pos  = hand.indexOf(n);
             if (pos<0) return;
+
+            // ▼ 追加：センターに同数の「表」カードが4枚あるか？
+            const cNow = Array.isArray(R.m29_center) ? R.m29_center : [];
+            const openedSame = cNow.filter(o => o && o.faceUp === true && (o.n|0) === (n|0)).length;
+            if (openedSame >= 4){
+              // “捨てる”ポップを出して、選ばれたら手札から削除するだけ
+              openOneMini(ev.clientX, ev.clientY, '捨てる', async ()=>{
+                const tSnap2 = await get(tRef);                 // 念のため再取得
+                const T2     = tSnap2.val()||{};
+                const hand2  = Array.isArray(T2.m29Hand) ? T2.m29Hand.slice() : [];
+                const p2     = hand2.indexOf(n);
+                if (p2<0) return;
+                hand2.splice(p2,1);
+                await update(tRef, { m29Hand: hand2 });
+              });
+              return; // ポップ操作に委ねる
+            }
+
+            // 従来どおり：センターに出す
             hand.splice(pos,1);
-            const center = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
-            center.push({ n, by: myIdx, faceUp:false });
+            const center = Array.isArray(R.m29_center) ?            center.push({ n, by: myIdx, faceUp:false });
             await Promise.all([
              update(tRef, { m29Hand: hand }),
               update(ref(db, `rooms/${state.roomCode}`), { m29_center: center })
