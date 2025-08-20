@@ -4225,216 +4225,130 @@ function renderM61(v){
 
 }
 
+/* ▼▼ ：ミッション54（酸素トークン＋赤デッキ） ▼▼ */
+function renderM54(v){
+  if ((v?.mission?.id|0) !== 54) {
+    // 終了処理：UIを掃除
+    document.getElementById('m54OxPool')?.remove();
+    document.getElementById('m54RedDeck')?.remove();
+    document.querySelectorAll('.ox-row').forEach(n=>n.remove());
+    document.querySelectorAll('.table').forEach(tb=> tb.style.removeProperty('--table-h'));
+    return;
+  }
 
-/* ▼▼ ここから追加：ミッション54（リザーブ＋個人酸素＋赤デッキ） ▼▼ */
-async function renderM54(v){
-  try{
-    const isM54 = ((v?.mission?.id|0) === 54);
-    // #54以外 → 後片付け：高さを元に戻す＆UI撤去
-    if (!isM54){
-      document.querySelectorAll('.table').forEach(tb=> tb.style.removeProperty('--table-h'));
-      const oldPool = document.getElementById('m54OxPool'); if (oldPool) oldPool.remove();
-      const oldRed  = document.getElementById('m54RedLane'); if (oldRed) oldRed.remove();
-      return;
-    }
+  const tables = v?.tables || [];
+  const nPlayers = tables.length;
+  if (!nPlayers) return;
 
-    // --- 0) セーフガード
-    const N = (v?.tables?.length|0);
-    if (!Array.isArray(v?.tables) || N<=0) return;
+  // 人数ごとの配布数
+  const oxDist = {2:9, 3:6, 4:3, 5:2, 6:2}[nPlayers] || 0;
 
-    // --- 1) 初期化（ホストのみ一度だけ）
-    if (state.isHost && v?.meta?.m54_init !== true){
-      // ② 初期配布：人数→各人の初期枚数
-      const perMap = (m)=> (m<=2?9 : m===3?6 : m===4?3 : 2);
-      const per = perMap(N);
-      const by  = {}; for (let i=0;i<N;i++) by[i] = per;
-      // ③ リザーブ＝ 30 - 「配った総数」＝ 30 - (per * N)
-      const reserve = Math.max(0, 30 - (per * N));
+  /* === ox2プール行 === */
+  let pool = document.getElementById('m54OxPool');
+  if (!pool){
+    pool = document.createElement('div');
+    pool.id = 'm54OxPool';
+    pool.className = 'ox-row ox-pool';
+    const side = document.createElement('div');
+    side.className = 'ox-side'; // 左のox2画像
+    pool.appendChild(side);
 
-      // ⑥ 赤デッキ：赤コード 11種を .5 付きでシャッフル
-      const deck = (MATERIALS.redCodes||[]).slice().map(n => n + 0.5);
-      shuffle(deck);
+    const wrap = document.createElement('div');
+    wrap.className = 'ox-wrap';
+    pool.appendChild(wrap);
 
-      await update(ref(db, `rooms/${state.roomCode}/meta`), {
-        oxByTable: by,
-        oxItem: reserve,
-        m54_redDeck: deck,
-        m54_init: true
+    itemsBar.insertAdjacentElement('afterend', pool);
+  }
+  const wrap = pool.querySelector('.ox-wrap');
+  wrap.innerHTML = '';
+  const reserve = 30 - oxDist;
+  for (let i=0;i<reserve;i++){
+    const t = document.createElement('div');
+    t.className = 'token ox';
+    t.onclick = (ev)=>{
+      openOneMini(ev.clientX, ev.clientY, '補給', async ()=>{
+        const cur = v.meta.oxByTable?.[state.seatedTable]||0;
+        await update(ref(db, `rooms/${state.roomCode}/meta/oxByTable`), {[state.seatedTable]: cur+1});
       });
-      return; // 次回 onValue で描画
-    }
-
-    // --- 2) リザーブ行（アイテム列の直下・左に ox2 画像）
-    const itemsBar = document.getElementById('itemsBar'); if (!itemsBar) return;
-    let poolRow = document.getElementById('m54OxPool');
-    if (!poolRow){
-      poolRow = document.createElement('div');
-      poolRow.id = 'm54OxPool';
-      poolRow.className = 'ox-row ox-pool';
-      itemsBar.insertAdjacentElement('afterend', poolRow);
-    }
-
-    // 左：ox2 サイド、右：.ox-wrap（15で折返し）
-    let wrap = poolRow.querySelector('.ox-wrap');
-    if (!wrap){
-      poolRow.innerHTML = '';
-      const side = document.createElement('div'); side.className = 'ox-side'; poolRow.appendChild(side);
-      wrap = document.createElement('div'); wrap.className = 'ox-wrap'; poolRow.appendChild(wrap);
-    }else{
-      wrap.innerHTML = '';
-    }
-
-    // ③ リザーブ表示（oxItem個を横並び）
-    const poolCnt = Math.max(0, v?.meta?.oxItem|0);
-    for (let i=0;i<poolCnt;i++){ const t=document.createElement('div'); t.className='token ox'; wrap.appendChild(t); }
-
-    // ④ リザーブクリック → 補給ポップ（1枚取得）
-    const myIdx = (()=>{ const s=state?.seatedTable; if (Number.isInteger(s)) return s|0; return (v.tables||[]).findIndex(T=> T?.playerId===state.userId); })();
-    poolRow.onclick = (ev)=>{
-      ev.stopPropagation();
-      openBottomMenu([
-        { label:`補給 +1${poolCnt<=0?'（在庫なし）':''}`, disabled:(poolCnt<=0 || myIdx<0),
-          action: async ()=>{
-            const code = state.roomCode;
-            const mRef = ref(db, `rooms/${code}/meta`);
-            const snap = await get(mRef); const meta = snap.val()||{};
-            const by = Object.assign({}, meta.oxByTable||{});
-            const pool = Math.max(0, meta.oxItem|0);
-            if (pool<=0 || myIdx<0) return;
-            by[myIdx] = Math.max(0, (by[myIdx]|0) + 1);
-            await update(mRef, { oxItem: pool-1, oxByTable: by });
-          }
-        }
-      ]);
     };
+    wrap.appendChild(t);
+  }
 
-    // --- 3) 各テーブル下に自分の酸素トークン行（#49/#63準拠・15で改行・高さ順応）
-    const tableNodes = document.querySelectorAll('.table');
-    const by = v?.meta?.oxByTable||{};
-    (v.tables||[]).forEach((T, ti)=>{
-      const box = tableNodes[ti]; if (!box) return;
-
-      // 行ノードを確保（アルファベット直下＝.badge-fixed の親に置く）
-      // 行ノードを確保（アルファベット直下＝.badge-fixed の親に置く）
-      let row = box.querySelector('.ox-row[data-owner="1"]');
-      if (!row){
-        row = document.createElement('div');
-        row.className = 'ox-row';
-        row.dataset.owner = '1';
-
-        const anchor = box.querySelector('.badge-fixed');
-        if (anchor && anchor.parentElement){
-          (anchor.parentElement).appendChild(row);
-        }else{
-          const hand = box.querySelector('.hand');
-          (hand || box).appendChild(row);
-        }
-      }
-
-      // 毎回：alpha高さに応じて row.marginTop を再計算（カード追加/削除後も追従）
-      {
-        const anchor = box.querySelector('.badge-fixed');
-        const ah = anchor?.parentElement?.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+  /* === 各テーブルの酸素所持行 === */
+  const tableNodes = document.querySelectorAll('.table');
+  tables.forEach((T, ti)=>{
+    const box = tableNodes[ti]; if (!box) return;
+    let row = box.querySelector('.ox-row');
+    if (!row){
+      row = document.createElement('div');
+      row.className = 'ox-row';
+      row.dataset.owner = '1';
+      const anchor = box.querySelector('.badge-fixed');
+      if (anchor && anchor.parentElement){
+        const ah = anchor.parentElement.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        anchor.parentElement.appendChild(row);
         row.style.marginTop = `${Math.round(ah * 5)}px`;
-      }
-
-      // 再描画（常に .ox-wrap を介して 15 個/行）
-      row.innerHTML = '';
-      const w = document.createElement('div'); w.className = 'ox-wrap'; row.appendChild(w);
-      const cnt = Math.max(0, by?.[ti]|0);
-      for (let i=0;i<cnt;i++){ const t=document.createElement('div'); t.className='token ox'; w.appendChild(t); }
-
-      // 毎回：行数からテーブル高さを再計算
-      const baseH = 96; // :root の既定と合わせる
-      const rows = (cnt>0) ? Math.ceil(cnt / 15) : 0;
-      const extra = rows>0 ? (rows * 22) : 0; // 1行あたり+22px 目安
-
-      // var(--table-h) と height に両対応（テーマ差異対策）
-      const h = `${baseH + extra}px`;
-      box.style.setProperty('--table-h', h);
-      box.style.height = `var(--table-h, ${h})`;
-
-      // ⑤ 自分の行だけ 1/2/3 ポップでリザーブ返却
-      if (ti === myIdx){
-        row.onclick = (ev)=>{
-          ev.stopPropagation();
-          if (cnt<=0) return;
-          const opts = [1,2,3].filter(k=> k<=cnt).map(k=>({
-            label: String(k),
-            action: async ()=>{
-              const code = state.roomCode;
-              const mRef  = ref(db, `rooms/${code}/meta`);
-              const snap  = await get(mRef); const meta = snap.val()||{};
-              const by2   = Object.assign({}, meta.oxByTable||{});
-              const pool2 = Math.max(0, meta.oxItem|0);
-              const mine  = Math.max(0, by2?.[ti]|0);
-              if (mine < k) return;
-              by2[ti] = mine - k;
-              await update(mRef, { oxByTable: by2, oxItem: pool2 + k });
-
-              // 「+k」フラッシュ（リザーブ側）
-              const flash = document.createElement('div');
-              flash.textContent = `+${k}`;
-              flash.style.cssText = 'position:fixed;left:50%;bottom:54px;transform:translateX(-50%);background:#111;color:#fff;padding:2px 6px;border-radius:6px;font-size:12px;z-index:2147483602;opacity:.9';
-              document.body.appendChild(flash);
-              setTimeout(()=> flash.remove(), 1200);
-            }
-          }));
-          openBottomMenu(opts);
-        };
       }else{
-        row.onclick = null;
+        (box.querySelector('.hand')||box).appendChild(row);
       }
-    });
-
-    // --- 4) 赤デッキ（di 左）— 残枚数表示＆「追加」タブから配布
-    const di = document.getElementById('di');
-    if (di && di.parentElement){
-      let lane = document.getElementById('m54RedLane');
-      if (!lane){
-        lane = document.createElement('div');
-        lane.id = 'm54RedLane';
-        lane.className = 'numlane';
-        di.parentElement.insertBefore(lane, di); // diの左
-      }
-      lane.innerHTML = '';
-
-      const deckBtn = document.createElement('div'); deckBtn.className = 'reddeck';
-      const rest = document.createElement('span'); rest.className = 'redrest';
-      const deck = Array.isArray(v?.meta?.m54_redDeck) ? v.meta.m54_redDeck : [];
-      rest.textContent = `×${deck.length}`;
-      lane.appendChild(deckBtn); lane.appendChild(rest);
-
-      deckBtn.onclick = (ev)=>{
-        ev.stopPropagation();
-        openBottomMenu([{
-          label:'追加',
-          disabled: (deck.length<=0 || myIdx<0),
-          action: async ()=>{
-            const code = state.roomCode;
-            const mRef = ref(db, `rooms/${code}/meta`);
-            const snap = await get(mRef); const meta = snap.val()||{};
-            const tbls = Array.isArray(v.tables) ? v.tables.slice() : [];
-            const deck2 = Array.isArray(meta.m54_redDeck) ? meta.m54_redDeck.slice() : [];
-            if (deck2.length<=0) return;
-            const n = deck2.shift();
-            const i = myIdx;
-            if (i==null || i<0 || !tbls[i]){ alert('席に座ってから操作してください'); return; }
-            const T = tbls[i];
-            const hand = Array.isArray(T.hand) ? T.hand.slice() : [];
-            hand.push({ id:crypto.randomUUID(), num:n, kind:'red', open:false, ownerId:T.playerId||null, tokens:[], markUntil:null });
-            hand.sort((a,b)=> (a.num||0) - (b.num||0));
-            await Promise.all([
-              update(mRef, { m54_redDeck: deck2 }),
-              update(ref(db, `rooms/${code}/tables/${i}`), { hand })
-            ]);
-          }
-        }]);
-      };
     }
-  }catch(e){ console.error(e); }
+    row.innerHTML = '';
+    const wrap2 = document.createElement('div');
+    wrap2.className = 'ox-wrap';
+    row.appendChild(wrap2);
+
+    const cnt = v?.meta?.oxByTable?.[ti] || oxDist;
+    for (let i=0;i<cnt;i++){
+      const t = document.createElement('div');
+      t.className = 'token ox';
+      if (ti === state.seatedTable){
+        t.onclick = (ev)=>{
+          openMenu(ev.clientX, ev.clientY, [1,2,3].map(k=>({
+            label:String(k),
+            action: async ()=>{
+              const cur = v?.meta?.oxByTable?.[ti]||0;
+              const nx = Math.max(0, cur-k);
+              await update(ref(db, `rooms/${state.roomCode}/meta/oxByTable`), {[ti]:nx});
+              const rv = reserve + k;
+              wrap.insertAdjacentHTML('beforeend', `<span class="blink">+${k}</span>`);
+              setTimeout(()=>{ wrap.querySelector('.blink')?.remove(); },2000);
+            }
+          })));
+        };
+      }
+      wrap2.appendChild(t);
+    }
+    box.style.setProperty('--table-h', cnt>0 ? '160px':'96px');
+  });
+
+  /* === 赤デッキ === */
+  let redUI = document.getElementById('m54RedDeck');
+  if (!redUI){
+    redUI = document.createElement('div');
+    redUI.id = 'm54RedDeck';
+    redUI.className = 'numlane';
+    diEl.insertAdjacentElement('beforebegin', redUI);
+
+    const deck = document.createElement('div');
+    deck.className = 'reddeck';
+    deck.onclick = (ev)=>{
+      openOneMini(ev.clientX, ev.clientY, '追加', async ()=>{
+        const arr = shuffle(MATERIALS.redCodes.slice());
+        const pick = arr[0];
+        const my = (tables[state.seatedTable]?.hand||[]).slice();
+        my.push(pick); my.sort((a,b)=>a-b);
+        await update(ref(db, `rooms/${state.roomCode}/tables/${state.seatedTable}`), {hand:my});
+      });
+    };
+    redUI.appendChild(deck);
+
+    const rest = document.createElement('div');
+    rest.className = 'redrest';
+    rest.textContent = `残り ${MATERIALS.redCodes.length}`;
+    redUI.appendChild(rest);
+  }
 }
-/* ▲▲ ここまで追加：ミッション54 ▲▲ */
+
 
   
   
