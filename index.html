@@ -2430,8 +2430,8 @@ function renderM29(v){
          /* ここから追加：数値カードの表面は画像を使用 */
        c.style.backgroundImage = `url('${imgNumber(n)}')`;
        c.style.backgroundSize = 'cover';
-      c.style.backgroundPosition = 'center';
-       c.title = '場に出す';
+       c.style.backgroundPosition = 'center';
+        c.title = '場に出す';
         c.onclick = async (ev)=>{
           try{
             // DBから再取得して安全に更新
@@ -2443,28 +2443,8 @@ function renderM29(v){
             const hand = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
             const pos  = hand.indexOf(n);
             if (pos<0) return;
-
-            // ▼ 追加：センターに同数の「表」カードが4枚あるか？
-            const cNow = Array.isArray(R.m29_center) ? R.m29_center : [];
-           const openedSame = cNow.filter(o => o && o.faceUp === true && (o.n|0) === (n|0)).length;
-           if (openedSame >= 4){
-              // “捨てる”ポップを出して、選ばれたら手札から削除するだけ
-              openOneMini(ev.clientX, ev.clientY, '捨てる', async ()=>{
-                const tSnap2 = await get(tRef);                 // 念のため再取得
-                const T2     = tSnap2.val()||{};
-                const hand2  = Array.isArray(T2.m29Hand) ? T2.m29Hand.slice() : [];
-                const p2     = hand2.indexOf(n);
-                if (p2<0) return;
-                hand2.splice(p2,1);
-                await update(tRef, { m29Hand: hand2 });
-              });
-              return; // ポップ操作に委ねる
-            }
-
-            // 従来どおり：センターに出す
             hand.splice(pos,1);
-           const center = Array.isArray(R.m29_center) ?    
-          R.m29_center.slice() : [];
+            const center = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
             center.push({ n, by: myIdx, faceUp:false });
             await Promise.all([
               update(tRef, { m29Hand: hand }),
@@ -2490,6 +2470,16 @@ function renderM29(v){
   { const ex = document.getElementById('m29CenterRow'); if (ex) ex.remove(); }
 
   const center = Array.isArray(v.m29_center) ? v.m29_center : [];
+  // ★追加：公開中“コード”の数字別公開枚数を集計（kind:'normal' かつ open:true）
+  const openCountByNum = {};
+  (v.tables||[]).forEach(T=>{
+    (T.hand||[]).forEach(c=>{
+      if (c?.kind === 'normal' && c.open === true){
+        const num = c.num|0;
+        openCountByNum[num] = (openCountByNum[num]||0) + 1;
+      }
+    });
+  });
   if (center.length>0){
     const row = document.createElement('div');
     row.id = 'm29CenterRow';
@@ -2510,9 +2500,10 @@ function renderM29(v){
        cell.style.backgroundSize = 'cover';
        cell.style.backgroundPosition = 'center';
      }
-      cell.title = obj.faceUp ? '出したプレイヤーの次のテーブルへ移す' : 'めくる';
-      cell.onclick = async ()=>{
-        try{
+      // ★変更：公開4枚成立時は「捨てる」表示
+      const willDiscardOnly = obj.faceUp && ((openCountByNum[obj.n|0]||0) === 4);
+      cell.title = obj.faceUp ? (willDiscardOnly ? '捨てる' : '出したプレイヤーの次のテーブルへ移す') : 'めくる';
+      cell.onclick = async (ev)=>{        try{
           const rRef = ref(db, `rooms/${state.roomCode}`);
           const rSnap = await get(rRef);
           const R = rSnap.val()||{};
@@ -2526,21 +2517,43 @@ function renderM29(v){
             // 表にする
             cur[idx] = { ...curObj, faceUp:true };
             await update(rRef, { m29_center: cur });
-          } else {
-            // 「出したプレイヤーの次のテーブル」へ移す
-            const toIdx = ((curObj.by|0) + 1) % (v.tableCount|0);
-            // 受け取り先の手札を更新
-            const tRef = ref(db, `rooms/${state.roomCode}/tables/${toIdx}`);
-            const tSnap = await get(tRef);
-            const T = tSnap.val()||{};
-            const hand = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
-            hand.push(curObj.n);
-            // センターから取り除く
-            cur.splice(idx,1);
-            await Promise.all([
-              update(tRef, { m29Hand: hand }),
-              update(rRef, { m29_center: cur })
-            ]);
+        } else {
+            // ★変更：公開4枚成立時は送らず「捨てる」ポップ
+            const opened4 = (()=>{
+              const map = {};
+              (R.tables||[]).forEach(T=>{
+                (T.hand||[]).forEach(c=>{
+                  if (c?.kind==='normal' && c.open===true){
+                    const num = c.num|0;
+                    map[num] = (map[num]||0) + 1;
+                  }
+                });
+              });
+             return (map[(curObj.n|0)]||0) === 4;
+            })();
+           if (opened4){
+              openOneMini(ev.clientX, ev.clientY, '捨てる', async ()=>{
+                const nowSnap = await get(rRef);
+                const RR = nowSnap.val()||{};
+                const arr = Array.isArray(RR.m29_center) ? RR.m29_center.slice() : [];
+               if (idx<0 || idx>=arr.length) return;
+                arr.splice(idx,1);
+               await update(rRef, { m29_center: arr });
+              });
+           } else {
+              // 通常：出したプレイヤーの“次のテーブル”へ移す
+              const toIdx = ((curObj.by|0) + 1) % (v.tableCount|0);
+              const tRef = ref(db, `rooms/${state.roomCode}/tables/${toIdx}`);
+              const tSnap = await get(tRef);
+              const T2 = tSnap.val()||{};
+              const hand = Array.isArray(T2.m29Hand) ? T2.m29Hand.slice() : [];
+              hand.push(curObj.n);
+              cur.splice(idx,1);
+              await Promise.all([
+                update(tRef, { m29Hand: hand }),
+                update(rRef,  { m29_center: cur })
+             ]);
+            }      
           }
         }catch(e){ console.error(e); }
       };
