@@ -5971,18 +5971,6 @@ async function setupMissionOnStart(code){
       tbls[ti].hand = hand;
     });
 
-    // ▼▼ 追加：#41 開始時に「各キャラ下へ 情報トークン(黒) を1枚ずつ」配布（クリック不可・使用で自動消滅）
-    //    表示は既存の m22Tokens 描画（char 下の黒トークン列）を流用します。
-    //    仕様：各席ランダム 1..12（重複OK）。使用時は consumeM22IfMatches で自動的に取り除かれます。
-    try{
-      const pool = MATERIALS.numbers.slice();  // [1..12]
-      shuffle(pool);
-      for (let ti = 0; ti < tbls.length; ti++){
-        if (!tbls[ti]) continue;
-        const n = pool[ti % pool.length];      // 人数>12 の場合も循環配布（重複可）
-        tbls[ti].m22Tokens = [ n ];            // 1枚だけ持たせる
-      }
-    }catch(_){}
 
 
     
