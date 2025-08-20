@@ -2225,7 +2225,7 @@ if (canX1 && c.kind === 'normal'){
           }
           if(tokens.length>0){
             tokens.forEach((tk,ti)=>{
-              const label = tk.type==='equal' ? '＝を消す' : tk.type==='noteq' ? '≠を消す' : tk.type==='x1' ? 'x1を消す' : '数字を消す';
+    const label = `${tokenText(tk)}を消す`; // ← 付与済みトークンの見た目どおりに
               entries.push({label, action: async ()=>{
                 const next = tokens.slice(); const removed = next.splice(ti,1)[0];
                 await update(ref(db, cardPath), { tokens: next });
