@@ -2329,6 +2329,25 @@ async function incToken(kind, delta){
 }
 
 }
+
+// ▼ #29: 名前横の手札枚数の右に「＋1」を3秒表示するヘルパー
+function flashM29PlusOne(tableIdx){
+ try{
+   const boxes = document.querySelectorAll('.table');
+    const box = boxes[tableIdx];
+    if (!box) return;
+    const header = box.querySelector('.t-header') || box;
+    const tag = document.createElement('span');
+    tag.className = 'numrest'; // 既存の小さめ数字ラベルを流用
+   tag.textContent = '+1';
+    header.appendChild(tag);
+   setTimeout(()=>{ try{ tag.remove(); }catch(_){ } }, 3000);
+  }catch(_){}
+}
+ 
+
+
+  
 function renderM22PickPanel(v){
   // ミッション22以外は消す
   if (!v?.mission?.id || v.mission.id !== 22) {
@@ -2412,7 +2431,16 @@ function renderM29(v){
   // 自分の席
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
   const myHand = (myIdx>=0) ? (v.tables[myIdx]?.m29Hand||[]) : [];
-
+  // ▼ #29 専用：数値カード山札(meta.m29_deck)の初期化（ホストのみ一度）
+  try{
+    if(state.isHost && !Array.isArray(v?.meta?.m29_deck)){
+      const all = new Set(MATERIALS.numbers); // 想定: 1..12
+      (v.tables||[]).forEach(T => (T?.m29Hand||[]).forEach(n => all.delete(n)));
+      const deck = Array.from(all); shuffle(deck);
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m29_deck: deck });
+      // 以後のonValueで描画されるのでここでは続行
+    }
+  }catch(_){}
   // ---- 自分の手札（画面下部：ミッション詳細の上） ----
   const footer = document.getElementById('missionFooter');
   if (footer) {
@@ -2450,6 +2478,24 @@ function renderM29(v){
               update(tRef, { m29Hand: hand }),
               update(ref(db, `rooms/${state.roomCode}`), { m29_center: center })
             ]);
+            // ▼▼ ここから：手札が1枚以下なら、山札(meta.m29_deck)から1枚補充
+           const metaRef = ref(db, `rooms/${state.roomCode}/meta`);
+           const metaSnap = await get(metaRef);
+           const meta = metaSnap.val() || {};
+           const deck = Array.isArray(meta.m29_deck) ? meta.m29_deck.slice() : [];
+            if (hand.length <= 1 && deck.length > 0){
+              const draw = deck.pop();
+              const nextHand = hand.concat(draw);
+              await Promise.all([
+                update(tRef, { m29Hand: nextHand }),
+               update(metaRef, { m29_deck: deck })
+              ]);
+              // 「＋1」を名前横の枚数の右に3秒表示
+              flashM29PlusOne(myIdx);
+           }
+            // ▲▲ ここまで：自動補充
+
+            
           }catch(e){ console.error(e); }
         };
         row.appendChild(c);
