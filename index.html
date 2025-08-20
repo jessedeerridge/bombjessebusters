@@ -1352,23 +1352,35 @@ function applyTableHeight(box, needPx){
   // 次回以降の不要アニメを防ぐため短時間で解除
   setTimeout(()=> box.classList.remove('anim-h'), 300);
 }
-// トークン行数に基づいて必要高さを計算し、変化時のみスライド適用
-function slideTableByTokenRows(box, tokenCount, {
-  base = 96,       // 既定テーブル高さ
-  perRow = 15,     // 1行あたりのトークン数（.ox-wrap と一致）
-  tokenH = 20,     // トークンの見た目高さ
-  rowGap = 2,      // 行間
-  topPad = 4       // 上端の余白
-} = {}){
-  const rows = (tokenCount > 0) ? Math.ceil(tokenCount / perRow) : 0;
-  // 1行以下は「一切スライドしない」
-  const need = (rows >= 2)
-    ? Math.max(base, base + topPad + rows * tokenH + (rows - 1) * rowGap)
-    : base;
 
-  applyTableHeight(box, need);
+  // ▼▼ カード下トークン（.tok-col）の“実測下端”に合わせて、必要時のみテーブルを伸ばす ▼▼
+// 対象：数字 / x1・x2・x3 / 偶数 / 奇数 / ＝ / ≠ （= .tok-col に並ぶ .token）
+function growForCardTokens(box, basePx = 96, padPx = 6){
+  // テーブル内の各カードバッジ直下にあるトークン列を全部見る
+  const cols = box.querySelectorAll('.badge-fixed .tok-col');
+  if (!cols.length) return;
+
+  let needs = false;
+  let maxBottom = 0;
+  const rBox = box.getBoundingClientRect();
+
+  cols.forEach(col=>{
+    const cnt = col.querySelectorAll('.token').length | 0;
+    // ――― 1行（=1個）以下なら一切スライドしない
+    if (cnt >= 2){
+      needs = true;
+      const r = col.getBoundingClientRect();
+      maxBottom = Math.max(maxBottom, r.bottom);
+    }
+  });
+
+  if (!needs) return; // 2個以上の列が無ければ何もしない（アニメも発生しない）
+
+  // テーブル上端から“最も下に出たトークン列の下端”までの高さに少しパディングを足す
+  const needPx = Math.max(basePx, Math.ceil(maxBottom - rBox.top + padPx));
+  applyTableHeight(box, needPx);
 }
-
+// ▲▲ カード下トークンでの自動伸長 ▲▲
 
   
 /* mission panels */
@@ -2221,6 +2233,8 @@ if (canX1 && c.kind === 'normal'){
     box.classList.toggle('elevated', hasToken);
 
     tablesEl.appendChild(box);
+      growForCardTokens(box);
+
   });
 
   /* ★ #22：黄カードが「公開」された枚数が2枚以上になった瞬間に表を出す（種類ではなく枚数） */
