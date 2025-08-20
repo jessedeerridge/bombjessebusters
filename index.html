@@ -3451,10 +3451,13 @@ function renderM43(v){
 
   const tb = tablesEl.getBoundingClientRect();
   const rb = target.getBoundingClientRect();
-  const x = rb.left - tb.left + (rb.width/2) - (56/2);
-  const y = 0; // ← 縦位置は常に tables 内の先頭（= アイテム列との間）に固定、上下余白0
+  const cl = tablesEl.querySelector('.checklist');
+ const cb = cl ? cl.getBoundingClientRect() : null;
+  const x  = rb.left - tb.left + (rb.width/2) - (56/2);
+  // checklist の直上に配置（56px は nano 高さ、2px は見た目の余白）
+  const y  = cb ? (cb.top - tb.top - 56 - 2) : 0;
   node.style.left = `${Math.max(0, x)}px`;
-  node.style.top  = `${y}px`;
+  node.style.top  = `${Math.max(0, y)}px`;
 
   if (!node.isConnected) tablesEl.appendChild(node);
 }
