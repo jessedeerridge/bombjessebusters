@@ -1706,11 +1706,12 @@ title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1
     
     /* ▼▼ ここから追加：#29 所持数表示 ▼▼ */
 if ((v.mission?.id|0) === 29) {
-  const cnt = (Array.isArray(t.m29Hand) ? 
-    t.m29Hand.length : 0);
-
-  
-  title.textContent += `（${cnt}）`;
+  const cnt = Array.isArray(t.m29Hand) ? t.m29Hand.length : 0;
+  // ← 「（n）」の“n”部分をアンカー化
+  const span = document.createElement('span');
+  span.id = `m29cnt-${idx}`;  // ★ここが anchor
+  span.textContent = `（${cnt}）`;
+ title.appendChild(span);
 }
     
     header.appendChild(title);
