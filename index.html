@@ -2207,22 +2207,7 @@ if (canX1 && c.kind === 'normal'){
           // x1 を既に持っている場合：
           // 1) x1ポップは表示しない
           // 2) 数字（num）を消すのみ表示（num がある時だけ）
-          if (has('x1')) {
-            const hasNum = tokens.some(tk => tk.type === 'num');
-            if (hasNum) {
-              entries.push({
-               label: String(c.num) + ' を消す',
-                action: async ()=>{
-                  const next = tokens.filter(tk => tk.type !== 'num');
-                  await update(ref(db, cardPath), { tokens: next });
-                  // x1 は残すので incToken('x1', ...) なし
-                const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length > 0);
-                  box.classList.toggle('elevated', afterHas);
-                }
-              });
-            }
-            // hasNum が無ければ何も出さない（= x1ポップ非表示）
-          }
+
           if(tokens.length>0){
 tokens.forEach((tk,ti)=>{
   const tokenText =
