@@ -2211,7 +2211,6 @@ if (canX1 && c.kind === 'normal'){
             const hasNum = tokens.some(tk => tk.type === 'num');
             if (hasNum) {
               entries.push({
-               label: String(c.num) + ' を消す',
                 action: async ()=>{
                   const next = tokens.filter(tk => tk.type !== 'num');
                   await update(ref(db, cardPath), { tokens: next });
