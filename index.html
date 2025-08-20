@@ -2224,8 +2224,16 @@ if (canX1 && c.kind === 'normal'){
             // hasNum が無ければ何も出さない（= x1ポップ非表示）
           }
           if(tokens.length>0){
-const label = String(tk.value ?? c.num) + ' を消す';
-　　　　    const label: String(c.num) + ' を消す',
+  const tokenText =
+    tk.type === 'equal'  ? '＝' :
+    tk.type === 'noteq'  ? '≠' :
+    tk.type === 'x1'     ? 'x1' :
+    (tk.value != null)   ? String(tk.value) :
+    (c?.num != null)     ? String(c.num) : '';
+
+  const label = `${tokenText} を消す`;
+            
+            const label: String(c.num) + ' を消す',
               entries.push({label, action: async ()=>{
                 const next = tokens.slice(); const removed = next.splice(ti,1)[0];
                 await update(ref(db, cardPath), { tokens: next });
