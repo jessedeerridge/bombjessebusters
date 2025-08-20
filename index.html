@@ -1309,7 +1309,7 @@ renderM55(state.watching);
     renderM63(v);
     renderM65(v);
     renderM66(v);
- slideTablesByTokenStacks(96, 4);
+
 
 
     
@@ -1352,49 +1352,24 @@ function applyTableHeight(box, needPx){
   // 次回以降の不要アニメを防ぐため短時間で解除
   setTimeout(()=> box.classList.remove('anim-h'), 300);
 }
+// トークン行数に基づいて必要高さを計算し、変化時のみスライド適用
+function slideTableByTokenRows(box, tokenCount, {
+  base = 96,       // 既定テーブル高さ
+  perRow = 15,     // 1行あたりのトークン数（.ox-wrap と一致）
+  tokenH = 20,     // トークンの見た目高さ
+  rowGap = 2,      // 行間
+  topPad = 4       // 上端の余白
+} = {}){
+  const rows = (tokenCount > 0) ? Math.ceil(tokenCount / perRow) : 0;
+  // 1行以下は「一切スライドしない」
+  const need = (rows >= 2)
+    ? Math.max(base, base + topPad + rows * tokenH + (rows - 1) * rowGap)
+    : base;
 
-/* ▼▼ 追加：トークン重ねによる高さスライド ▼▼ */
-// 「同じカードの下に2枚以上トークンがある」テーブルだけ高さを“実測”で引き上げる
-function slideTablesByTokenStacks(basePx = 96, padPx = 4){
-  const tables = document.querySelectorAll('.table');
-  tables.forEach(box=>{
-    // 条件1：カード直下で重ねる想定の列（例：.tok-col / .i16-below など）
-    let needs = false;
-    // A) 一般的なトークン縦列（キャラやカードの真下で使う想定）
-    box.querySelectorAll('.tok-col').forEach(col=>{
-      if ((col.querySelectorAll('.token').length|0) >= 2) needs = true;
-    });
-    // B) アイテム16など、カード真下に出す系の簡易ホルダー
-    if (!needs && box.querySelector('.i16-below .token:nth-child(2)')) needs = true;
-
-    // 条件を満たさなければ「そのテーブルは基準高のまま」
-    if (!needs){
-      // ただし、他要素で自然に底が伸びている可能性もあるので、実測して basePx 超過なら合わせる
-      const rBox = box.getBoundingClientRect();
-      let bottom = 0;
-      box.querySelectorAll(':scope *').forEach(el=>{
-        const r = el.getBoundingClientRect?.(); if(!r) return;
-        bottom = Math.max(bottom, r.bottom - rBox.top);
-      });
-      const rawNeed = Math.max(basePx, Math.ceil(bottom + padPx));
-      applyTableHeight(box, rawNeed);
-      return;
-    }
-
-    // ここから「スライドが必要」：見た目の底を実測して高さ決定
-    const rBox = box.getBoundingClientRect();
-    let bottom = 0;
-    box.querySelectorAll(':scope *').forEach(el=>{
-      const r = el.getBoundingClientRect?.(); if(!r) return;
-      bottom = Math.max(bottom, r.bottom - rBox.top);
-    });
-    const need = Math.max(basePx, Math.ceil(bottom + padPx));
-    applyTableHeight(box, need);
-  });
+  applyTableHeight(box, need);
 }
-/* ▲▲ 追加：トークン重ねによる高さスライド ▲▲ */
 
-  
+
   
 /* mission panels */
 function renderMissionPanels(v){
