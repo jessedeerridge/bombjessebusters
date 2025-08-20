@@ -138,8 +138,11 @@
     position:relative;border:1px dashed #ddd;border-radius:10px;
     padding:0 8px;height:var(--table-h);display:block;background:#fff;
     overflow:hidden;width:max-content;z-index:0;
-    transition: height .25s ease;  /* ← 高さ変更をアニメーション */
+ transition: none; 
   }
+  .table.anim-h{
+  transition: height .25s ease;  /* ← 必要時だけ付ける */
+}
   .table.elevated{ z-index:9999; }
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
@@ -1307,6 +1310,9 @@ renderM55(state.watching);
     renderM65(v);
     renderM66(v);
 
+
+
+    
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
     // ★ 追加：プレイヤーが1人だけなら、その人を自動でホストにする
@@ -1333,6 +1339,20 @@ renderM55(state.watching);
 }
 
 
+// ▼ テーブル高さの差分適用（変化がある時だけ更新＆その時だけアニメ）
+function applyTableHeight(box, needPx){
+  const curCss = getComputedStyle(box).getPropertyValue('--table-h').trim();
+  const cur = parseInt(curCss.replace('px','')) || 0;
+  if (cur === needPx) return;            // 変化なし → 何もしない（アニメもなし）
+
+  // 変化あり：この更新時だけトランジションを有効化
+  box.classList.add('anim-h');
+  box.style.setProperty('--table-h', `${needPx}px`);
+  box.style.height = `${needPx}px`;      // 念のため実高さも
+  // 次回以降の不要アニメを防ぐため短時間で解除
+  setTimeout(()=> box.classList.remove('anim-h'), 300);
+}
+  
 /* mission panels */
 function renderMissionPanels(v){
   if(!v?.mission){
