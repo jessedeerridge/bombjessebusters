@@ -4226,12 +4226,8 @@ async function renderM54(v){
   const isM54 = ((v?.mission?.id|0) === 54);
   // 画面要素の片付け
   if (!isM54){
-    document.getElementById('m54OxPool')?.remove();
-    document.getElementById('m54RedBox')?.remove();
-    // M54専用の各テーブル行を掃除
-    document.querySelectorAll('.ox-row[data-m54="1"]').forEach(el=> el.remove());
-   // テーブル高さを既定に戻す
-    document.querySelectorAll('.table').forEach(tb=> tb.style.removeProperty('--table-h'));
+    const x = document.getElementById('m54OxPool'); if (x) x.remove();
+    const y = document.getElementById('m54RedBox'); if (y) y.remove();
     return;
   }
 
@@ -4311,22 +4307,20 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
   (v.tables||[]).forEach((T, ti)=>{
     const box = tableNodes[ti]; if (!box) return;
 
-    let row = box.querySelector(`.ox-row[data-owner="${ti}"][data-m54="1"]`);
+    let row = box.querySelector('.ox-row[data-owner="1"][data-m54="1"]');
     if (!row){
       row = document.createElement('div');
       row.className = 'ox-row';
-      row.dataset.owner = String(ti);
+      row.dataset.owner = '1';
       row.dataset.m54 = '1';
       const anchor = box.querySelector('.badge-fixed');
       if (anchor){
-        const parent = anchor.parentElement || box;
-        parent.appendChild(row);
-        const ah = parent.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        anchor.insertAdjacentElement('afterend', row);
+        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
         row.style.marginTop = `${Math.round(ah * 5)}px`;
       }else{
         (box.querySelector('.hand') || box).appendChild(row);
       }
-      row.style.minHeight = '22px';
     }
     // 再描画
     row.innerHTML = '';
@@ -4338,8 +4332,8 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
     }
     // テーブルの高さ（1行ぶんだけ拡張）
     const baseH = 96;
-    const extra = 24; // 4px余白 + 20pxトークン行 相当
-    box.style.setProperty('--table-h', `${baseH + extra}px`);
+    const extra = (cnt>0)? (4+20) : 0;
+    box.style.setProperty('--table-h', `${Math.max(baseH, baseH+extra)}px`);
 
     // ⑤ 自分の行クリック → 1/2/3 を返却（リザーブに戻す）
     //    （#44の返却 UI と同様の挙動）
@@ -4623,22 +4617,12 @@ function renderM44(v){
     if (!box) return;
 
     // 既存の行を再利用 or 生成
-  // ★M54は m54_byTable を参照（初期配布で設定済み）
-  const cnt = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
-  // 既存の行（M54専用）を取る
-  let ownRow = box.querySelector('.ox-row[data-owner="1"][data-m54="1"]');
-  // 0枚：行は作らない＆高さは既定に戻す
-  if (cnt <= 0){
-    if (ownRow) ownRow.remove();
-    box.style.removeProperty('--table-h');
-   return;
-  }
+    let ownRow = box.querySelector('.ox-row[data-owner="1"]');
     if (!ownRow){
       ownRow = document.createElement('div');
       ownRow.className = 'ox-row';
       ownRow.dataset.owner = '1';
-    ownRow.dataset.m54 = '1';
-   // ★変更：情報トークン有無に依らず、常に「アルファベット直下」に置く
+      // ★変更：情報トークン有無に依らず、常に「アルファベット直下」に置く
       const anchor = box.querySelector('.badge-fixed'); // ← 1枚目の .alpha を含む
       if (anchor) {
         anchor.insertAdjacentElement('afterend', ownRow);
@@ -4651,26 +4635,31 @@ function renderM44(v){
         (hand || box).appendChild(ownRow);
       }
     }
-  // 再描画（CSSの15個/行に合わせて wrap を常に入れる）
-  ownRow.innerHTML = '';
-  const wrapSelf = document.createElement('div');
-  wrapSelf.className = 'ox-wrap';      // ← 折返しはCSSで15（.ox-wrap）
-  ownRow.appendChild(wrapSelf);
+    // 再描画（10個で改行するため常に .ox-wrap を挿入）
+    ownRow.innerHTML = '';
+    const cnt = Math.max(0, v.meta?.oxByTable?.[ti]||0);
+    const wrapSelf = document.createElement('div');
+    wrapSelf.className = 'ox-wrap';      // ← プールと同じ折返しルール（10で改行）
+    ownRow.appendChild(wrapSelf);
     for (let i=0; i<cnt; i++){
       const t = document.createElement('div');
      t.className = 'token ox';
       wrapSelf.appendChild(t);           // ← トークンは wrap 内に入れる
     }
 
-    // ▼▼ テーブル高さを所持酸素の【行数】に合わせてスライド
-    const BASE   = 96;     // 基準高さ（座席のみ）
-  const PERROW = 15;   // ← CSSの折返しに一致させる（.ox-wrap）
-    const ROWH   = 28;     // 1行ぶんの増分（見た目に合わせて微調整OK）
-   const GAP    = 0;      // 余白が必要なら調整
-  const rows   = Math.ceil(cnt / PERROW);
-  const extra  = rows * ROWH + GAP;
-  box.style.setProperty('--table-h', `${BASE + extra}px`);
-  
+    const BASE   = cssNum('--table-h') || 96; // CSSの既定値を参照（=96px）
+    const PERROW = 15;    // 1行あたりのトークン数（.ox-wrap と揃える）:contentReference[oaicite:1]{index=1}
+    const ROWH   = 24;    // 1行ぶんの増分（トークン20px+余白を想定）
+    const GAP    = 0;     // 余白が必要なら調整
+    const rows   = (cnt>0) ? Math.ceil(cnt / PERROW) : 0;
+    if (rows > 0) {
+     const extra  = rows * ROWH + GAP;
+      const needH  = BASE + extra;
+     box.style.setProperty('--table-h', `${needH}px`);
+   } else {
+      // 所持0なら高さを既定に戻す（＝CSSの --table-h に委ねる）
+     box.style.removeProperty('--table-h');
+    }
 
     // 自分の所持酸素をクリック → 1/2/3 を返却（プールへ）
 if (Number.isInteger(idx) && idx === ti){
