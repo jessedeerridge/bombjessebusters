@@ -2224,7 +2224,7 @@ if (canX1 && c.kind === 'normal'){
             // hasNum が無ければ何も出さない（= x1ポップ非表示）
           }
           if(tokens.length>0){
-            tokens.forEach((tk,ti)=>{
+    const label = tk.type==='equal' ? '＝を消す' : tk.type==='noteq' ? '≠を消す' : tk.type==='x1' ? 'x1を消す' : String(c.num) + ' を消す';
 　　　　    const label: String(c.num) + ' を消す',
               entries.push({label, action: async ()=>{
                 const next = tokens.slice(); const removed = next.splice(ti,1)[0];
