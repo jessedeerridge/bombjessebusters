@@ -4315,6 +4315,7 @@ async function renderM54(v){
       const box = tableNodes[ti]; if (!box) return;
 
       // 行ノードを確保（アルファベット直下＝.badge-fixed の親に置く）
+      // 行ノードを確保（アルファベット直下＝.badge-fixed の親に置く）
       let row = box.querySelector('.ox-row[data-owner="1"]');
       if (!row){
         row = document.createElement('div');
@@ -4323,14 +4324,18 @@ async function renderM54(v){
 
         const anchor = box.querySelector('.badge-fixed');
         if (anchor && anchor.parentElement){
-          const ah = anchor.parentElement.querySelector('.alpha')?.getBoundingClientRect().height || 18;
           (anchor.parentElement).appendChild(row);
-          row.style.marginTop = `${Math.round(ah * 5)}px`;
         }else{
-          // フォールバック：手札の直後
           const hand = box.querySelector('.hand');
           (hand || box).appendChild(row);
         }
+      }
+
+      // 毎回：alpha高さに応じて row.marginTop を再計算（カード追加/削除後も追従）
+      {
+        const anchor = box.querySelector('.badge-fixed');
+        const ah = anchor?.parentElement?.querySelector('.alpha')?.getBoundingClientRect().height || 18;
+        row.style.marginTop = `${Math.round(ah * 5)}px`;
       }
 
       // 再描画（常に .ox-wrap を介して 15 個/行）
@@ -4339,11 +4344,15 @@ async function renderM54(v){
       const cnt = Math.max(0, by?.[ti]|0);
       for (let i=0;i<cnt;i++){ const t=document.createElement('div'); t.className='token ox'; w.appendChild(t); }
 
-      // 高さ：#49/#63と同じ計算（0枚なら増やさない）
-      const baseH = 96; // :root --table-h
+      // 毎回：行数からテーブル高さを再計算
+      const baseH = 96; // :root の既定と合わせる
       const rows = (cnt>0) ? Math.ceil(cnt / 15) : 0;
       const extra = rows>0 ? (rows * 22) : 0; // 1行あたり+22px 目安
-      box.style.setProperty('--table-h', `${baseH + extra}px`);
+
+      // var(--table-h) と height に両対応（テーマ差異対策）
+      const h = `${baseH + extra}px`;
+      box.style.setProperty('--table-h', h);
+      box.style.height = `var(--table-h, ${h})`;
 
       // ⑤ 自分の行だけ 1/2/3 ポップでリザーブ返却
       if (ti === myIdx){
