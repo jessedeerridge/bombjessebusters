@@ -1306,8 +1306,7 @@ renderM55(state.watching);
     renderM63(v);
     renderM65(v);
     renderM66(v);
-    autoGrowTables();
-
+autoGrowTables();
     // ▼ ホスト判定を最新化
     state.isHost = (v?.hostId === state.userId);
     // ★ 追加：プレイヤーが1人だけなら、その人を自動でホストにする
@@ -3662,7 +3661,13 @@ function renderM63(v){
    w.appendChild(t);                // ← .ox-wrap 内に追加
  }
 
-
+    // テーブル高さを所持数に応じて拡張（15個ごとに1行追加）
+    const baseH = 96;       // 標準の高さ
+    const perRow = 15;      // 1行あたりのトークン数
+    const rowH = 24;        // 1行の高さ（20px + gap余白を考慮）
+    const rows = Math.ceil(cnt / perRow);
+    const extra = rows > 0 ? (4 + rowH * rows) : 0;
+    box.style.setProperty('--table-h', `${baseH + extra}px`);
     // 自分の所持酸素クリック → 1..12 をリザーブへ返却（+Nフラッシュ）
     if (Number.isInteger(myIdx) && myIdx === ti){
       row.onclick = (ev)=>{
@@ -4109,6 +4114,25 @@ function renderM65(v){
 }
 /* ===== /#65 ===== */
 
+ // ▼▼ 共通：テーブル高さを“実測”で自動拡張（全ミッション） ▼▼
+ function autoGrowTables(basePx = 96, padPx = 4){
+   const tables = document.querySelectorAll('.table');
+   tables.forEach(box=>{
+     const rBox = box.getBoundingClientRect();
+     let bottom = 0;
+     // box 内の全子孫の「見た目の底（bottom）」の最大値をとる
+     box.querySelectorAll(':scope *').forEach(el=>{
+       const r = el.getBoundingClientRect?.();
+       if (!r) return;
+       bottom = Math.max(bottom, r.bottom - rBox.top);
+     });
+     const need = Math.max(basePx, Math.ceil(bottom + padPx));
+     box.style.setProperty('--table-h', `${need}px`);
+     box.style.height = `${need}px`; // 念のため実高さも直指定
+   });
+ }
+ // ▲▲ 共通：テーブル高さ自動拡張 ▲▲
+    
   
 function renderM61(v){
   const isM61 = ((v?.mission?.id|0) === 61);
@@ -4325,6 +4349,11 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
       t.className = 'token ox';
       row.appendChild(t);
     }
+    // テーブルの高さ（1行ぶんだけ拡張）
+    const baseH = 96;
+    const extra = (cnt>0)? (4+20) : 0;
+    box.style.setProperty('--table-h', `${Math.max(baseH, baseH+extra)}px`);
+
     // ⑤ 自分の行クリック → 1/2/3 を返却（リザーブに戻す）
     //    （#44の返却 UI と同様の挙動）
     const myIdx = (()=>{
@@ -4452,26 +4481,6 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
 }
 /* ここまで追加：ミッション54 */
 
- // ▼▼ 共通：テーブル高さを“実測”で自動拡張（全ミッション） ▼▼
- function autoGrowTables(basePx = 96, padPx = 4){
-   const tables = document.querySelectorAll('.table');
-   tables.forEach(box=>{
-     const rBox = box.getBoundingClientRect();
-     let bottom = 0;
-     // box 内の全子孫の「見た目の底（bottom）」の最大値をとる
-     box.querySelectorAll(':scope *').forEach(el=>{
-       const r = el.getBoundingClientRect?.();
-       if (!r) return;
-       bottom = Math.max(bottom, r.bottom - rBox.top);
-     });
-     const need = Math.max(basePx, Math.ceil(bottom + padPx));
-     box.style.setProperty('--table-h', `${need}px`);
-     box.style.height = `${need}px`; // 念のため実高さも直指定
-  });
- }
- // ▲▲ 共通：テーブル高さ自動拡張 ▲▲
-
-  
   
 /* ここから追加：ミッション53（nano0 固定） */
 function renderM53(v){
@@ -4657,19 +4666,16 @@ function renderM44(v){
       wrapSelf.appendChild(t);           // ← トークンは wrap 内に入れる
     }
 
-    const BASE   = cssNum('--table-h') || 96; // CSSの既定値を参照（=96px）
-    const PERROW = 15;    // 1行あたりのトークン数（.ox-wrap と揃える）:contentReference[oaicite:1]{index=1}
-    const ROWH   = 24;    // 1行ぶんの増分（トークン20px+余白を想定）
-    const GAP    = 0;     // 余白が必要なら調整
+    // ▼▼ テーブル高さを所持酸素の【行数】に合わせてスライド
+    const BASE   = 96;     // 基準高さ（座席のみ）
+    const PERROW = 10;     // 1行あたりのトークン数（.ox-wrap と揃える）
+    const ROWH   = 28;     // 1行ぶんの増分（見た目に合わせて微調整OK）
+   const GAP    = 0;      // 余白が必要なら調整
     const rows   = (cnt>0) ? Math.ceil(cnt / PERROW) : 0;
-    if (rows > 0) {
-     const extra  = rows * ROWH + GAP;
-      const needH  = BASE + extra;
-     box.style.setProperty('--table-h', `${needH}px`);
-   } else {
-      // 所持0なら高さを既定に戻す（＝CSSの --table-h に委ねる）
-     box.style.removeProperty('--table-h');
-    }
+    const extra  = rows>0 ? (rows * ROWH + GAP) : 0;
+    const needH  = BASE + extra;
+    box.style.setProperty('--table-h', `${needH}px`);
+  
 
     // 自分の所持酸素をクリック → 1/2/3 を返却（プールへ）
 if (Number.isInteger(idx) && idx === ti){
@@ -4701,7 +4707,12 @@ if (Number.isInteger(idx) && idx === ti){
   try{
       const isM49 = ((v?.mission?.id|0) === 49);
       // ミッション49でなければ、前回の高さ上書きを元に戻して終了
-
+      if (!isM49) {
+        document.querySelectorAll('.table').forEach(tb=>{
+          tb.style.removeProperty('--table-h');
+       });
+        return;
+      }
 
     // --- 0) 安全ガード：tables が無い/空なら何もしない ---
     const n = (v?.tables?.length|0);
@@ -4767,7 +4778,18 @@ if (Number.isInteger(idx) && idx === ti){
     t.className = 'token ox';
     wrap.appendChild(t);
   }
+     // ▼▼ テーブル高さ：所持酸素の行数に合わせて自動調整（#63相当の計算）
+  {
+    const baseH = 96;           // CSS :root の --table-h 既定
+    const perRow = 15;          // 1 行あたりのトークン数（.ox-wrap と一致）
+    const rows = Math.ceil(cnt / perRow);
+    // 4px（前縁） + 20px（トークン高）×行数 + 2px（行間）×(行数-1)
+    const extra = rows > 0 ? (4 + rows * 20 + Math.max(0, rows - 1) * 2) : 0;
+    const needH = Math.max(baseH, baseH + extra);
+    box.style.setProperty('--table-h', `${needH}px`);
+　  box.style.height = `${needH}px`;          // ← 実高さも直指定して確実に広げる
 
+  }
       // --- 3) 譲渡メニュー：自分“以外”の行だけクリック可 ---
       // 自分のテーブル番号を安全に特定する
       const myIdx = (() => {
