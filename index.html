@@ -3404,7 +3404,7 @@ function renderM43(v){
 
   node.onclick = (ev)=>{
     openMenu(ev.clientX, ev.clientY, [
-      { label:'回収（段階を下げる）', action: async ()=>{
+      { label:'回収', action: async ()=>{
       /* ここから追加：#43 回収タップ → A群から1枚を自分の手札へ */
       const code = state.roomCode;
       const myTable = state.seatedTable;
