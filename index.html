@@ -1425,6 +1425,38 @@ function renderMissionPanels(v){
   missionDetailBody.innerHTML = (v.mission.display||[]).slice(1)
     .map(line=>`<div class="line">${line}</div>`).join('');
 
+if (state.isHost){
+    const bar = document.createElement('div');
+    bar.className = 'line';
+    bar.innerHTML = `
+      <button class="btn small" id="m30Back10">⏪10秒</button>
+      <button class="btn small" id="m30Play">▶</button>
+      <button class="btn small" id="m30Pause">⏸</button>
+      <input id="m30Seek" type="range" min="0" max="0" step="0.1" style="width:240px; margin:0 8px;">
+      <span id="m30Time">0:00</span>
+    `;
+    missionFooter.appendChild(bar);
+
+    const seek    = document.getElementById('m30Seek');
+    const timeLbl = document.getElementById('m30Time');
+    const fmt = (t)=>{ const s=Math.floor(t|0); return `${(s/60)|0}:${String(s%60).padStart(2,'0')}`; };
+    const writeMeta = (playing)=> update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m30_audio:{ playing, t:audio30.currentTime||0, at:Date.now() }
+    });
+
+    document.getElementById('m30Play').onclick  = async()=>{ await audio30.play();  writeMeta(true); };
+    document.getElementById('m30Pause').onclick = async()=>{ audio30.pause();       writeMeta(false); };
+    document.getElementById('m30Back10').onclick= async()=>{ audio30.currentTime=Math.max(0,audio30.currentTime-10); writeMeta(!audio30.paused); };
+    seek.oninput  = ()=>{ timeLbl.textContent = fmt(seek.value); };
+    seek.onchange = ()=>{ audio30.currentTime=Number(seek.value); writeMeta(!audio30.paused); };
+
+    audio30.ontimeupdate = ()=>{ 
+      timeLbl.textContent = fmt(audio30.currentTime||0);
+      if (document.activeElement!==seek){ seek.value=audio30.currentTime||0; }
+    };
+    audio30.onloadedmetadata = ()=>{ seek.max = audio30.duration||0; };
+  }
+  
   /* ここから追加：#50 専用 OKタブ＆赤/黄のみ [?] マスク（全員に同期） */
   if ((v?.mission?.id|0) === 50) {
   document.querySelectorAll('.check-mark').forEach(el=>{
@@ -7008,6 +7040,18 @@ function renderM30(v){
   const old   = document.getElementById(rowId);
   if (!isM30){ if (old) old.remove(); return; }
 
+  let audio30 = document.getElementById('m30Audio');
+  if (!audio30){
+    audio30 = document.createElement('audio');
+    audio30.id = 'm30Audio';
+    audio30.src = './mi30.mp3';
+    audio30.preload = 'auto';
+    audio30.style.display = 'none';
+    document.body.appendChild(audio30);
+  }
+  
+
+  
   // 初回：ホストが meta を用意（未用意なら用意して次の onValue で描画）
   if (!Array.isArray(v?.meta?.m30_deck)){ ensureM30MetaInit(v); if (old) old.remove(); return; }
 
@@ -7129,6 +7173,30 @@ function renderM30(v){
 
   // DOM設置：アイテム列の直下（他ミッションと同じ）
   mountLaneUnderItemsBar(lane);
+
+    const data = v?.meta?.m30_audio;
+  if (data){
+    const elapsed = (Date.now() - (data.at||0)) / 1000;
+    const target  = (data.t||0) + (data.playing ? elapsed : 0);
+    if (Math.abs(audio30.currentTime - target) > 0.5){
+      audio30.currentTime = target;
+    }
+    if (data.playing && audio30.paused){
+      audio30.play().catch(()=>{
+        if (!document.getElementById('m30Unlock')){
+          const div = document.createElement('div');
+          div.id = 'm30Unlock';
+          div.className = 'mini-pop bottom-pop';
+          div.innerHTML = `<button class="btn small" id="m30UnlockBtn">音声を有効化</button>`;
+          document.getElementById('popLayer').appendChild(div);
+          document.getElementById('m30UnlockBtn').onclick=()=>{ audio30.play(); div.remove(); };
+        }
+      });
+    }
+    if (!data.playing && !audio30.paused){
+      audio30.pause();
+    }
+  }
 }
 
 /* ここから追加：#36 数値5枚＋左2/右2（同期表示） */
