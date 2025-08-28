@@ -1303,6 +1303,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM16(v);
     renderM19(v);
     renderM30(v);
+   renderM30Audio(v);
     renderM32(v);
     renderM36(v);
     renderM37(v);
@@ -6764,6 +6765,131 @@ deckBtn.onclick = async (ev)=>{
     // アイテム列の直下に設置（既存ユーティリティ使用）
     mountLaneUnderItemsBar(lane);
   }
+
+   function renderM30Audio(v){
+     const isM30 = ((v?.mission?.id|0) === 30);
+     const barId = 'm30AudioBar';
+     const audioId = 'm30Audio';
+     const oldBar = document.getElementById(barId);
+     if (!isM30){ if (oldBar) oldBar.remove(); return; }
+
+     let audio = document.getElementById(audioId);
+     if (!audio){
+       audio = document.createElement('audio');
+       audio.id = audioId;
+       audio.preload = 'auto';
+      audio.src = './mi30.mp3';
+       audio.crossOrigin = 'anonymous';
+      audio.style.display = 'none';
+       document.body.appendChild(audio);
+    }
+
+     if (state.isHost){
+       if (oldBar) oldBar.remove();
+       const bar = document.createElement('div');
+       bar.id = barId;
+       bar.className = 'line';
+       bar.innerHTML = `
+         <button class="btn small" id="m30Back10">⏪ 10秒</button>
+         <button class="btn small" id="m30Play">▶</button>
+         <button class="btn small" id="m30Pause">⏸</button>
+         <input id="m30Seek" type="range" min="0" max="0" value="0" step="0.1" style="vertical-align:middle; width:240px; margin:0 8px;">
+         <span id="m30Time">0:00</span>
+       `;
+       const footer = document.getElementById('missionFooter');
+       if (footer && !footer.classList.contains('hidden')) {
+         footer.appendChild(bar);
+       }
+
+       const btnBack = document.getElementById('m30Back10');
+       const btnPlay = document.getElementById('m30Play');
+       const btnPause= document.getElementById('m30Pause');
+       const seek    = document.getElementById('m30Seek');
+       const timeLbl = document.getElementById('m30Time');
+
+       const fmt = (t)=> {
+         const s = Math.max(0, Math.floor(t|0));
+         const m = (s/60)|0; const r = s%60;
+         return `${m}:${String(r).padStart(2,'0')}`;
+       };
+       const writeMeta = async (playing)=>{
+         const payload = {
+           m30_audio: {
+             playing: !!playing,
+             t: audio.currentTime||0,
+             at: Date.now()
+           }
+         };
+         await update(ref(db, `rooms/${state.roomCode}/meta`), payload);
+       };
+       const refreshDur = ()=>{
+         const dur = isFinite(audio.duration) ? Math.max(0, audio.duration) : 0;
+         seek.max = String(dur || 0);
+       };
+       if (isNaN(audio.duration) || !isFinite(audio.duration)){
+         audio.addEventListener('loadedmetadata', refreshDur, { once:true });
+       } else {
+         refreshDur();
+       }
+       const refreshLocal = ()=>{
+         timeLbl.textContent = fmt(audio.currentTime||0);
+         if (!document.activeElement || document.activeElement !== seek){
+           seek.value = String(audio.currentTime||0);
+         }
+       };
+       refreshLocal();
+       audio.addEventListener('timeupdate', refreshLocal);
+
+       btnPlay.onclick = async ()=>{
+         try{ await audio.play(); }catch(_e){}
+         await writeMeta(true);
+       };
+       btnPause.onclick = async ()=>{
+         try{ audio.pause(); }catch(_e){}
+         await writeMeta(false);
+       };
+       btnBack.onclick = async ()=>{
+         audio.currentTime = Math.max(0, (audio.currentTime||0) - 10);
+         await writeMeta(!audio.paused);
+       };
+       seek.oninput = ()=>{ timeLbl.textContent = fmt(Number(seek.value||'0')); };
+       seek.onchange = async ()=>{
+         audio.currentTime = Number(seek.value||'0');
+         await writeMeta(!audio.paused);
+       };
+     } else {
+       if (oldBar) oldBar.remove();
+     }
+
+     // ▼ ホスト以外も meta を見て追従（#19 と同仕様）
+     const data = v?.meta?.m30_audio || null;
+     if (data){
+       const elapsed = Math.max(0, (Date.now() - (data.at||0)) / 1000);
+       const target = Math.max(0, (data.t||0) + (data.playing ? elapsed : 0));
+       if (Math.abs((audio.currentTime||0) - target) > 0.5){
+         audio.currentTime = target;
+       }
+       if (data.playing && audio.paused){
+         audio.play().catch(()=>{
+           if (!document.getElementById('m30Unlock')){
+             const div = document.createElement('div');
+             div.id = 'm30Unlock';
+             div.className = 'mini-pop bottom-pop';
+             div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
+             div.onclick = async ()=>{
+               try{ await audio.play(); }catch(_e){}
+               div.remove();
+             };
+             document.getElementById('popLayer')?.appendChild(div);
+           }
+         });
+       }
+       if (!data.playing && !audio.paused){
+        audio.pause();
+       }
+     }
+   }
+
 
    function renderM19(v){
      const isM19 = ((v?.mission?.id|0) === 19);
