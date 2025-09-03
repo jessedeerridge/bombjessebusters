@@ -516,27 +516,6 @@
 }
 /* ▲▲ ミッション66 ▲▲ */
 
-/* === 最前面ダイアログ用ルート === */
-#dialogRoot {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483647;   /* 画面で最上位 */
-  display: grid;         /* 中央寄せに使う */
-  place-items: center;
-  pointer-events: none;  /* 背景にクリックを通す */
-}
-/* 中のダイアログ自体は操作可能に */
-#dialogRoot > * { pointer-events: auto; }
-
-/* 中央表示の startPop は transform を無効化して素直に中央へ */
-#dialogRoot .start-pop { position: static; transform: none; }
-
-/* 座席ポップは画面下中央に固定（従来の見た目を維持） */
-#dialogRoot .seat-pop {
-  position: absolute;
-  left: 50%; bottom: 10px;
-  transform: translateX(-50%);
-}
 
 
 
@@ -2702,42 +2681,6 @@ function renderM29(v){
   }
 }
 
-/* ==== ダイアログを常に最前面に出すための reparent ==== */
-function ensureDialogRoot() {
-  let r = document.getElementById('dialogRoot');
-  if (!r) {
-    r = document.createElement('div');
-    r.id = 'dialogRoot';
-    document.body.appendChild(r);
-  }
-  return r;
-}
-function mountDialog(el) {
-  const r = ensureDialogRoot();
-  if (el.parentElement !== r) r.appendChild(el);
-  document.body.dataset.dialog = 'open';
-}
-function unmountDialog(el) {
-  // 閉じたら body 直下（末尾）に戻す（DOM順の最後=他より上に描かれやすい）
-  document.body.appendChild(el);
-  // 開いているダイアログが無ければフラグ解除
-  const anyOpen = !startPop.classList.contains('hidden') || !seatPop.classList.contains('hidden');
-  if (!anyOpen) delete document.body.dataset.dialog;
-}
-
-/* startPop / seatPop の hidden 切替を監視して自動で移動 */
-const dialogObserver = new MutationObserver(() => {
-  if (!startPop.classList.contains('hidden')) mountDialog(startPop); else unmountDialog(startPop);
-  if (!seatPop.classList.contains('hidden'))  mountDialog(seatPop);  else unmountDialog(seatPop);
-});
-dialogObserver.observe(startPop, { attributes: true, attributeFilter: ['class'] });
-dialogObserver.observe(seatPop,  { attributes: true, attributeFilter: ['class'] });
-
-/* 既存の開閉でも自動で効くが、明示的に一度同期 */
-if (!startPop.classList.contains('hidden')) mountDialog(startPop);
-if (!seatPop.classList.contains('hidden'))  mountDialog(seatPop);
-
-
 function renderM26(v){
   const mid = (v?.mission?.id|0);
   const isTarget = (mid === 26 || mid === 47);   // ← ここだけ追加・変更
@@ -3539,8 +3482,9 @@ function renderM43(v){
   const rb = target.getBoundingClientRect();
   const rrow = row.getBoundingClientRect();
   const x = rb.left - rrow.left + (rb.width/2) - 28; // 56px の半分
-  node.style.left = `${Math.max(0, x)}px`;
-  node.style.top  = `0px`;
+const bias = (pos === 1) ? -4 : 0;  // ← 1の位置だけ、少し左へ
+node.style.left = `${Math.max(0, x + bias)}px`;
+node.style.top  = `0px`;
   if (!node.isConnected) row.appendChild(node);
 }
 
