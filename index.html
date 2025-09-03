@@ -516,8 +516,19 @@
 }
 /* ▲▲ ミッション66 ▲▲ */
 
-.restart-pop, .start-pop, .seat-pop { z-index:2147483647; }
+/* === dialogs always on top === */
+.start-pop, .seat-pop, .restart-pop {
+  position: fixed;               /* 念のため明示 */
+  z-index: 2147483647 !important;/* 最高層に固定（他のルールを強制上書き）*/
+}
 
+/* たとえ .table.elevated（z-index:9999）でもダイアログ中は下げる */
+body[data-dialog="open"] .table,
+body[data-dialog="open"] .table.elevated,
+body[data-dialog="open"] .marker,
+body[data-dialog="open"] .badge-fixed {
+  z-index: 1 !important;
+}
   
 </style>
 </head>
