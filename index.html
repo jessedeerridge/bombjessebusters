@@ -429,7 +429,7 @@
 .nano-row{
   position:relative;
   height:56px;           /* nano の高さぶん */
-  margin:4px 0 0 10px;   /* items と checklist の“間”に置く */
+  margin:0px 0 0 10px;   /* items と checklist の“間”に置く */
   z-index:2147483601;    /* ほぼ最前面。ただし pop よりは下でOK */
 }
 .m43-nano{
@@ -516,20 +516,7 @@
 }
 /* ▲▲ ミッション66 ▲▲ */
 
-/* === dialogs always on top === */
-.start-pop, .seat-pop, .restart-pop {
-  position: fixed;               /* 念のため明示 */
-  z-index: 2147483647 !important;/* 最高層に固定（他のルールを強制上書き）*/
-}
 
-/* たとえ .table.elevated（z-index:9999）でもダイアログ中は下げる */
-body[data-dialog="open"] .table,
-body[data-dialog="open"] .table.elevated,
-body[data-dialog="open"] .marker,
-body[data-dialog="open"] .badge-fixed {
-  z-index: 1 !important;
-}
-  
 </style>
 </head>
 <body>
