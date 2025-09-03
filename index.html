@@ -743,7 +743,17 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function cssNum(name){const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return parseFloat(v.replace('px',''))||0;}
 const now=()=>Date.now();
-
+  // スクロール位置を保ったままDOMを更新するガード
+  function withScrollHold(fn){
+    const x = window.scrollX, y = window.scrollY;
+    const prev = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = 'auto';
+    try { return fn(); }
+    finally{
+      window.scrollTo(x, y);
+      document.documentElement.style.scrollBehavior = prev;
+    }
+  }
 function buildRoomLink(){
   const url = new URL(location.href);
   url.searchParams.set('room', state.roomCode || '');
@@ -1276,17 +1286,24 @@ if (v) {
     }
   }
 }    
-   renderItemsAndDi(v);  renderM29(v); renderM31(v);  renderTables(v); 
-     // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
-     if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }    if (v?.meta?.m22_infoShown === true) {
-  showInfo22Panel(v);  // まだ無ければ一度だけ生成（あれば何もしない）
-  refreshInfo22(v);    // 既存パネルの x0/x1/x2 と disabled を更新
-}
-if (state.seatedTable == null && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
-   btnSit.onclick();
-    }
-    
-    renderMissionPanels(v); renderGlobalReveal(v); renderHostTool(v);
+    withScrollHold(()=> {
+      renderItemsAndDi(v);
+      renderM29(v);
+      renderM31(v);
+      renderTables(v);
+      // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
+      if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }
+      if (v?.meta?.m22_infoShown === true) {
+        showInfo22Panel(v);   // まだ無ければ一度だけ生成（あれば何もしない）
+        refreshInfo22(v);     // 既存パネルの x0/x1/x2 と disabled を更新
+      }
+      if (state.seatedTable == null && v?.started && !state.gameStarted && seatPop.classList.contains('hidden')) {
+        btnSit.onclick();
+      }
+      renderMissionPanels(v);
+      renderGlobalReveal(v);
+      renderHostTool(v);
+    });
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
    const midNow  = (v?.mission?.id|0);
     const midPrev = (state._lastMissionId|0);
