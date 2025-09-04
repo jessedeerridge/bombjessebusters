@@ -1497,13 +1497,21 @@ function renderMissionPanels(v){
 /* ===== Items & DI ===== */
 function renderItemsAndDi(v){
   if(!v || !v.started){ H(itemsBar,true); return; }
-  // ★ #23：広げる前はアイテム列を非表示
+  // ★ #23：広げる前は「アイテムのみ」非表示（DIは残す）
+  let hideItems = false;
   {
     const flags = v?.mission?.flags || {};
-    const hide = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
-    H(itemsBar, hide ? true : false);
-    if (hide) return; // ここで終了（数値帯や#23のデッキUIは別途表示）
+    hideItems = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
+    // バー自体は常に表示、アイテムだけ隠す
+    H(itemsBar, false);
+    H(itemsEl, hideItems);
+    H(diEl, false);
   }
+
+  // ★ 追加：誤クリア・誤配置の安全ガード（ここから）
+  if (itemsEl.contains(diEl)) itemsBar.appendChild(diEl);   // di が items 内に紛れていたら救出
+  if (!itemsBar.contains(diEl)) itemsBar.appendChild(diEl); // di がバーから消えていたら復帰
+  // ★ 追加：誤クリア・誤配置の安全ガード（ここまで）
 
   itemsEl.innerHTML='';
   const itemNodes = []; // ★ ノード参照を保持
@@ -7750,6 +7758,10 @@ function renderM39(v){
   });
   missionFooter.insertAdjacentElement('beforebegin', row);
 }
+
+
+
+
 
   
 /* ===== #16：数値3 + 右4（全員同期） ===== */
