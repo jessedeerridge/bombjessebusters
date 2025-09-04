@@ -1290,6 +1290,8 @@ if (v) {
 }    
     withScrollHold(()=> {
       renderItemsAndDi(v);
+  renderSfx(v);                 // ★ 追加：SFX同期再生
+
       renderM29(v);
       renderM34(v);
       renderTables(v);
@@ -1594,7 +1596,15 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   diEl.style.backgroundImage = `url("./di${val}.png")`;
   diEl.onclick=(ev)=>{
     openMenu(ev.clientX, ev.clientY, [
-      {label:'進める', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv-1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
+{label:'進める', action: async ()=>{
+  const nowv = state.watching?.di?.value ?? val;
+  const next = clamp(nowv-1,0,6);
+  await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
+  // ▼ 全員同期のSFXトリガー（countdown）
+  await update(ref(db, `rooms/${state.roomCode}/meta`), {
+    sfx: { name: 'countdown', at: Date.now(), nonce: Math.random().toString(36).slice(2) }
+  });
+}},
       {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
     ]);
   };
@@ -7156,6 +7166,48 @@ deckBtn.onclick = async (ev)=>{
        }
      }
    }
+
+function renderSfx(v){
+  // 今回は countdown のみ処理
+  const data = v?.meta?.sfx || null;
+  if (!data || data.name !== 'countdown') return;
+
+  // audio エレメント確保
+  let audio = document.getElementById('sfxCountdown');
+  if (!audio){
+    audio = document.createElement('audio');
+    audio.id = 'sfxCountdown';
+    audio.preload = 'auto';
+    audio.src = './countdown.mp3';
+    audio.crossOrigin = 'anonymous';
+    audio.style.display = 'none';
+    document.body.appendChild(audio);
+  }
+
+  // 同じイベントの二重再生防止（nonce または at をキー）
+  if (!state._sfxHandled) state._sfxHandled = {};
+  const key = String(data.nonce || data.at || '');
+  if (state._sfxHandled[key]) return;
+  state._sfxHandled = { [key]: true }; // メモリ増加防止のため都度置き換え
+
+  // 再生（オート再生ブロック対策は既存仕様に倣ってミニポップで解除）
+  try{
+    audio.currentTime = 0;
+    audio.play().catch(()=>{ 
+      if (!document.getElementById('sfxUnlock')){
+        const div = document.createElement('div');
+        div.id = 'sfxUnlock';
+        div.className = 'mini-pop bottom-pop';
+        div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
+        div.onclick = async ()=>{
+          try{ await audio.play(); }catch(_e){}
+          div.remove();
+        };
+        document.getElementById('popLayer')?.appendChild(div);
+      }
+    });
+  }catch(_e){}
+}
 
 
    function renderM19(v){
