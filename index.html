@@ -733,7 +733,8 @@ const popLayer = document.getElementById('popLayer');
 const globalReveal = document.getElementById('globalReveal');
 /* host tool */
 const hostTool = document.getElementById('hostTool');
-
+const countdownAudio = new Audio('./countdown.mp3');
+countdownAudio.preload = 'auto';
 /* helpers */
 function hiragana(len=4){
   const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"];
