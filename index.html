@@ -782,7 +782,7 @@ const imgNumber = n => `./s${n}.jpg`;
 const imgBack   = `./numbercardback.jpg`;
 const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
 const imgConstraint = L => `./${String(L).toLowerCase()}.jpg`;
-
+const imgConstraintBack = () => `./conback.jpg`;
 const imgChallenge = id => `./${id}.png`;
 
 /* ===== 数値カード一意管理＆重ね表示ユーティリティ ===== */
@@ -803,9 +803,9 @@ document.querySelectorAll('.numlane').forEach(n => {
     // ★ ミッション27：アイテム直下の行を確実に消す
   const m27 = document.getElementById('m27Row');
   if (m27) m27.remove();
-  // ★追加：制約系UI（#31/#32/#37）を丸ごと掃除
-  document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m31HandRow/m31CenterRow/m32ConRowはconlane
-  ['m31HandRow','m31CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
+  // ★追加：制約系UI（#34/#32/#37）を丸ごと掃除
+  document.querySelectorAll('.conlane').forEach(n => n.remove());   // 例：m34HandRow/m34CenterRow/m32ConRowはconlane
+  ['m34HandRow','m34CenterRow','m32ConRow','conZoomOverlay'].forEach(id=>{
   const m44 = document.getElementById('m44OxPool'); if (m44) m44.remove(); // ← ox2の行を確実に掃除
   });
 
@@ -1291,7 +1291,7 @@ if (v) {
     withScrollHold(()=> {
       renderItemsAndDi(v);
       renderM29(v);
-      renderM31(v);
+      renderM34(v);
       renderTables(v);
       // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
       if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }
@@ -1322,6 +1322,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM16(v);
     renderM19(v);
     renderM30(v);
+renderM31(v);
    renderM30Audio(v);
     renderM32(v);
     renderM36(v);
@@ -2809,27 +2810,266 @@ openChallengeZoom(fname.replace(/\.(png|jpg)$/,''));
   mountLaneUnderItemsBar(lane);  // #15 の末尾と同じ呼び方でOK :contentReference[oaicite:0]{index=0}
 }
 
+/* ==== #31：アイテム列の下に A~E、キャラ列はブランク＋直下にミニ ==== */
+function renderM31(v){
+  const isM31 = ((v?.mission?.id|0) === 31);
+  const rowId = 'm31ConRow';
+
+  // #31 以外になったら片付けだけして終了
+  if (!isM31){
+    const lane = document.getElementById(rowId);
+    if (lane) lane.remove();
+    document.querySelectorAll('.m31-mini').forEach(n=>n.remove());
+    return;
+  }
+
+  // --- ① 制約カード A~E を itemsBar 直下に（既存CSS: .conlane/.concard を使用）
+  let lane = document.getElementById(rowId);
+  if (!lane){
+    lane = document.createElement('div');
+    lane.id = rowId;
+    lane.className = 'conlane';
+  }else{
+    // 既存レーンは消さずに中身だけ更新（"消さないで"対応）
+    lane.replaceChildren();
+  }
+
+const taken = new Set(
+  (v?.tables || []).map(t => t?.m31Con).filter(Boolean)
+);
+const pool = ['A','B','C','D','E'].filter(ch => !taken.has(ch));
+
+// プール（未取得のみ）を描画
+pool.forEach(ch=>{
+  const cc = document.createElement('div');
+  cc.className = 'concard';
+  cc.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+  cc.title = '拡大';
+  cc.onclick = (ev)=>{ 
+    ev.stopPropagation(); 
+    const myIdx = (()=>{
+      const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
+      if (Number.isInteger(sNum) && sNum>=0 && sNum < (state?.watching?.tables||[]).length) return sNum;
+      const alt = (state?.watching?.tables||[]).findIndex(t=> t?.playerId===state.userId);
+      return (alt>=0? alt : null);
+    })();
+    openConstraintZoom31(ch, myIdx);
+  };
+  lane.appendChild(cc);
+});
+
+  // 既存ヘルパで itemsBar の直下へ（既に在れば順序を整えるだけ）
+  mountLaneUnderItemsBar(lane);
+
+  // --- ② 各テーブル：大キャラはブランク化し、直下にミニを追加（#61と同じ見た目操作）
+  const tableEls = Array.from(document.querySelectorAll('#tables .table'));
+  tableEls.forEach((tbEl, ti)=>{
+    const charCol = tbEl.querySelector('.char-col');
+    if (!charCol) return;
+
+    // 古いミニ（#31用）を除去して重複防止
+    charCol.querySelectorAll('.m31-mini').forEach(n=>n.remove());
+
+    // 大キャラを常にブランク表示に固定
+const big = charCol.querySelector('.char-card');
+if (big){
+  big.classList.add('blank');
+  big.removeAttribute('style');
+  big.onclick = null;
+
+  const picked = v?.tables?.[ti]?.m31Con;
+  const face   = v?.tables?.[ti]?.m31Face || 'front';  // 'front' | 'back'
+  if (picked){
+    big.classList.remove('blank');
+    // 表/裏で画像を切替
+    if (face === 'back'){
+      big.style.backgroundImage = `url('${imgConstraintBack()}')`;
+    }else{
+      big.style.backgroundImage = `url('${imgConstraint(picked)}')`;
+    }
+    big.style.backgroundSize = 'cover';
+    big.style.backgroundPosition = 'center';
+
+    // クリック挙動：自分は裏返しメニュー、他人は閲覧だけ
+    const myIdx = (()=>{
+      const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
+      if (Number.isInteger(sNum) && sNum>=0 && sNum < (state?.watching?.tables||[]).length) return sNum;
+      const alt = (state?.watching?.tables||[]).findIndex(t=> t?.playerId===state.userId);
+      return (alt>=0? alt : null);
+    })();
+    const isMine = (typeof myIdx === 'number' && myIdx === ti);
+
+    big.onclick = (ev)=>{
+      ev.stopPropagation();
+      if (isMine){
+        // 自分：裏返し可能なズーム
+        openConstraintZoom31Owned(picked, ti);
+      }else{
+        // 他人：閲覧専用ズーム
+        openConstraintZoomView(picked);
+      }
+    };
+  }
+}
+
+
+
+    // ミニキャラ（#61と同寸の .m61-mini を流用）＋ #31識別用クラスを付与
+    const mini = document.createElement('div');
+    mini.className = 'm61-mini m31-mini';
+
+    const t = (v.tables||[])[ti] || {};
+    const seatEmpty = !t.playerId;
+    const amMe = !!t.playerId && t.playerId === state.userId;
+
+    if (seatEmpty){
+      // 空席：枠だけ
+      mini.classList.add('blank');
+    }else{
+      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+      mini.style.backgroundImage = `url("${face}")`;
+      // 本人のみ裏表トグル
+      mini.onclick = amMe ? (async ()=>{
+        await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
+      }) : null;
+      if (!amMe) mini.style.cursor = 'default';
+    }
+
+    // 「大キャラの直下」にミニを追加
+    charCol.appendChild(mini);
+  });
+}
+
+
+// #31専用（所有カード用）：拡大 → 「裏返す」ポップ → m31Face を front/back トグル
+function openConstraintZoom31Owned(letter, tableIdx){
+  try{
+    // 既存オーバーレイ掃除
+    const old = document.getElementById('conZoomOverlay');
+    if (old) old.remove();
+
+    const ov = document.createElement('div');
+    ov.id = 'conZoomOverlay';
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'conzoom-wrap';
+
+    const big = document.createElement('div');
+    big.className = 'conzoom-card';
+
+    // 現在の face を取得して見た目を合わせる
+    const face = state?.watching?.tables?.[tableIdx]?.m31Face || 'front';
+    big.style.backgroundImage = (face==='back')
+      ? `url('${imgConstraintBack()}')`
+      : `url('${imgConstraint(letter)}')`;
+
+    // 拡大カードクリックでメニューをトグル
+    big.addEventListener('click', (e)=>{
+      e.stopPropagation();
+
+      // メニューの開閉
+      let menu = wrap.querySelector('.conzoom-menu');
+      if (menu){ menu.remove(); return; }
+
+      menu = document.createElement('div');
+      menu.className = 'conzoom-menu';
+
+      // 「裏返す」ボタン（自分のカードなので常に表示）
+      const btnFlip = document.createElement('button');
+      btnFlip.textContent = '裏返す';
+      btnFlip.onclick = async (ev)=>{
+        ev.stopPropagation();
+        try{
+          const cur = state?.watching?.tables?.[tableIdx]?.m31Face || 'front';
+          const next = (cur==='back') ? 'front' : 'back';
+          await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { m31Face: next });
+        }catch(err){ console.error(err); }
+        closeConstraintZoom();
+      };
+
+      menu.appendChild(btnFlip);
+      wrap.appendChild(menu);
+    });
+
+    wrap.appendChild(big);
+    ov.appendChild(wrap);
+    document.body.appendChild(ov);
+  }catch(e){ console.error(e); }
+}
+
+
+// #31専用：拡大 → 「選択する」ポップ → 自分の m31Con に保存
+function openConstraintZoom31(letter, myIdx){
+  try{
+    // 既存オーバーレイを閉じてから新規
+    const old = document.getElementById('conZoomOverlay');
+    if (old) old.remove();
+
+    const ov = document.createElement('div');
+    ov.id = 'conZoomOverlay';
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'conzoom-wrap';
+
+    const big = document.createElement('div');
+    big.className = 'conzoom-card';
+    big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
+
+    // 拡大カード自体のクリックでメニューをトグル
+    big.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if (typeof myIdx !== 'number' || myIdx<0) return;
+
+      let menu = wrap.querySelector('.conzoom-menu');
+      if (menu){ menu.remove(); return; } // 2回目クリックで閉じる
+
+      menu = document.createElement('div');
+      menu.className = 'conzoom-menu';
+
+      const btnPick = document.createElement('button');
+      btnPick.textContent = '選択する';
+      btnPick.onclick = async (ev)=>{
+        ev.stopPropagation();
+        try{
+          // 自分のテーブルに m31Con を保存（上書きOK仕様）
+          await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m31Con: letter });
+        }catch(err){ console.error(err); }
+        closeConstraintZoom();
+      };
+
+      menu.appendChild(btnPick);
+      wrap.appendChild(menu);
+    });
+
+    wrap.appendChild(big);
+    ov.appendChild(wrap);
+    document.body.appendChild(ov);
+  }catch(e){ console.error(e); }
+}
+
 
   
-/* ここから追加：#31 描画・操作ロジック */
-function renderM31(v){
-  const isM31 = ((v?.mission?.id|0) === 31) || ((v?.mission?.id|0) === 34);
+/* ここから追加：#34 描画・操作ロジック */
+function renderM34(v){
+  const isM34 = ((v?.mission?.id|0) === 34) || ((v?.mission?.id|0) === 34);
 
   // 既存除去
-  const oldH = document.getElementById('m31HandRow'); if (oldH) oldH.remove();
-  const oldC = document.getElementById('m31CenterRow'); if (oldC) oldC.remove();
-  if (!isM31) return;
+  const oldH = document.getElementById('m34HandRow'); if (oldH) oldH.remove();
+  const oldC = document.getElementById('m34CenterRow'); if (oldC) oldC.remove();
+  if (!isM34) return;
 
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
-  const myLetter = (myIdx>=0) ? v.tables[myIdx]?.m31Con : null;
-  const center = Array.isArray(v.m31_center) ? v.m31_center : [];
+  const myLetter = (myIdx>=0) ? v.tables[myIdx]?.m34Con : null;
+  const center = Array.isArray(v.m34_center) ? v.m34_center : [];
 
   // ── 自分の下部（場に出してないときだけ表示）
   const myOut = center.some(o => o?.by === myIdx);
   const footer = document.getElementById('missionFooter');
   if (footer && myIdx>=0 && myLetter && !myOut) {
     const row = document.createElement('div');
-    row.id = 'm31HandRow';
+    row.id = 'm34HandRow';
     row.className = 'conlane';
     const c = document.createElement('div');
     c.className = 'concard';
@@ -2850,7 +3090,7 @@ function renderM31(v){
   const bar = document.getElementById('itemsBar');
   if (bar && center.length>0){
     const row = document.createElement('div');
-    row.id = 'm31CenterRow';
+    row.id = 'm34CenterRow';
     row.className = 'conlane';
     center.forEach((obj, idx)=>{
       const cell = document.createElement('div');
@@ -2862,10 +3102,10 @@ function renderM31(v){
           const rRef = ref(db, `rooms/${state.roomCode}`);
           const rSnap = await get(rRef);
           const R = rSnap.val()||{};
-          const cur = Array.isArray(R.m31_center) ? R.m31_center.slice() : [];
+          const cur = Array.isArray(R.m34_center) ? R.m34_center.slice() : [];
           if (idx>=0 && idx<cur.length){
             cur.splice(idx,1);
-            await update(rRef, { m31_center: cur });
+            await update(rRef, { m34_center: cur });
           }
         }catch(e){ console.error(e); }
       };
@@ -5058,7 +5298,7 @@ if (Number.isInteger(idx) && idx === ti){
 
 
   
-  // #31：制約カード拡大ポップ（オーバーレイ表示）
+  // #34：制約カード拡大ポップ（オーバーレイ表示）
 function openConstraintZoom(letter, myIdx){
   try{
     const old = document.getElementById('conZoomOverlay');
@@ -5091,10 +5331,10 @@ function openConstraintZoom(letter, myIdx){
           const rRef = ref(db, `rooms/${state.roomCode}`);
           const rSnap = await get(rRef);
           const R = rSnap.val()||{};
-          const cur = Array.isArray(R.m31_center) ? R.m31_center.slice() : [];
+          const cur = Array.isArray(R.m34_center) ? R.m34_center.slice() : [];
           if (!cur.some(o => o?.by === myIdx)){
             cur.push({ ch: letter, by: myIdx });
-            await update(rRef, { m31_center: cur });
+            await update(rRef, { m34_center: cur });
           }
         }catch(err){ console.error(err); }
         closeConstraintZoom();
@@ -6331,18 +6571,18 @@ if ((v.mission?.id|0) === 39) {
     mountM26GridUnderItems();
   }
   
-// #31：A〜E を各テーブルに1枚ずつ（人数>5のときは循環）
-if ((v.mission?.id|0) === 31 || (v.mission?.id|0) === 34) {
+// #34：A〜E を各テーブルに1枚ずつ（人数>5のときは循環）
+if ((v.mission?.id|0) === 34 || (v.mission?.id|0) === 34) {
   const codeSnap = await get(ref(db, `rooms/${code}`));
   const vv = codeSnap.val() || {};
   const tables = (vv.tables||[]).map(T => ({...T}));
   const letters = ['A','B','C','D','E']; shuffle(letters);
   for (let i=0; i<tables.length; i++){
-    if (!tables[i].m31Con) tables[i].m31Con = letters[i % letters.length];
+    if (!tables[i].m34Con) tables[i].m34Con = letters[i % letters.length];
   }
   await update(ref(db, `rooms/${code}`), {
     tables,
-   m31_center: []
+   m34_center: []
   });
 }
   function randNum(){ return MATERIALS.numbers[(Math.random()*12)|0]; }
@@ -6448,7 +6688,7 @@ function buildDeckLaneP1(){
 }
 /* 制約カード版：P1（山札→めくる）*/
 function buildConDeckLaneP1(){
-  // ミッション31と同じ見た目サイズにするため、帯は conlane、カードは concard を使う
+  // ミッション34と同じ見た目サイズにするため、帯は conlane、カードは concard を使う
   const lane = document.createElement('div');
   lane.className = 'conlane';
   lane.id = 'm32ConRow'; // 念のため一意ID
