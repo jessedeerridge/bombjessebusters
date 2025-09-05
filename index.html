@@ -544,6 +544,11 @@
 .card.m42-dragging + .badge-fixed,
 .card.m42-dragging ~ .badge-fixed { visibility: hidden !important; pointer-events: none !important; }
 
+
+.m42-remote-ghost {
+  position: fixed;
+  pointer-events: none;
+}
 </style>
 </head>
 <body>
@@ -1265,9 +1270,9 @@ function updateHeaderInfo(){
   }
   // 「コード：XXXX」＋右にコピーボタン（メニューやポップは使わない）
   const html = `
-    <span class="code-label">${state.roomCode}</span>
+    <span class="code-label">コード：${state.roomCode}</span>
     <button id="btnCopyLink" class="btn small copy-btn" aria-live="polite">COPY</button>
-    　${state.userName}
+    　/　あなた：${state.userName}
   `;
   roomInfo.innerHTML = html;
 
@@ -1981,9 +1986,30 @@ wrap.dataset.cardId = String(c.id||'');
           document.body.appendChild(ghost);
  card.classList.add('m42-dragging'); 
   card.style.visibility = 'hidden';
-          const offX = ev.clientX - r.left, offY = ev.clientY - r.top;
-          const move = (e)=>{ ghost.style.left=(e.clientX-offX)+'px'; ghost.style.top=(e.clientY-offY)+'px'; };
-          const up = async (e)=>{
+  // --- SYNC: 送信セットアップ ---
+  const cardId = wrap.dataset.cardId;
+  const dragParentRef = ref(db, `rooms/${state.roomCode}/m42/drag`);
+  const put = (lx, ly, phase) => {
+    // 位置はビューポート基準の割合で送る（端末差を吸収）
+    const x = lx / window.innerWidth;
+    const y = ly / window.innerHeight;
+    update(dragParentRef, {
+      [cardId]: { by: state.userId, table: idx, ci, x, y, hide: true, phase, ts: Date.now() }
+    });
+  };
+  // 接続断時の掃除（可能なら）
+  try { onDisconnect(ref(db, `rooms/${state.roomCode}/m42/drag/${cardId}`)).remove(); } catch(_) {}          const offX = ev.clientX - r.left, offY = ev.clientY - r.top;
+          let lastSend = 0;
+          const move = (e)=>{
+            const lx = (e.clientX - offX), ly = (e.clientY - offY);
+            ghost.style.left = lx + 'px';
+            ghost.style.top  = ly + 'px';
+            const now = performance.now();
+            if (now - lastSend > 40) { // 25fps程度で送信（帯域節約）
+              lastSend = now;
+              put(lx, ly, 'move');
+            }
+          };          const up = async (e)=>{
             window.removeEventListener('pointermove', move, true);
             window.removeEventListener('pointerup', up, true);
             const bx = document.getElementById('m42Box');
@@ -2002,6 +2028,7 @@ wrap.dataset.cardId = String(c.id||'');
               card.style.visibility = 'visible';
  card.classList.remove('m42-dragging');
             }
+await update(dragParentRef, { [cardId]: null });
           };
           window.addEventListener('pointermove', move, true);
           window.addEventListener('pointerup', up, true);
@@ -3553,6 +3580,49 @@ function renderM42(v){
       });
       bar.insertAdjacentElement('afterend', box);
     }
+
+    if (!state._m42DragListen) {
+      state._m42DragListen = true;
+      state._m42Ghosts = {}; // cardId -> ghostEl
+      const parentRef = ref(db, `rooms/${state.roomCode}/m42/drag`);
+      onValue(parentRef, (snap)=>{
+        const data = snap.val() || {};
+        // 1) 既存ゴーストで、もう無くなったものは消す＆表示を戻す
+        for (const id in state._m42Ghosts) {
+          if (!data[id]) {
+            state._m42Ghosts[id]?.remove();
+            delete state._m42Ghosts[id];
+            const wrap = document.querySelector(`.card-wrap[data-card-id="${id}"]`);
+            const cardEl = wrap?.querySelector('.card');
+            if (cardEl) cardEl.classList.remove('m42-dragging'); // 数字帯も復帰
+          }
+        }
+        // 2) 新規/更新：自分以外のドラッグだけ描画
+        Object.entries(data).forEach(([id, v])=>{
+          if (!v || v.by === state.userId) return;
+          const wrap = document.querySelector(`.card-wrap[data-table="${v.table}"][data-card-id="${id}"]`);
+          const cardEl = wrap?.querySelector('.card');
+          if (!cardEl) return;
+          // 元カードはドラッグ中クラスで隠す（数字帯もCSSで隠れる）
+          if (v.hide) cardEl.classList.add('m42-dragging');
+          // ゴースト生成 or 取得
+          let g = state._m42Ghosts[id];
+          if (!g) {
+            g = cardEl.cloneNode(true);
+            g.classList.add('m42-remote-ghost');
+            g.style.opacity = '0.95';
+            g.style.zIndex = '2147483646';
+            document.body.appendChild(g);
+            state._m42Ghosts[id] = g;
+         }
+          // 受け取った割合 → 画面px
+          const left = (v.x || 0) * window.innerWidth;
+          const top  = (v.y || 0) * window.innerHeight;
+          g.style.left = left + 'px';
+          g.style.top  = top  + 'px';
+        });
+      });
+    }
   }
 
   // 4) ⇅入れ替えモード：青枠＋クリック選択（▼表示は renderTables 側の2行で描画）
@@ -3959,119 +4029,120 @@ async function renderM59(v){
 }
 
   
-// ミッション57：二重描画/二重保存対策込みで全面書き直し
+// ミッション57：同数4枚公開 → 制約カードをアイテム列の右に表示（完全重ね）。
+// 重ね位置には数値カードは出さない。ペア欄には数値＋制約ペアを表示。
 async function renderM57(v){
   const isM57 = ((v?.mission?.id|0) === 57);
-  
   if (!isM57){
-    // #57から離れた瞬間に確実に片付ける（ホットリロード/一時的な未呼出対策）
+    // #57から離れた瞬間に片付け
     document.getElementById('m57Grid')?.remove();
+    document.querySelectorAll('.m57-grid').forEach(n=>n.remove());
     document.getElementById('m57Sel')?.remove();
+    document.getElementById('m57Done')?.remove();
+    document.getElementById('m57Stack')?.remove();
+    document.getElementById('m57StackRight')?.remove();
     document.getElementById('conZoomOverlay')?.remove();
     return;
   }
-  // 再入防止（同フレーム二重実行を遮断）
+
   if (state._m57Rendering) return;
   state._m57Rendering = true;
 
   try {
-    // 既存ノードを必ず1個化
+    // 再描画前の掃除
     document.getElementById('m57Grid')?.remove();
-    document.querySelectorAll('.m57-grid').forEach(n=>n.remove()); // 互換用
+    document.querySelectorAll('.m57-grid').forEach(n=>n.remove());
+    document.getElementById('m57Sel')?.remove();
+    document.getElementById('m57Done')?.remove();
+    document.getElementById('m57Stack')?.remove();
+    document.getElementById('m57StackRight')?.remove();
 
     const itemsBar = document.getElementById('itemsBar');
     if (!itemsBar) return;
 
-    // letters は初回のみホストが保存して全員で再利用
+    // 数字→制約 A..L の対応（ホストが初回保存）
     let letters = v?.meta?.m57Letters;
     if (!letters) {
-      letters = shuffle("abcdefghijkl".split(''));
+      letters = Array.from({length:12}, (_,i)=>String.fromCharCode(97+i)); // a..l
       if (state.isHost) {
         await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Letters: letters });
       }
     }
- // ▼ 全体公開中の通常コードを数字別に集計し、4枚そろった数字を抽出
- const openCountByNum = {};
- (v.tables || []).forEach(T => {
-   (T.hand || []).forEach(c => {
-     if (c?.kind === 'normal' && c.open === true) {
-       const n = c.num | 0; // 1..12
-       openCountByNum[n] = (openCountByNum[n] || 0) + 1;
-     }
-   });
- });
- const hideNums = new Set(
-   Object.entries(openCountByNum)
-     .filter(([, cnt]) => (cnt | 0) >= 4)
-     .map(([n]) => Number(n))
- );
-    // グリッド生成
-    const grid = document.createElement('div');
-    grid.id = 'm57Grid';
-    grid.className = 'm57-grid';
-    grid.style.display = 'grid';
-    grid.style.gridTemplateColumns = 'repeat(4, auto)';
-    grid.style.gap = '6px';
-    grid.style.marginTop = '6px';
 
-    for (let i = 1; i <= 12; i++) {
-        if (hideNums.has(i)) continue;
-      const wrap = document.createElement('div');
-      wrap.style.position = 'relative';
-      wrap.style.display = 'flex';
-      wrap.style.alignItems = 'center';
-      wrap.style.marginRight = '-6px'; // 少し重ねる
+    // 4枚公開が成立した数字の抽出
+    const openCountByNum = {};
+    (v.tables || []).forEach(T => {
+      (T.hand || []).forEach(c => {
+        if (c?.kind === 'normal' && c.open === true) {
+          const n = c.num | 0;
+          openCountByNum[n] = (openCountByNum[n] || 0) + 1;
+        }
+      });
+    });
+    const achievedSet = new Set(
+      Object.entries(openCountByNum)
+        .filter(([, cnt]) => (cnt|0) >= 4)
+        .map(([n]) => Number(n))
+    );
 
-      // 数値カード
-      const num = document.createElement('div');
-      num.className = 'numcard';
-      num.style.backgroundImage = `url('${imgNumber(i)}')`;
+    // まだ成立していない「数値＋制約」ペアの確認グリッド（アイテム列の直下）
+    {
+      const grid = document.createElement('div');
+      grid.id = 'm57Grid';
+      grid.className = 'm57-grid';
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = 'repeat(4, auto)';
+      grid.style.gap = '6px';
+      grid.style.marginTop = '6px';
 
-      // 制約カード
-      const con = document.createElement('div');
-      con.className = 'concard';
-      con.style.marginLeft = '-6px'; // 重なり
-      con.style.backgroundImage = `url('${imgConstraint(letters[i-1])}')`;
+      for (let i = 1; i <= 12; i++) {
+        if (achievedSet.has(i)) continue;
 
-      // 拡大（選ぶ付き）
-      con.onclick = () => {
-        // 既存の拡大を消してから出す（多重ポップ防止）
-        document.getElementById('conZoomOverlay')?.remove();
+        const wrap = document.createElement('div');
+        wrap.style.display = 'flex';
+        wrap.style.alignItems = 'center';
+        wrap.style.marginRight = '-6px';
 
-        const overlay = document.createElement('div');
-        overlay.id = 'conZoomOverlay';
-        overlay.innerHTML = `
-          <div class="conzoom-wrap">
-            <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[i-1])}')"></div>
-            <div class="conzoom-menu"><button id="m57ChooseBtn">選ぶ</button></div>
-          </div>`;
-        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-        document.body.appendChild(overlay);
+        // 数値カード（← ペア欄には表示する）
+        const num = document.createElement('div');
+        num.className = 'numcard';
+        num.style.backgroundImage = `url('${imgNumber(i)}')`;
 
-        document.getElementById('m57ChooseBtn').onclick = async () => {
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { m57Chosen: letters[i-1] });
-          overlay.remove();
+        // 制約カード（拡大のみ）
+        const con = document.createElement('div');
+        con.className = 'concard';
+        con.style.marginLeft = '-6px';
+        con.style.backgroundImage = `url('${imgConstraint(letters[i-1])}')`;
+        con.onclick = () => {
+          document.getElementById('conZoomOverlay')?.remove();
+          const overlay = document.createElement('div');
+          overlay.id = 'conZoomOverlay';
+          overlay.innerHTML = `
+            <div class="conzoom-wrap">
+              <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[i-1])}')"></div>
+            </div>`;
+          overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
+          document.body.appendChild(overlay);
         };
-      };
 
-      wrap.appendChild(num);
-      wrap.appendChild(con);
-      grid.appendChild(wrap);
+        wrap.appendChild(num);
+        wrap.appendChild(con);
+        grid.appendChild(wrap);
+      }
+
+      itemsBar.insertAdjacentElement('afterend', grid);
     }
 
-    itemsBar.insertAdjacentElement('afterend', grid);
-
-    // di 左側に選択中カードを同期表示（クリックで拡大のみ・ポップなし）
-    const di = document.getElementById('di');
-    if (di) {
-      document.getElementById('m57Sel')?.remove();
+    // （任意）選ばれた制約をアイテム右に単体表示したい場合のミラー
+    {
+      const di = document.getElementById('di');
       const sel = v?.meta?.m57Chosen;
-      if (sel) {
+      if (di && sel) {
         const img = document.createElement('div');
         img.id = 'm57Sel';
         img.className = 'concard';
-        img.style.backgroundImage = `url('${imgConstraint(sel)}')`;
         img.style.marginRight = '6px';
+        img.style.backgroundImage = `url('${imgConstraint(sel)}')`;
         img.onclick = () => {
           document.getElementById('conZoomOverlay')?.remove();
           const overlay = document.createElement('div');
@@ -4080,16 +4151,85 @@ async function renderM57(v){
             <div class="conzoom-wrap">
               <div class="conzoom-card" style="background-image:url('${imgConstraint(sel)}')"></div>
             </div>`;
-          overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+          overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
           document.body.appendChild(overlay);
         };
-        di.insertAdjacentElement('beforebegin', img);
+        di.insertAdjacentElement('beforebegin', img); // アイテムの右に表示
       }
     }
+
+    // 右側スタック（数値カードは出さない／制約のみ完全重ね）
+    {
+      const achieved = Array.from(achievedSet);
+      if (!achieved.length) return;
+
+      // 並び順：既存順をベースに、新規は末尾（＝最上面）に追加
+      let order = Array.isArray(v?.meta?.m57Order) ? v.meta.m57Order.slice() : [];
+      const before = new Set(order);
+      order = order.filter(n => achievedSet.has(n));
+      achieved.forEach(n => { if (!before.has(n)) order.push(n); });
+
+      // ホストが同期
+      if (state.isHost) {
+        const changed =
+          (v?.meta?.m57Order?.length||0) !== order.length ||
+          (v?.meta?.m57Order||[]).some((x,i)=> x !== order[i]);
+        if (changed) {
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            m57Order: order,
+            m57UpdatedAt: Date.now()
+          });
+        }
+      }
+
+      const di = document.getElementById('di');
+      const done = document.createElement('div');
+      done.id = 'm57Done';
+      done.style.display = 'flex';
+      done.style.alignItems = 'center';
+
+      // 制約の完全重ね用ボックス（同一座標・同サイズに配置）
+      const stackBox = document.createElement('div');
+      stackBox.id = 'm57Stack';
+      stackBox.style.position = 'relative';
+      stackBox.style.width  = `var(--con-w, var(--item-w, 50px))`;
+      stackBox.style.height = `var(--con-h, var(--item-h, 75px))`;
+
+      order.forEach((n, i) => {
+        const con = document.createElement('div');
+        con.className = 'concard';
+        con.style.position = 'absolute';
+        // 完全に同じ位置（下を完全に隠す）
+        con.style.left = '0';
+        con.style.top  = '0';
+        con.style.width  = '100%';
+        con.style.height = '100%';
+        con.style.backgroundImage = `url('${imgConstraint(letters[n-1])}')`;
+        con.style.zIndex = String(100 + i); // 後のものほど上
+        con.onclick = () => {
+          document.getElementById('conZoomOverlay')?.remove();
+          const overlay = document.createElement('div');
+          overlay.id = 'conZoomOverlay';
+          overlay.innerHTML = `
+            <div class="conzoom-wrap">
+              <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[n-1])}')"></div>
+            </div>`;
+          overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
+          document.body.appendChild(overlay);
+        };
+        stackBox.appendChild(con);
+      });
+
+      done.appendChild(stackBox);
+      if (di) di.insertAdjacentElement('beforebegin', done);
+      else itemsBar.appendChild(done);
+    }
+
   } finally {
     state._m57Rendering = false;
   }
 }
+
 
 /* ここから追加：ミッション61（制約A~E配布＆交換/B=F~G、隊長の↑↓回し） */
 async function ensureM61MetaInit(vNow){
