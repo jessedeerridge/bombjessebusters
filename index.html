@@ -536,7 +536,13 @@
 }
 
 
+/* M42: ドラッグ中は元位置の見た目を完全に隠す */
+.card.m42-dragging,
+.card.m42-dragging * { visibility: hidden !important; pointer-events: none !important; }
 
+/* 数字/トークン帯（兄弟要素）も隠す */
+.card.m42-dragging + .badge-fixed,
+.card.m42-dragging ~ .badge-fixed { visibility: hidden !important; pointer-events: none !important; }
 
 </style>
 </head>
@@ -1964,8 +1970,6 @@ wrap.dataset.cardId = String(c.id||'');
         card.classList.add('i2-selectable'); // 既存青点線
 
         card.addEventListener('pointerdown', (ev)=>{
-    card.style.visibility = 'hidden';
-    card.classList.add('m42-dragging');
           // ゴースト生成（実カードは固定のまま）
           const r = card.getBoundingClientRect();
           const ghost = card.cloneNode(true);
@@ -1975,7 +1979,8 @@ wrap.dataset.cardId = String(c.id||'');
           ghost.style.opacity='0.9'; ghost.style.cursor='grabbing';
           ghost.style.zIndex='2147483647';
           document.body.appendChild(ghost);
-
+ card.classList.add('m42-dragging'); 
+  card.style.visibility = 'hidden';
           const offX = ev.clientX - r.left, offY = ev.clientY - r.top;
           const move = (e)=>{ ghost.style.left=(e.clientX-offX)+'px'; ghost.style.top=(e.clientY-offY)+'px'; };
           const up = async (e)=>{
@@ -1992,6 +1997,10 @@ wrap.dataset.cardId = String(c.id||'');
             if(hit){
               // 消滅：このカードに gone:true を立てる（見えない空枠となる）
               await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), { gone:true });
+            } else {
+              // ★未ヒットで離した：元カードを再表示
+              card.style.visibility = 'visible';
+ card.classList.remove('m42-dragging');
             }
           };
           window.addEventListener('pointermove', move, true);
