@@ -786,7 +786,7 @@ function buildRoomLink(){
 async function copyText(text){
  try{
    await navigator.clipboard.writeText(text);
-    alert('リンクをコピーしました');
+    alert('COPYしました');
   }catch(_e){
     // 失敗時フォールバック
     prompt('コピーできない場合はこのテキストをコピーしてください', text);
@@ -1260,7 +1260,7 @@ function updateHeaderInfo(){
   // 「コード：XXXX」＋右にコピーボタン（メニューやポップは使わない）
   const html = `
     <span class="code-label">コード：${state.roomCode}</span>
-    <button id="btnCopyLink" class="btn small copy-btn" aria-live="polite">リンクをコピー</button>
+    <button id="btnCopyLink" class="btn small copy-btn" aria-live="polite">COPY</button>
     　/　あなた：${state.userName}
   `;
   roomInfo.innerHTML = html;
@@ -1271,18 +1271,18 @@ function updateHeaderInfo(){
       const link = buildRoomLink();
       try{
         await navigator.clipboard.writeText(link);
-        // 枠（ボタン）の中身を「コピーしました！」に変更
-        btn.textContent = 'コピーしました！';
+        // 枠（ボタン）の中身を「COPIED」に変更
+        btn.textContent = 'COPIED';
         btn.classList.add('copied');
         // 1.8秒後に元に戻す
         setTimeout(()=>{
-          btn.textContent = 'リンクをコピー';
+          btn.textContent = 'COPY';
           btn.classList.remove('copied');
         }, 1800);
       }catch(_e){
         // 失敗時もポップは出さない。文言だけ短く通知。
         btn.textContent = 'コピーできません…';
-        setTimeout(()=>{ btn.textContent = 'リンクをコピー'; }, 1800);
+        setTimeout(()=>{ btn.textContent = 'COPY'; }, 1800);
       }
     };
   }
@@ -1964,6 +1964,8 @@ wrap.dataset.cardId = String(c.id||'');
         card.classList.add('i2-selectable'); // 既存青点線
 
         card.addEventListener('pointerdown', (ev)=>{
+    card.style.visibility = 'hidden';
+    card.classList.add('m42-dragging');
           // ゴースト生成（実カードは固定のまま）
           const r = card.getBoundingClientRect();
           const ghost = card.cloneNode(true);
