@@ -1855,9 +1855,18 @@ if (!amSeated || seatEmpty) {
 } else {
   const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
   char.style.backgroundImage = `url("${face}")`;
-  char.onclick = async ()=> {
-    await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), { flipped: !t.character?.flipped });
-  };
+  // ▼▼ ここから：member(9) だけは拡大、その他は従来どおり裏返し ▼▼
+  const isMine = (t.playerId === state.userId);
+  const myOrigFace = String(t?.character?.face || '');
+  if (isMine && myOrigFace.includes('member (9).jpg')) {
+    // 自分＆member(9) → クリックで拡大（裏返ししない）
+    char.onclick = ()=> openRoleZoomView(myOrigFace);
+  } else {
+    // 従来挙動：自分はクリックで裏返し
+    char.onclick = async ()=> {
+      await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), { flipped: !t.character?.flipped });
+    };
+  }
 }
     if ((state.watching?.mission?.id|0) === 34 && t.playerId !== state.userId){
   // #34：自分以外はブランク表示・操作不可
@@ -2980,9 +2989,20 @@ if (big){
       const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
       mini.style.backgroundImage = `url("${face}")`;
       // 本人のみ裏表トグル
-      mini.onclick = amMe ? (async ()=>{
-        await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
-      }) : null;
+      // 本人のみ：member(9)なら拡大→「使う」ポップ、その他は裏表トグル
+      if (amMe){
+        const orig = String(t?.character?.face || '');
+        if (orig.includes('member (9).jpg')){
+          mini.style.cursor = 'pointer';
+          mini.onclick = ()=> openRoleZoomView(orig);
+        }else{
+          mini.onclick = async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
+          };
+        }
+      }else{
+        mini.onclick = null;
+      }
       if (!amMe) mini.style.cursor = 'default';
     }
 
@@ -3016,31 +3036,17 @@ function openConstraintZoom31Owned(letter, tableIdx){
       : `url('${imgConstraint(letter)}')`;
 
     // 拡大カードクリックでメニューをトグル
-    big.addEventListener('click', (e)=>{
+    // ▼ 変更：拡大した9カードを押したら「アイテム2」と同じ挙動（= i2Flow開始）
+    big.addEventListener('click', async (e)=>{
       e.stopPropagation();
-
-      // メニューの開閉
-      let menu = wrap.querySelector('.conzoom-menu');
-      if (menu){ menu.remove(); return; }
-
-      menu = document.createElement('div');
-      menu.className = 'conzoom-menu';
-
-      // 「裏返す」ボタン（自分のカードなので常に表示）
-      const btnFlip = document.createElement('button');
-      btnFlip.textContent = '裏返す';
-      btnFlip.onclick = async (ev)=>{
-        ev.stopPropagation();
-        try{
-          const cur = state?.watching?.tables?.[tableIdx]?.m31Face || 'front';
-          const next = (cur==='back') ? 'front' : 'back';
-          await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { m31Face: next });
-        }catch(err){ console.error(err); }
-        closeConstraintZoom();
-      };
-
-      menu.appendChild(btnFlip);
-      wrap.appendChild(menu);
+      const f = String(faceFileName||'');
+      if (f.includes('member (9).jpg') || f.includes('member9')){
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          i2Flow: { usingBy: state.userId, phase: 'pickSelf', selA: null, selB: null }
+        });
+      }
+      // そのまま拡大を閉じて、青枠選択に入る
+      closeConstraintZoom();
     });
 
     wrap.appendChild(big);
@@ -4678,9 +4684,21 @@ function renderM61(v){
       const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
       mini.style.backgroundImage = `url("${face}")`;
      // 既存の大キャラ同様、本人のみ裏表トグル
-      mini.onclick = amSeatedHere ? (async ()=> {
-        await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
-      }) : null;
+
+      if (amSeatedHere){
+        const orig = String(t?.character?.face || '');
+        if (orig.includes('member (9).jpg')){
+          mini.style.cursor = 'pointer';
+          mini.onclick = ()=> openRoleZoomView(orig);
+        }else{
+          mini.onclick = async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
+          };
+        }
+      }else{
+        mini.onclick = null;
+      }
+
       if (!amSeatedHere) mini.style.cursor = 'default';
    }
     stack.appendChild(con);
@@ -5776,7 +5794,50 @@ function openConstraintZoomView(letter){
     document.body.appendChild(ov);
   }catch(e){ console.error(e); }
 }
-  
+ 
+
+function openRoleZoomView(faceFileName){
+  try{
+    const old = document.getElementById('conZoomOverlay');
+    if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'conZoomOverlay';
+    ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
+    const wrap = document.createElement('div');
+    wrap.className = 'conzoom-wrap';
+    const big = document.createElement('div');
+    big.className = 'conzoom-card';
+    // member画像をそのまま拡大
+    big.style.backgroundImage = `url('./${faceFileName}')`;
+    // ▼ 追加：拡大カードをクリックで「使う」ポップ（トグル）
+    big.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      let menu = wrap.querySelector('.conzoom-menu');
+      if (menu){ menu.remove(); return; }   // 2回目クリックで閉じる
+      menu = document.createElement('div');
+      menu.className = 'conzoom-menu';
+      const btnUse = document.createElement('button');
+      btnUse.textContent = '使う';
+btnUse.onclick = async (ev)=>{
+  ev.stopPropagation();
+  const isNine = String(faceFileName||'').includes('member (9).jpg');
+  if (isNine){
+    // item2 の「使う」と同じ：i2Flow を pickSelf で開始
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      i2Flow: { usingBy: state.userId, phase: 'pickSelf', selA: null, selB: null }
+    });
+  }
+  closeConstraintZoom();
+};
+
+      menu.appendChild(btnUse);
+      wrap.appendChild(menu);
+    });
+    wrap.appendChild(big);
+    ov.appendChild(wrap);
+    document.body.appendChild(ov);
+  }catch(e){ console.error('[role-zoom]', e); }
+} 
 // ★ #61専用：拡大→「交換」→「本当に？」→B(F/G)から差し替え
 function openConstraintZoom61(letter, myIdx){
   try{
@@ -6221,6 +6282,17 @@ async function doItem2Swap(A, B){
     set(ref(db, `rooms/${state.roomCode}/tables/${B.table}/hand`), b.hand),
     update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null })
   ]);
+  // 交換後：member(9) を自分が持っているなら枠の9を裏返す
+  try{
+    const myIdx = (tables||[]).findIndex(t => t?.playerId === state.userId);
+    if (myIdx >= 0){
+      const meChar = tables[myIdx]?.character || {};
+      const isNine = String(meChar.face||'').includes('member (9).jpg');
+      if (isNine && !meChar.flipped){
+        await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}/character`), { flipped: true });
+      }
+    }
+  } catch(e){ console.warn('[i2] auto-flip 9 failed', e); }
 }
 
 /* ===== Item 18 take ===== */
