@@ -4777,32 +4777,35 @@ function enforceM31to66(v){
     const body = document.body;
 
     // 競合しうる古いスタイルを掃除
-    ['m3166Style','m3166MaskStyle','m3166PrivacyStyle','m3166TableMaskStyle','m3166CaptainBlankStyle','m3166HardMaskStyle']
+    ['m3166Style','m3166MaskStyle','m3166PrivacyStyle','m3166TableMaskStyle','m3166CaptainBlankStyle','m3166HardMaskStyle','m3166MiniBorderStyle']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.remove(); });
 
-    // CSSオーバーレイ（最終裁定）
+    // CSS（最終裁定）：未選択テーブル／隊長未着席は常時ブランク + 小枠用の黒枠
     const css = `
 /* === M31-66: 正体カードの最終裁定（未選択&隊長未着席は常時ブランク） === */
-body[data-privacy="m31-66"] #tables .table .char-card { position: relative; }
+body[data-privacy="m31-66"] #tables .table .char-card{ position:relative; }
 
-/* 未選択テーブル(data-picked="0")は常時ブランク（初期配布も不可視） */
+/* 未選択テーブルは常時ブランク（初期配布も不可視） */
 body[data-privacy="m31-66"] #tables .table[data-picked="0"] .char-card::after{
   content:""; position:absolute; inset:0;
   background:#f3f4f6; border:1px dashed #d1d5db; border-radius:6px;
   z-index:2147483647; pointer-events:none;
 }
-
-/* 隊長テーブルが未着席(data-cap="1"かつdata-seated="0")なら常時ブランク */
+/* 隊長テーブルが未着席なら常時ブランク */
 body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-card::after{
   content:""; position:absolute; inset:0;
   background:#f3f4f6; border:1px dashed #d1d5db; border-radius:6px;
   z-index:2147483647; pointer-events:none;
 }
+
+/* ★ 小さい枠（m61-mini）用の黒枠 — ファイルCSSには定義がないためここで付与 */
+.m61-mini.captain-card{ border:2px solid #000 !important; border-radius:4px; }
 /* === /M31-66 === */
 `;
-    let st = document.getElementById('m3166CaptainBlankStyle');
-    if(!st){ st=document.createElement('style'); st.id='m3166CaptainBlankStyle'; document.head.appendChild(st); }
-    if(st.textContent !== css) st.textContent = css;
+    let st = document.createElement('style');
+    st.id = 'm3166MiniBorderStyle';
+    st.textContent = css;
+    document.head.appendChild(st);
 
     // 範囲外はクリーンアップ
     if(!inRange){
@@ -4812,50 +4815,56 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
         tb.removeAttribute('data-seated');
         tb.removeAttribute('data-cap');
       });
-      document.querySelectorAll('#tables .char-card.captain-card').forEach(el=>el.classList.remove('captain-card'));
+      document.querySelectorAll('#tables .char-card.captain-card, #tables .m61-mini.captain-card')
+        .forEach(el=>el.classList.remove('captain-card'));
       return;
     }
     body.dataset.privacy = 'm31-66';
 
-    // DBの状態を取得
+    // DBの状態
     const tables = Array.isArray(v?.tables) ? v.tables : [];
-    const face1to9  = /member\s*\(([1-9])\)\.(?:jpe?g|png|webp)$/i;
-    const faceNot5  = /member\s*\((1|2|3|4|6|7|8|9)\)\.(?:jpe?g|png|webp)$/i; // 黒枠許可（5は除外）
+    const face1to9   = /member\s*\(([1-9])\)\.(?:jpe?g|png|webp)$/i;
+    const faceNot5   = /member\s*\((1|2|3|4|6|7|8|9)\)\.(?:jpe?g|png|webp)$/i; // 黒枠は「5」除外
 
     const tEls = document.querySelectorAll('#tables .table');
     const capIdx = (v?.captainTable ?? null);
 
-    // テーブルごとの属性を刻む & 初期カードの露出を抑止/復帰
+    // 各テーブルの属性を刻む & 初期カードの露出を抑止/復帰
     tEls.forEach((tb, idx)=>{
       const t = tables[idx] || {};
       const seatedThere = !!t.playerId;
-      const face = String(t?.character?.face || '');   // DB実値（フォールバックは信用しない）
+      const face = String(t?.character?.face || '');   // DB実値
       const picked = seatedThere && face1to9.test(face);
 
       tb.dataset.seated = seatedThere ? '1' : '0';
       tb.dataset.picked = picked ? '1' : '0';
       if (capIdx === idx) tb.dataset.cap = '1'; else tb.removeAttribute('data-cap');
 
-      // 未選択や隊長未着席は inline でも確実に不可視（初期配布の露出抑止）
-      const card = tb.querySelector('.char-card');
-      if (!card) return;
+      const charEl = tb.querySelector('.char-card');
+      const miniEl = tb.querySelector('.m61-mini'); // 小さい表示（特にM61で使用）
 
-      const forceHide = (!picked) || (capIdx === idx && !seatedThere);
-      if (forceHide){
-        card.style.backgroundImage = 'none';
-      }else if (card.style.backgroundImage === 'none'){
-        card.style.removeProperty('background-image');
+      // 未選択 or（隊長テーブルで未着席）→ 初期画像を確実に消す（オーバーレイと二重化で保険）
+      const mustHide = (!picked) || (capIdx === idx && !seatedThere);
+      if (charEl){
+        if (mustHide) charEl.style.backgroundImage = 'none';
+        else if (charEl.style.backgroundImage === 'none') charEl.style.removeProperty('background-image');
+        charEl.classList.remove('blank','captain-card'); // 残骸を掃除
       }
-
-      // 古い .blank などの残骸を掃除（可視阻害対策）
-      card.classList.remove('blank');
-      // 既存の黒枠は一旦外す（この後で条件に合えば付け直す）
-      card.classList.remove('captain-card');
+      if (miniEl){
+        if (mustHide) miniEl.style.backgroundImage = 'none';
+        else if (miniEl.style.backgroundImage === 'none') miniEl.style.removeProperty('background-image');
+        miniEl.classList.remove('blank','captain-card');
+      }
     });
 
-    // 隊長の黒枠：閲覧者が1〜9の選択者 & 隊長が5以外(1,2,3,4,6,7,8,9)を選択 & 隊長席が着席 のときだけ
+    // 隊長の黒枠：閲覧者が1〜9の選択者 & 隊長席が着席かつ「5以外」を選択済み
+    // さらに「ミッション31/61では小さい枠にのみ」枠を付与。それ以外では通常の.char-cardに付与。
     const viewerIdx = (state?.seatedTable ?? null);
     const viewerPicked = (viewerIdx !== null) && face1to9.test(String(tables?.[viewerIdx]?.character?.face || ''));
+
+    // いったん全ての枠を外す（競合排除）
+    document.querySelectorAll('#tables .char-card.captain-card, #tables .m61-mini.captain-card')
+      .forEach(el=>el.classList.remove('captain-card'));
 
     if (capIdx != null && viewerPicked){
       const capT = tables[capIdx] || {};
@@ -4864,8 +4873,21 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       const capPickedNot5 = capSeated && faceNot5.test(capFace); // 5は除外
 
       if (capPickedNot5){
-        const capEl = tEls[capIdx]?.querySelector('.char-card');
-        if (capEl) capEl.classList.add('captain-card'); // 既存CSS（太い黒枠）が効く
+        const capTableEl = tEls[capIdx];
+        if (capTableEl){
+          const miniEl = capTableEl.querySelector('.m61-mini');
+          const bigEl  = capTableEl.querySelector('.char-card');
+
+          if (mid === 31 || mid === 61){
+            // 小さい枠の方だけに黒枠
+            if (miniEl) miniEl.classList.add('captain-card');
+            if (bigEl)  bigEl.classList.remove('captain-card'); // 念のため外す
+          }else{
+            // 通常は大きい正体カードに黒枠
+            if (bigEl)  bigEl.classList.add('captain-card');
+            if (miniEl) miniEl.classList.remove('captain-card');
+          }
+        }
       }
     }
   }catch(e){
