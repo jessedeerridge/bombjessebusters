@@ -535,6 +535,9 @@
   border-color:#16a34a;
 }
 
+
+
+
 </style>
 </head>
 <body>
@@ -783,7 +786,7 @@ function buildRoomLink(){
 async function copyText(text){
  try{
    await navigator.clipboard.writeText(text);
-    alert('COPYしました');
+    alert('リンクをコピーしました');
   }catch(_e){
     // 失敗時フォールバック
     prompt('コピーできない場合はこのテキストをコピーしてください', text);
@@ -1257,7 +1260,7 @@ function updateHeaderInfo(){
   // 「コード：XXXX」＋右にコピーボタン（メニューやポップは使わない）
   const html = `
     <span class="code-label">コード：${state.roomCode}</span>
-    <button id="btnCopyLink" class="btn small copy-btn" aria-live="polite">COPY</button>
+    <button id="btnCopyLink" class="btn small copy-btn" aria-live="polite">リンクをコピー</button>
     　/　あなた：${state.userName}
   `;
   roomInfo.innerHTML = html;
@@ -1268,18 +1271,18 @@ function updateHeaderInfo(){
       const link = buildRoomLink();
       try{
         await navigator.clipboard.writeText(link);
-        // 枠（ボタン）の中身を「COPIED！」に変更
-        btn.textContent = 'COPIED！';
+        // 枠（ボタン）の中身を「コピーしました！」に変更
+        btn.textContent = 'コピーしました！';
         btn.classList.add('copied');
         // 1.8秒後に元に戻す
         setTimeout(()=>{
-          btn.textContent = 'COPY';
+          btn.textContent = 'リンクをコピー';
           btn.classList.remove('copied');
         }, 1800);
       }catch(_e){
         // 失敗時もポップは出さない。文言だけ短く通知。
         btn.textContent = 'コピーできません…';
-        setTimeout(()=>{ btn.textContent = 'COPY'; }, 1800);
+        setTimeout(()=>{ btn.textContent = 'リンクをコピー'; }, 1800);
       }
     };
   }
@@ -1533,15 +1536,22 @@ function renderMissionPanels(v){
 function renderItemsAndDi(v){
   if(!v || !v.started){ H(itemsBar,true); return; }
   // ★ #23：広げる前は「アイテムのみ」非表示（DIは残す）
+  // ★ #42：☝（ドラッグ＆ドロップ起動中）はアイテムとDIを一時的に非表示
   let hideItems = false;
+  let hideDi = false;
   {
     const flags = v?.mission?.flags || {};
-    hideItems = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
-    // バー自体は常に表示、アイテムだけ隠す
+    const isM42 = ((v?.mission?.id|0) === 42);
+    const m23OnlyHideItems = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
+    hideItems = m23OnlyHideItems || (isM42 && !!v?.meta?.m42_on);
+    hideDi    = (isM42 && !!v?.meta?.m42_on);
+
+    // バー自体は常に表示（m42の箱を置くため）、必要に応じて中身だけ隠す
     H(itemsBar, false);
     H(itemsEl, hideItems);
-    H(diEl, false);
+    H(diEl, hideDi);
   }
+
 
   // ★ 追加：誤クリア・誤配置の安全ガード（ここから）
   if (itemsEl.contains(diEl)) itemsBar.appendChild(diEl);   // di が items 内に紛れていたら救出
@@ -3289,6 +3299,45 @@ function renderM37(v){ renderConDeckSync(v, 37); }
 /* ここから追加：#42 描画・操作ロジック（⇅入れ替えモードをひとかたまりで実装） */
 function renderM42(v){
   const isM42 = ((v?.mission?.id|0) === 42);
+  const nowLock = (isM42 && !!v?.meta?.m42_on);
+
+  if (typeof state._m42ScrollLocked === 'undefined') state._m42ScrollLocked = false;
+
+  const releaseScrollLock = ()=>{
+    document.body.classList.remove('m42-noscroll');
+    if (state._m42LockHandler){
+      window.removeEventListener('touchmove', state._m42LockHandler, { passive:false });
+      window.removeEventListener('wheel',     state._m42LockHandler, { passive:false });
+      window.removeEventListener('keydown',   state._m42KeyHandler,  { passive:false });
+      state._m42LockHandler = null;
+      state._m42KeyHandler  = null;
+    }
+    state._m42ScrollLocked = false;
+  };
+
+  if (nowLock && !state._m42ScrollLocked){
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    document.body.classList.add('m42-noscroll');
+    state._m42LockHandler = (e)=>{ e.preventDefault(); };
+    state._m42KeyHandler  = (e)=>{
+      const k = e.code || e.key;
+      if (['ArrowUp','ArrowDown','PageUp','PageDown','Home','End','Space'].includes(k)) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('touchmove', state._m42LockHandler, { passive:false });
+    window.addEventListener('wheel',     state._m42LockHandler, { passive:false });
+    window.addEventListener('keydown',   state._m42KeyHandler,  { passive:false });
+    state._m42ScrollLocked = true;
+  }
+
+  if (!nowLock && state._m42ScrollLocked){
+    releaseScrollLock();
+  }
+
+  if (!isM42 && state._m42ScrollLocked){
+    releaseScrollLock();
+  }
 
   // 1) 一度だけ仕込む補助CSS
   if (!document.getElementById('m42ExtraStyle')) {
@@ -3302,7 +3351,10 @@ function renderM42(v){
       body[data-m42m2="on"]   .card.open { outline:2px dashed #38bdf8; outline-offset:-3px; }
         /* exright/exleft の表示は常に画面中央に固定（保険） */
         #m42Ex{ position:fixed!important; left:50%!important; top:50%!important; transform:translate(-50%,-50%)!important; }
-
+      body.m42-noscroll{
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+      }
       
     `;
     document.head.appendChild(st);
