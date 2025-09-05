@@ -1265,7 +1265,7 @@ function updateHeaderInfo(){
   }
   // 「コード：XXXX」＋右にコピーボタン（メニューやポップは使わない）
   const html = `
-    <span class="code-label">ROOM${state.roomCode}</span>
+    <span class="code-label">${state.roomCode}</span>
     <button id="btnCopyLink" class="btn small copy-btn" aria-live="polite">COPY</button>
     　${state.userName}
   `;
