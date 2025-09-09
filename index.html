@@ -2636,15 +2636,7 @@ function renderM29(v){
             let drew = false;
             let nextHand = hand0.slice();
             if (nextHand.length <= 1) {
-              // 既存のデッキがあれば使う。無ければ“残り”（1..12 から使用済みを除外）を生成
-              let deck = Array.isArray(R.m29_deck) ? R.m29_deck.slice() : null;
-              if (!Array.isArray(deck)) {
-                const used = new Set();
-                (R.tables||[]).forEach(TT => (TT?.m29Hand||[]).forEach(x => used.add(x)));
-                (Array.isArray(R.m29_center)?R.m29_center:[]).forEach(o => used.add(o?.n|0));
-                deck = MATERIALS.numbers.filter(x => !used.has(x));
-                shuffle(deck);
-              }
+           let deck = Array.isArray(R.m29_deck) ? R.m29_deck.slice() : [];
               if (deck.length > 0) {
                 const d = deck.shift();
                 nextHand.push(d);
@@ -6842,6 +6834,7 @@ async function startGame(playerCount, missionId){
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
+let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
   // ベースデッキ 1..12 x4 = 48（通常コード）
   const base=[]; for(let n=1;n<=12;n++){ for(let k=0;k<4;k++) base.push({id:crypto.randomUUID(), num:n, kind:'normal', open:false, ownerId:null}); }
   shuffle(base);
@@ -6882,6 +6875,7 @@ async function startGame(playerCount, missionId){
       T.m29Hand = [];
       for (let k=0; k<take && pi<nums.length; k++) T.m29Hand.push(nums[pi++]);
     });
+m29Rest = nums.slice(pi);
     // センター（場に出した数値カード置き場）
     // 形式: { n: number, by: tableIndex, faceUp: boolean }
     missionMeta.flags = { ...(missionMeta.flags||{}), m29:true };
@@ -6943,6 +6937,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
   di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : playerCount), max:6 },
   captainTable: captainIndex, mission: missionMeta,     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
+ m29_deck:   (missionMeta?.id===29 ? (m29Rest||[]) : null),
     /* ▲▲ ここまで追加 ▼▼ */
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
   });
