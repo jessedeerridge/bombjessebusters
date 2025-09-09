@@ -4982,6 +4982,14 @@ function applyCaptainBorder(v) {
   const pickedAlt = /member\s*\((6|7|8|9)\)\.(jpe?g|png)$/.test(capFace);
   if (!pickedAlt) return;   // 未選択や member (5) なら黒枠なし
 
+  // ▼▼ #34 専用：隊長が自分の制約カードを「場（センター）」に出すまで黒枠を出さない ▼▼
+  if (mid === 34) {
+    const center = Array.isArray(v?.m34_center) ? v.m34_center : [];
+    const capHasPlayed = center.some(o => (o?.by|0) === capIdx);
+    if (!capHasPlayed) return; // まだ場に出していない → 黒枠を抑止
+  }
+  
+
   // DOMに反映（正体カードは .char-card）
   const tb = tablesEl.querySelectorAll('.table')[capIdx];
   if (!tb) return;
@@ -5093,23 +5101,35 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       const capFace = String(capT?.character?.face || '');
       const capPickedNot5 = capSeated && faceNot5.test(capFace); // 5は除外
 
-      if (capPickedNot5){
-        const capTableEl = tEls[capIdx];
-        if (capTableEl){
-          const miniEl = capTableEl.querySelector('.m61-mini');
-          const bigEl  = capTableEl.querySelector('.char-card');
-
-          if (mid === 31 || mid === 61){
-            // 小さい枠の方だけに黒枠
+        if (capPickedNot5){
+          const capTableEl = tEls[capIdx];
+          if (capTableEl){
+            const miniEl = capTableEl.querySelector('.m61-mini');
+            const bigEl  = capTableEl.querySelector('.char-card');
+  
+            // #34 例外：隊長本人には常に黒枠を表示。未場出しの間は他者には非表示。
+            if (mid === 34){
+              const center = Array.isArray(v?.m34_center) ? v.m34_center : [];
+              const capHasPlayed = center.some(o => (o?.by|0) === capIdx);
+              const viewingSelfCaptain = (state?.seatedTable ?? null) === capIdx;
+              if (!capHasPlayed && !viewingSelfCaptain){
+                // 抑止：何も付けない（直前で一度 remove 済み）
+              }else{
+              if (bigEl)  bigEl.classList.add('captain-card');
+              if (miniEl) miniEl.classList.remove('captain-card');
+             }
+         }else if (mid === 31 || mid === 61){
+             // 小さい枠の方だけに黒枠
             if (miniEl) miniEl.classList.add('captain-card');
-            if (bigEl)  bigEl.classList.remove('captain-card'); // 念のため外す
+             if (bigEl)  bigEl.classList.remove('captain-card'); // 念のため外す
           }else{
-            // 通常は大きい正体カードに黒枠
-            if (bigEl)  bigEl.classList.add('captain-card');
+           // 通常は大きい正体カードに黒枠
+           if (bigEl)  bigEl.classList.add('captain-card');
             if (miniEl) miniEl.classList.remove('captain-card');
-          }
-        }
+         }
+       }
       }
+
     }
   }catch(e){
     console.warn('enforceM31to66 error:', e);
@@ -5750,8 +5770,14 @@ function openConstraintZoom(letter, myIdx){
     big.addEventListener('click', (e)=>{
       e.stopPropagation();
       // メニューが無ければ生成／あればトグル
-       if (typeof myIdx !== 'number') return;
-      let m = wrap.querySelector('.conzoom-menu');
+        if (typeof myIdx !== 'number') return;
+        // ★追加：隊長以外は「場に出す」ポップを出さない（閲覧のみ）
+        const cap = (state?.watching?.captainTable | 0);
+        const isCaptain = (typeof cap === 'number' && cap === myIdx);
+        if (!isCaptain) {
+          // 非隊長はトグル動作をしない＝メニューを出さず、そのまま拡大のみ
+          return;
+        }      let m = wrap.querySelector('.conzoom-menu');
       if (m){ m.remove(); return; }
       m = document.createElement('div');
       m.className = 'conzoom-menu';
@@ -9103,11 +9129,18 @@ function missionInfo(id, opts={}){
         id:34, name:'#34', desc:'',
         display:[
           '#34',...linesForMix,
-          '自分だけ役職カードを見る。',
+ 'A:君は偶数のコードだけを切断しなければならない。',
+ 'B:君は奇数のコードだけを切断しなければならない。',
+ 'C:1～6のコードだけを切断しなければならない。',
+ 'D:7～12のコードだけを切断しなければならない。',
+ 'E:4～9のコードだけを切断しなければならない。',
+          '先に隊長を決めて、自分だけ役職カードを見る。',
           '隊長カードの持ち主は「ウィーケスト・リンク」となる。',
           '「ウィーケスト・リンク」だけが制約を守らなければならない。',
-          '誰かが「ウィーケスト・リンク」であるプレイヤーと制約の両方を指摘できたら、「ウィーケスト・リンク」は制約カードを公開して解放される。',
-          'ただし、間違えると起爆ダイヤルが1進む。'
+          '他プレイヤーはいつでも、「ウィーケスト・リンク」と制約の種類の両方を特定できたら、「ウィーケスト・リンク」は制約カードを公開できて、制約から解放される。',
+          'ただし、どちらかでも間違えると起爆ダイヤルが1進む。',
+          '「ウィーケスト・リンク」は自分の制約により切断できなくなった時点で制約カードを公開して、起爆ダイヤルを2進める。',
+          'カードが公開されるまで、いずれのプレイヤーも個人装備は使用できない。',
         ],
         // ※今回：表示のみ。秘匿/推理UIは後続PRで
         flags:{}
