@@ -6697,10 +6697,45 @@ gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.co
 async function leaveSeatNow(){
   if(state.seatedTable==null || !state.watching?.tables) return;
   const idx=state.seatedTable; const hand=(state.watching.tables[idx].hand||[]);
+  try{
+    await onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}`)).cancel();
+    await Promise.all(hand.map((_,i)=>
+      onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`)).cancel()
+    ));
+  }catch(_e){}
   await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
   await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
   state.seatedTable=null; updateMenuButtons();
 }
+
+/* ★ 自動退席：切断時に席と手札の所有を外す予約を張る */
+async function setupAutoLeaveOnDisconnect(tableIdx){
+  if (tableIdx == null) return;
+  const room = state.roomCode;
+
+  try{
+    if (state.seatedTable != null && state.seatedTable !== tableIdx){
+      const prev = state.seatedTable;
+      await onDisconnect(ref(db, `rooms/${room}/tables/${prev}`)).cancel();
+      const prevHand = state.watching?.tables?.[prev]?.hand || [];
+      await Promise.all(prevHand.map((_,i)=>
+        onDisconnect(ref(db, `rooms/${room}/tables/${prev}/hand/${i}`)).cancel()
+      ));
+    }
+  }catch(_e){}
+
+  await onDisconnect(ref(db, `rooms/${room}/tables/${tableIdx}`))
+    .update({ playerId:null, playerName:null });
+
+  const hand = state.watching?.tables?.[tableIdx]?.hand || [];
+  await Promise.all(hand.map((_,i)=>
+    onDisconnect(ref(db, `rooms/${room}/tables/${tableIdx}/hand/${i}`))
+      .update({ ownerId:null })
+  ));
+}
+
+
+
 
   /* ★ 追加：ホスト用—任意テーブルをキック（離席化） */
   async function kickSeatAt(tableIdx){
@@ -6736,6 +6771,7 @@ function renderSeatTabs(v){
       await Promise.all(hand.map((_,idx)=> 
         update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), { ownerId: state.userId })
       ));
+await setupAutoLeaveOnDisconnect(i);   // ★切断時の自動退席を予約
       state.seatedTable=i; H(seatPop,true); updateMenuButtons();
 maybeOpenRolePickerAfterSeat();
 
