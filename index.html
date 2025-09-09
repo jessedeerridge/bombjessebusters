@@ -719,7 +719,12 @@ try{
   if (qRoom) inputCode.value = qRoom.slice(0, 12);
   if (qName) inputName.value = qName.slice(0, 4);
 }catch(_e){}
-  
+  if (!inputName.value) {
+  try {
+    const saved = localStorage.getItem("savedUserName");
+    if (saved) inputName.value = saved.slice(0, 4);
+  } catch(_e){}
+}
 const tablesEl= document.getElementById('tables');
 const gear    = document.getElementById('gear');
 const menuPop = document.getElementById('menuPopup');
@@ -1236,6 +1241,7 @@ btnJoin.onclick   = ()=>{
   const nm = (inputName?.value || '').trim();
   // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
   state.userName = nm ? nm.slice(0,4) : hiragana(4);
+  try { localStorage.setItem("savedUserName", state.userName); } catch(_e){}
 
   // ★ルームコード未入力なら0225にする
   if (!inputCode.value.trim()) {
@@ -6703,6 +6709,7 @@ async function leaveSeatNow(){
       onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`)).cancel()
     ));
   }catch(_e){}
+
   await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
   await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
   state.seatedTable=null; updateMenuButtons();
