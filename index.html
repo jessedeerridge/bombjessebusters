@@ -3075,18 +3075,31 @@ function openConstraintZoom31Owned(letter, tableIdx){
       ? `url('${imgConstraintBack()}')`
       : `url('${imgConstraint(letter)}')`;
 
-    // 拡大カードクリックでメニューをトグル
-    // ▼ 変更：拡大した9カードを押したら「アイテム2」と同じ挙動（= i2Flow開始）
-    big.addEventListener('click', async (e)=>{
+    const renderMenu = ()=>{
+      // 既存メニューを消してから再生成（ラベルを最新状態に）
+      wrap.querySelector('.conzoom-menu')?.remove();
+      const menu = document.createElement('div');
+      menu.className = 'conzoom-menu';
+      const cur = state?.watching?.tables?.[tableIdx]?.m31Face || 'front';
+      const btnFlip = document.createElement('button');
+      btnFlip.textContent = (cur === 'back') ? '表に戻す' : '裏返す';
+      btnFlip.onclick = async (ev)=>{
+        ev.stopPropagation();
+        try{
+          const next = (cur === 'back') ? 'front' : 'back';
+          await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { m31Face: next });
+        }catch(e){ console.error('[M31 flip]', e); }
+        closeConstraintZoom();
+      };
+      menu.appendChild(btnFlip);
+      wrap.appendChild(menu);
+    };
+
+    // カードをタップするとメニューの表示/非表示をトグル（任意操作）
+    big.addEventListener('click', (e)=>{
       e.stopPropagation();
-      const f = String(faceFileName||'');
-      if (f.includes('member (9).jpg') || f.includes('member9')){
-        await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          i2Flow: { usingBy: state.userId, phase: 'pickSelf', selA: null, selB: null }
-        });
-      }
-      // そのまま拡大を閉じて、青枠選択に入る
-      closeConstraintZoom();
+      const m = wrap.querySelector('.conzoom-menu');
+      if (m) m.remove(); else renderMenu();
     });
 
     wrap.appendChild(big);
