@@ -7870,16 +7870,7 @@ deckBtn.onclick = async (ev)=>{
      const oldBar = document.getElementById(barId);
      if (!isM30){ if (oldBar) oldBar.remove(); return; }
 
-     let audio = document.getElementById(audioId);
-     if (!audio){
-       audio = document.createElement('audio');
-       audio.id = audioId;
-       audio.preload = 'auto';
-      audio.src = './mi30.mp3';
-       audio.crossOrigin = 'anonymous';
-      audio.style.display = 'none';
-       document.body.appendChild(audio);
-    }
+
 
      if (state.isHost){
        if (oldBar) oldBar.remove();
