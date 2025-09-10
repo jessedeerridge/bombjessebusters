@@ -1311,7 +1311,7 @@ function openMenu(x,y, entries){
     b.className='btn small';
     b.textContent = ent.label;
     if (ent && typeof ent.action === 'function') {
-      b.onclick = async ()=>{ if(div.isConnected) div.remove(); await ent.action(); };
+  b.onclick = ()=>{ if(div.isConnected) div.remove(); try{ ent.action(); }catch(_e){} };
     } else {
       // 非クリック（表示のみ）
       b.disabled = true;
@@ -1773,14 +1773,16 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   const next = clamp(nowv-1,0,6);
 
   const a = getCountdownAudio();
+const now = Date.now();
+if (!state._sfxJustPlayedAt || now - state._sfxJustPlayedAt > 500) {
   try {
-    const now = Date.now();
-    if (!state._sfxJustPlayedAt || now - state._sfxJustPlayedAt > 500) {
-      a.currentTime = 0;
-      await a.play();
-      state._sfxJustPlayedAt = now;
-    }
+    a.currentTime = 0;
+    const p = a.play();        // ← awaitしない（同期のうちに開始）
+    state._sfxJustPlayedAt = now;
+    p.catch(()=>{});           // 必要ならここで「音声を有効化」ポップ表示に差し替え可
   } catch(_e){}
+}
+
 
   await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
