@@ -2629,57 +2629,68 @@ function renderM29(v){
        c.style.backgroundSize = 'cover';
        c.style.backgroundPosition = 'center';
         c.title = '場に出す';
-        c.onclick = async (ev)=>{
-          try{
-            // DBから再取得して安全に更新
-            const tRef = ref(db, `rooms/${state.roomCode}/tables/${myIdx}`);
-            const mRef = ref(db, `rooms/${state.roomCode}`);
-            const [tSnap, rSnap] = await Promise.all([get(tRef), get(mRef)]);
-            const T = tSnap.val()||{};
-           const R = rSnap.val()||{};
-            const hand0 = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
-            const pos   = hand0.indexOf(n);
-            if (pos<0) return;
-            // 1) 出す：手札から抜いてセンターへ
-            hand0.splice(pos,1);
-            const center = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
-            center.push({ n, by: myIdx, faceUp:false });
+c.onclick = (ev)=>{
+  // クリック即実行ではなく、まず確認ポップを表示
+  openMenu(ev.clientX, ev.clientY, [
+    {
+      label: `場に出す`,
+      action: async ()=>{
+        try{
+          // DBから再取得して安全に更新
+          const tRef = ref(db, `rooms/${state.roomCode}/tables/${myIdx}`);
+          const mRef = ref(db, `rooms/${state.roomCode}`);
+          const [tSnap, rSnap] = await Promise.all([get(tRef), get(mRef)]);
+          const T = tSnap.val()||{};
+          const R = rSnap.val()||{};
+          const hand0 = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
+          const pos   = hand0.indexOf(n);
+          if (pos<0) return;
 
-            // 2) 自動ドロー：手札が1枚以下なら残り山から1枚
-            let drew = false;
-            let nextHand = hand0.slice();
-            if (nextHand.length <= 1) {
-           let deck = Array.isArray(R.m29_deck) ? R.m29_deck.slice() : [];
-              if (deck.length > 0) {
-                const d = deck.shift();
-                nextHand.push(d);
-                drew = true;
-                // m29_deck を書き戻す
-                await update(ref(db, `rooms/${state.roomCode}`), { m29_deck: deck });
-              }
+          // 1) 出す：手札から抜いてセンターへ
+          hand0.splice(pos,1);
+          const center = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
+          center.push({ n, by: myIdx, faceUp:false });
+
+          // 2) 自動ドロー：手札が1枚以下なら残り山から1枚
+          let drew = false;
+          let nextHand = hand0.slice();
+          if (nextHand.length <= 1) {
+            let deck = Array.isArray(R.m29_deck) ? R.m29_deck.slice() : [];
+            if (deck.length > 0) {
+              const d = deck.shift();
+              nextHand.push(d);
+              drew = true;
+              // m29_deck を書き戻す
+              await update(ref(db, `rooms/${state.roomCode}`), { m29_deck: deck });
             }
-            // 3) DB 更新（手札・センター）
-            await Promise.all([
-              update(tRef, { m29Hand: nextHand }),
-              update(ref(db, `rooms/${state.roomCode}`), { m29_center: center })
-            ]);
-            // 4) UI：名前右の枚数表示の右に「+1」を3秒出す
-            if (drew) {
-              const id = `m29cnt-${myIdx}`;
-              const anchor = document.getElementById(id);
-              if (anchor && anchor.parentNode) {
-                const badge = document.createElement('span');
-                badge.textContent = '+1';
-                // 目立ちすぎない緑＆少し余白、3秒後フェードアウト
-                badge.style.marginLeft = '2px';
-                badge.style.color = '#22c55e';
-                badge.style.transition = 'opacity .3s linear';
-                anchor.after(badge);
-                setTimeout(()=>{ badge.style.opacity='0'; setTimeout(()=>badge.remove(), 300); }, 2700);
-              }
+          }
+
+          // 3) DB 更新（手札・センター）
+          await Promise.all([
+            update(tRef, { m29Hand: nextHand }),
+            update(ref(db, `rooms/${state.roomCode}`), { m29_center: center })
+          ]);
+
+          // 4) UI：名前右の枚数表示の右に「+1」を3秒出す
+          if (drew) {
+            const id = `m29cnt-${myIdx}`;
+            const anchor = document.getElementById(id);
+            if (anchor && anchor.parentNode) {
+              const badge = document.createElement('span');
+              badge.textContent = '+1';
+              badge.style.marginLeft = '2px';
+              badge.style.color = '#22c55e';
+              badge.style.transition = 'opacity .3s linear';
+              anchor.after(badge);
+              setTimeout(()=>{ badge.style.opacity='0'; setTimeout(()=>badge.remove(), 300); }, 2700);
             }
-          }catch(e){ console.error(e); }
-        };
+          }
+        }catch(e){ console.error(e); }
+      }
+    }
+  ]);
+};
+
         row.appendChild(c);
       });
       // ミッション詳細タイトルの直前に差し込む
