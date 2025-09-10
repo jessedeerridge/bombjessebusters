@@ -604,6 +604,17 @@ main:has(#lobby.hidden){
   pointer-events: none; /* クリックを妨げない */
 }
 
+/* PC幅では .di をカード群のすぐ右に寄せる */
+@media (min-width: 861px){
+  .di{ margin-left: 8px; }  /* ← auto を上書き */
+}
+
+/* スマホ幅では従来どおり右端に寄せる */
+@media (max-width: 860px){
+  .di{ margin-left: auto; }
+}
+
+
 </style>
 </head>
 <body>
