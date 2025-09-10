@@ -354,7 +354,7 @@
   }
   .seat-pop{
     position:fixed;left:50%;bottom:10px;transform:translateX(-50%);
-    background:rgba(200, 240, 200, 0.95);
+background:#a1adbf;
 border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
     padding:10px;z-index:220;display:flex;flex-direction:column;gap:10px;min-width:280px
   }
@@ -550,6 +550,60 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   position: fixed;
   pointer-events: none;
 }
+
+/* 既存 main に追記（position を付与） */
+main{
+  padding:10px 12px;
+  display:flex;
+  gap:12px;
+  overflow:visible;
+  position: relative;
+  isolation: isolate; /* 疑似要素の層を独立 */
+}
+
+/* 入室画面だけ：画像を半透明に敷く */
+main:has(#lobby.hidden)::before{
+  content:"";
+  position:absolute; inset:0;
+  background: url('./bbback.jpg') center/cover no-repeat;
+  opacity: .4;           /* ←透明度。0=完全透明, 1=不透明 */
+  z-index: 0;
+  pointer-events: none;  /* クリックを邪魔しない */
+}
+
+/* コンテンツは常に前面＆不透明 */
+main:has(#lobby.hidden) > *{
+  position: relative;
+  z-index: 1;
+}
+
+/* 画面いっぱいに見せたい場合だけ */
+main:has(#lobby.hidden){
+  min-height: calc(100vh - 56px);
+}
+
+.tab{
+  padding:6px 10px;
+  border:1px solid #ddd;
+  border-radius:999px;
+  cursor:pointer;
+  user-select:none;
+  position: relative; /* ← 追加：擬似要素の基準にする */
+}
+
+/* 席タブ：使用中は数字の上に✕を重ねて表示 */
+.tab.disabled::after{
+  content: '✕';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 18px;     /* ✕の大きさは必要に応じて調整 */
+  font-weight: 700;
+  color: #b91c1c;      /* 落ち着いた赤。好みで変更可 */
+  pointer-events: none; /* クリックを妨げない */
+}
+
 </style>
 </head>
 <body>
@@ -6844,7 +6898,7 @@ function renderSeatTabs(v){
   (v.tables||[]).forEach((t,i)=>{
     const tab=document.createElement('div'); 
     tab.className='tab';
-    tab.textContent = t.playerName ? `${i+1}（使用中）` : `${i+1}`;
+tab.textContent = String(i + 1);
     if(t.playerId) tab.classList.add('disabled');
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
