@@ -615,6 +615,64 @@ main:has(#lobby.hidden){
 }
 
 
+/* ★ ミッション完了ポップ */
+.mission-complete-pop{
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-150%, -50%); /* 画面外（左）から開始 */
+  background: rgba(20,20,20,.92);
+  color: #fff;
+  border-radius: 16px;
+  padding: 18px 28px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  box-shadow: 0 18px 40px rgba(0,0,0,.35);
+  z-index: 2147483647;
+  pointer-events: auto;
+  animation: missionSlideIn .55s cubic-bezier(.22,.84,.44,1) forwards;
+}
+@keyframes missionSlideIn{
+  to{ transform: translate(-50%, -50%); } /* 画面中央へ */
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 </style>
 </head>
 <body>
@@ -853,6 +911,25 @@ function getCountdownAudio(){
   return a;
 }
 
+
+/* ★ 追加：comp.mp3 用の Audio 要素を用意 */
+function getCompAudio(){
+  let a = document.getElementById('sfxComp');
+  if (!a) {
+    a = document.createElement('audio');
+    a.id = 'sfxComp';
+    a.preload = 'auto';
+    a.src = './comp.mp3';
+    a.style.display = 'none';
+    a.setAttribute('playsinline', '');
+    a.setAttribute('webkit-playsinline', '');
+    a.playsInline = true;
+    document.body.appendChild(a);
+  }
+  return a;
+}
+
+
 let _audioUnlocked = false;
 window.addEventListener('pointerdown', async function _unlockOnce(){
   if (_audioUnlocked) return;
@@ -868,6 +945,17 @@ window.addEventListener('pointerdown', async function _unlockOnce(){
     a.muted = false;
     a.load();         // Safari対策
   } catch(_e){}
+  /* ★ 追加：comp.mp3 も無音で一瞬再生して解錠 */
+  const ac = getCompAudio();
+  try {
+    ac.muted = true;
+    ac.currentTime = 0;
+    await ac.play();
+    ac.pause();
+    ac.muted = false;
+    ac.load();         // Safari対策
+  } catch(_e){}
+
 });
 
 
@@ -1431,6 +1519,8 @@ function listenRoom(code){
     window.m22_alreadyShown = false;   // ← 自動ポップを再許可
     state.m22GaveOnce = false;         // ← 念のためローカルの渡し済みもクリア
     state._prevMissionId = curId;
+  state._mcShownMissionId = 0;
+
   }
 
    /* ★ 追加：リセット検知（未開始＆ミッション未選択）→ 座席ポップを確実に出す */
@@ -1483,6 +1573,8 @@ if (v) {
       renderMissionPanels(v);
       renderGlobalReveal(v);
       renderHostTool(v);
+  renderMissionComplete(v);
+
     });
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
    const midNow  = (v?.mission?.id|0);
@@ -1828,6 +1920,57 @@ function renderHostTool(v){
   H(hostTool, !hasOdd);
 }
 hostTool.onclick = ()=> alert('全体公開されている通常コードの枚数に奇数が含まれています。');
+
+
+
+/* ===== Mission Complete (all normal & yellow open) ===== */
+/* ★ 追加：黒&黄が全公開なら“ミッション完了!!”ポップ＋comp.mp3 再生 */
+function renderMissionComplete(v){
+  try{
+    if(!v || !Array.isArray(v.tables)) return;
+    const mid = (v?.mission?.id|0) || 0;
+    if(!mid) return;
+
+    // 黒(normal)と黄(yellow)のみ対象
+    const cards = [];
+    (v.tables||[]).forEach(T=>{
+      (T.hand||[]).forEach(c=>{
+        if (!c) return;
+        if (c.kind === 'normal' || c.kind === 'yellow') cards.push(c);
+      });
+    });
+    if (cards.length === 0) return;
+    const allOpen = cards.every(c => c.open === true);
+    if (!allOpen) return;
+
+    // 同一ミッション内で一度だけ表示
+    if (state._mcShownMissionId === mid) return;
+    state._mcShownMissionId = mid;
+
+    // ポップ生成（左→中央へ）
+    const id = 'missionCompletePop';
+    const old = document.getElementById(id);
+    if (old) old.remove();
+
+    const div = document.createElement('div');
+    div.id = id;
+    div.className = 'mission-complete-pop';
+    div.textContent = 'ミッション完了!!';
+    div.title = 'クリックで閉じる';
+    div.onclick = ()=>{ if (div.isConnected) div.remove(); };
+    popLayer.appendChild(div);
+
+    // ★ 同時に完了サウンド再生
+    const comp = getCompAudio();
+    try{
+      comp.currentTime = 0;
+      comp.play().catch(()=>{});
+    }catch(_e){}
+
+    // 自動フェードアウト（任意）
+    setTimeout(()=>{ if (div.isConnected) div.remove(); }, 2200);
+  }catch(_e){}
+}
 
 /* ===== Tables ===== */
 function renderTables(v){
