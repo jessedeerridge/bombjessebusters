@@ -354,7 +354,8 @@
   }
   .seat-pop{
     position:fixed;left:50%;bottom:10px;transform:translateX(-50%);
-    background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
+    background:rgba(200, 240, 200, 0.95);
+border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
     padding:10px;z-index:220;display:flex;flex-direction:column;gap:10px;min-width:280px
   }
   .start-pop .row,.seat-pop .row{display:flex;gap:8px;align-items:center}
@@ -1329,6 +1330,19 @@ function listenRoom(code){
     state.m22GaveOnce = false;         // ← 念のためローカルの渡し済みもクリア
     state._prevMissionId = curId;
   }
+
+   /* ★ 追加：リセット検知（未開始＆ミッション未選択）→ 座席ポップを確実に出す */
+   const isReset = v && (v.started === false) && (v.mission == null);
+   if (isReset) {
+     // DB座席が全消しの間にローカルが残っていると抑止されるため、先にクリア
+     state.seatedTable = null;
+     // UI側の座席状態も念のため「未着席」に
+     try { document.body.setAttribute('data-seated', 'no'); } catch(_e){}
+    // まだ開いていなければ開く（描画と競合しないよう次タスクで実行）
+     if (seatPop.classList.contains('hidden')) {
+       setTimeout(()=> { btnSit.onclick(); }, 0);
+     }
+   }
 if (v) {
   const p = Object.keys(v.players || {}).length;
   const s = Object.keys(v.spectators || {}).length;
