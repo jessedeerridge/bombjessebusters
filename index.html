@@ -1322,6 +1322,13 @@ function baseRoom(hostId){
 function listenRoom(code){
   onValue(ref(db, `rooms/${code}`),(snap)=>{
     const v=snap.val(); state.watching=v;
+  // ★ #22: 新しいゲーム/ミッション開始時にクライアント側の一度きりガードを解除（全端末）
+  const curId = (v?.mission?.id|0) || 0;
+  if (state._prevMissionId !== curId) {
+    window.m22_alreadyShown = false;   // ← 自動ポップを再許可
+    state.m22GaveOnce = false;         // ← 念のためローカルの渡し済みもクリア
+    state._prevMissionId = curId;
+  }
 if (v) {
   const p = Object.keys(v.players || {}).length;
   const s = Object.keys(v.spectators || {}).length;
@@ -6867,6 +6874,8 @@ async function startGame(playerCount, missionId){
 
   // ★ 前のゲーム由来のDOM＆レジスタを完全クリア
   clearMissionOverlays();
+  window.m22_alreadyShown = false;
+
   // 念のため、画面下部バッジも消す
   if(globalReveal){ globalReveal.innerHTML=''; H(globalReveal,true); }
  // ★ #22：渡し済みガードのリセット
