@@ -771,6 +771,34 @@ const globalReveal = document.getElementById('globalReveal');
 const hostTool = document.getElementById('hostTool');
 const countdownAudio = new Audio('./countdown.mp3');
 countdownAudio.preload = 'auto';
+
+let _audioUnlocked = false;
+window.addEventListener('pointerdown', async function _unlockOnce(){
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  window.removeEventListener('pointerdown', _unlockOnce);
+  // sfxCountdown を事前に用意して無音アンロック
+  let a = document.getElementById('sfxCountdown');
+  if (!a) {
+    a = document.createElement('audio');
+    a.id = 'sfxCountdown';
+    a.preload = 'auto';
+    a.src = './countdown.mp3';
+    a.crossOrigin = 'anonymous';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+  }
+  try {
+    a.muted = true;
+    await a.play();   // 無音で一瞬再生
+    a.pause();
+    a.currentTime = 0;
+    a.muted = false;
+  } catch(_e){}
+});
+
+
+
 /* helpers */
 function hiragana(len=4){
   const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"];
@@ -1680,7 +1708,27 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
 {label:'進める', action: async ()=>{
   const nowv = state.watching?.di?.value ?? val;
   const next = clamp(nowv-1,0,6);
-  await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
+ 
+  let a = document.getElementById('sfxCountdown');
+  if (!a) {
+    a = document.createElement('audio');
+    a.id = 'sfxCountdown';
+    a.preload = 'auto';
+    a.src = './countdown.mp3';
+    a.crossOrigin = 'anonymous';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+  }
+  try {
+    a.currentTime = 0;
+    await a.play();   // ← タップ直後なのでブロックされにくい
+  } catch(_e) {
+    // 失敗時は従来のミニポップ解除（renderSfx 側のフォールバックが出る）
+  }
+
+
+
+ await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
   // ▼ 全員同期のSFXトリガー（countdown）
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
     sfx: { name: 'countdown', at: Date.now(), nonce: Math.random().toString(36).slice(2) }
