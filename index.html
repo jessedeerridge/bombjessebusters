@@ -769,8 +769,7 @@ const popLayer = document.getElementById('popLayer');
 const globalReveal = document.getElementById('globalReveal');
 /* host tool */
 const hostTool = document.getElementById('hostTool');
-const countdownAudio = new Audio('./countdown.mp3');
-countdownAudio.preload = 'auto';
+
 /* helpers */
 function hiragana(len=4){
   const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"];
@@ -809,7 +808,61 @@ async function copyText(text){
     prompt('コピーできない場合はこのテキストをコピーしてください', text);
   }
 }
-  
+  // ======== Audio Unlock Utilities ========
+// 1回だけ、ユーザー操作（pointerdown）で全オーディオを解禁する
+let _audioUnlocked = false;
+function installAudioUnlockOnce(){
+  if (_audioUnlocked) return;
+  const handler = async () => {
+    try{
+      // 既存のSFX要素があれば使い、無ければ一時的に作る
+      let a = document.getElementById('sfxCountdown');
+      if (!a) {
+        a = document.createElement('audio');
+        a.id = 'sfxCountdown';
+        a.preload = 'auto';
+        a.src = './countdown.mp3';
+        a.crossOrigin = 'anonymous';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+      }
+      // 無音で一瞬再生→停止（自動再生許可を獲得）
+      const prevVol = a.volume;
+      a.volume = 0.0;
+      try { await a.play(); } catch(_e){}
+      try { a.pause(); } catch(_e){}
+      a.currentTime = 0;
+      a.volume = prevVol;
+
+      _audioUnlocked = true;
+    } finally {
+      window.removeEventListener('pointerdown', handler, { once:true, capture:true });
+    }
+  };
+  window.addEventListener('pointerdown', handler, { once:true, capture:true });
+}
+// ページ起動時に仕掛ける
+installAudioUnlockOnce();
+
+// 再生前に読み込みを待つ（最大1.2秒で妥協）
+function waitAudioReady(audio, timeoutMs=1200){
+  return new Promise((resolve)=>{
+    if (audio.readyState >= 2) return resolve(); // HAVE_CURRENT_DATA
+    let done = false;
+    const onReady = ()=>{ if (done) return; done = true; cleanup(); resolve(); };
+    const onTimeout = ()=>{ if (done) return; done = true; cleanup(); resolve(); }; // タイムアウトでも進む
+    const cleanup = ()=>{
+      audio.removeEventListener('loadeddata', onReady);
+      audio.removeEventListener('canplaythrough', onReady);
+      clearTimeout(tid);
+    };
+    audio.addEventListener('loadeddata', onReady, {once:true});
+    audio.addEventListener('canplaythrough', onReady, {once:true});
+    try { audio.load(); } catch(_e){}
+    const tid = setTimeout(onTimeout, timeoutMs);
+  });
+}
+
 /* ==== ミッション素材定義 ==== */
 const MATERIALS = {
   redCodes : [1,2,3,4,5,6,7,8,9,10,11].map(n=> n + 0.5),
@@ -7940,12 +7993,12 @@ deckBtn.onclick = async (ev)=>{
      }
    }
 
-function renderSfx(v){
+async function renderSfx(v){
   // 今回は countdown のみ処理
   const data = v?.meta?.sfx || null;
   if (!data || data.name !== 'countdown') return;
 
-  // audio エレメント確保
+  // audio エレメント確保（1個に統一）
   let audio = document.getElementById('sfxCountdown');
   if (!audio){
     audio = document.createElement('audio');
@@ -7963,23 +8016,38 @@ function renderSfx(v){
   if (state._sfxHandled[key]) return;
   state._sfxHandled = { [key]: true }; // メモリ増加防止のため都度置き換え
 
-  // 再生（オート再生ブロック対策は既存仕様に倣ってミニポップで解除）
   try{
+    // 自動再生ブロックを事前に可能な範囲で解禁
+    installAudioUnlockOnce();
+
+    // 読み込みを待ってから確実に再生
+    await waitAudioReady(audio);
+
+    // 直前の再生が残っている可能性に備えてリセット
+    try { audio.pause(); } catch(_e){}
     audio.currentTime = 0;
-    audio.play().catch(()=>{ 
+
+    await audio.play().catch(()=>{ 
+      // 失敗時は解禁ボタンを提示（既存仕様を踏襲）
       if (!document.getElementById('sfxUnlock')){
         const div = document.createElement('div');
         div.id = 'sfxUnlock';
         div.className = 'mini-pop bottom-pop';
         div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
         div.onclick = async ()=>{
-          try{ await audio.play(); }catch(_e){}
+          try{
+            await waitAudioReady(audio);
+            audio.currentTime = 0;
+            await audio.play();
+          }catch(_e){}
           div.remove();
         };
         document.getElementById('popLayer')?.appendChild(div);
       }
     });
-  }catch(_e){}
+  }catch(_e){
+    // ここは握りつぶし（UIを汚さない）
+  }
 }
 
 
