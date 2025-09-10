@@ -769,33 +769,42 @@ const popLayer = document.getElementById('popLayer');
 const globalReveal = document.getElementById('globalReveal');
 /* host tool */
 const hostTool = document.getElementById('hostTool');
-const countdownAudio = new Audio('./countdown.mp3');
-countdownAudio.preload = 'auto';
 
-let _audioUnlocked = false;
-window.addEventListener('pointerdown', async function _unlockOnce(){
-  if (_audioUnlocked) return;
-  _audioUnlocked = true;
-  window.removeEventListener('pointerdown', _unlockOnce);
-  // sfxCountdown を事前に用意して無音アンロック
+// 共有のカウントダウンAudio要素を必ず1個だけ使う
+function getCountdownAudio(){
   let a = document.getElementById('sfxCountdown');
   if (!a) {
     a = document.createElement('audio');
     a.id = 'sfxCountdown';
     a.preload = 'auto';
     a.src = './countdown.mp3';
-    a.crossOrigin = 'anonymous';
+    // crossOriginは不要
     a.style.display = 'none';
+    a.setAttribute('playsinline', '');
+    a.setAttribute('webkit-playsinline', '');
+    a.playsInline = true;
     document.body.appendChild(a);
   }
+  return a;
+}
+
+let _audioUnlocked = false;
+window.addEventListener('pointerdown', async function _unlockOnce(){
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  window.removeEventListener('pointerdown', _unlockOnce);
+
+  const a = getCountdownAudio();
   try {
     a.muted = true;
+    a.currentTime = 0;
     await a.play();   // 無音で一瞬再生
     a.pause();
-    a.currentTime = 0;
     a.muted = false;
+    a.load();         // Safari対策
   } catch(_e){}
 });
+
 
 
 
@@ -1708,28 +1717,18 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
 {label:'進める', action: async ()=>{
   const nowv = state.watching?.di?.value ?? val;
   const next = clamp(nowv-1,0,6);
- 
-  let a = document.getElementById('sfxCountdown');
-  if (!a) {
-    a = document.createElement('audio');
-    a.id = 'sfxCountdown';
-    a.preload = 'auto';
-    a.src = './countdown.mp3';
-    a.crossOrigin = 'anonymous';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-  }
+
+  const a = getCountdownAudio();
   try {
-    a.currentTime = 0;
-    await a.play();   // ← タップ直後なのでブロックされにくい
-  } catch(_e) {
-    // 失敗時は従来のミニポップ解除（renderSfx 側のフォールバックが出る）
-  }
+    const now = Date.now();
+    if (!state._sfxJustPlayedAt || now - state._sfxJustPlayedAt > 500) {
+      a.currentTime = 0;
+      await a.play();
+      state._sfxJustPlayedAt = now;
+    }
+  } catch(_e){}
 
-
-
- await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
-  // ▼ 全員同期のSFXトリガー（countdown）
+  await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
     sfx: { name: 'countdown', at: Date.now(), nonce: Math.random().toString(36).slice(2) }
   });
@@ -7989,32 +7988,23 @@ deckBtn.onclick = async (ev)=>{
    }
 
 function renderSfx(v){
-  // 今回は countdown のみ処理
   const data = v?.meta?.sfx || null;
   if (!data || data.name !== 'countdown') return;
 
-  // audio エレメント確保
-  let audio = document.getElementById('sfxCountdown');
-  if (!audio){
-    audio = document.createElement('audio');
-    audio.id = 'sfxCountdown';
-    audio.preload = 'auto';
-    audio.src = './countdown.mp3';
-    audio.crossOrigin = 'anonymous';
-    audio.style.display = 'none';
-    document.body.appendChild(audio);
-  }
+  const audio = getCountdownAudio();
 
-  // 同じイベントの二重再生防止（nonce または at をキー）
   if (!state._sfxHandled) state._sfxHandled = {};
   const key = String(data.nonce || data.at || '');
   if (state._sfxHandled[key]) return;
-  state._sfxHandled = { [key]: true }; // メモリ増加防止のため都度置き換え
+  state._sfxHandled = { [key]: true };
 
-  // 再生（オート再生ブロック対策は既存仕様に倣ってミニポップで解除）
+  if (state._sfxJustPlayedAt && Date.now() - state._sfxJustPlayedAt <= 500) {
+    return;
+  }
+
   try{
     audio.currentTime = 0;
-    audio.play().catch(()=>{ 
+    audio.play().catch(()=>{
       if (!document.getElementById('sfxUnlock')){
         const div = document.createElement('div');
         div.id = 'sfxUnlock';
@@ -8029,7 +8019,6 @@ function renderSfx(v){
     });
   }catch(_e){}
 }
-
 
    function renderM19(v){
      const isM19 = ((v?.mission?.id|0) === 19);
