@@ -808,7 +808,12 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
-
+// ▼ 追加：サーバー時刻（オフセット）を取得して統一時計を作る
+let _serverOffsetMs = 0;
+onValue(ref(db, '.info/serverTimeOffset'), (snap)=>{
+  _serverOffsetMs = Number(snap.val() || 0);
+});
+const serverNow = ()=> Date.now() + _serverOffsetMs;
 /* State */
 const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
@@ -1919,7 +1924,7 @@ if (!state._sfxJustPlayedAt || now - state._sfxJustPlayedAt > 500) {
 
   await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    sfx: { name: 'countdown', at: Date.now(), nonce: Math.random().toString(36).slice(2) }
+  sfx: { name: 'countdown', at: serverNow(), nonce: Math.random().toString(36).slice(2) }
   });
 }},
       {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
@@ -8215,8 +8220,7 @@ deckBtn.onclick = async (ev)=>{
            m30_audio: {
              playing: !!playing,
              t: audio.currentTime||0,
-             at: Date.now()
-           }
+      at: serverNow()             }
          };
          await update(ref(db, `rooms/${state.roomCode}/meta`), payload);
        };
@@ -8262,7 +8266,7 @@ deckBtn.onclick = async (ev)=>{
      // ▼ ホスト以外も meta を見て追従（#19 と同仕様）
      const data = v?.meta?.m30_audio || null;
      if (data){
-       const elapsed = Math.max(0, (Date.now() - (data.at||0)) / 1000);
+  const elapsed = Math.max(0, (serverNow() - (data.at||0)) / 1000); // ←置換
        const target = Math.max(0, (data.t||0) + (data.playing ? elapsed : 0));
        if (Math.abs((audio.currentTime||0) - target) > 0.5){
          audio.currentTime = target;
@@ -8372,7 +8376,7 @@ function renderSfx(v){
            m19_audio: {
              playing: !!playing,
              t: audio.currentTime||0,
-             at: Date.now()
+      at: serverNow()  
            }
          };
          await update(ref(db, `rooms/${state.roomCode}/meta`), payload);
@@ -8419,7 +8423,7 @@ function renderSfx(v){
      
      const data = v?.meta?.m19_audio || null;
      if (data){
-       const elapsed = Math.max(0, (Date.now() - (data.at||0)) / 1000);
+const elapsed = Math.max(0, (serverNow() - (data.at||0)) / 1000); // ←置換
        const target = Math.max(0, (data.t||0) + (data.playing ? elapsed : 0));
        if (Math.abs((audio.currentTime||0) - target) > 0.5){
          audio.currentTime = target;
