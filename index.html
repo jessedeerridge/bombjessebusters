@@ -794,7 +794,7 @@ main:has(#lobby.hidden){
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getDatabase, ref, get, set, update, remove, onValue, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { getDatabase, ref, get, set, update, remove, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
 /* Firebase */
 const firebaseConfig = {
@@ -808,15 +808,9 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
-// --- 共通クロック（Firebaseサーバ基準） ---
-let _svrOffset = 0;
-onValue(ref(db, '.info/serverTimeOffset'), (snap)=>{ _svrOffset = snap.val() || 0; });
-const serverNow = ()=> Date.now() + _svrOffset;
 
 /* State */
 const state = {
-
-
   roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
   m22GaveOnce:false, // ★ #22：自分が渡した一回ガード（即時連打対策）
@@ -8100,7 +8094,6 @@ deckBtn.onclick = async (ev)=>{
     audio.setAttribute('webkit-playsinline', '');
     audio.playsInline = true;
     document.body.appendChild(audio);
-    audio.load(); // ← 初期ロードを明示（Safari等の揺らぎ低減）
   }
 
      if (state.isHost){
@@ -8136,7 +8129,7 @@ deckBtn.onclick = async (ev)=>{
            m30_audio: {
              playing: !!playing,
              t: audio.currentTime||0,
-      at: serverTimestamp()
+             at: Date.now()
            }
          };
          await update(ref(db, `rooms/${state.roomCode}/meta`), payload);
@@ -8160,18 +8153,9 @@ deckBtn.onclick = async (ev)=>{
        audio.addEventListener('timeupdate', refreshLocal);
 
        btnPlay.onclick = async ()=>{
-  const startAt = serverNow() + 1200;
-  const t = audio.currentTime || 0;
-
-  // メタへ「開始予約」を配布（nonceで多重防止）
-  await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    m30_audio: { playing:true, t, at: serverTimestamp(), startAt, nonce: (crypto.randomUUID?.() || String(Math.random())) }
-  });
-
-  // ホスト自身も同じ時刻で開始
-  const delay = Math.max(0, startAt - serverNow());
-  setTimeout(()=>{ audio.play().catch(()=>{}); }, delay);
-};
+         try{ await audio.play(); }catch(_e){}
+         await writeMeta(true);
+       };
        btnPause.onclick = async ()=>{
          try{ audio.pause(); }catch(_e){}
          await writeMeta(false);
@@ -8190,57 +8174,32 @@ deckBtn.onclick = async (ev)=>{
      }
 
      // ▼ ホスト以外も meta を見て追従（#19 と同仕様）
-// ▼ ホスト以外も meta を見て追従（startAt対応）
-const data = v?.meta?.m30_audio || null;
-if (data){
-
-  // 未来同時スタート：初回だけアームして待つ
-  if (data.startAt){
-    const delay = Math.max(0, data.startAt - serverNow());
-    if (delay > 20 && state._m30Armed !== data.nonce){
-      state._m30Armed = data.nonce;
-      audio.currentTime = Number(data.t||0);
-      setTimeout(()=>{
-        audio.play().catch(()=>{
-          if (!document.getElementById('m30Unlock')){
-            const div = document.createElement('div');
-            div.id = 'm30Unlock';
-            div.className = 'mini-pop bottom-pop';
-            div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-            div.onclick = async ()=>{ try{ await audio.play(); }catch(_e){}; div.remove(); };
-            document.getElementById('popLayer')?.appendChild(div);
-          }
-        });
-      }, delay);
-      return; // スケジュール起動待ち
-    }
-  }
-
-  // サーバ時刻ベースでターゲット算出
-  const elapsed = Math.max(0, (serverNow() - (data.at||0)) / 1000);
-  const target  = Math.max(0, (data.t||0) + (data.playing ? elapsed : 0));
-
-  // しきい値を 0.2s に（耳障りなジャンプ低減）
-  if (Math.abs((audio.currentTime||0) - target) > 0.2){
-    audio.currentTime = target;
-  }
-
-  // 再生/停止の追従
-  if (data.playing && audio.paused){
-    audio.play().catch(()=>{
-      if (!document.getElementById('m30Unlock')){
-        const div = document.createElement('div');
-        div.id = 'm30Unlock';
-        div.className = 'mini-pop bottom-pop';
-        div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-        div.onclick = async ()=>{ try{ await audio.play(); }catch(_e){}; div.remove(); };
-        document.getElementById('popLayer')?.appendChild(div);
-      }
-    });
-  }
-  if (!data.playing && !audio.paused){ audio.pause(); }
-}
-
+     const data = v?.meta?.m30_audio || null;
+     if (data){
+       const elapsed = Math.max(0, (Date.now() - (data.at||0)) / 1000);
+       const target = Math.max(0, (data.t||0) + (data.playing ? elapsed : 0));
+       if (Math.abs((audio.currentTime||0) - target) > 0.5){
+         audio.currentTime = target;
+       }
+       if (data.playing && audio.paused){
+         audio.play().catch(()=>{
+           if (!document.getElementById('m30Unlock')){
+             const div = document.createElement('div');
+             div.id = 'm30Unlock';
+             div.className = 'mini-pop bottom-pop';
+             div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
+             div.onclick = async ()=>{
+               try{ await audio.play(); }catch(_e){}
+               div.remove();
+             };
+             document.getElementById('popLayer')?.appendChild(div);
+           }
+         });
+       }
+       if (!data.playing && !audio.paused){
+        audio.pause();
+       }
+     }
    }
 
 function renderSfx(v){
@@ -8292,7 +8251,6 @@ function renderSfx(v){
        audio.crossOrigin = 'anonymous';
        audio.style.display = 'none';
        document.body.appendChild(audio);
-    audio.load(); 
      }
 
      if (state.isHost){
@@ -8328,7 +8286,7 @@ function renderSfx(v){
            m19_audio: {
              playing: !!playing,
              t: audio.currentTime||0,
-      at: serverTimestamp()
+             at: Date.now()
            }
          };
          await update(ref(db, `rooms/${state.roomCode}/meta`), payload);
@@ -8352,18 +8310,9 @@ function renderSfx(v){
        audio.addEventListener('timeupdate', refreshLocal);
 
        btnPlay.onclick = async ()=>{
-  const startAt = serverNow() + 1200;
-  const t = audio.currentTime || 0;
-
-  // メタへ「開始予約」を配布（nonceで多重防止）
-  await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    m19_audio: { playing:true, t, at: serverTimestamp(), startAt, nonce: (crypto.randomUUID?.() || String(Math.random())) }
-  });
-
-  // ホスト自身も同じ時刻で開始
-  const delay = Math.max(0, startAt - serverNow());
-  setTimeout(()=>{ audio.play().catch(()=>{}); }, delay);
-};
+         try{ await audio.play(); }catch(_e){}
+         await writeMeta(true);
+       };
        btnPause.onclick = async ()=>{
          try{ audio.pause(); }catch(_e){}
          await writeMeta(false);
@@ -8382,57 +8331,32 @@ function renderSfx(v){
      }
 
      
-// ▼ ホスト以外も meta を見て追従（startAt対応）
-const data = v?.meta?.m19_audio || null;
-if (data){
-
-  // 未来同時スタート：初回だけアームして待つ
-  if (data.startAt){
-    const delay = Math.max(0, data.startAt - serverNow());
-    if (delay > 20 && state._m19Armed !== data.nonce){
-      state._m19Armed = data.nonce;
-      audio.currentTime = Number(data.t||0);
-      setTimeout(()=>{
-        audio.play().catch(()=>{
-          if (!document.getElementById('m19Unlock')){
-            const div = document.createElement('div');
-            div.id = 'm19Unlock';
-            div.className = 'mini-pop bottom-pop';
-            div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-            div.onclick = async ()=>{ try{ await audio.play(); }catch(_e){}; div.remove(); };
-            document.getElementById('popLayer')?.appendChild(div);
-          }
-        });
-      }, delay);
-      return; // スケジュール起動待ち
-    }
-  }
-
-  // サーバ時刻ベースでターゲット算出
-  const elapsed = Math.max(0, (serverNow() - (data.at||0)) / 1000);
-  const target  = Math.max(0, (data.t||0) + (data.playing ? elapsed : 0));
-
-  // しきい値を 0.2s に（耳障りなジャンプ低減）
-  if (Math.abs((audio.currentTime||0) - target) > 0.2){
-    audio.currentTime = target;
-  }
-
-  // 再生/停止の追従
-  if (data.playing && audio.paused){
-    audio.play().catch(()=>{
-      if (!document.getElementById('m19Unlock')){
-        const div = document.createElement('div');
-        div.id = 'm19Unlock';
-        div.className = 'mini-pop bottom-pop';
-        div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-        div.onclick = async ()=>{ try{ await audio.play(); }catch(_e){}; div.remove(); };
-        document.getElementById('popLayer')?.appendChild(div);
-      }
-    });
-  }
-  if (!data.playing && !audio.paused){ audio.pause(); }
-}
-
+     const data = v?.meta?.m19_audio || null;
+     if (data){
+       const elapsed = Math.max(0, (Date.now() - (data.at||0)) / 1000);
+       const target = Math.max(0, (data.t||0) + (data.playing ? elapsed : 0));
+       if (Math.abs((audio.currentTime||0) - target) > 0.5){
+         audio.currentTime = target;
+       }
+       if (data.playing && audio.paused){
+         audio.play().catch(()=>{
+           if (!document.getElementById('m19Unlock')){
+             const div = document.createElement('div');
+             div.id = 'm19Unlock';
+             div.className = 'mini-pop bottom-pop';
+             div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
+             div.onclick = async ()=>{
+               try{ await audio.play(); }catch(_e){}
+               div.remove();
+             };
+             document.getElementById('popLayer')?.appendChild(div);
+           }
+         });
+       }
+       if (!data.playing && !audio.paused){
+         audio.pause();
+       }
+     }
    }
   
 /* ===== #15：数値カード山札（同期表示｜#39/#18に準拠） ===== */
