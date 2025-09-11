@@ -931,6 +931,22 @@ function getCompAudio(){
   return a;
 }
 
+/* ★ 追加：sptimer.mp3 用の Audio 要素を用意 */
+function getSpTimerAudio(){
+  let a = document.getElementById('sfxSpTimer');
+  if (!a) {
+    a = document.createElement('audio');
+    a.id = 'sfxSpTimer';
+    a.preload = 'auto';
+    a.src = './sptimer.mp3';
+    a.style.display = 'none';
+    a.setAttribute('playsinline', '');
+    a.setAttribute('webkit-playsinline', '');
+    a.playsInline = true;
+    document.body.appendChild(a);
+  }
+  return a;
+}
 
 let _audioUnlocked = false;
 window.addEventListener('pointerdown', async function _unlockOnce(){
@@ -956,6 +972,16 @@ window.addEventListener('pointerdown', async function _unlockOnce(){
     ac.pause();
     ac.muted = false;
     ac.load();         // Safari対策
+  } catch(_e){}
+  /* ★ 追加：sptimer.mp3 も無音で一瞬再生して解錠 */
+  const at = getSpTimerAudio();
+  try {
+    at.muted = true;
+    at.currentTime = 0;
+    await at.play();
+    at.pause();
+    at.muted = false;
+    at.load();         // Safari対策
   } catch(_e){}
 
 });
@@ -1520,10 +1546,12 @@ function listenRoom(code){
   if (state._prevMissionId !== curId) {
     window.m22_alreadyShown = false;   // ← 自動ポップを再許可
     state.m22GaveOnce = false;         // ← 念のためローカルの渡し済みもクリア
+    state._spTimerOn = false;   
     state._prevMissionId = curId;
   state._mcShownMissionId = 0;
 
   }
+    if (state._mcTimer){ try{ clearTimeout(state._mcTimer); }catch(_e){} state._mcTimer = null; } // ★ 待機タイマーを確実に解除
 
    /* ★ 追加：リセット検知（未開始＆ミッション未選択）→ 座席ポップを確実に出す */
    const isReset = v && (v.started === false) && (v.mission == null);
@@ -1941,12 +1969,38 @@ function renderMissionComplete(v){
         if (c.kind === 'normal' || c.kind === 'yellow') cards.push(c);
       });
     });
+
+    // ★ 追加：未公開（open!==true）枚数を数える
+    const unopened = cards.filter(c => c.open !== true).length;
+
+    // ★ 変更：未公開が「2枚 または 1枚」になったら sptimer を再生
+    const nearComplete = (unopened === 2 || unopened === 1);
+    if (nearComplete && !state._spTimerOn){
+      const at = getSpTimerAudio();
+      try{
+        at.loop = true;
+        at.currentTime = 0;
+        at.play().catch(()=>{});
+        state._spTimerOn = true;
+      }catch(_e){}
+    }
+
+    // ★ 変更：2枚/1枚 以外になったら停止（>2枚 もしくは 0枚＝全公開）
+    if (!nearComplete && state._spTimerOn){
+      const at = getSpTimerAudio();
+      try{ at.pause(); at.currentTime = 0; }catch(_e){}
+      state._spTimerOn = false;
+    }
+
+
+    // ここから通常の「全公開」判定へ
     if (cards.length === 0) return;
-    const allOpen = cards.every(c => c.open === true);
+    const allOpen = unopened === 0;
     if (!allOpen) return;
 
     // 同一ミッション内で一度だけ表示
     if (state._mcShownMissionId === mid) return;
+
     state._mcShownMissionId = mid;
 
     // ポップ生成（左→中央へ）
@@ -1960,17 +2014,49 @@ function renderMissionComplete(v){
     div.textContent = 'ミッション完了!!';
     div.title = 'クリックで閉じる';
     div.onclick = ()=>{ if (div.isConnected) div.remove(); };
+
+    /* ★ 2秒待ってから表示・音声開始するため準備だけしてDOMへ挿入 */
+    div.style.setProperty('--mc-scale', '1');   // 既定は1
+    div.style.animationPlayState = 'paused';    // いったん停止
+    div.style.visibility = 'hidden';            // まだ見せないがレイアウトは確保
     popLayer.appendChild(div);
 
-    // ★ 同時に完了サウンド再生
-    const comp = getCompAudio();
-    try{
-      comp.currentTime = 0;
-      comp.play().catch(()=>{});
-    }catch(_e){}
+    // 既存の待機タイマーがあればキャンセル（多重防止）
+    if (state._mcTimer){ try{ clearTimeout(state._mcTimer); }catch(_e){} }
+    state._mcTimer = setTimeout(()=>{
 
-    // 自動フェードアウト（任意）
-    setTimeout(()=>{ if (div.isConnected) div.remove(); }, 2200);
+      // 表示直前の実測でスケールを決定（1行キープ）
+      const vw = Math.min(window.innerWidth || 0, document.documentElement.clientWidth || 0);
+      const rect = div.getBoundingClientRect();
+      const max = vw * 0.92;                    // 左右に8%の余白
+      const s = rect.width > 0 ? Math.min(1, max / rect.width) : 1;
+      div.style.setProperty('--mc-scale', s.toFixed(3));
+      div.style.visibility = 'visible';
+      void div.offsetWidth;                     // reflow
+
+      // ★ comp 再生の“直前”で sptimer を停止（ほぼ同時）
+      if (state._spTimerOn){
+        const at = getSpTimerAudio();
+        try{ at.pause(); at.currentTime = 0; }catch(_e){}
+        state._spTimerOn = false;
+      }
+
+      // スライドイン開始
+      div.style.animationPlayState = 'running';
+
+      // ★ comp.mp3 再生（2秒後に開始）
+      const comp = getCompAudio();
+      try{
+        comp.currentTime = 0;
+        comp.play().catch(()=>{});
+      }catch(_e){}
+
+      // 表示開始から2.2秒後に自動フェードアウト
+      setTimeout(()=>{ if (div.isConnected) div.remove(); }, 1200);
+
+      state._mcTimer = null; // 待機タイマーは消す
+    }, 1000); // ★ 2秒待つ
+
   }catch(_e){}
 }
 
