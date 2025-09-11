@@ -2052,10 +2052,10 @@ function renderMissionComplete(v){
       }catch(_e){}
 
       // 表示開始から2.2秒後に自動フェードアウト
-      setTimeout(()=>{ if (div.isConnected) div.remove(); }, 1200);
+      setTimeout(()=>{ if (div.isConnected) div.remove(); }, 900);
 
       state._mcTimer = null; // 待機タイマーは消す
-    }, 1000); // ★ 2秒待つ
+    }, 700); // ★ 2秒待つ
 
   }catch(_e){}
 }
