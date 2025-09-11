@@ -642,13 +642,30 @@ main:has(#lobby.hidden){
 
 
 
+/* ▼ 入室後メイン画面：boomback.jpg を薄く背景に */
+main:not(:has(#lobby.hidden))::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url('./boomback.jpg') center/cover no-repeat;
+  opacity: 0.1;            /* 透明度：0=完全透明, 1=不透明。お好みで調整 */
+  z-index: 0;
+  pointer-events: none;    /* クリック操作を邪魔しない */
+}
+main:not(:has(#lobby.hidden)) > * {
+  position: relative;
+  z-index: 1;
+}
 
-
-
-
-
-
-
+/* ▼ ミッション説明 (#missionFooter) は常に白い下地で画像を遮断 */
+#missionFooter{
+  position: relative;
+  z-index: 1;      /* 背景レイヤー(::before)より前面 */
+  background: #fff;/* ← ここを none → #fff にする（完全に不透明） */
+  /* 必要なら読みやすさ向上用に：
+  box-shadow: 0 -4px 12px rgba(0,0,0,.06) inset;
+  */
+}
 
 
 
