@@ -2266,12 +2266,19 @@ if (!amSeated || seatEmpty) {
     };
   }
 }
-    if ((state.watching?.mission?.id|0) === 34 && t.playerId !== state.userId){
-  // #34：自分以外はブランク表示・操作不可
-  char.removeAttribute('style');
-  char.onclick = null;
-  char.classList.add('blank');
-}
+    if ((state.watching?.mission?.id|0) === 34) {
+      // #34：隊長が場に出す「前」だけ、他人の正体カードをブランク固定
+      const capIdx = state?.watching?.captainTable;
+      const center = Array.isArray(state?.watching?.m34_center) ? state.watching.m34_center : [];
+      const capHasPlayed = (typeof capIdx === 'number') && center.some(o => (o?.by|0) === capIdx);
+
+      if (!capHasPlayed && t.playerId !== state.userId) {
+        char.removeAttribute('style');
+        char.onclick = null;
+        char.classList.add('blank');
+      }
+    }
+
 charCol.appendChild(char);
 
 // ★ #13：初期情報トークンはキャラの「下」に小さく表示（meta.m13_header をそのまま使う）
