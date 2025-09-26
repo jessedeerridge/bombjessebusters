@@ -893,6 +893,11 @@ const btnMpBack = document.getElementById('btnMpBack');
 
 
 const miniPop = document.getElementById('miniPop');
+document.addEventListener('click', (e)=>{
+  state._lastClickX = e.clientX;
+  state._lastClickY = e.clientY;
+}, true);
+
 
 const startPop=document.getElementById('startPop');
 const selCount=document.getElementById('selCount');
@@ -1469,6 +1474,13 @@ function openMenu(x,y, entries){
     div.appendChild(b);
   });  placeInsideViewport(div, x, y);
 }
+
+function openMenuAtClick(entries){
+  const x = (state._lastClickX ?? innerWidth/2);
+  const y = (state._lastClickY ?? innerHeight/2);
+  openMenu(x, y, entries);
+}
+
 function openBottomMenu(entries){
   const div=document.createElement('div'); div.className='mini-pop bottom-pop';
   div.addEventListener('click', e=>e.stopPropagation());
@@ -2506,15 +2518,16 @@ if (showM42M2 && m42m2.selB && m42m2.selB.cardId===c.id && m42m2.selB.table===id
             await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther' });
           }else if(canPickOther){
             await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
-            openBottomMenu([
-              {label:'交換する', action: async ()=>{
-                const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
-                if(i2?.selA && i2?.selB) await doItem2Swap(i2.selA, i2.selB);
-              }},
-              {label:'やり直す', action: async ()=>{
-                await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
-              }}
-            ]);
+openMenuAtClick([
+  {label:'交換する', action: async ()=>{
+    const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
+    if(i2?.selA && i2?.selB) await doItem2Swap(i2.selA, i2.selB);
+  }},
+  {label:'やり直す', action: async ()=>{
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+  }}
+]);
+
           }
         };
       }else if(canI18Pick){
@@ -2522,10 +2535,11 @@ if (showM42M2 && m42m2.selB && m42m2.selB.cardId===c.id && m42m2.selB.table===id
         card.onclick = async (ev)=>{
           ev.stopPropagation();
           await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:{table:idx, cardId:c.id} });
-          openBottomMenu([
-            {label:'とる', action: async ()=>{ const i18=(await get(ref(db, `rooms/${state.roomCode}/meta/i18Flow`))).val(); if(i18?.sel) await doItem18Take(i18.sel); }},
-            {label:'やり直す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:null, phase:'pickOther' }); }}
-          ]);
+      openMenuAtClick([
+  {label:'とる', action: async ()=>{ const i18=(await get(ref(db, `rooms/${state.roomCode}/meta/i18Flow`))).val(); if(i18?.sel) await doItem18Take(i18.sel); }},
+  {label:'やり直す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:null, phase:'pickOther' }); }}
+]);
+
         };
       }else{
          card.onclick = async ()=>{
@@ -4102,7 +4116,7 @@ function renderM42(v){
 
           // 2枚揃った：下ポップで「交換する／やり直す」
           await update(mRef, { m42Swap:{on:true, usingBy:me, selA, selB} });
-          openBottomMenu([
+openMenuAtClick([
             {label:'交換する', action: async ()=>{
               // 昇順に並べ替えず、その場で入れ替える
               const ts = (await get(ref(db, `rooms/${state.roomCode}/tables`))).val() || [];
@@ -4184,7 +4198,7 @@ function renderM42(v){
           }
           // 2枚揃い：下ポップ
           await update(mRef, { m42M2:{on:true, usingBy:me, selA, selB} });
-          openBottomMenu([
+openMenuAtClick([
            {label:'元に戻す', action: async ()=>{
               // 2枚とも「裏」にする（open:false）
               const ts2 = (await get(ref(db, `rooms/${state.roomCode}/tables`))).val() || [];
@@ -7101,7 +7115,25 @@ b.onclick = ()=>{ window.m22_alreadyShown = false; showInfo22Panel(state.watchin
 
 
 const outsideClose=(e,t)=>{ if(!t.contains(e.target)) H(t,true); };
-function closeAllMini(e){ document.querySelectorAll('.mini-pop').forEach(pop=>{ if(!pop.contains(e.target)) pop.remove(); }); }
+function closeAllMini(e){
+  const b = document.body;
+  const inM42 =
+    b.getAttribute('data-m42m2') === 'on' ||
+    b.getAttribute('data-m42swap') === 'on';
+
+  // ▼ 追加：item2 / item18 の選択フロー中も外側クリックで閉じない
+  const meta = state.watching?.meta || {};
+  const i2   = meta.i2Flow  || null;
+  const i18  = meta.i18Flow || null;
+  const inI2  = !!(i2  && i2.usingBy === state.userId && (i2.phase === 'pickSelf' || i2.phase === 'pickOther'));
+  const inI18 = !!(i18 && i18.usingBy === state.userId && (i18.phase === 'pickOther'));
+
+  if (inM42 || inI2 || inI18) return;
+
+  document.querySelectorAll('.mini-pop').forEach(pop=>{
+    if(!pop.contains(e.target)) pop.remove();
+  });
+}
  document.addEventListener('click',(e)=>{ closeAllMini(e); outsideClose(e, menuPop); }, true);
 gear.onclick=()=> { menuPop.classList.toggle('hidden'); if(!menuPop.classList.contains('hidden')) updateMenuButtons(); };
 
