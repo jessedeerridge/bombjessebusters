@@ -663,8 +663,40 @@ main:not(:has(#lobby.hidden)) > * {
 
 
 
+/* ★ M42: -2 用 黒ポップ */
+.m42minus2-pop{
+  position: fixed;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  background: #000;
+  color: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  z-index: 2147483647;
+  min-width: 280px;
+  text-align: left;
+  pointer-events: auto;             /* ← クリック可 */
+}
+.m42minus2-pop .line12{ font-size: 12pt; line-height: 1.6; }
+.m42minus2-pop .line8 { font-size: 8pt;  line-height: 1.6; opacity:.9; }
 
 
+/* ★ M42: ⇅ 用 黒ポップ（-2 と同様の見た目） */
+.m42swap-pop{
+  position: fixed;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  background: #000;
+  color: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  z-index: 2147483647;
+  min-width: 280px;
+  text-align: left;
+  pointer-events: auto;             /* ← クリック可 */
+}
+.m42swap-pop .line12{ font-size: 12pt; line-height: 1.6; }
+.m42swap-pop .line8 { font-size: 8pt;  line-height: 1.6; opacity:.9; }
 
 
 
@@ -800,6 +832,19 @@ main:not(:has(#lobby.hidden)) > * {
     <button class="btn small ghost" id="btnSeatCancel">観戦</button>
   </div>
 </div>
+<div id="m42Minus2Pop" class="m42minus2-pop hidden">
+  <div class="line12">同じ数字のカードを2枚選ぼう。</div>
+  <div class="line12">それを元に戻すんだ。</div>
+  <div class="line8">わかったら、画面をクリックして、閉じる。</div>
+</div>
+
+<!-- ここに（-2 用の #m42Minus2Pop があるなら）その直後に追加 -->
+<div id="m42SwapPop" class="m42swap-pop hidden">
+  <div class="line12">違う数字のカードを2枚選ぼう。</div>
+  <div class="line12">それらの場所を入れ替えるんだ。</div>
+  <div class="line8">わかったら、画面をクリックして、閉じる。</div>
+</div>
+
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
@@ -907,12 +952,69 @@ const seatPop = document.getElementById('seatPop');
 const seatTabs= document.getElementById('seatTabs');
 const btnSeatCancel=document.getElementById('btnSeatCancel');
 
+
+
 /* Pop layer */
 const popLayer = document.getElementById('popLayer');
 /* global reveal */
 const globalReveal = document.getElementById('globalReveal');
 /* host tool */
 const hostTool = document.getElementById('hostTool');
+const m42Minus2Pop = document.getElementById('m42Minus2Pop');
+
+/* ★ 開く／閉じる */
+function openM42Minus2Pop(){
+  if (!m42Minus2Pop) return;
+  m42Minus2Pop.classList.remove('hidden');
+
+  const close = ()=> {
+    m42Minus2Pop.classList.add('hidden');
+    m42Minus2Pop.onclick = null;
+    // ★ 同期閉じ：誰かが閉じたら全員閉じる
+    update(ref(db, `rooms/${state.roomCode}/meta`), { m42M2Pop: null });
+  };
+  m42Minus2Pop.onclick = close;
+
+  setTimeout(()=>{
+    const onDoc = (ev)=>{
+      if (!m42Minus2Pop.contains(ev.target)) {
+        close();
+        document.removeEventListener('click', onDoc, true);
+      }
+    };
+    document.addEventListener('click', onDoc, { once:true, capture:true });
+  }, 0);
+}
+
+
+const m42SwapPop = document.getElementById('m42SwapPop');
+
+/* ★ 開く／閉じる：⇅ 用 */
+/* ★ 開く／閉じる：⇅ 用 */
+function openM42SwapPop(){
+  if (!m42SwapPop) return;
+  m42SwapPop.classList.remove('hidden');
+
+  const close = ()=> {
+    m42SwapPop.classList.add('hidden');
+    m42SwapPop.onclick = null;
+    // ★ 同期閉じ
+    update(ref(db, `rooms/${state.roomCode}/meta`), { m42SwapPop: null });
+  };
+  m42SwapPop.onclick = close;
+
+  setTimeout(()=>{
+    const onDoc = (ev)=>{
+      if (!m42SwapPop.contains(ev.target)) {
+        close();
+        document.removeEventListener('click', onDoc, true);
+      }
+    };
+    document.addEventListener('click', onDoc, { once:true, capture:true });
+  }, 0);
+}
+
+
 
 // 共有のカウントダウンAudio要素を必ず1個だけ使う
 function getCountdownAudio(){
@@ -3788,8 +3890,36 @@ async function renderM42(v){
     const btn = (txt, on)=>{ const b=document.createElement('button'); b.className='btn small'; b.textContent=txt; b.onclick=on; return b; };
 
     const toggleBox    = async ()=>{ const on = !!v?.meta?.m42_on;        await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_on: !on }); };
-    const toggleSwap   = async ()=>{ const on = !!v?.meta?.m42Swap?.on;   await update(ref(db, `rooms/${state.roomCode}/meta`), { m42Swap: on? null : { on:true, usingBy:null, selA:null, selB:null } }); };
-    const toggleMinus2 = async ()=>{ const on = !!v?.meta?.m42M2?.on;     await update(ref(db, `rooms/${state.roomCode}/meta`), { m42M2:  on? null : { on:true, usingBy:null, selA:null, selB:null } }); };
+const toggleSwap = async ()=>{
+  const on = !!v?.meta?.m42Swap?.on;
+  if (on){
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m42Swap: null,
+      m42SwapPop: null
+    });
+  }else{
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m42Swap: { on:true, usingBy:null, selA:null, selB:null },
+      m42SwapPop: { on:true, at: Date.now() }
+    });
+  }
+};
+
+const toggleMinus2 = async ()=>{
+  const on = !!v?.meta?.m42M2?.on;
+  if (on){
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m42M2: null,
+      m42M2Pop: null
+    });
+  }else{
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m42M2: { on:true, usingBy:null, selA:null, selB:null },
+      m42M2Pop: { on:true, at: Date.now() }
+    });
+  }
+};
+
 
     // ↻演出（画像を最前ポップ層に一時表示）
     const flashEx = (img)=>{
@@ -4210,6 +4340,30 @@ B.hand[B.idx] = toB;
       state._m42m2Click=null;
     }
   }
+
+// ===== 黒ポップの同期表示 =====
+{
+  const sp = !!v?.meta?.m42SwapPop?.on;
+  const mp = !!v?.meta?.m42M2Pop?.on;
+
+  // ⇅ ポップ
+  const spEl = document.getElementById('m42SwapPop');
+  if (sp) {
+    if (spEl && spEl.classList.contains('hidden')) openM42SwapPop();
+  } else {
+    if (spEl && !spEl.classList.contains('hidden')) spEl.classList.add('hidden');
+  }
+
+  // -2 ポップ
+  const mpEl = document.getElementById('m42Minus2Pop');
+  if (mp) {
+    if (mpEl && mpEl.classList.contains('hidden')) openM42Minus2Pop();
+  } else {
+    if (mpEl && !mpEl.classList.contains('hidden')) mpEl.classList.add('hidden');
+  }
+}
+
+
 }
 
 
