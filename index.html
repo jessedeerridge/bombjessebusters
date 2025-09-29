@@ -2526,9 +2526,14 @@ const showM42M2 = !!(m42m2 && m42m2.usingBy === state.userId);
 if (showM42M2 && m42m2.selA && m42m2.selA.cardId===c.id && m42m2.selA.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
 if (showM42M2 && m42m2.selB && m42m2.selB.cardId===c.id && m42m2.selB.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i18All?.sel && i18All.sel.cardId===c.id && i18All.sel.table===idx){ const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
-if(c.markUntil && now()<c.markUntil && c.markBy === state.userId){
-  const m=document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m);
+if (c.markUntil && now() < c.markUntil) {
+  const isI2orI18 = (c.markSrc === 'i2' || c.markSrc === 'i18');  // ← 1)と2)で付けたタグ
+  const canSee = isI2orI18 ? true : (c.markBy === state.userId);  // i2/18は全員、それ以外は本人のみ
+  if (canSee) {
+    const m = document.createElement('div'); m.className = 'marker'; m.textContent = '▼'; wrap.appendChild(m);
+  }
 }
+
 
       const isI2Actor = i2All && i2All.usingBy===state.userId;
       const canPickSelf  = isI2Actor && i2All?.phase==='pickSelf'  && t.playerId===state.userId;
@@ -7067,9 +7072,8 @@ async function doItem2Swap(A, B){
   const insertSortedLeft = (hand, card)=>{ const n = card.num; let pos = 0; while(pos<hand.length && hand[pos].num < n) pos++; while(pos>0 && hand[pos-1].num===n) pos--; hand.splice(pos,0,card); };
 
   const mark = now()+10000; // 10秒
-  const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark};
-  const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark};
-
+ const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2'};
+   const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2'};
   insertSortedLeft(b.hand, toB);
   insertSortedLeft(a.hand, toA);
 
@@ -7110,8 +7114,7 @@ async function doItem18Take(sel){
   const n = card.num;
   let pos = 0; while(pos<dstHand.length && dstHand[pos].num < n) pos++; while(pos>0 && dstHand[pos-1].num===n) pos--; 
   const mark = now()+10000;
-  dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark});
-
+dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark, markSrc:'i18'});
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(dstHand); realpha(srcHand);
 
