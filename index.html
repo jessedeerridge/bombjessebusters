@@ -159,7 +159,7 @@
   }
   /* ▼ M61: 制約カードの下に置く極小キャラ */
   .m61-mini{
-    width:16px; height:20px;            /* とても小さく */
+    width:24px; height:30px;            /* とても小さく */
     border:1px solid #ddd; border-radius:4px;
     background:#f3f4f6 center/cover no-repeat;
     margin:2px auto 0; user-select:none; cursor:pointer;
@@ -3506,6 +3506,13 @@ if (big){
 
     // 「大キャラの直下」にミニを追加
     charCol.appendChild(mini);
+    {
+      const rBox  = tbEl.getBoundingClientRect();
+      const rMini = mini.getBoundingClientRect();
+      // 既定 96px 以上で、下端 + 余白6px まで確保
+      const needPx = Math.max(96, Math.ceil(rMini.bottom - rBox.top + 6));
+      applyTableHeight(tbEl, needPx);
+    }
   });
 }
 
@@ -5484,6 +5491,16 @@ function renderM61(v){
     // 旧 .char-col を物理削除して詰める
     content.insertBefore(stack, charCol);
     charCol.remove();
+
+
+  {
+      const rBox   = tbEl.getBoundingClientRect();
+      const rStack = stack.getBoundingClientRect();
+      // 既定 96px 以上で、下端 + 余白6px まで確保
+      const needPx = Math.max(96, Math.ceil(rStack.bottom - rBox.top + 6));
+      applyTableHeight(tbEl, needPx);
+    }
+
     // 自分のテーブルだけ「拡大→交換」可能
     if (ti === myIdx){
       con.style.cursor = 'pointer';
