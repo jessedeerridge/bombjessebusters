@@ -699,6 +699,11 @@ main:not(:has(#lobby.hidden)) > * {
 .m42swap-pop .line8 { font-size: 8pt;  line-height: 1.6; opacity:.9; }
 
 
+.range-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
 
 
 
@@ -1559,17 +1564,23 @@ function openMenu(x,y, entries){
   entries.forEach(ent=>{
     const b=document.createElement('button');
     b.className='btn small';
-    b.textContent = ent.label;
-    if (ent && typeof ent.action === 'function') {
-  b.onclick = ()=>{ if(div.isConnected) div.remove(); try{ ent.action(); }catch(_e){} };
+    if (ent && ent.html){ 
+      b.innerHTML = ent.html;                // ★ 追加：HTMLで見た目を差し替え
+      if (ent.ariaLabel) b.setAttribute('aria-label', ent.ariaLabel);
     } else {
-      // 非クリック（表示のみ）
+      b.textContent = (ent?.label ?? '');
+    }
+    if (ent && typeof ent.action === 'function') {
+      b.onclick = ()=>{ if(div.isConnected) div.remove(); try{ ent.action(); }catch(_e){} };
+    } else {
       b.disabled = true;
-      b.classList.add('ghost'); // 見た目を少し薄く
+      b.classList.add('ghost');
     }
     div.appendChild(b);
-  });  placeInsideViewport(div, x, y);
+  });
+  placeInsideViewport(div, x, y);
 }
+
 
 function openMenuAtClick(entries){
   const x = (state._lastClickX ?? innerWidth/2);
@@ -2439,32 +2450,35 @@ if (Array.isArray(t.m22Tokens) && t.m22Tokens.length > 0) {
   charCol.appendChild(row);
 }
   // ★ #50：情報トークンはアルファベット直下ではなく「キャラカードの下」に集約表示（4列で折返し）
-  if ((v.mission?.id|0) === 50) {
-    const nums = [];
-    (t.hand||[]).forEach(c=>{
-      (c.tokens||[]).forEach(tk=>{
-        if (tk?.type === 'num') nums.push( (parseInt(tk.value,10) || tk.value) );
-      });
+  // ★ #50：情報トークンはアルファベット直下ではなく「キャラカードの下」に集約表示（4列で折返し）
+if ((v.mission?.id|0) === 50) {
+  const nums = [];
+  (t.hand||[]).forEach(c=>{
+    if (c.open === true) return; // #50 公開分はカード下へ移動するため、ここでは集計しない
+    (c.tokens||[]).forEach(tk=>{
+      if (tk?.type === 'num') nums.push( (parseInt(tk.value,10) || tk.value) );
     });
-    if (nums.length > 0) {
-      const row = document.createElement('div');
-      row.className = 'm50-under';
-      nums.forEach(nn=>{
-        const d = document.createElement('div');
-        d.className = 'token black';
-        d.textContent = String(nn);
-        d.style.cursor = 'default';
-        row.appendChild(d);
-      });
-      charCol.appendChild(row);
+  });
+  if (nums.length > 0) {
+    const row = document.createElement('div');
+    row.className = 'm50-under';
+    nums.forEach(nn=>{
+      const d = document.createElement('div');
+      d.className = 'token black';
+      d.textContent = String(nn);
+      d.style.cursor = 'default';
+      row.appendChild(d);
+    });
+    charCol.appendChild(row);
 
-      // 高さ調整：4列折返しに合わせて必要分だけテーブルを拡張
-      const BASE=96, PERROW=3;
-      const rows = Math.ceil(nums.length / PERROW);
-      const extra = rows>0 ? (4 + rows*20 + Math.max(0, rows-1)*2) : 0; // 20px(トークン) + 行間
-      applyTableHeight(box, Math.max(BASE, BASE + extra));  // ← 既存ユーティリティ
-    }
+    // 高さ調整：4列折返しに合わせて必要分だけテーブルを拡張
+    const BASE=96, PERROW=3;
+    const rows = Math.ceil(nums.length / PERROW);
+    const extra = rows>0 ? (4 + rows*20 + Math.max(0, rows-1)*2) : 0; // 20px(トークン) + 行間
+    applyTableHeight(box, Math.max(BASE, BASE + extra));  // ← 既存ユーティリティ
   }
+}
+
 
     
 content.appendChild(charCol);
@@ -2616,35 +2630,38 @@ openMenuAtClick([
       bot.style.backgroundImage=`url("./${img}")`; if(card.classList.contains('back')) bot.style.display='none';
       card.appendChild(bot);
 
-      const badge=document.createElement('div'); badge.className='badge-fixed';
-      const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
+const badge=document.createElement('div'); badge.className='badge-fixed';
+const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
 
-      const col=document.createElement('div'); col.className='tok-col';
-      const isM50 = ((state.watching?.mission?.id|0) === 50);
-      if (!isM50) {
-        (c.tokens||[]).forEach(tk=>{
-          const el = document.createElement('div');
-          el.className = 'token ' + (tk.style || '');
-          col.appendChild(el);
+const col=document.createElement('div'); col.className='tok-col';
+const isM50 = ((state.watching?.mission?.id|0) === 50);
+/* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
+if (!isM50 || (isM50 && c.open === true)) {
+  (c.tokens||[]).forEach(tk=>{
+    if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
+    const el = document.createElement('div');
+    el.className = 'token ' + (tk.style || '');
+    col.appendChild(el);
 
-          const tokenText = (t)=>{
-    switch(t.type){
-      case 'equal':  return '＝';   // = トークン
-      case 'noteq':  return '≠';   // ≠ トークン
-      case 'x1':     return 'x1';  // x1
-      case 'x2':     return 'x2';  // x2（ミッション専用）
-      case 'x3':     return 'x3';  // x3（ミッション専用）
-      case 'yellow': return '▧';   // 黄コードトークン（▧）
-      case 'even':   return '2/4'; // 偶数
-      case 'odd':    return '1/3'; // 奇数
-      case 'xmark':  return '✕';   // ミッション#20の黄色✕用
-      case 'num':    return String(t.value); // 数字
-      default:       return String(t.value ?? '');
-    }
-          };
-          el.textContent = tokenText(tk);
-        });
+    const tokenText = (t)=>{
+      switch(t.type){
+        case 'equal':  return '＝';
+        case 'noteq':  return '≠';
+        case 'x1':     return 'x1';
+        case 'x2':     return 'x2';
+        case 'x3':     return 'x3';
+        case 'yellow': return '▧';
+        case 'even':   return '2/4';
+        case 'odd':    return '1/3';
+        case 'xmark':  return '✕';
+        case 'num':    return String(t.value);
+        default:       return String(t.value ?? '');
       }
+    };
+    el.textContent = tokenText(tk);
+  });
+}
+
 
 
       if(!(i2All && i2All.usingBy===state.userId) && !(i18All && i18All.usingBy===state.userId) && isMine){
@@ -5919,19 +5936,44 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
   }
 
   // ④ リザーブクリック → 「補給」ポップ（1枚獲得）
-  poolRow.onclick = (ev)=>{
-    if ((v?.meta?.m54_pool|0) <= 0) return;
-    openOneMini(ev.clientX, ev.clientY, '補給', async ()=>{
-      const idx = (state?.seatedTable==null)? null : Number(state.seatedTable);
-      if (idx==null) return;
-      const mine = (v?.meta?.m54_byTable?.[idx]|0) + 1;
-      const left = (v?.meta?.m54_pool|0) - 1;
-      await update(ref(db, `rooms/${state.roomCode}/meta`), {
-        m54_pool: left,
-        [`m54_byTable/${idx}`]: mine
-      });
-    });
-  };
+// ④ リザーブクリック → OX表示の 1/2/3 ボタン（実行値は 1/2/3）
+poolRow.onclick = (ev)=>{
+  const poolCnt = Math.max(0, v?.meta?.m54_pool|0);
+  if (poolCnt <= 0) return;
+
+  const idx = (state?.seatedTable==null)? null : Number(state.seatedTable);
+  if (idx==null){ alert('席に座ってから取得してください'); return; }
+
+  const x = ev.clientX, y = ev.clientY;
+  const oxHtml = (n)=> `<span style="display:flex;gap:2px">${'<div class="token ox"></div>'.repeat(n)}</span>`;
+
+const rangeLabel = {1:"1~4", 2:"5~8", 3:"9~12"};
+
+const entries = [1,2,3]
+  .filter(k => poolCnt >= k)
+  .map(k => ({
+    label: '',
+    // ★範囲ラベルを上、OXを下に並べる
+    html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+             <div class="range-label">${rangeLabel[k]}</div>
+             <div style="display:flex;gap:2px">
+               ${'<div class="token ox"></div>'.repeat(k)}
+             </div>
+           </div>`,
+    ariaLabel: rangeLabel[k],      action: async ()=>{
+        const mine = (v?.meta?.m54_byTable?.[idx]|0) + k;
+        const left = (v?.meta?.m54_pool|0) - k;
+        if (left < 0) return;
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          m54_pool: left,
+          [`m54_byTable/${idx}`]: mine
+        });
+      }
+    }));
+
+  openMenu(x, y, entries);
+};
+
 
   // --- 2) 各テーブル下に自分の酸素トークン表示（#44と同じ場所） ---
   const tableNodes = document.querySelectorAll('.table'); // renderTables と同順
@@ -6200,23 +6242,39 @@ function renderM44(v){
   }
 
   // クリックで 1/2/3 取得（隊長は「集める」も表示）
-  poolRow.onclick = (ev)=>{
-    const poolCnt = Math.max(0, v.meta?.oxItem|0);  // ← プール残量
-    const entries = [1,2,3]
-      .filter(k => poolCnt >= k)                    // ← 足りる数だけ表示
-     .map(k => ({
-        label: String(k),
-        action: async ()=>{
-         const left = (v.meta?.oxItem|0) - k;
-         if (idx==null){ alert('席に座ってから取得してください'); return; }
-         const mine = (v.meta?.oxByTable?.[idx]||0) + k;         
-          if (left < 0) return;
-          await update(ref(db, `rooms/${state.roomCode}/meta`), {
-            oxItem: left,
-            [`oxByTable/${idx}`]: mine
-          });
-        }
-      }));
+// クリックで 1/2/3 取得（隊長は「集める」も表示）
+poolRow.onclick = (ev)=>{
+  const poolCnt = Math.max(0, v.meta?.oxItem|0);  // ← プール残量
+
+  // ★ OXトークンHTML（n個分）を生成
+  const oxHtml = (n)=> `<span style="display:flex;gap:2px">${'<div class="token ox"></div>'.repeat(n)}</span>`;
+
+const rangeLabel = {1:"1~4", 2:"5~8", 3:"9~12"};
+
+const entries = [1,2,3]
+  .filter(k => poolCnt >= k)
+  .map(k => ({
+    label: '',
+    // ★範囲ラベルを上、OXを下に並べる
+    html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+             <div class="range-label">${rangeLabel[k]}</div>
+             <div style="display:flex;gap:2px">
+               ${'<div class="token ox"></div>'.repeat(k)}
+             </div>
+           </div>`,
+    ariaLabel: rangeLabel[k],      action: async ()=>{
+        const left = (v.meta?.oxItem|0) - k;
+        if (idx==null){ alert('席に座ってから取得してください'); return; }
+        const mine = (v.meta?.oxByTable?.[idx]||0) + k;
+        if (left < 0) return;
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          oxItem: left,
+          [`oxByTable/${idx}`]: mine
+        });
+      }
+    }));
+
+  // （この後の 隊長だけ「集める」entries.push はそのまま残す）
 
     // ★隊長だけ：全員の酸素トークンを集めてリザーブ（oxItem）へ戻す
     if ((v.captainTable|0) === (state.seatedTable|0)) {
