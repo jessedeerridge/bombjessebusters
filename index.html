@@ -78,7 +78,7 @@
 
   /* ★ 数値カードの「重ね」用ホルダー＆オーバーレイ */
   .numcard-holder { position:relative; width:32px; height:48px; flex:0 0 auto; }
-  .numcard.overlay { position:absolute; left:2px; top:2px; opacity:0.9; }
+  .numcard.overlay { position:absolute; left:2px; top:2px; opacity:1; }
   .numcard.overlay:nth-child(3){ left:4px; top:4px; opacity:0.85; }
   .numcard.overlay:nth-child(4){ left:6px; top:6px; opacity:0.8; }
  .conlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
@@ -1612,10 +1612,19 @@ async function enter(mode){
   if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
   else{ state.isHost = snap.val()?.hostId === state.userId; }
 
-  await set(ref(db, `rooms/${code}/players/${state.userId}`), {name:state.userName, at:Date.now()});
-  onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).remove();
+  await set(ref(db, `rooms/${code}/players/${state.userId}`), {
+    name: state.userName,
+    at: Date.now(),
+    online: true,
+    lastSeen: Date.now()
+  });
+  onDisconnect(ref(db, `rooms/${code}/players/${state.userId}`)).update({
+    online: false,
+    lastSeen: Date.now()
+  });
   listenRoom(code);
-
+  // ★ 自動離席の遅延クリア役（Janitor）を起動
+  startSeatJanitor(db, code);
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
 }
 
@@ -1752,6 +1761,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM15(v);
     renderM16(v);
     renderM19(v);
+    renderM29(v);
     renderM30(v);
 renderM31(v);
    renderM30Audio(v);
@@ -3074,7 +3084,8 @@ c.onclick = (ev)=>{
       action: async ()=>{
         try{
           // DBから再取得して安全に更新
-          const tRef = ref(db, `rooms/${state.roomCode}/tables/${myIdx}`);
+          const tRef = ref(db,
+ `rooms/${state.roomCode}/tables/${myIdx}`);
           const mRef = ref(db, `rooms/${state.roomCode}`);
           const [tSnap, rSnap] = await Promise.all([get(tRef), get(mRef)]);
           const T = tSnap.val()||{};
@@ -3147,100 +3158,200 @@ c.onclick = (ev)=>{
 
   const center = Array.isArray(v.m29_center) ? v.m29_center : [];
   // ★追加：公開中“コード”の数字別公開枚数を集計（kind:'normal' かつ open:true）
-  const openCountByNum = {};
-  (v.tables||[]).forEach(T=>{
-    (T.hand||[]).forEach(c=>{
-      if (c?.kind === 'normal' && c.open === true){
-        const num = c.num|0;
-        openCountByNum[num] = (openCountByNum[num]||0) + 1;
-      }
-    });
+const openCountByNum = {};
+(v.tables||[]).forEach(T=>{
+  (T.hand||[]).forEach(c=>{
+    if (c?.kind === 'normal' && c.open === true){
+      const num = c.num|0;
+      openCountByNum[num] = (openCountByNum[num]||0) + 1;
+    }
   });
-  if (center.length>0){
-    const row = document.createElement('div');
-    row.id = 'm29CenterRow';
-    row.className = 'numlane';
-    row.style.justifyContent = 'center';
-    // 各センター札
-    center.forEach((obj, idx)=>{
-      const cell = document.createElement('div');
-      cell.className = 'numcard';
-      cell.style.display = 'grid'; cell.style.placeItems = 'center'; cell.style.fontWeight = 'bold';
-         /* ここから追加：数値カードは表＝数字画像／裏＝背面画像 */
-     if (obj.faceUp) {
-       cell.style.backgroundImage = `url('${imgNumber(obj.n)}')`;
-       cell.style.backgroundSize = 'cover';
-       cell.style.backgroundPosition = 'center';
-     } else {
-       cell.style.backgroundImage = "url('./numbercardback.jpg')";
-       cell.style.backgroundSize = 'cover';
-       cell.style.backgroundPosition = 'center';
-     }
+});
+
+if (state.isHost) ensureM29AutoDrop(v);
+if (center.length > 0) {
+  const row = document.createElement('div');
+  row.id = 'm29CenterRow';
+  row.className = 'numlane';
+row.style.justifyContent = 'flex-start'; // スクロール前提で左寄せ
+row.style.scrollBehavior = 'smooth';
+  // 「重ね対象」と「通常表示」に振り分け
+  const stackTargets = [];
+  const others = [];
+  center.forEach((obj, idx) => {
+    const isStack = (obj?.faceUp === true) && ((openCountByNum[obj.n] | 0) >= 4);
+    (isStack ? stackTargets : others).push({ obj, idx });
+  });
+
+  // ▼ 重ね対象があれば、1箇所に“山”として重ねて表示
+// ▼ 重ね対象があれば、1箇所に“山”として重ねて表示
+if (stackTargets.length > 0) {
+  const holder = document.createElement('div');
+  holder.className = 'numcard-holder';
+
+  // 1枚目は基準、以降は「左に +2px ずらす」＝横方向のみで重ねる
+  const baseW = 32;  // .numcard の幅に合わせる
+  const step  = 2;   // 1枚重なるごとのオフセット(px)
+
+  // ★追加：内容幅に合わせてホルダー自体の幅を拡げる（= はみ出し→スクロール可能に）
+  const totalW = baseW + step * Math.max(0, stackTargets.length - 1);
+  holder.style.width = `${totalW}px`;
+
+  stackTargets.forEach(({ obj, idx }, k) => {
+    const cell = document.createElement('div');
+    cell.className = (k === 0) ? 'numcard' : 'numcard overlay';
+    cell.style.display = 'grid';
+    cell.style.placeItems = 'center';
+    cell.style.fontWeight = 'bold';
+
+    // 数値画像（faceUp前提）
+    cell.style.backgroundImage = `url('${imgNumber(obj.n)}')`;
+    cell.style.backgroundSize = 'cover';
+    cell.style.backgroundPosition = 'center';
+
+    // ▼ 段差（k=0は基準、以降は 2px 刻みで「横へ」ずらす）
+    if (k > 0) {
+      const off = step * k;
+      cell.style.position = 'absolute';
+      cell.style.left     = `${off}px`;
+cell.style.top      = `${off}px`; 
+      cell.style.opacity  = `${Math.max(0.6, 1 - 0.05 * k)}`;
+      cell.style.zIndex   = String(100 + k);
+    }
+
+    // ▼ クリック処理は元のロジックをそのまま適用
+    const willDiscardOnly = false; // （M29は捨て無効）
+    cell.title = obj.faceUp ? '出したプレイヤーの次のテーブルへ移す' : 'めくる';    cell.onclick = async (ev) => { try {
+      const rRef  = ref(db, `rooms/${state.roomCode}`);
+      const rSnap = await get(rRef);
+      const R     = rSnap.val() || {};
+      const cur   = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
+
+      if (idx < 0 || idx >= cur.length) return;
+      const curObj = cur[idx];
+      if (!curObj) return;
+
+      if (!curObj.faceUp) {
+        // 表にする
+        cur[idx] = { ...curObj, faceUp: true };
+        await update(rRef, { m29_center: cur });
+        if (state.isHost) {
+          const rSnap2 = await get(rRef);
+          ensureM29AutoDrop(rSnap2.val() || {});
+        }
+      } else {
+        // 4枚公開済なら渡せない
+        const already4 = ((openCountByNum[curObj.n] | 0) >= 4);
+        if (((state?.watching?.mission?.id | 0) === 29) && already4) {
+          openOneMini(ev.clientX, ev.clientY, '渡せません（この数字は4枚公開済）');
+          return;
+        }
+        // 次テーブルへ
+        const toIdx = ((curObj.by | 0) + 1) % (v.tableCount | 0);
+        const tRef  = ref(db, `rooms/${state.roomCode}/tables/${toIdx}`);
+        const tSnap = await get(tRef);
+        const T2    = tSnap.val() || {};
+        const hand  = Array.isArray(T2.m29Hand) ? T2.m29Hand.slice() : [];
+        hand.push(curObj.n);
+        cur.splice(idx, 1);
+        await Promise.all([
+          update(tRef, { m29Hand: hand }),
+          update(rRef, { m29_center: cur }),
+        ]);
+      }
+    } catch(e){ console.error(e); } };
+
+    holder.appendChild(cell);
+  });
+
+ // ▼ holderの“見かけの幅/高さ”を、重ね枚数に応じて拡張（M18準拠）
+const extra = step * Math.max(0, stackTargets.length - 1);
+holder.style.width  = `${baseW + extra}px`;
+holder.style.height = `${48 + extra}px`;   // M18同様：縦方向の重なり分だけ器を伸ばす
+row.style.marginBottom = `${extra}px`;     // 次の行と干渉しないよう余白を追加
 
 
-      
-      // ★変更：公開4枚成立時は「捨てる」表示
-      const willDiscardOnly = obj.faceUp && ((openCountByNum[obj.n|0]||0) === 4);
-      cell.title = obj.faceUp ? (willDiscardOnly ? '捨てる' : '出したプレイヤーの次のテーブルへ移す') : 'めくる';
-      cell.onclick = async (ev)=>{        try{
-          const rRef = ref(db, `rooms/${state.roomCode}`);
-          const rSnap = await get(rRef);
-          const R = rSnap.val()||{};
-          const cur = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
-          // インデックス安全化
-          if (idx<0 || idx>=cur.length) return;
-          const curObj = cur[idx];
-          if (!curObj) return;
+  // 重ね山は行の左側に配置
+row.insertBefore(holder, row.firstChild);
 
-          if (!curObj.faceUp){
-            // 表にする
-            cur[idx] = { ...curObj, faceUp:true };
-            await update(rRef, { m29_center: cur });
-        } else {
-            // ★変更：公開4枚成立時は送らず「捨てる」ポップ
-            const opened4 = (()=>{
-              const map = {};
-              (R.tables||[]).forEach(T=>{
-                (T.hand||[]).forEach(c=>{
-                  if (c?.kind==='normal' && c.open===true){
-                    const num = c.num|0;
-                    map[num] = (map[num]||0) + 1;
-                  }
-                });
-              });
-             return (map[(curObj.n|0)]||0) === 4;
-            })();
-           if (opened4){
-              openOneMini(ev.clientX, ev.clientY, '捨てる', async ()=>{
-                const nowSnap = await get(rRef);
-                const RR = nowSnap.val()||{};
-                const arr = Array.isArray(RR.m29_center) ? RR.m29_center.slice() : [];
-               if (idx<0 || idx>=arr.length) return;
-                arr.splice(idx,1);
-               await update(rRef, { m29_center: arr });
-              });
-           } else {
-              // 通常：出したプレイヤーの“次のテーブル”へ移す
-              const toIdx = ((curObj.by|0) + 1) % (v.tableCount|0);
-              const tRef = ref(db, `rooms/${state.roomCode}/tables/${toIdx}`);
-              const tSnap = await get(tRef);
-              const T2 = tSnap.val()||{};
-              const hand = Array.isArray(T2.m29Hand) ? T2.m29Hand.slice() : [];
-              hand.push(curObj.n);
-              cur.splice(idx,1);
-              await Promise.all([
-                update(tRef, { m29Hand: hand }),
-                update(rRef,  { m29_center: cur })
-             ]);
-            }      
-          }
-        }catch(e){ console.error(e); }
-      };
-      row.appendChild(cell);
-    });
+// 追加：重なりが増えたら右端まで自動スライド
+requestAnimationFrame(() => {
+  row.scrollLeft = row.scrollWidth;
+});
 
-    bar.insertAdjacentElement('afterend', row);
-  }
+  // ▼ 追加：重なりが増えたら、行の右端まで自動スライド（横スクロール）
+  requestAnimationFrame(() => {
+    row.scrollLeft = row.scrollWidth;
+  });
+}
+  // ▼ 重ね対象以外は従来どおり“横並び”で表示
+  others.forEach(({ obj, idx }) => {
+    const cell = document.createElement('div');
+    cell.className = 'numcard';
+    cell.style.display = 'grid';
+    cell.style.placeItems = 'center';
+    cell.style.fontWeight = 'bold';
+
+    if (obj.faceUp) {
+      cell.style.backgroundImage = `url('${imgNumber(obj.n)}')`;
+      cell.style.backgroundSize = 'cover';
+      cell.style.backgroundPosition = 'center';
+    } else {
+      cell.style.backgroundImage = "url('./numbercardback.jpg')";
+      cell.style.backgroundSize = 'cover';
+      cell.style.backgroundPosition = 'center';
+    }
+
+    const willDiscardOnly = false; // （M29は捨て無効）
+    cell.title = obj.faceUp ? '出したプレイヤーの次のテーブルへ移す' : 'めくる';
+    cell.onclick = async (ev) => { try {
+      const rRef  = ref(db, `rooms/${state.roomCode}`);
+      const rSnap = await get(rRef);
+      const R     = rSnap.val() || {};
+      const cur   = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
+
+      if (idx < 0 || idx >= cur.length) return;
+      const curObj = cur[idx];
+      if (!curObj) return;
+
+      if (!curObj.faceUp) {
+        cur[idx] = { ...curObj, faceUp: true };
+        await update(rRef, { m29_center: cur });
+        if (state.isHost) {
+          const rSnap2 = await get(rRef);
+          ensureM29AutoDrop(rSnap2.val() || {});
+        }
+      } else {
+        const already4 = ((openCountByNum[curObj.n] | 0) >= 4);
+        if (((state?.watching?.mission?.id | 0) === 29) && already4) {
+          openOneMini(ev.clientX, ev.clientY, '');
+          return;
+        }
+        const toIdx = ((curObj.by | 0) + 1) % (v.tableCount | 0);
+        const tRef  = ref(db, `rooms/${state.roomCode}/tables/${toIdx}`);
+        const tSnap = await get(tRef);
+        const T2    = tSnap.val() || {};
+        const hand  = Array.isArray(T2.m29Hand) ? T2.m29Hand.slice() : [];
+        hand.push(curObj.n);
+        cur.splice(idx, 1);
+        await Promise.all([
+          update(tRef, { m29Hand: hand }),
+          update(rRef, { m29_center: cur }),
+        ]);
+      }
+    } catch(e){ console.error(e); } };
+
+    row.appendChild(cell);
+  });
+
+bar.insertAdjacentElement('afterend', row);
+// ★追加：重なり枚数に応じて自動スライド（右端へ）
+requestAnimationFrame(()=>{
+  try{
+    row.scrollTo({ left: row.scrollWidth, behavior: 'smooth' });
+  }catch(_){}
+});
+}
 }
 
 function renderM26(v){
@@ -5396,7 +5507,15 @@ function renderM65(v){
     }
     nc.title = `#${n}`;
 
-    nc.onclick = async (ev)=>{
+nc.onclick = async (ev)=>{
+
+  /*** 追加：#29 で 4枚公開済みの数値は「渡せない」 ***/
+  const isM29Now = ((state?.watching?.mission?.id|0) === 29);
+  if (isM29Now && (openCountByNum[n]|0) >= 4){
+    openOneMini(ev.clientX, ev.clientY, '');
+    return;
+  }
+
       openMenu(ev.clientX, ev.clientY, [
         { label:`${nextName} に ${n} を渡す`, action: async ()=>{
           try{
@@ -7048,6 +7167,95 @@ if (shown === 0) cell.classList.add('disabled');
   document.body.appendChild(div);
 }
 
+// ★★★ ここから追加：#29 自動出しヘルパー ★★★
+async function ensureM29AutoDrop(roomVal){
+  try{
+    if ((roomVal?.mission?.id|0) !== 29) return;
+    // すでに処理済みの数字をメタに記録して二重実行を防止
+    const doneMap = (roomVal.meta && roomVal.meta.m29_autoDone) ? { ...roomVal.meta.m29_autoDone } : {};
+
+    // 現在公開中コードの「数字別 open:true 枚数」を集計
+    const openMap = {};
+    (roomVal.tables||[]).forEach(T=>{
+      (T.hand||[]).forEach(c=>{
+        if (c?.kind==='normal' && c.open===true){
+          const n = c.num|0;
+          openMap[n] = (openMap[n]||0) + 1;
+        }
+      });
+    });
+
+    // センター/デッキの現状
+    let center = Array.isArray(roomVal.m29_center) ? roomVal.m29_center.slice() : [];
+    let deck   = Array.isArray(roomVal.m29_deck)   ? roomVal.m29_deck.slice()   : [];
+
+    // 1..12 を走査し、「公開4枚」かつ「未処理」の数字を自動で場に出す
+    for (let n=1; n<=12; n++){
+      if ((openMap[n]||0) !== 4) continue;
+      if (doneMap[n]) continue;
+
+      // まず各テーブルの m29Hand から該当 n を探す
+      let placed = false;
+      let ownerIdx = -1;
+
+      for (let i=0; i<(roomVal.tables||[]).length; i++){
+        const tPath = `rooms/${state.roomCode}/tables/${i}`;
+        const tSnap = await get(ref(db, tPath));
+        const T = tSnap.val() || {};
+        const curHand = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
+        const pos = curHand.indexOf(n);
+        if (pos >= 0){
+          curHand.splice(pos, 1);
+
+          // ② 手札が1枚以下なら、山札から1枚 自動ドロー（あれば）
+          //    ※ deck は ensureM29AutoDrop 内で保持 → 最後にまとめて DB 反映
+         if (curHand.length <= 1 && deck.length > 0) {
+            const d = deck.shift();    // 先頭から1枚
+            curHand.push(d);
+          }
+
+          // ③ 手札だけ先に書き戻す（センター/デッキは関数末尾で一括反映）
+          await update(ref(db, tPath), { m29Hand: curHand });
+          ownerIdx = i;
+          placed = true;
+          break;
+        }
+      }
+
+      // 手札に無ければ m29_deck（残り山）から拾う
+      if (!placed){
+        const p = deck.indexOf(n);
+        if (p >= 0){
+          deck.splice(p,1);
+          placed = true;
+          ownerIdx = -1; // デッキ由来
+        }
+      }
+
+      // 見つかったらセンターへ「表で」出す
+      if (placed){
+        center.push({ n, by: ownerIdx, faceUp: true });
+        doneMap[n] = true;
+      }
+    }
+
+    // まとめてDBへ反映
+    const updates = { };
+    updates['rooms/'+state.roomCode+'/m29_center'] = center;
+    updates['rooms/'+state.roomCode+'/meta'] = {
+      ...(roomVal.meta||{}),
+      m29_autoDone: doneMap
+    };
+    updates['rooms/'+state.roomCode+'/m29_deck'] = deck;
+    await update(ref(db), updates);
+  }catch(e){
+    console.error('ensureM29AutoDrop failed', e);
+  }
+}
+// ★★★ ここまで追加 ★★★
+
+
+
 function refreshInfo22(vNow){
   const panel = document.getElementById('info22');
   if (!panel) return;
@@ -7332,16 +7540,60 @@ async function setupAutoLeaveOnDisconnect(tableIdx){
   }catch(_e){}
 
   await onDisconnect(ref(db, `rooms/${room}/tables/${tableIdx}`))
-    .update({ playerId:null, playerName:null });
-
-  const hand = state.watching?.tables?.[tableIdx]?.hand || [];
-  await Promise.all(hand.map((_,i)=>
-    onDisconnect(ref(db, `rooms/${room}/tables/${tableIdx}/hand/${i}`))
-      .update({ ownerId:null })
-  ));
+    .update({ leaveRequested: serverNow(), leaveUid: state.userId });
 }
 
 
+/* ★ 自動離席の遅延クリア役（Janitor）：一定時間オフラインなら本当に空席化 */
+function startSeatJanitor(db, roomId){
+  const GRACE_MS = 15000; // 一時切断ゆるし時間（15秒）
+  const timer = setInterval(async ()=>{
+    try{
+      const tablesSnap = await get(ref(db, `rooms/${roomId}/tables`));
+      const tables = tablesSnap.val() || [];
+      const now = serverNow();
+      const updates = {};
+
+      for(let i=0; i<tables.length; i++){
+        const t = tables[i];
+        if(!t || !t.leaveRequested || !t.leaveUid) continue;
+
+        const uid = t.leaveUid;
+        const pSnap = await get(ref(db, `rooms/${roomId}/players/${uid}`));
+        const p = pSnap.val();
+        const isOnline = !!(p && p.online);
+
+        const ts = (typeof t.leaveRequested === 'number')
+          ? t.leaveRequested
+          : (t.leaveRequested?.toMillis?.() ?? 0);
+        const expired = now - ts > GRACE_MS;
+
+        if (isOnline){
+          // もう戻っている → 予約フラグだけ掃除
+          updates[`rooms/${roomId}/tables/${i}/leaveRequested`] = null;
+          updates[`rooms/${roomId}/tables/${i}/leaveUid`] = null;
+        } else if (expired && t.playerId === uid){
+          // 本当にいない → 席と手札の所有をクリア
+          updates[`rooms/${roomId}/tables/${i}/playerId`] = null;
+          updates[`rooms/${roomId}/tables/${i}/playerName`] = null;
+          updates[`rooms/${roomId}/tables/${i}/leaveRequested`] = null;
+          updates[`rooms/${roomId}/tables/${i}/leaveUid`] = null;
+          const hand = Array.isArray(t.hand) ? t.hand : [];
+          hand.forEach((_,hIdx)=>{
+            updates[`rooms/${roomId}/tables/${i}/hand/${hIdx}/ownerId`] = null;
+          });
+        }
+      }
+
+      if(Object.keys(updates).length){
+        await update(ref(db), updates);
+      }
+    }catch(_e){}
+  }, 2000);
+
+  // 必要なら停止用に返す（今回は未使用でもOK）
+  return ()=> clearInterval(timer);
+}
 
 
   /* ★ 追加：ホスト用—任意テーブルをキック（離席化） */
