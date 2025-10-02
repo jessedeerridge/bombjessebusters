@@ -305,10 +305,21 @@
 }
   
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
-  .mini-pop{
-    position:fixed;z-index:2147483647;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.08);
-    display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;max-width:min(300vw,320px)
-  }
+.mini-pop{
+  position:fixed;
+  z-index:100;
+  background:#fff;
+  border:1px solid #eee;
+  border-radius:8px;
+  padding:6px;
+  box-shadow:0 8px 20px rgba(0,0,0,.08);
+  display:flex;
+  gap:6px;
+  pointer-events:auto;
+  flex-wrap:wrap;
+  max-width:min(300vw,320px);
+  transform: translateX(-24px); /* ← 左に少し寄せる */
+}
   .bottom-pop{left:50%;transform:translateX(-50%);bottom:10px;}
 
   /* ★ 画面下部のグローバル黒枠バッジ（アイテム16表示） */
@@ -2667,6 +2678,13 @@ if (!isM50 || (isM50 && c.open === true)) {
       if(!(i2All && i2All.usingBy===state.userId) && !(i18All && i18All.usingBy===state.userId) && isMine){
         a.onclick=(ev)=>{
           ev.stopPropagation();
+ const mid = (state.watching?.mission?.id|0);
+    if (mid === 58) {
+      // 視覚的に無効っぽくしたい場合（任意）
+      // a.style.opacity = '0.6'; a.style.cursor = 'default';
+      return; // ← 何もしない（メニューを出さない）
+    }
+
           const cardPath  = `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`;
           const tokens = c.tokens || [];
           const has = (type)=> tokens.some(tk=>tk.type===type);
@@ -6592,8 +6610,8 @@ async function maybeOpenRolePickerAfterSeat(){
   try{
     const v = state?.watching;
     const mid = (v?.mission?.id|0);
-    if (!(mid >= 31 && mid <= 66)) return;
-
+    const inPickerRange = (mid >= 31 && mid <= 66 && mid !== 58);
+    if (!inPickerRange) return;
     const myIdx = (typeof state.seatedTable === 'number')
       ? state.seatedTable
       : (v?.tables||[]).findIndex(t=> t?.playerId===state.userId);
