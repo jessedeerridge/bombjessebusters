@@ -4938,10 +4938,19 @@ async function ensureM61MetaInit(vNow){
   // 既に配り済みなら何もしない
   if (Array.isArray(v?.meta?.m61_byTable) && v.meta.m61_byTable.length === n) return;
   if (!state.isHost) return;
-  // デッキA = A..E をシャッフルして人数分に配る（人数が5超なら循環）
-  const A = ['A','B','C','D','E']; shuffle(A);
-  const by = Array.from({length:n}, (_,i)=> A[i % A.length]);
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m61_byTable: by, m61_rotAt: Date.now() });
+// デッキA = A..E をシャッフルして人数分に配る（人数が5超なら循環）
+const A = ['A','B','C','D','E']; shuffle(A);
+const by = Array.from({length:n}, (_,i)=> A[i % A.length]);
+
+// ★追加：Bデッキ（F..L）をシャッフルして meta へ保存。使用済みは空で開始
+const bDeck = ['F','G','H','I','J','K','L']; shuffle(bDeck);
+
+await update(ref(db, `rooms/${state.roomCode}/meta`), {
+  m61_byTable: by,
+  m61_bDeck: bDeck,     // ← 追加
+  m61_bUsed: [],        // ← 追加
+  m61_rotAt: Date.now()
+});
 }
 
 /* ここから追加：ミッション63（隊長のみ初期配布／リザーブはアイテム下／譲渡＆回収） */
@@ -6861,10 +6870,23 @@ function openConstraintZoom61(letter, myIdx){
           const arr  = Array.isArray(meta.m61_byTable) ? meta.m61_byTable.slice() : [];
           if (myIdx<0 || myIdx>=arr.length) { closeConstraintZoom(); return; }
           // デッキB = F or G をランダム
-const deckB = ['F','G','H','I','J','K','L'];
-const B = deckB[Math.floor(Math.random() * deckB.length)];
-          arr[myIdx] = B;
-          await update(mRef, { m61_byTable: arr, m61_swapAt: Date.now() });
+// ★変更：meta の Bデッキから「未使用の先頭1枚」を引く
+const deck = Array.isArray(meta.m61_bDeck) ? meta.m61_bDeck.slice() : ['F','G','H','I','J','K','L'];
+const used = Array.isArray(meta.m61_bUsed) ? meta.m61_bUsed.slice() : [];
+
+// まだ使っていない最上段を取得
+const nextB = deck.find(ch => !used.includes(ch));
+if (!nextB) { closeConstraintZoom(); return; } // 在庫切れなら何もしない
+
+arr[myIdx] = nextB;
+used.push(nextB);
+
+// m61_byTable と m61_bUsed を同時更新（重複防止）
+await update(mRef, {
+  m61_byTable: arr,
+  m61_bUsed: used,
+  m61_swapAt: Date.now()
+});
         }catch(e){ console.error('[M61 swap]', e); }
         closeConstraintZoom();
       };
