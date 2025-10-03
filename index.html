@@ -1753,6 +1753,7 @@ if (v) {
       renderM34(v);
       renderTables(v);
 
+
       // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
       if (!seatPop.classList.contains('hidden')) { renderSeatTabs(v); }
       if (v?.meta?.m22_infoShown === true) {
@@ -2119,43 +2120,43 @@ hostTool.onclick = ()=> alert('全体公開されている通常コードの枚�
 
 /* ===== Mission Complete (all normal & yellow open) ===== */
 /* ★ 追加：黒&黄が全公開なら“ミッション完了!!”ポップ＋comp.mp3 再生 */
+/* ===== Mission Complete (all normal & yellow open) ===== */
+/* ★ 黒(normal)＆黄(yellow)が「手札で未公開0枚」になったら1度だけ完了ポップ */
 function renderMissionComplete(v){
   try{
     if(!v || !Array.isArray(v.tables)) return;
     const mid = (v?.mission?.id|0) || 0;
     if(!mid) return;
 
-    // 黒(normal)と黄(yellow)のみ対象
+    // ★ M29/M57 の処理中は中間スナップショットを評価しない
+    const busy = !!(v?.meta?.m29_busy) || !!(v?.meta?.m57_busy);
+    if (busy) return;
+
+    // 黒(normal)と黄(yellow)のみ対象（手札のみ）
     const cards = [];
     (v.tables||[]).forEach(T=>{
       (T.hand||[]).forEach(c=>{
-        if (!c) return;
+        // ★ 中間個体は除外：null/undefined, gone:true, num未定義
+        if(!c || c.gone===true || c.num==null) return;
         if (c.kind === 'normal' || c.kind === 'yellow') cards.push(c);
       });
     });
 
-    // ★ 追加：未公開（open!==true）枚数を数える
+    // 未公開（open!==true）の枚数。ただし上で中間個体は既に除外済み
     const unopened = cards.filter(c => c.open !== true).length;
 
-    // ★ 変更：未公開が「2枚 または 1枚」になったら sptimer を再生
+    // ▼ スパートタイマー制御（既存仕様を踏襲）
     const nearComplete = (unopened === 2 || unopened === 1);
     if (nearComplete && !state._spTimerOn){
       const at = getSpTimerAudio();
-      try{
-        at.loop = true;
-        at.currentTime = 0;
-        at.play().catch(()=>{});
-        state._spTimerOn = true;
-      }catch(_e){}
+      try{ at.loop = true; at.currentTime = 0; at.play().catch(()=>{}); state._spTimerOn = true; }catch(_e){}
     }
-
-    // ★ 変更：2枚/1枚 以外になったら停止（>2枚 もしくは 0枚＝全公開）
+    // 2枚/1枚 以外になったら停止（>2枚 もしくは 0枚＝全公開）
     if (!nearComplete && state._spTimerOn){
       const at = getSpTimerAudio();
       try{ at.pause(); at.currentTime = 0; }catch(_e){}
       state._spTimerOn = false;
     }
-
 
     // ここから通常の「全公開」判定へ
     if (cards.length === 0) return;
@@ -2164,10 +2165,9 @@ function renderMissionComplete(v){
 
     // 同一ミッション内で一度だけ表示
     if (state._mcShownMissionId === mid) return;
-
     state._mcShownMissionId = mid;
 
-    // ポップ生成（左→中央へ）
+    // ポップ生成（左→中央へ：既存CSS .mission-complete-pop を使用）
     const id = 'missionCompletePop';
     const old = document.getElementById(id);
     if (old) old.remove();
@@ -2176,52 +2176,20 @@ function renderMissionComplete(v){
     div.id = id;
     div.className = 'mission-complete-pop';
     div.textContent = 'ミッション完了!!';
-    div.title = 'クリックで閉じる';
-    div.onclick = ()=>{ if (div.isConnected) div.remove(); };
+    document.body.appendChild(div);
 
-    /* ★ 2秒待ってから表示・音声開始するため準備だけしてDOMへ挿入 */
-    div.style.setProperty('--mc-scale', '1');   // 既定は1
-    div.style.animationPlayState = 'paused';    // いったん停止
-    div.style.visibility = 'hidden';            // まだ見せないがレイアウトは確保
-    popLayer.appendChild(div);
+    // 効果音（comp.mp3）再生
+    try{
+      const au = new Audio('./comp.mp3');
+      au.currentTime = 0;
+      au.play().catch(()=>{});
+    }catch(_e){}
 
-    // 既存の待機タイマーがあればキャンセル（多重防止）
-    if (state._mcTimer){ try{ clearTimeout(state._mcTimer); }catch(_e){} }
-    state._mcTimer = setTimeout(()=>{
-
-      // 表示直前の実測でスケールを決定（1行キープ）
-      const vw = Math.min(window.innerWidth || 0, document.documentElement.clientWidth || 0);
-      const rect = div.getBoundingClientRect();
-      const max = vw * 0.92;                    // 左右に8%の余白
-      const s = rect.width > 0 ? Math.min(1, max / rect.width) : 1;
-      div.style.setProperty('--mc-scale', s.toFixed(3));
-      div.style.visibility = 'visible';
-      void div.offsetWidth;                     // reflow
-
-      // ★ comp 再生の“直前”で sptimer を停止（ほぼ同時）
-      if (state._spTimerOn){
-        const at = getSpTimerAudio();
-        try{ at.pause(); at.currentTime = 0; }catch(_e){}
-        state._spTimerOn = false;
-      }
-
-      // スライドイン開始
-      div.style.animationPlayState = 'running';
-
-      // ★ comp.mp3 再生（2秒後に開始）
-      const comp = getCompAudio();
-      try{
-        comp.currentTime = 0;
-        comp.play().catch(()=>{});
-      }catch(_e){}
-
-      // 表示開始から2.2秒後に自動フェードアウト
-      setTimeout(()=>{ if (div.isConnected) div.remove(); }, 900);
-
-      state._mcTimer = null; // 待機タイマーは消す
-    }, 700); // ★ 2秒待つ
-
-  }catch(_e){}
+    // 3秒後に自動で閉じる（任意）
+    setTimeout(()=>{ const x=document.getElementById(id); if(x) x.remove(); }, 3000);
+  }catch(e){
+    console.error('renderMissionComplete failed', e);
+  }
 }
 
 /* ===== Tables ===== */
@@ -7243,6 +7211,9 @@ if (shown === 0) cell.classList.add('disabled');
   document.body.appendChild(div);
 }
 
+
+
+
 // ★★★ ここから追加：#29 自動出しヘルパー ★★★
 async function ensureM29AutoDrop(roomVal){
   try{
@@ -7291,9 +7262,7 @@ async function ensureM29AutoDrop(roomVal){
           }
 
           // ③ 手札だけ先に書き戻す（センター/デッキは関数末尾で一括反映）
-// ③ 手札は書き戻さず、後段の multi-path updates に積む
-if (!updates) updates = {};
-updates[`rooms/${state.roomCode}/tables/${i}/m29Hand`] = curHand;
+          await update(ref(db, tPath), { m29Hand: curHand });
           ownerIdx = i;
           placed = true;
           break;
@@ -10179,7 +10148,7 @@ function missionInfo(id, opts={}){
           '①手番の最初に、手番プレイヤーの一つ前のプレイヤーは数値カードを1枚選んで裏向きで出す。',
           '②手番の最後に数値カードを公開して、切断に成功したコードと数値カードが同じ数字だった場合、起爆ダイヤルが1進む。',
           '③手番の最後に、切断を試みたプレイヤーは場の数値カードを回収する。',
-          '（数値カードが1枚以下になったプレイヤーは数値カードの山札から1枚追加される。',
+     '（数値カードが1枚以下になったプレイヤーは数値カードの山札から1枚追加される。',
           '既に4枚切断を終えた数字の数値カードは場に捨てる。）'
         ],
         // ※UIは段階導入。初回は説明のみ（今後のPRでアクション実装予定）
@@ -10591,10 +10560,9 @@ case 59: {
       '#59',
       ...linesForMix,
       '数値カード12枚をランダムに並べて、7の位置に12の方向を向くようにナノを配置する。',
-      '❶ナノが今いるカードか、ナノの前方にあるカードのうち、手札にある数字の方を選び、ナノをそのままにしておくか移動させる。',
-      '❷その数字のコードを切断する。',
-      '❸ナノを任意の方向に向ける（そのままにしてもよい）。',
-      '選択できる数値がない場合は、ナノを反転させてから起爆ダイヤルを1進めて、切断を行う。',
+      '❶ナノを動かさないか、一つ前方に移動させることができ、ナノが置いてあるカードの数字を宣言して切断できる。',
+      '❷その後、ナノを右向きにするか左向きにするか自由に決める。',
+      '選択できる数値がない場合は、ナノを反転させてから起爆ダイヤルを1進める。その後、選択できる場合は切断を行う。',
       '「いつでもコーヒー」は手番全体を飛ばす。',
     ],
     flags:{}
