@@ -1649,7 +1649,6 @@ async function enter(mode){
   });
   listenRoom(code);
   // ★ 自動離席の遅延クリア役（Janitor）を起動
-  startSeatJanitor(db, code);
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
 }
 
@@ -7614,56 +7613,6 @@ async function setupAutoLeaveOnDisconnect(tableIdx){
 }
 
 
-/* ★ 自動離席の遅延クリア役（Janitor）：一定時間オフラインなら本当に空席化 */
-function startSeatJanitor(db, roomId){
-  const GRACE_MS = 15000; // 一時切断ゆるし時間（15秒）
-  const timer = setInterval(async ()=>{
-    try{
-      const tablesSnap = await get(ref(db, `rooms/${roomId}/tables`));
-      const tables = tablesSnap.val() || [];
-      const now = serverNow();
-      const updates = {};
-
-      for(let i=0; i<tables.length; i++){
-        const t = tables[i];
-        if(!t || !t.leaveRequested || !t.leaveUid) continue;
-
-        const uid = t.leaveUid;
-        const pSnap = await get(ref(db, `rooms/${roomId}/players/${uid}`));
-        const p = pSnap.val();
-        const isOnline = !!(p && p.online);
-
-        const ts = (typeof t.leaveRequested === 'number')
-          ? t.leaveRequested
-          : (t.leaveRequested?.toMillis?.() ?? 0);
-        const expired = now - ts > GRACE_MS;
-
-        if (isOnline){
-          // もう戻っている → 予約フラグだけ掃除
-          updates[`rooms/${roomId}/tables/${i}/leaveRequested`] = null;
-          updates[`rooms/${roomId}/tables/${i}/leaveUid`] = null;
-        } else if (expired && t.playerId === uid){
-          // 本当にいない → 席と手札の所有をクリア
-          updates[`rooms/${roomId}/tables/${i}/playerId`] = null;
-          updates[`rooms/${roomId}/tables/${i}/playerName`] = null;
-          updates[`rooms/${roomId}/tables/${i}/leaveRequested`] = null;
-          updates[`rooms/${roomId}/tables/${i}/leaveUid`] = null;
-          const hand = Array.isArray(t.hand) ? t.hand : [];
-          hand.forEach((_,hIdx)=>{
-            updates[`rooms/${roomId}/tables/${i}/hand/${hIdx}/ownerId`] = null;
-          });
-        }
-      }
-
-      if(Object.keys(updates).length){
-        await update(ref(db), updates);
-      }
-    }catch(_e){}
-  }, 2000);
-
-  // 必要なら停止用に返す（今回は未使用でもOK）
-  return ()=> clearInterval(timer);
-}
 
 
   /* ★ 追加：ホスト用—任意テーブルをキック（離席化） */
@@ -7700,7 +7649,7 @@ tab.textContent = String(i + 1);
       await Promise.all(hand.map((_,idx)=> 
         update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), { ownerId: state.userId })
       ));
-await setupAutoLeaveOnDisconnect(i);   // ★切断時の自動退席を予約
+// await setupAutoLeaveOnDisconnect(i);   // ★自動退席を無効化
       state.seatedTable=i; H(seatPop,true); updateMenuButtons();
 maybeOpenRolePickerAfterSeat();
 
@@ -7709,12 +7658,38 @@ maybeOpenRolePickerAfterSeat();
   });
 }
 
-btnSit.onclick = ()=>{
+btnSit.onclick = async ()=>{
   if(state.mode!=='player'){ alert('観戦入室では席に座れません。参加で入り直してください。'); return; }
-  const v=state.watching; if(!v?.started){ return; }
+  const v = state.watching;
+  if(!v?.started){ return; }
+
+  // ★ 自動着席：同じ名前の席を探す
+  const sameNameIdx = (v.tables || []).findIndex(t => t.playerName === state.userName);
+  if (sameNameIdx >= 0) {
+    // 名前が一致する席があれば自動着席
+    await update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}`), {
+      playerId: state.userId,
+      playerName: state.userName
+    });
+    const hRef = ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand`);
+    const hSnap = await get(hRef);
+    const hand = hSnap.val() || [];
+    await Promise.all(hand.map((_, idx) => 
+      update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand/${idx}`), { ownerId: state.userId })
+    ));
+    state.seatedTable = sameNameIdx;
+    H(seatPop, true); 
+    updateMenuButtons();
+    maybeOpenRolePickerAfterSeat();
+    return;
+  }
+
+  // 名前一致なしの場合は従来の席ポップ
   renderSeatTabs(v);
-  H(seatPop,false);
- };
+  H(seatPop, false);
+};
+
+
 btnSeatCancel.onclick=()=> H(seatPop,true);
 
 btnLeave.onclick = async ()=>{ await leaveSeatNow();btnSit.onclick(); };
