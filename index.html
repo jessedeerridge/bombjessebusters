@@ -39,7 +39,7 @@
   .btn.ghost{background:transparent}
   .hidden{display:none!important}
 
-  .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:200}
+  .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:900}
   .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08);z-index:210}
   .menu .btn{width:220px;text-align:left}
 
@@ -658,7 +658,7 @@ main:not(:has(#lobby.hidden)) > * {
 /* ▼ ミッション説明 (#missionFooter) は常に白い下地で画像を遮断 */
 #missionFooter{
   position: relative;
-  z-index: 1;      /* 背景レイヤー(::before)より前面 */
+  z-index: 10;      /* 背景レイヤー(::before)より前面 */
   background: #fff;/* ← ここを none → #fff にする（完全に不透明） */
   /* 必要なら読みやすさ向上用に：
   box-shadow: 0 -4px 12px rgba(0,0,0,.06) inset;
@@ -732,6 +732,8 @@ main:not(:has(#lobby.hidden)) > * {
 
 
 
+
+
 </style>
 </head>
 <body>
@@ -764,11 +766,12 @@ main:not(:has(#lobby.hidden)) > * {
   <div id="m22PickPanel" class="m22-panel hidden">
     <span class="cap">未所持の数字から最大2つ選択：</span>
   </div>
+
   <div id="missionDetailTitle" class="bold line"></div>
   <div id="missionDetailBody"></div>
 </div>
 
-
+<div id=""> <!-- 親を新設して stacking context を分ける -->
       <button class="fab hidden" id="gear" title="設定">⚙</button>
       <div class="menu hidden" id="menuPopup">
         <button class="btn" id="btnSit">席に座る</button>
@@ -5646,9 +5649,7 @@ function renderM61(v){
     }
   });
 
-  // ▼ 隊長の画面下に ↑/↓ ポップ（自分が隊長＝face: member (5).jpg かつ自席）
-   // ▼ 隊長の画面下に ↑/↓ ポップ（自分が隊長＝face: member (5).jpg かつ自席）
-  const capIdx = (v.tables||[]).findIndex(T => (T?.character?.face||'').includes('member (5).jpg'));
+const capIdx = v?.captainTable ?? null;
   const zoneId = 'm61TapZone';
   document.getElementById(zoneId)?.remove();
   if (capIdx >= 0 && capIdx === myIdx){
@@ -5656,7 +5657,7 @@ function renderM61(v){
     zone.id = zoneId;
     Object.assign(zone.style, {
       position:'fixed', left:'0', right:'0', bottom:'0', height:'56px',
-      zIndex:'2147483602', background:'transparent', pointerEvents:'auto'
+      zIndex:'200', background:'transparent', pointerEvents:'auto'
     });
     const mRef = ref(db, `rooms/${state.roomCode}/meta`);
     const rotate = async (dir)=>{
