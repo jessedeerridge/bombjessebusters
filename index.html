@@ -200,6 +200,20 @@
 
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
+  .alpha.m43-added{border:0.4px dashed #000;}
+  .hand.m43-pre-shift .card-wrap{animation:m43PushRight .35s ease forwards;}
+  @keyframes m43PushRight{
+    from{transform:translateX(0);}
+    to{transform:translateX(26px);}
+  }
+  .m43-fly-card{
+    position:fixed; width:var(--card-w); height:var(--card-h); border-radius:6px; z-index:2147483646;
+    background:#000; border:1px solid #ddd; pointer-events:none; opacity:1;
+    display:flex; align-items:flex-start; justify-content:center;
+    transition:left .55s ease, top .55s ease, opacity .55s ease;
+  }
+  .m43-fly-card.back{background:#fff url('./codeback.jpg') center/cover no-repeat;border-color:#ccc}
+  .m43-fly-card .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
     font-size:11px; line-height:1;
@@ -2468,6 +2482,11 @@ content.appendChild(charCol);
 
 
     const hand=document.createElement('div'); hand.className='hand';
+    const m43Anim = v?.meta?.m43_anim;
+    if ((v?.mission?.id|0) === 43 && m43Anim?.on && (m43Anim.toTable|0)===idx){
+      const beforeInsert = Date.now() < ((m43Anim.startAt|0) + 2000);
+      if (beforeInsert) hand.classList.add('m43-pre-shift');
+    }
     (t.hand||[]).forEach((c,ci)=>{
             /* 無効カードは描画しない（"undefined"表示の根絶） */
       if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
@@ -2615,6 +2634,7 @@ openMenuAtClick([
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
 const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
+if (c.fromM43) a.classList.add('m43-added');
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -4512,7 +4532,9 @@ function renderM43(v){
   // ミッション43以外 → 後片付け
   if (!isM43){
     if (old) old.remove();
+    document.getElementById('m43FlyCard')?.remove();
     document.getElementById('nanoRow')?.remove(); // 旧・新UIの掃除
+    state._m43AnimId = null;
     return;
   }
 
@@ -4524,6 +4546,7 @@ function renderM43(v){
       update(ref(db, `rooms/${state.roomCode}/meta`), { m43_nano: initNano, m43_pos: 0, m43_prevPos: 0 });
     }
     if (old) old.remove();
+    document.getElementById('m43FlyCard')?.remove();
     document.getElementById('nanoRow')?.remove();
     return;
   }
@@ -4534,6 +4557,7 @@ function renderM43(v){
 
   if (!pos){
     if (old) old.remove();
+    document.getElementById('m43FlyCard')?.remove();
     document.getElementById('nanoRow')?.remove();
     return;
   }
@@ -4572,17 +4596,34 @@ function renderM43(v){
       const meta = mSnap.val() || {};
       const tbls = tSnap.val() || [];
       const A = Array.isArray(meta.m43_A) ? meta.m43_A.slice() : [];
+      if (meta?.m43_anim?.on) return;
 
       // A群から1枚取り出し（先頭＝一番上）
       if (A.length > 0 && tbls[myTable]) {
         const n = A.shift(); // number
+        const cardId = crypto.randomUUID();
+        const handNow = Array.isArray(tbls[myTable].hand) ? tbls[myTable].hand.slice() : [];
+        const insertIndex = handNow.filter(x => (x?.num|0) <= n).length;
+        const anim = {
+          on:true,
+          id: cardId,
+          toTable: myTable,
+          num: n,
+          startAt: Date.now(),
+          insertIndex
+        };
+        const M43_SHIFT_MS = 2000;
+        const M43_FLY_MS = 650;
+        await update(mRef, { m43_A: A, m43_anim: anim, m43_updatedAt: Date.now() });
+        await new Promise(r=>setTimeout(r, M43_SHIFT_MS + M43_FLY_MS));
         const T = tbls[myTable];
         const hand = Array.isArray(T.hand) ? T.hand : [];
         hand.push({
-          id: crypto.randomUUID(),
+          id: cardId,
           num: n,
           kind: 'normal',
           open: false,
+          fromM43: true,
           ownerId: T.playerId || null,
           tokens: [],
           markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
@@ -4595,7 +4636,7 @@ function renderM43(v){
         // DB へ反映（テーブル更新＋A群を更新）
         await Promise.all([
           set(ref(db, `rooms/${code}/tables`), tbls),
-          update(mRef, { m43_A: A })
+          update(mRef, { m43_anim: null })
         ]);
       }
 
@@ -4618,6 +4659,55 @@ const x = rb.left - rrow.left + (rb.width/2) - 28; // 56px の半分
 node.style.left = `${Math.max(0, x)}px`;
 node.style.top  = `0px`;
   if (!node.isConnected) row.appendChild(node);
+
+  const anim = v?.meta?.m43_anim;
+  const flyOld = document.getElementById('m43FlyCard');
+  if (!anim?.on){
+    flyOld?.remove();
+    state._m43AnimId = null;
+    return;
+  }
+  if (state._m43AnimId === anim.id) return;
+  state._m43AnimId = anim.id;
+  flyOld?.remove();
+
+  const M43_SHIFT_MS = 2000;
+  const M43_FLY_MS = 650;
+  const delay = Math.max(0, (anim.startAt|0) + M43_SHIFT_MS - Date.now());
+  setTimeout(()=>{
+    const boxes = tablesEl.querySelectorAll('.table');
+    const box = boxes[anim.toTable|0];
+    const handEl = box?.querySelector('.hand');
+    if (!handEl) return;
+
+    const fly = document.createElement('div');
+    fly.id = 'm43FlyCard';
+    fly.className = 'm43-fly-card';
+    const isReceiver = ((v?.tables?.[anim.toTable]?.playerId||'') === state.userId);
+    if (!isReceiver) fly.classList.add('back');
+    if (isReceiver){
+      const numEl = document.createElement('div');
+      numEl.className = 'num';
+      numEl.textContent = String(anim.num ?? '');
+      fly.appendChild(numEl);
+    }
+
+    const from = node.getBoundingClientRect();
+    const hr = handEl.getBoundingClientRect();
+    const W = cssNum('--card-w'), G = cssNum('--card-gap');
+    const x = hr.left + ((anim.insertIndex|0) * (W + G));
+    const y = hr.top;
+
+    fly.style.left = `${from.left}px`;
+    fly.style.top  = `${from.top}px`;
+    document.body.appendChild(fly);
+
+    requestAnimationFrame(()=>{
+      fly.style.left = `${x}px`;
+      fly.style.top  = `${y}px`;
+      setTimeout(()=>{ if (fly.isConnected) fly.remove(); }, M43_FLY_MS);
+    });
+  }, delay);
 }
 
 /* ==== ミッション59：各 checklistbox の直上に12数値カード（固定ランダム）
