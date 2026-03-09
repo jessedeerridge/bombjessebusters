@@ -4658,16 +4658,21 @@ function runM43InsertAnimation(v){
   wraps.forEach(w=>{
     const ci = Number(w.dataset.cardIndex || -1);
     const cid = String(w.dataset.cardId || '');
-    if (ci >= insertIndex && cid !== String(anim.cardId || '')) {
+    if (ci > insertIndex && cid !== String(anim.cardId || '')) {
+      w.style.transition = 'none';
+      w.style.transform = `translateX(${-shiftPx}px)`; // 旧位置から開始
+      void w.offsetWidth; // reflow
       w.style.transition = `transform ${shiftMs}ms ease`;
-      w.style.transform = `translateX(${shiftPx}px)`;
-      setTimeout(()=>{ w.style.transform=''; w.style.transition=''; }, shiftMs + 40);
+      w.style.transform = ''; // 最終位置へ（= 右へ1枚分）
+      setTimeout(()=>{ w.style.transition=''; }, shiftMs + 40);
     }
   });
 
+  const targetWrap = document.querySelector(`.card-wrap[data-table="${tableIdx}"][data-card-id="${String(anim.cardId||'')}"]`);
+  if (targetWrap) targetWrap.style.visibility = 'hidden'; // 挿入位置を先に空ける
+
   setTimeout(()=>{
     const nano = document.getElementById('m43Nano');
-    const targetWrap = document.querySelector(`.card-wrap[data-table="${tableIdx}"][data-card-id="${String(anim.cardId||'')}"]`);
     if (!nano || !targetWrap) return;
 
     const table = (v?.tables||[])[tableIdx] || {};
@@ -4699,7 +4704,10 @@ function runM43InsertAnimation(v){
       fly.style.left = `${b.left}px`;
       fly.style.top = `${b.top}px`;
     });
-    setTimeout(()=> fly.remove(), 380);
+    setTimeout(()=>{
+      fly.remove();
+      targetWrap.style.visibility = '';
+    }, 380);
   }, shiftMs + settleDelayMs);
 }
 
