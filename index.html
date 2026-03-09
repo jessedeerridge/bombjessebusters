@@ -203,6 +203,7 @@
 
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
+  .alpha.swap-gray{background:#9ca3af;border-color:#6b7280;color:#fff;}
   .alpha.m43-added{border:0.4px dashed #000;}
   .m43-fly-card{position:fixed;left:0;top:0;width:var(--card-w);height:var(--card-h);border-radius:6px;z-index:2147483640;pointer-events:none;}
   .m43-fly-card .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;}
@@ -2688,6 +2689,7 @@ openMenuAtClick([
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
 const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.classList.add('m43-added'); a.textContent=c.alpha||'';
+if ((c?.alphaGrayUntil|0) > now()) a.classList.add('swap-gray');
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -7537,6 +7539,63 @@ function refreshInfo22(vNow){
   }
 }
 
+const waitMs = (ms)=> new Promise(r=> setTimeout(r, ms));
+
+async function animateOwnCardSwapSequence({ tableIdx, removeCardId, insertIndex }){
+  try{
+    const wrap = document.querySelector(`.card-wrap[data-table="${tableIdx}"][data-card-id="${removeCardId}"]`);
+    if (!wrap) return;
+    const hand = wrap.closest('.hand');
+    if (!hand) return;
+
+    const cardH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--card-h')) || 40;
+    const cardW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--card-w')) || 24;
+    wrap.style.transition = 'transform .22s ease';
+    wrap.style.transform = `translateY(-${cardH}px)`;
+    await waitMs(230);
+
+    const liftRect = wrap.getBoundingClientRect();
+    wrap.style.transition = 'width .2s ease, opacity .2s ease';
+    wrap.style.width = '0px';
+    wrap.style.opacity = '0';
+    await waitMs(210);
+    wrap.remove();
+
+    const cards = Array.from(hand.querySelectorAll('.card-wrap'));
+    const pos = Math.max(0, Math.min(insertIndex|0, cards.length));
+    const ph = document.createElement('div');
+    ph.className = 'card-wrap';
+    ph.style.width = '0px';
+    ph.style.minHeight = '0px';
+    ph.style.opacity = '0';
+    ph.style.transition = 'width .2s ease, opacity .2s ease';
+    if (cards[pos]) hand.insertBefore(ph, cards[pos]); else hand.appendChild(ph);
+
+    requestAnimationFrame(()=>{
+      ph.style.width = `${cardW}px`;
+      ph.style.opacity = '1';
+    });
+    await waitMs(210);
+
+    const fly = document.createElement('div');
+    fly.className = 'm43-fly-card front';
+    fly.style.left = `${liftRect.left}px`;
+    fly.style.top  = `${liftRect.top}px`;
+    const dst = ph.getBoundingClientRect();
+    document.body.appendChild(fly);
+
+    requestAnimationFrame(()=>{
+      fly.style.transition = 'transform .25s ease';
+      fly.style.transform = `translate(${dst.left - liftRect.left}px, ${dst.top - liftRect.top}px)`;
+    });
+    await waitMs(260);
+    fly.remove();
+    ph.remove();
+  }catch(e){
+    console.warn('[swap-anim]', e);
+  }
+}
+
 
 
 
@@ -7556,6 +7615,8 @@ async function doItem2Swap(A, B){
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
 
+  const myIdx = (tables||[]).findIndex(t => t?.playerId === state.userId);
+
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
   const insertSortedRight = (hand, card)=>{
@@ -7567,9 +7628,14 @@ async function doItem2Swap(A, B){
 
   const mark = now()+10000; // 10秒
  const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2'};
-   const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2'};
+   const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2', alphaGrayUntil: now()+10000};
   insertSortedRight(b.hand, toB);
   insertSortedRight(a.hand, toA);
+
+  const toAIndex = a.hand.findIndex(c => c.id === toA.id);
+  if (myIdx === A.table){
+    await animateOwnCardSwapSequence({ tableIdx: A.table, removeCardId: A.cardId, insertIndex: toAIndex });
+  }
 
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(a.hand); realpha(b.hand);
@@ -7581,7 +7647,6 @@ async function doItem2Swap(A, B){
   ]);
   // 交換後：member(9) を自分が持っているなら枠の9を裏返す
   try{
-    const myIdx = (tables||[]).findIndex(t => t?.playerId === state.userId);
     if (myIdx >= 0){
       const meChar = tables[myIdx]?.character || {};
       const isNine = String(meChar.face||'').includes('member (9).jpg');
