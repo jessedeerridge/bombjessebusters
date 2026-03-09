@@ -4652,7 +4652,7 @@ function runM43InsertAnimation(v){
   const insertIndex = anim.insertIndex|0;
   const shiftPx = cssNum('--card-w') + cssNum('--card-gap');
   const shiftMs = 260;
-  const settleDelayMs = 1000;
+  const settleDelayMs = 2000;
 
   const wraps = Array.from(document.querySelectorAll(`.card-wrap[data-table="${tableIdx}"]`));
   wraps.forEach(w=>{
@@ -4670,13 +4670,16 @@ function runM43InsertAnimation(v){
 
   const targetSelector = `.card-wrap[data-table="${tableIdx}"][data-card-id="${String(anim.cardId||'')}"]`;
   let hiddenWrap = document.querySelector(targetSelector);
-  if (hiddenWrap) hiddenWrap.style.visibility = 'hidden'; // 挿入位置を先に空ける
+  if (hiddenWrap){
+    hiddenWrap.style.visibility = 'hidden'; // 挿入位置を先に空ける
+    hiddenWrap.style.pointerEvents = 'none';
+  }
 
   setTimeout(()=>{
     const nano = document.getElementById('m43Nano');
     const targetWrap = document.querySelector(targetSelector);
     if (!nano || !targetWrap){
-      if (hiddenWrap) hiddenWrap.style.visibility = '';
+      if (hiddenWrap){ hiddenWrap.style.visibility = ''; hiddenWrap.style.pointerEvents = ''; }
       return;
     }
 
@@ -4688,6 +4691,7 @@ function runM43InsertAnimation(v){
     const b = targetCard.getBoundingClientRect();
     if (!Number.isFinite(a.left) || !Number.isFinite(b.left)) {
       targetWrap.style.visibility = '';
+      targetWrap.style.pointerEvents = '';
       return;
     }
 
@@ -4717,6 +4721,7 @@ function runM43InsertAnimation(v){
     setTimeout(()=>{
       fly.remove();
       targetWrap.style.visibility = '';
+      targetWrap.style.pointerEvents = '';
       hiddenWrap = null;
     }, 380);
   }, shiftMs + settleDelayMs);
