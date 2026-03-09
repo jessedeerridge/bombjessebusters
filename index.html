@@ -749,7 +749,6 @@ main:not(:has(#lobby.hidden)) > * {
   <input id="userName" placeholder="名前（4文字以内）" maxlength="4" />
   <input id="roomCode" placeholder="ルームコード" maxlength="12" />
   <button class="btn primary" id="btnJoin">入室</button>
-  <button class="btn ghost" id="btnRandom">自動コード</button>
 </div>
 
 
@@ -907,7 +906,6 @@ const inputName = document.getElementById('userName'); // ★追加
 const inputCode = document.getElementById('roomCode');
 
 const btnJoin = document.getElementById('btnJoin');
-const btnRandom=document.getElementById('btnRandom');
 
 const lobby   = document.getElementById('lobby');
 // ▼ 追加：クイックミッションピッカー起動ボタン
@@ -1136,6 +1134,10 @@ window.addEventListener('pointerdown', async function _unlockOnce(){
 function hiragana(len=4){
   const h=[..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"];
   return Array.from({length:len},()=>h[Math.random()*h.length|0]).join('');
+}
+function randomRoomCode(len=5){
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return Array.from({length:len}, ()=> chars[Math.random()*chars.length|0]).join('');
 }
 const H=(el,b)=> el.classList.toggle('hidden', !!b);
 function pos(el,x,y){el.style.left=x+'px';el.style.top=y+'px';}
@@ -1612,16 +1614,15 @@ function openBottomMenu(entries){
 
 
 /* enter */
-btnRandom.onclick = ()=>{ inputCode.value = String(Math.random()*1e4|0).padStart(4,'0'); };
 btnJoin.onclick   = ()=>{
   const nm = (inputName?.value || '').trim();
   // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
   state.userName = nm ? nm.slice(0,4) : hiragana(4);
   try { localStorage.setItem("savedUserName", state.userName); } catch(_e){}
 
-  // ★ルームコード未入力なら0225にする
+  // ★ルームコード未入力なら英数字5文字を自動採番
   if (!inputCode.value.trim()) {
-    inputCode.value = '0225';
+    inputCode.value = randomRoomCode(5);
   }
 
   enter('player');
