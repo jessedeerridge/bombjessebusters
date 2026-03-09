@@ -4608,8 +4608,10 @@ function renderM43(v){
           startAt: Date.now(),
           insertIndex
         };
+        const M43_SHIFT_MS = 2000;
+        const M43_FLY_MS = 650;
         await update(mRef, { m43_A: A, m43_anim: anim, m43_updatedAt: Date.now() });
-        await new Promise(r=>setTimeout(r, 2000));
+        await new Promise(r=>setTimeout(r, M43_SHIFT_MS + M43_FLY_MS));
         const T = tbls[myTable];
         const hand = Array.isArray(T.hand) ? T.hand : [];
         hand.push({
@@ -4665,7 +4667,9 @@ node.style.top  = `0px`;
   state._m43AnimId = anim.id;
   flyOld?.remove();
 
-  const delay = Math.max(0, (anim.startAt|0) + 2000 - Date.now());
+  const M43_SHIFT_MS = 2000;
+  const M43_FLY_MS = 650;
+  const delay = Math.max(0, (anim.startAt|0) + M43_SHIFT_MS - Date.now());
   setTimeout(()=>{
     const boxes = tablesEl.querySelectorAll('.table');
     const box = boxes[anim.toTable|0];
@@ -4697,7 +4701,7 @@ node.style.top  = `0px`;
     requestAnimationFrame(()=>{
       fly.style.left = `${x}px`;
       fly.style.top  = `${y}px`;
-      setTimeout(()=>{ if (fly.isConnected) fly.remove(); }, 650);
+      setTimeout(()=>{ if (fly.isConnected) fly.remove(); }, M43_FLY_MS);
     });
   }, delay);
 }
