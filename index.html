@@ -200,6 +200,20 @@
 
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
+  .alpha.m43-added{ border:0.4px dashed #111; }
+
+  .hand .card-wrap{ transition:transform 380ms ease; }
+  .hand.m43-hand-push .card-wrap{ transform:translateX(14px); }
+  .card-wrap.m43-entering .card,
+  .card-wrap.m43-entering .badge-fixed{ opacity:0; }
+  .m43-flyer{
+    position:fixed;
+    left:0;
+    top:0;
+    z-index:2147483606;
+    pointer-events:none;
+    transition:transform 560ms cubic-bezier(.2,.8,.2,1), opacity 560ms ease;
+  }
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
     font-size:11px; line-height:1;
@@ -892,7 +906,9 @@ const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
   m22GaveOnce:false, // ★ #22：自分が渡した一回ガード（即時連打対策）
-  _lastMissionId:null};
+  _lastMissionId:null,
+  _m43Anim:{}
+};
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -2615,6 +2631,7 @@ openMenuAtClick([
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
 const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
+if (c?.m43AddedAt) a.classList.add('m43-added');
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -2892,6 +2909,14 @@ tokens.forEach((tk,ti)=>{
       wrap.appendChild(card);
       wrap.appendChild(badge);
       hand.appendChild(wrap);
+
+      const aid = c?.id ? String(c.id) : '';
+      const anim = aid ? state._m43Anim?.[aid] : null;
+      if (anim && anim.pending) {
+        const openForMe = (t.playerId === state.userId);
+        runM43CardEntryAnim({ cardWrap:wrap, handEl:hand, nanoEl:anim.nanoEl, openForMe });
+        anim.pending = false;
+      }
     });
     content.appendChild(hand);
     box.appendChild(content);
@@ -4504,6 +4529,48 @@ B.hand[B.idx] = toB;
 
 /* ここまで追加：#42 */
 
+function runM43CardEntryAnim({ cardWrap, handEl, nanoEl, openForMe }){
+  if (!cardWrap || !handEl || !nanoEl) return;
+
+  handEl.classList.add('m43-hand-push');
+  setTimeout(()=> handEl.classList.remove('m43-hand-push'), 420);
+
+  cardWrap.classList.add('m43-entering');
+
+  setTimeout(()=>{
+    if (!cardWrap.isConnected || !nanoEl.isConnected) return;
+
+    const cardEl = cardWrap.querySelector('.card');
+    if (!cardEl) return;
+
+    if (openForMe) cardEl.classList.add('open');
+    else cardEl.classList.add('back');
+
+    const fly = cardWrap.cloneNode(true);
+    fly.classList.add('m43-flyer');
+    fly.classList.remove('m43-entering');
+    document.body.appendChild(fly);
+
+    const from = nanoEl.getBoundingClientRect();
+    const to = cardWrap.getBoundingClientRect();
+    fly.style.transform = `translate(${from.left}px, ${from.top}px)`;
+
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        fly.style.transform = `translate(${to.left}px, ${to.top}px)`;
+        fly.style.opacity = '0.95';
+      });
+    });
+
+    const done = ()=>{
+      fly.remove();
+      cardWrap.classList.remove('m43-entering');
+    };
+    fly.addEventListener('transitionend', done, { once:true });
+    setTimeout(done, 700);
+  }, 2000);
+}
+
 /* ここから追加：ミッション43 */
 function renderM43(v){
   const isM43 = ((v?.mission?.id|0) === 43);
@@ -4578,14 +4645,17 @@ function renderM43(v){
         const n = A.shift(); // number
         const T = tbls[myTable];
         const hand = Array.isArray(T.hand) ? T.hand : [];
+        const addedId = crypto.randomUUID();
+        const addedAt = Date.now();
         hand.push({
-          id: crypto.randomUUID(),
+          id: addedId,
           num: n,
           kind: 'normal',
           open: false,
           ownerId: T.playerId || null,
           tokens: [],
-          markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
+          markUntil: Date.now() + 5000,   // ← 5秒間「▼」表示
+          m43AddedAt: addedAt
         });
         hand.sort((a,b)=> a.num - b.num);
         const alpha = 'abcdefghijklmnopqrstuvwxyz';
@@ -4597,6 +4667,12 @@ function renderM43(v){
           set(ref(db, `rooms/${code}/tables`), tbls),
           update(mRef, { m43_A: A })
         ]);
+
+        state._m43Anim = state._m43Anim || {};
+        state._m43Anim[addedId] = {
+          pending: true,
+          nanoEl: document.getElementById('m43Nano')
+        };
       }
 
       // 既存の「段階を下げる」もそのまま実行
