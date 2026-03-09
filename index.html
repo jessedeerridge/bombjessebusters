@@ -200,6 +200,7 @@
 
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
+  .alpha.m43-added{ border:0.4px dashed #000; }
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
     font-size:11px; line-height:1;
@@ -449,6 +450,22 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   width:56px; height:56px;
   background-size:contain; background-repeat:no-repeat; background-position:center;
   pointer-events:auto;   /* クリックで回収メニュー */
+}
+.hand.m43-pre-shift .card-wrap{
+  transform:translateX(calc(var(--card-w) + var(--card-gap)));
+  transition:transform .3s ease;
+}
+.m43-fly-card{
+  position:fixed; z-index:2147483646;
+  width:var(--card-w); height:var(--card-h);
+  border-radius:6px; border:1px solid #ddd;
+  background:#000;
+  pointer-events:none;
+}
+.m43-fly-card.back{background:#fff url('./codeback.jpg') center/cover no-repeat;border-color:#ccc}
+.m43-fly-card .num{
+  position:absolute;top:2px;left:0;right:0;text-align:center;
+  font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;
 }
 
 
@@ -892,7 +909,9 @@ const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
   m22GaveOnce:false, // ★ #22：自分が渡した一回ガード（即時連打対策）
-  _lastMissionId:null};
+  _lastMissionId:null,
+  _m43PendingShift:null,
+  _m43AnimToken:0};
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -1006,6 +1025,75 @@ function openM42Minus2Pop(){
 
 
 const m42SwapPop = document.getElementById('m42SwapPop');
+
+
+function queueM43InsertionAnim(tableIdx, cardId){
+  if (tableIdx == null || !cardId) return;
+  state._m43PendingShift = {
+    tableIdx:Number(tableIdx),
+    cardId:String(cardId),
+    at:Date.now(),
+    token:++state._m43AnimToken
+  };
+}
+
+function runM43InsertionAnim(v){
+  const mid = (v?.mission?.id|0);
+  const p = state._m43PendingShift;
+  if (mid !== 43 || !p) return;
+
+  const hand = tablesEl.querySelector(`.table[data-table-idx="${p.tableIdx}"] .hand`);
+  if (!hand) return;
+  const target = hand.querySelector(`.card-wrap[data-card-id="${p.cardId}"] .card`);
+  if (!target) return;
+
+  const nowToken = p.token;
+  const myTable = (state.seatedTable==null)? null : Number(state.seatedTable);
+  const isOwner = (myTable != null && myTable === p.tableIdx);
+
+  hand.classList.add('m43-pre-shift');
+
+  setTimeout(()=>{
+    if (state._m43AnimToken !== nowToken) return;
+
+    const rb = target.getBoundingClientRect();
+    const startX = Math.max(8, window.innerWidth * 0.5 - rb.width*0.5);
+    const startY = Math.max(8, window.innerHeight * 0.45 - rb.height*0.5);
+
+    const ghost = document.createElement('div');
+    ghost.className = 'm43-fly-card';
+    if (!isOwner) {
+      ghost.classList.add('back');
+    } else {
+      const n = Number(target.querySelector('.num')?.textContent || '');
+      if (!Number.isNaN(n)){
+        const num = document.createElement('div');
+        num.className = 'num';
+        num.textContent = String(n);
+        ghost.appendChild(num);
+      }
+    }
+    ghost.style.left = `${startX}px`;
+    ghost.style.top = `${startY}px`;
+    document.body.appendChild(ghost);
+
+    target.style.visibility = 'hidden';
+
+    requestAnimationFrame(()=>{
+      ghost.style.transition = 'left .45s ease, top .45s ease';
+      ghost.style.left = `${rb.left}px`;
+      ghost.style.top = `${rb.top}px`;
+    });
+
+    const clear = ()=>{
+      hand.classList.remove('m43-pre-shift');
+      target.style.visibility = '';
+      ghost.remove();
+      if (state._m43PendingShift?.token === nowToken) state._m43PendingShift = null;
+    };
+    setTimeout(clear, 500);
+  }, 2000);
+}
 
 /* ★ 開く／閉じる：⇅ 用 */
 /* ★ 開く／閉じる：⇅ 用 */
@@ -1800,6 +1888,7 @@ renderM31(v);
     renderM26(v);
     renderM42(v);
     renderM43(v);
+    runM43InsertionAnim(v);
     renderM44(v);
     renderM49(v);
     renderM53(v);
@@ -2292,6 +2381,7 @@ if ((v.mission?.id|0) === 23) {
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table';
+    box.dataset.tableIdx = String(idx);
     box.addEventListener('mouseenter', ()=> box.classList.add('elevated'));
     box.addEventListener('mouseleave', ()=> {
       const hasTokenLater = (t.hand||[]).some(c=> (c.tokens||[]).length>0);
@@ -2614,7 +2704,9 @@ openMenuAtClick([
       card.appendChild(bot);
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
-const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
+const a=document.createElement('div');
+const isM43Added = ((state.watching?.mission?.id|0) === 43) && (c?.m43Added===true);
+a.className='alpha' + (isM43Added ? ' m43-added' : ''); a.textContent=c.alpha||'';
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -4578,19 +4670,23 @@ function renderM43(v){
         const n = A.shift(); // number
         const T = tbls[myTable];
         const hand = Array.isArray(T.hand) ? T.hand : [];
+        const newId = crypto.randomUUID();
         hand.push({
-          id: crypto.randomUUID(),
+          id: newId,
           num: n,
           kind: 'normal',
           open: false,
           ownerId: T.playerId || null,
           tokens: [],
+          m43Added: true,
           markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
         });
         hand.sort((a,b)=> a.num - b.num);
         const alpha = 'abcdefghijklmnopqrstuvwxyz';
         hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
         T.hand = hand;
+        const inserted = hand.find(c=>c.id===newId);
+        if (inserted) queueM43InsertionAnim(myTable, inserted.id);
 
         // DB へ反映（テーブル更新＋A群を更新）
         await Promise.all([
