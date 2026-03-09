@@ -196,6 +196,7 @@
   .card.open{background:#000}
   /* ★ アイテム2：選択可能カードの青枠 */
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
+  .card.reveal-pending{box-shadow:inset 0 0 0 0.5px #000;}
 
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center}
@@ -907,7 +908,8 @@ const state = {
   _lastMissionId:null};
 
 // カード公開ガード："ダブルタップを2回連続"で初めて公開する
-const REVEAL_DOUBLE_TAP_WINDOW_MS = 1200;
+const REVEAL_DOUBLE_TAP_WINDOW_MS = 3000;
+const REVEAL_PENDING_MS = 1000;
 function canRevealByDoubleDoubleTap(cardKey){
   const nowMs = Date.now();
   const g = state._revealGuard || (state._revealGuard = {});
@@ -921,6 +923,48 @@ function canRevealByDoubleDoubleTap(cardKey){
   }
   return false;
 }
+
+function showRevealPendingBorder(cardEl, cardKey){
+  if (!cardEl) return;
+  const g = state._revealPendingUi || (state._revealPendingUi = {});
+
+  Object.entries(g).forEach(([k, ent])=>{
+    if (k === cardKey) return;
+    if (ent?.timer) clearTimeout(ent.timer);
+    ent?.el?.classList?.remove('reveal-pending');
+    delete g[k];
+  });
+
+  const prev = g[cardKey];
+  if (prev?.timer) clearTimeout(prev.timer);
+
+  cardEl.classList.add('reveal-pending');
+  const timer = setTimeout(()=>{
+    cardEl.classList.remove('reveal-pending');
+    if (g[cardKey]?.timer === timer) delete g[cardKey];
+  }, REVEAL_PENDING_MS);
+
+  g[cardKey] = { el:cardEl, timer };
+}
+
+function clearRevealPendingBorder(cardKey){
+  const g = state._revealPendingUi;
+  if (!g) return;
+  if (cardKey){
+    const ent = g[cardKey];
+    if (!ent) return;
+    if (ent.timer) clearTimeout(ent.timer);
+    ent.el?.classList?.remove('reveal-pending');
+    delete g[cardKey];
+    return;
+  }
+  Object.keys(g).forEach(k=> clearRevealPendingBorder(k));
+}
+
+document.addEventListener('click', (e)=>{
+  if (e.target?.closest?.('.card.reveal-pending')) return;
+  clearRevealPendingBorder();
+}, true);
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -2632,14 +2676,21 @@ openMenuAtClick([
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
             if(blockingI2 || blockingI18) return;
             if (!c.open){
-              if (!canRevealByDoubleDoubleTap(cardKey)) return;
+              if (!canRevealByDoubleDoubleTap(cardKey)){
+                showRevealPendingBorder(card, cardKey);
+                return;
+              }
+              clearRevealPendingBorder(cardKey);
               await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: true});
               return;
             }
+            clearRevealPendingBorder(cardKey);
             await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: false});
           }
         };
-         card.onclick = async ()=>{};
+         card.onclick = async ()=>{
+           if (!c.open) showRevealPendingBorder(card, cardKey);
+         };
          let lastTouchDoubleAt = 0;
          card.ondblclick = async (ev)=>{
            if (Date.now() - lastTouchDoubleAt < 500) return; // touch由来の擬似dblclickを無視
