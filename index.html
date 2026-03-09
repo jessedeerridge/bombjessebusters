@@ -194,6 +194,7 @@
   .card.back{background:#fff url('./codeback.jpg') center/cover no-repeat;border-color:#ccc}
     .card.back .num{display:none;}   /* ← 裏状態では数字を隠す */
   .card.open{background:#000}
+  .card.reveal-armed{outline:1.5px solid #000;outline-offset:-1.5px;}
   /* ★ アイテム2：選択可能カードの青枠 */
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
 
@@ -1157,6 +1158,42 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function cssNum(name){const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return parseFloat(v.replace('px',''))||0;}
 const now=()=>Date.now();
+
+let revealArmState = null;
+function clearRevealArm(){
+  if (revealArmState?.timer) clearTimeout(revealArmState.timer);
+  if (revealArmState?.table != null){
+    const sel = `.card-wrap[data-table="${revealArmState.table}"][data-card-key="${revealArmState.cardKey}"] .card`;
+    const armedCard = document.querySelector(sel);
+    if (armedCard) armedCard.classList.remove('reveal-armed');
+  }
+  revealArmState = null;
+}
+function armReveal(table, cardKey){
+  clearRevealArm();
+  const sel = `.card-wrap[data-table="${table}"][data-card-key="${cardKey}"] .card`;
+  const cardEl = document.querySelector(sel);
+  if (!cardEl) return;
+  cardEl.classList.add('reveal-armed');
+  const timer = setTimeout(()=>{ clearRevealArm(); }, 900);
+  revealArmState = { table, cardKey, timer, at: now() };
+}
+function isRevealArmed(table, cardKey){
+  return !!revealArmState
+    && revealArmState.table === table
+    && revealArmState.cardKey === cardKey
+    && (now() - revealArmState.at) <= 900;
+}
+
+document.addEventListener('click', (ev)=>{
+  if (!revealArmState) return;
+  const wrap = ev.target.closest?.('.card-wrap');
+  if (!wrap){ clearRevealArm(); return; }
+  const same = Number(wrap.dataset.table) === revealArmState.table
+    && String(wrap.dataset.cardKey || '') === String(revealArmState.cardKey);
+  if (!same) clearRevealArm();
+}, true);
+
   // スクロール位置を保ったままDOMを更新するガード
   function withScrollHold(fn){
     const x = window.scrollX, y = window.scrollY;
@@ -2492,6 +2529,8 @@ content.appendChild(charCol);
 wrap.dataset.table = String(idx);
 wrap.dataset.cardId = String(c.id||'');
 wrap.dataset.cardIndex = String(ci);
+const cardKey = String(c.id || `ci-${ci}`);
+wrap.dataset.cardKey = cardKey;
 
       // #43: 挿入アニメ対象カードは、nanoから飛ぶ前に見えないよう先に隠す
       const m43Anim = v?.meta?.m43_insertAnim;
@@ -2614,7 +2653,17 @@ openMenuAtClick([
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
             if(blockingI2 || blockingI18) return;
-            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open});
+            if (c.open){
+              clearRevealArm();
+              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: false});
+              return;
+            }
+            if (isRevealArmed(idx, cardKey)){
+              clearRevealArm();
+              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: true});
+              return;
+            }
+            armReveal(idx, cardKey);
           }
         };
       }
