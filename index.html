@@ -6861,15 +6861,19 @@ function openRolePickZoomToPreview(previewEl, faceName, myIdx){
   previewEl.style.pointerEvents = 'auto';
   previewEl.innerHTML = '';
 
+  const wrap = document.createElement('div');
+  wrap.className = 'conzoom-wrap';
+
   const big = document.createElement('div');
   big.className = 'conzoom-card'; // 拡大見た目は流用でOK（掃除対象ではない）
   big.style.backgroundImage = `url('./${faceName}')`;
-  previewEl.appendChild(big);
+  wrap.appendChild(big);
+  previewEl.appendChild(wrap);
 
   // 拡大カードクリックで「選択する」表示（トグル）
   big.addEventListener('click', e=>{
     e.stopPropagation();
-    let m = previewEl.querySelector('.conzoom-menu');
+    let m = wrap.querySelector('.conzoom-menu');
     if (m){ m.remove(); return; }
     m = document.createElement('div');
     m.className = 'conzoom-menu';
@@ -6888,7 +6892,7 @@ function openRolePickZoomToPreview(previewEl, faceName, myIdx){
     };
 
     m.appendChild(btnPick);
-    previewEl.appendChild(m);
+    wrap.appendChild(m);
   }, { once:false });
 }
 
