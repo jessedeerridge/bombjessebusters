@@ -450,6 +450,16 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   background-size:contain; background-repeat:no-repeat; background-position:center;
   pointer-events:auto;   /* クリックで回収メニュー */
 }
+.m43-alpha-dashed{ border:0.4px dashed #111 !important; }
+.m43-pre-slot{
+  width:0;
+  overflow:hidden;
+  animation:m43PushRight .35s ease-out forwards;
+}
+.m43-pre-slot .card,
+.m43-pre-slot .alpha{ border:none !important; background:transparent !important; color:transparent !important; }
+@keyframes m43PushRight{ from{width:0;} to{width:var(--card-w);} }
+.m43-fly-card{ z-index: 30000; }
 
 
   
@@ -2615,6 +2625,7 @@ openMenuAtClick([
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
 const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
+if (((state.watching?.mission?.id|0) === 43) && (c.kind==='red' || c.kind==='yellow')) a.classList.add('m43-alpha-dashed');
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -4575,17 +4586,64 @@ function renderM43(v){
 
       // A群から1枚取り出し（先頭＝一番上）
       if (A.length > 0 && tbls[myTable]) {
-        const n = A.shift(); // number
+        const n = A.shift();
         const T = tbls[myTable];
-        const hand = Array.isArray(T.hand) ? T.hand : [];
+        const oldHand = Array.isArray(T.hand) ? T.hand.slice() : [];
+
+        // 1) 先に透明のカード枠・帯枠なしプレースホルダを差し込み、既存札だけ右へ押し出す
+        const myBox = tablesEl.querySelectorAll('.table-box')[myTable];
+        const handEl = myBox?.querySelector('.hand');
+        let insertPos = oldHand.findIndex(cc => (cc?.num|0) >= (n|0));
+        if (insertPos < 0) insertPos = oldHand.length;
+
+        if (handEl){
+          const pre = document.createElement('div');
+          pre.className = 'card-wrap m43-pre-slot';
+          pre.innerHTML = '<div class="card"></div><div class="badge-fixed"><div class="alpha"></div></div>';
+          handEl.insertBefore(pre, handEl.children[insertPos] || null);
+
+          // 2) 2秒後に nano の位置からカードが移動して収まる演出
+          const nano = document.getElementById('m43Nano');
+          const nanoRect = nano?.getBoundingClientRect();
+          const slotRect = pre.getBoundingClientRect();
+          if (nanoRect && slotRect){
+            const fly = document.createElement('div');
+            fly.className = 'card m43-fly-card';
+            fly.style.position = 'fixed';
+            fly.style.left = `${nanoRect.left + 16}px`;
+            fly.style.top = `${nanoRect.top + 8}px`;
+            fly.style.transition = 'transform .5s ease, opacity .5s ease';
+            const isReceiver = ((T.playerId||null) === state.userId);
+            if (!isReceiver) fly.classList.add('back');
+            else {
+              const numEl = document.createElement('div'); numEl.className='num'; numEl.textContent=String(n);
+              fly.appendChild(numEl);
+              const bot=document.createElement('div'); bot.className='img-bottom'; bot.style.backgroundImage='url("./codenumber.jpg")';
+              fly.appendChild(bot);
+            }
+            document.body.appendChild(fly);
+            setTimeout(()=>{
+              const dx = slotRect.left - (nanoRect.left + 16);
+              const dy = slotRect.top  - (nanoRect.top + 8);
+              fly.style.transform = `translate(${dx}px, ${dy}px)`;
+              fly.style.opacity = '0.9';
+            }, 2010);
+            setTimeout(()=>{ fly.remove(); }, 2650);
+          }
+          setTimeout(()=>{ if (pre.isConnected) pre.remove(); }, 2700);
+        }
+
+        await new Promise(r=>setTimeout(r, 2000));
+
+        const hand = oldHand.slice();
         hand.push({
           id: crypto.randomUUID(),
           num: n,
           kind: 'normal',
-          open: false,
+          open: ((T.playerId||null) === state.userId),
           ownerId: T.playerId || null,
           tokens: [],
-          markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
+          markUntil: Date.now() + 5000
         });
         hand.sort((a,b)=> a.num - b.num);
         const alpha = 'abcdefghijklmnopqrstuvwxyz';
