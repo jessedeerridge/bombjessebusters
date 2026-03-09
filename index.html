@@ -4665,35 +4665,40 @@ node.style.top  = `0px`;
   state._m43AnimId = anim.id;
   flyOld?.remove();
 
-  const fly = document.createElement('div');
-  fly.id = 'm43FlyCard';
-  fly.className = 'm43-fly-card';
-  const isReceiver = ((v?.tables?.[anim.toTable]?.playerId||'') === state.userId);
-  if (!isReceiver) fly.classList.add('back');
-  if (isReceiver){
-    const numEl = document.createElement('div');
-    numEl.className = 'num';
-    numEl.textContent = String(anim.num ?? '');
-    fly.appendChild(numEl);
-  }
-  const from = node.getBoundingClientRect();
-  fly.style.left = `${from.left}px`;
-  fly.style.top  = `${from.top}px`;
-  document.body.appendChild(fly);
-
   const delay = Math.max(0, (anim.startAt|0) + 2000 - Date.now());
   setTimeout(()=>{
     const boxes = tablesEl.querySelectorAll('.table');
     const box = boxes[anim.toTable|0];
     const handEl = box?.querySelector('.hand');
-    if (!handEl || !fly.isConnected) return;
+    if (!handEl) return;
+
+    const fly = document.createElement('div');
+    fly.id = 'm43FlyCard';
+    fly.className = 'm43-fly-card';
+    const isReceiver = ((v?.tables?.[anim.toTable]?.playerId||'') === state.userId);
+    if (!isReceiver) fly.classList.add('back');
+    if (isReceiver){
+      const numEl = document.createElement('div');
+      numEl.className = 'num';
+      numEl.textContent = String(anim.num ?? '');
+      fly.appendChild(numEl);
+    }
+
+    const from = node.getBoundingClientRect();
     const hr = handEl.getBoundingClientRect();
     const W = cssNum('--card-w'), G = cssNum('--card-gap');
     const x = hr.left + ((anim.insertIndex|0) * (W + G));
     const y = hr.top;
-    fly.style.left = `${x}px`;
-    fly.style.top  = `${y}px`;
-    setTimeout(()=>{ if (fly.isConnected) fly.remove(); }, 650);
+
+    fly.style.left = `${from.left}px`;
+    fly.style.top  = `${from.top}px`;
+    document.body.appendChild(fly);
+
+    requestAnimationFrame(()=>{
+      fly.style.left = `${x}px`;
+      fly.style.top  = `${y}px`;
+      setTimeout(()=>{ if (fly.isConnected) fly.remove(); }, 650);
+    });
   }, delay);
 }
 
