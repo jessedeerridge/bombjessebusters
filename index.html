@@ -196,7 +196,7 @@
   .card.open{background:#000}
   /* ★ アイテム2：選択可能カードの青枠 */
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
-  .card.reveal-pending{box-shadow:inset 0 0 0 0.5px #000;}
+  .card.reveal-pending{box-shadow:inset 0 0 0 1px #000;}
 
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center}
@@ -910,6 +910,7 @@ const state = {
 // カード公開ガード："ダブルタップを2回連続"で初めて公開する
 const REVEAL_DOUBLE_TAP_WINDOW_MS = 3000;
 const REVEAL_PENDING_MS = 1000;
+const TOUCH_DOUBLE_TAP_MAX_INTERVAL_MS = 700;
 function canRevealByDoubleDoubleTap(cardKey){
   const nowMs = Date.now();
   const g = state._revealGuard || (state._revealGuard = {});
@@ -2703,7 +2704,7 @@ openMenuAtClick([
            const nowMs = Date.now();
            const dt = nowMs - lastTouchAt;
            lastTouchAt = nowMs;
-           if (dt > 330) return;
+           if (dt > TOUCH_DOUBLE_TAP_MAX_INTERVAL_MS) return;
            lastTouchDoubleAt = nowMs;
            ev.preventDefault();
            await tryToggleOpen();
