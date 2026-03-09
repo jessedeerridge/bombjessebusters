@@ -685,6 +685,20 @@ main:not(:has(#lobby.hidden)) > * {
   visibility: hidden !important;
 }
 
+.card-wrap.swap-collapse{
+  width:0 !important;
+  min-width:0 !important;
+  margin:0 !important;
+  opacity:0;
+  overflow:hidden;
+  transition:width .2s ease, opacity .2s ease;
+}
+.alpha.swap-gray{
+  background:#a3a3a3;
+  border-color:#737373;
+  color:#111;
+}
+
 
 
 /* ★ M42: -2 用 黒ポップ */
@@ -2687,7 +2701,7 @@ openMenuAtClick([
       card.appendChild(bot);
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
-const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.classList.add('m43-added'); a.textContent=c.alpha||'';
+const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.classList.add('m43-added'); if (c?.swapGray) a.classList.add('swap-gray'); a.textContent=c.alpha||'';
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -7556,6 +7570,14 @@ async function doItem2Swap(A, B){
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
 
+  const myIdx = (tables||[]).findIndex(t => t?.playerId === state.userId);
+  const mySel = (myIdx === A.table) ? A : (myIdx === B.table ? B : null);
+  const mySelEl = mySel
+    ? document.querySelector(`.card-wrap[data-table="${mySel.table}"][data-card-id="${mySel.cardId}"]`)
+    : null;
+  const mySelCardEl = mySelEl?.querySelector('.card');
+  const mySelRect = mySelCardEl?.getBoundingClientRect() || null;
+
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
   const insertSortedRight = (hand, card)=>{
@@ -7566,22 +7588,47 @@ async function doItem2Swap(A, B){
   };
 
   const mark = now()+10000; // 10秒
- const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2'};
-   const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2'};
+  const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2', swapGray:true};
+  const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2', swapGray:true};
   insertSortedRight(b.hand, toB);
   insertSortedRight(a.hand, toA);
 
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(a.hand); realpha(b.hand);
 
+  if (mySelEl) mySelEl.classList.add('swap-collapse');
+
   await Promise.all([
     set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand),
     set(ref(db, `rooms/${state.roomCode}/tables/${B.table}/hand`), b.hand),
     update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null })
   ]);
+
+  const myInserted = (myIdx === A.table) ? toA : (myIdx === B.table ? toB : null);
+  if (mySelRect && myInserted?.id){
+    await new Promise(r=>requestAnimationFrame(r));
+    const toEl = document.querySelector(`.card-wrap[data-table="${myIdx}"][data-card-id="${myInserted.id}"]`);
+    if (toEl){
+      const toRect = toEl.getBoundingClientRect();
+      const ghost = document.createElement('div');
+      ghost.className = 'm43-fly-card front';
+      ghost.style.left = `${mySelRect.left}px`;
+      ghost.style.top  = `${mySelRect.top}px`;
+      ghost.style.width = `${mySelRect.width}px`;
+      ghost.style.height = `${mySelRect.height}px`;
+      ghost.style.transform = 'translate(0,-22px)';
+      ghost.style.transition = 'transform .24s ease';
+      document.body.appendChild(ghost);
+      await new Promise(r=>setTimeout(r, 30));
+      ghost.style.transform = `translate(${toRect.left - mySelRect.left}px, ${toRect.top - mySelRect.top}px)`;
+      await new Promise(r=>setTimeout(r, 250));
+      ghost.remove();
+      toEl.querySelector('.alpha')?.classList.add('swap-gray');
+    }
+  }
+
   // 交換後：member(9) を自分が持っているなら枠の9を裏返す
   try{
-    const myIdx = (tables||[]).findIndex(t => t?.playerId === state.userId);
     if (myIdx >= 0){
       const meChar = tables[myIdx]?.character || {};
       const isNine = String(meChar.face||'').includes('member (9).jpg');
