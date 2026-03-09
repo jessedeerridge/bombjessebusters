@@ -2492,7 +2492,7 @@ wrap.dataset.cardIndex = String(ci);
       const isM43PendingCard = ((v?.mission?.id|0) === 43)
         && !!m43Anim?.id
         && String(c.id||'') === String(m43Anim.cardId||'')
-        && (state._m43AnimDoneId !== m43Anim.id);
+        && (state._m43AnimFinishedId !== m43Anim.id);
       if (isM43PendingCard){
         wrap.style.visibility = 'hidden';
         wrap.style.pointerEvents = 'none';
@@ -4656,8 +4656,9 @@ node.style.top  = `0px`;
 function runM43InsertAnimation(v){
   const anim = v?.meta?.m43_insertAnim;
   if (!anim?.id) return;
-  if (state._m43AnimDoneId === anim.id) return;
-  state._m43AnimDoneId = anim.id;
+  if (state._m43AnimFinishedId === anim.id) return;
+  if (state._m43AnimRunningId === anim.id) return;
+  state._m43AnimRunningId = anim.id;
 
   const tableIdx = anim.table|0;
   const insertIndex = anim.insertIndex|0;
@@ -4691,6 +4692,7 @@ function runM43InsertAnimation(v){
     const targetWrap = document.querySelector(targetSelector);
     if (!nano || !targetWrap){
       if (hiddenWrap){ hiddenWrap.style.visibility = ''; hiddenWrap.style.pointerEvents = ''; }
+      state._m43AnimRunningId = null;
       return;
     }
 
@@ -4703,6 +4705,7 @@ function runM43InsertAnimation(v){
     if (!Number.isFinite(a.left) || !Number.isFinite(b.left)) {
       targetWrap.style.visibility = '';
       targetWrap.style.pointerEvents = '';
+      state._m43AnimRunningId = null;
       return;
     }
 
@@ -4734,6 +4737,8 @@ function runM43InsertAnimation(v){
       targetWrap.style.visibility = '';
       targetWrap.style.pointerEvents = '';
       hiddenWrap = null;
+      state._m43AnimFinishedId = anim.id;
+      state._m43AnimRunningId = null;
     }, 380);
   }, shiftMs + settleDelayMs);
 }
