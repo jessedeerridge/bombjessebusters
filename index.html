@@ -2486,6 +2486,17 @@ content.appendChild(charCol);
 wrap.dataset.table = String(idx);
 wrap.dataset.cardId = String(c.id||'');
 wrap.dataset.cardIndex = String(ci);
+
+      // #43: 挿入アニメ対象カードは、nanoから飛ぶ前に見えないよう先に隠す
+      const m43Anim = v?.meta?.m43_insertAnim;
+      const isM43PendingCard = ((v?.mission?.id|0) === 43)
+        && !!m43Anim?.id
+        && String(c.id||'') === String(m43Anim.cardId||'')
+        && (state._m43AnimDoneId !== m43Anim.id);
+      if (isM43PendingCard){
+        wrap.style.visibility = 'hidden';
+        wrap.style.pointerEvents = 'none';
+      }
       
       if (c.gone === true){
   wrap.classList.add('m42-gone');     // ★ 数字・トークンなど別レイヤもまとめて不可視
