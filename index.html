@@ -7637,14 +7637,13 @@ async function playHookSwapAnimation(A, B, tables){
       const h = handEl(ti);
       if (!h) return {x:0,y:0};
       const wraps = Array.from(h.querySelectorAll('.card-wrap')).filter(w=> w.style.visibility!=='hidden');
-      const refW = wraps[Math.min(ins, wraps.length-1)] || wraps[wraps.length-1] || h;
-      const rr = refW.getBoundingClientRect();
       if (wraps.length===0) {
         const rh = h.getBoundingClientRect();
         return {x:rh.left, y:rh.top};
       }
-      if (ins >= wraps.length) return {x: rr.left + shift, y: rr.top};
-      return {x: rr.left, y: rr.top};
+      const first = wraps[0].getBoundingClientRect();
+      const clamped = Math.max(0, Math.min(ins, wraps.length));
+      return {x: first.left + (clamped * shift), y: first.top};
     };
 
     const ta = targetPoint(A.table, insA);
