@@ -4603,7 +4603,7 @@ function renderM43(v){
         const T = tbls[myTable];
         const hand = Array.isArray(T.hand) ? T.hand : [];
         const newId = crypto.randomUUID();
-        hand.push({
+        const newCard = {
           id: newId,
           num: n,
           kind: 'normal',
@@ -4612,9 +4612,13 @@ function renderM43(v){
           tokens: [],
           m43Added: true,
           markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
-        });
-        hand.sort((a,b)=> a.num - b.num);
-        const insertIndex = Math.max(0, hand.findIndex(c=> c.id === newId));
+        };
+
+        // 同値は「右端」に入れる
+        let insertIndex = 0;
+        while (insertIndex < hand.length && (hand[insertIndex]?.num|0) <= n) insertIndex++;
+        hand.splice(insertIndex, 0, newCard);
+
         const alpha = 'abcdefghijklmnopqrstuvwxyz';
         hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
         T.hand = hand;
@@ -7505,13 +7509,18 @@ async function doItem2Swap(A, B){
 
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
-  const insertSortedLeft = (hand, card)=>{ const n = card.num; let pos = 0; while(pos<hand.length && hand[pos].num < n) pos++; while(pos>0 && hand[pos-1].num===n) pos--; hand.splice(pos,0,card); };
+  const insertSortedRight = (hand, card)=>{
+    const n = card.num;
+    let pos = 0;
+    while(pos < hand.length && (hand[pos]?.num|0) <= n) pos++;
+    hand.splice(pos,0,card);
+  };
 
   const mark = now()+10000; // 10秒
  const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2'};
    const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2'};
-  insertSortedLeft(b.hand, toB);
-  insertSortedLeft(a.hand, toA);
+  insertSortedRight(b.hand, toB);
+  insertSortedRight(a.hand, toA);
 
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(a.hand); realpha(b.hand);
