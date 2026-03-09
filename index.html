@@ -905,6 +905,22 @@ const state = {
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
   m22GaveOnce:false, // ★ #22：自分が渡した一回ガード（即時連打対策）
   _lastMissionId:null};
+
+// カード公開ガード："ダブルタップを2回連続"で初めて公開する
+const REVEAL_DOUBLE_TAP_WINDOW_MS = 1200;
+function canRevealByDoubleDoubleTap(cardKey){
+  const nowMs = Date.now();
+  const g = state._revealGuard || (state._revealGuard = {});
+  const prev = g[cardKey] || { count:0, at:0 };
+  const within = (nowMs - prev.at) <= REVEAL_DOUBLE_TAP_WINDOW_MS;
+  const count = within ? (prev.count + 1) : 1;
+  g[cardKey] = { count, at:nowMs };
+  if (count >= 2){
+    delete g[cardKey];
+    return true;
+  }
+  return false;
+}
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -2608,15 +2624,39 @@ openMenuAtClick([
 
         };
       }else{
-         card.onclick = async ()=>{
+         const cardKey = `${idx}:${c.id||ci}`;
+         const tryToggleOpen = async ()=>{
    if (state.watching?.meta?.m42_on || state.watching?.meta?.m42Swap?.on || state.watching?.meta?.m42M2?.on) return;
           if(isMine){
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
             if(blockingI2 || blockingI18) return;
-            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: !c.open});
+            if (!c.open){
+              if (!canRevealByDoubleDoubleTap(cardKey)) return;
+              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: true});
+              return;
+            }
+            await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: false});
           }
         };
+         card.onclick = async ()=>{};
+         let lastTouchDoubleAt = 0;
+         card.ondblclick = async (ev)=>{
+           if (Date.now() - lastTouchDoubleAt < 500) return; // touch由来の擬似dblclickを無視
+           ev.preventDefault();
+           await tryToggleOpen();
+         };
+
+         let lastTouchAt = 0;
+         card.addEventListener('touchend', async (ev)=>{
+           const nowMs = Date.now();
+           const dt = nowMs - lastTouchAt;
+           lastTouchAt = nowMs;
+           if (dt > 330) return;
+           lastTouchDoubleAt = nowMs;
+           ev.preventDefault();
+           await tryToggleOpen();
+         }, { passive:false });
       }
 
       const num=document.createElement('div'); num.className='num';
