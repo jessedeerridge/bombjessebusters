@@ -200,6 +200,7 @@
 
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
+  .alpha.m43-muted{background:#9ca3af;color:transparent;border-color:#6b7280;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
     font-size:11px; line-height:1;
@@ -2614,7 +2615,10 @@ openMenuAtClick([
       card.appendChild(bot);
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
-const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
+const a=document.createElement('div');
+const isM43AddedCard = ((state.watching?.mission?.id|0) === 43) && (c?.m43Added === true);
+a.className='alpha' + (isM43AddedCard ? ' m43-muted' : '');
+a.textContent = isM43AddedCard ? '' : (c.alpha||'');
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -4584,12 +4588,12 @@ function renderM43(v){
           kind: 'normal',
           open: false,
           ownerId: T.playerId || null,
+          alpha: '',
+          m43Added: true,
           tokens: [],
           markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
         });
         hand.sort((a,b)=> a.num - b.num);
-        const alpha = 'abcdefghijklmnopqrstuvwxyz';
-        hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
         T.hand = hand;
 
         // DB へ反映（テーブル更新＋A群を更新）
