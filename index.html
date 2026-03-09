@@ -4668,18 +4668,28 @@ function runM43InsertAnimation(v){
     }
   });
 
-  const targetWrap = document.querySelector(`.card-wrap[data-table="${tableIdx}"][data-card-id="${String(anim.cardId||'')}"]`);
-  if (targetWrap) targetWrap.style.visibility = 'hidden'; // 挿入位置を先に空ける
+  const targetSelector = `.card-wrap[data-table="${tableIdx}"][data-card-id="${String(anim.cardId||'')}"]`;
+  let hiddenWrap = document.querySelector(targetSelector);
+  if (hiddenWrap) hiddenWrap.style.visibility = 'hidden'; // 挿入位置を先に空ける
 
   setTimeout(()=>{
     const nano = document.getElementById('m43Nano');
-    if (!nano || !targetWrap) return;
+    const targetWrap = document.querySelector(targetSelector);
+    if (!nano || !targetWrap){
+      if (hiddenWrap) hiddenWrap.style.visibility = '';
+      return;
+    }
 
+    const targetCard = targetWrap.querySelector('.card') || targetWrap;
     const table = (v?.tables||[])[tableIdx] || {};
     const showFront = table.playerId === state.userId;
 
     const a = nano.getBoundingClientRect();
-    const b = targetWrap.getBoundingClientRect();
+    const b = targetCard.getBoundingClientRect();
+    if (!Number.isFinite(a.left) || !Number.isFinite(b.left)) {
+      targetWrap.style.visibility = '';
+      return;
+    }
 
     const fly = document.createElement('div');
     fly.className = `m43-fly-card ${showFront ? 'front' : 'back'}`;
@@ -4707,6 +4717,7 @@ function runM43InsertAnimation(v){
     setTimeout(()=>{
       fly.remove();
       targetWrap.style.visibility = '';
+      hiddenWrap = null;
     }, 380);
   }, shiftMs + settleDelayMs);
 }
