@@ -200,6 +200,7 @@
 
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
+  .alpha.m43-added{ border:0.4px dashed #000; }
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
     font-size:11px; line-height:1;
@@ -450,6 +451,18 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   background-size:contain; background-repeat:no-repeat; background-position:center;
   pointer-events:auto;   /* クリックで回収メニュー */
 }
+.card-wrap.m43-pre-shift{ transition:transform .32s ease; transform:translateX(28px); }
+.m43-fly-card{
+  position:fixed; left:0; top:0;
+  width:var(--card-w); height:var(--card-h);
+  border-radius:6px; border:1px solid #ddd;
+  z-index:2147483646; pointer-events:none;
+  transform:translate(0,0);
+  transition:transform .55s ease;
+}
+.m43-fly-card.face{ background:#000; }
+.m43-fly-card.back{ background:#fff url('./codeback.jpg') center/cover no-repeat; border-color:#ccc; }
+.m43-fly-card .num{ display:block; }
 
 
   
@@ -2600,7 +2613,8 @@ openMenuAtClick([
       const hasNum = (c.num != null && !Number.isNaN(Number(c.num)));
       if (hasNum) {
         num.textContent = String(c.num);
-        num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
+        const isM43Added = ((state.watching?.mission?.id|0) === 43) && !!c.m43Added;
+        num.style.visibility = ((c.open || isMine) || isM43Added) ? 'visible' : 'hidden';
       } else {
         num.textContent = '';
         num.style.visibility = 'hidden';
@@ -2614,7 +2628,9 @@ openMenuAtClick([
       card.appendChild(bot);
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
-const a=document.createElement('div'); a.className='alpha'; a.textContent=c.alpha||'';
+const a=document.createElement('div');
+a.className = 'alpha' + ((((state.watching?.mission?.id|0) === 43) && c.m43Added) ? ' m43-added' : '');
+a.textContent=c.alpha||'';
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -4505,12 +4521,23 @@ B.hand[B.idx] = toB;
 /* ここまで追加：#42 */
 
 /* ここから追加：ミッション43 */
+function clearM43Anim(){
+  if (state._m43ShiftTimer){ clearTimeout(state._m43ShiftTimer); state._m43ShiftTimer = null; }
+  if (state._m43FlyTimer){ clearTimeout(state._m43FlyTimer); state._m43FlyTimer = null; }
+  if (Array.isArray(state._m43ShiftNodes)){
+    state._m43ShiftNodes.forEach(n=> n?.classList?.remove('m43-pre-shift'));
+    state._m43ShiftNodes = null;
+  }
+  document.getElementById('m43FlyCard')?.remove();
+}
+
 function renderM43(v){
   const isM43 = ((v?.mission?.id|0) === 43);
   const old = document.getElementById('m43Nano');
 
   // ミッション43以外 → 後片付け
   if (!isM43){
+    clearM43Anim();
     if (old) old.remove();
     document.getElementById('nanoRow')?.remove(); // 旧・新UIの掃除
     return;
@@ -4523,6 +4550,7 @@ function renderM43(v){
       const initNano = (P>=5) ? 3 : 4;
       update(ref(db, `rooms/${state.roomCode}/meta`), { m43_nano: initNano, m43_pos: 0, m43_prevPos: 0 });
     }
+    clearM43Anim();
     if (old) old.remove();
     document.getElementById('nanoRow')?.remove();
     return;
@@ -4533,6 +4561,7 @@ function renderM43(v){
   const nanoLv  = clamp(v?.meta?.m43_nano|0, 0, 4);
 
   if (!pos){
+    clearM43Anim();
     if (old) old.remove();
     document.getElementById('nanoRow')?.remove();
     return;
@@ -4578,25 +4607,92 @@ function renderM43(v){
         const n = A.shift(); // number
         const T = tbls[myTable];
         const hand = Array.isArray(T.hand) ? T.hand : [];
-        hand.push({
+
+        const alpha = 'abcdefghijklmnopqrstuvwxyz';
+        const nextHand = hand.map(c=> ({ ...c, m43Added:false }));
+        const newCard = {
           id: crypto.randomUUID(),
           num: n,
           kind: 'normal',
           open: false,
           ownerId: T.playerId || null,
           tokens: [],
-          markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
+          markUntil: Date.now() + 5000,   // ← 5秒間「▼」表示
+          m43Added: true
+        };
+        nextHand.push(newCard);
+        nextHand.sort((a,b)=> a.num - b.num);
+        nextHand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
+
+        const insertedIndex = nextHand.findIndex(c=> c.id === newCard.id);
+
+        // 1) 先に既存カードだけ右へ押し出し
+        clearM43Anim();
+        const box = tablesEl?.children?.[myTable];
+        const wraps = box ? Array.from(box.querySelectorAll('.hand .card-wrap')) : [];
+        state._m43ShiftNodes = wraps;
+        wraps.forEach(w=> w.classList.add('m43-pre-shift'));
+
+        // 2) 2秒後に nano 位置からカードが収まるアニメ
+        await new Promise(res=>{
+          state._m43ShiftTimer = setTimeout(res, 2000);
         });
-        hand.sort((a,b)=> a.num - b.num);
-        const alpha = 'abcdefghijklmnopqrstuvwxyz';
-        hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
-        T.hand = hand;
+
+        const fly = document.createElement('div');
+        fly.id = 'm43FlyCard';
+        const isFace = (T.playerId === state.userId);
+        fly.className = 'm43-fly-card ' + (isFace ? 'face' : 'back');
+        if (isFace){
+          const num = document.createElement('div');
+          num.className = 'num';
+          num.textContent = String(newCard.num);
+          fly.appendChild(num);
+          const bot = document.createElement('div');
+          bot.className = 'img-bottom';
+          bot.style.backgroundImage = `url('./codenumber.jpg')`;
+          fly.appendChild(bot);
+        }
+        document.body.appendChild(fly);
+
+        const nano = document.getElementById('m43Nano');
+        const from = nano?.getBoundingClientRect();
+        const handEl = box?.querySelector('.hand');
+        const rHand = handEl?.getBoundingClientRect();
+        const gap = parseFloat(getComputedStyle(handEl || document.documentElement).gap || '3') || 3;
+        const targetX = (rHand ? (rHand.left + (insertedIndex * (24 + gap))) : 0);
+        const targetY = (rHand ? rHand.top : 0);
+
+        const startX = from ? (from.left + from.width/2 - 12) : targetX;
+        const startY = from ? (from.top + from.height/2 - 20) : targetY;
+        fly.style.left = `${startX}px`;
+        fly.style.top = `${startY}px`;
+
+        requestAnimationFrame(()=>{
+          fly.style.transform = `translate(${targetX - startX}px, ${targetY - startY}px)`;
+        });
+
+        T.hand = nextHand;
 
         // DB へ反映（テーブル更新＋A群を更新）
         await Promise.all([
           set(ref(db, `rooms/${code}/tables`), tbls),
           update(mRef, { m43_A: A })
         ]);
+        state._m43FlyTimer = setTimeout(()=>{ clearM43Anim(); }, 620);
+
+        // 新規追加フラグは短時間後に自動解除
+        setTimeout(async ()=>{
+          try{
+            const hs = await get(ref(db, `rooms/${code}/tables/${myTable}/hand`));
+            const arr = hs.val() || [];
+            let touched = false;
+            const out = arr.map(c=>{
+              if (c?.id === newCard.id && c?.m43Added){ touched = true; return { ...c, m43Added:false }; }
+              return c;
+            });
+            if (touched) await set(ref(db, `rooms/${code}/tables/${myTable}/hand`), out);
+          }catch(_e){}
+        }, 8000);
       }
 
       // 既存の「段階を下げる」もそのまま実行
