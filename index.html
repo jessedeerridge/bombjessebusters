@@ -187,6 +187,9 @@
   }
 
   .card-wrap{position:relative;width:var(--card-w);min-height:calc(var(--card-h) + 36px);flex:0 0 auto;}
+  .card-wrap.i2-lift{transform:translateY(calc(-1 * var(--card-h)));transition:transform .45s ease;z-index:30;}
+  .card-wrap.i2-squeeze{opacity:0;transform:translateY(calc(-1 * var(--card-h)));width:0;min-width:0;margin-right:0;overflow:hidden;transition:all .45s ease;}
+  .card-wrap.i2-gap{margin-left:calc(var(--card-w) + var(--card-gap));transition:margin-left .45s ease;}
   .card{
     width:var(--card-w);height:var(--card-h);border-radius:6px;border:1px solid #ddd;position:absolute;left:0;top:0;
     background:#bbb;display:flex;align-items:flex-start;justify-content:center;cursor:pointer;user-select:none
@@ -203,6 +206,7 @@
 
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
+  .alpha.swap-gray{background:#9ca3af;border-color:#6b7280;color:#fff;}
   .alpha.m43-added{border:0.4px dashed #000;}
   .m43-fly-card{position:fixed;left:0;top:0;width:var(--card-w);height:var(--card-h);border-radius:6px;z-index:2147483640;pointer-events:none;}
   .m43-fly-card .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;}
@@ -1158,6 +1162,77 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function cssNum(name){const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return parseFloat(v.replace('px',''))||0;}
 const now=()=>Date.now();
+const sleep=(ms)=>new Promise(r=>setTimeout(r, ms));
+
+async function playSwapHookAnimation(pairs=[]){
+  try{
+    const targets = pairs
+      .map(p=>({
+        from: document.querySelector(`.card-wrap[data-table="${p.from?.table}"][data-card-id="${p.from?.cardId}"]`),
+        to: document.querySelector(`.card-wrap[data-table="${p.to?.table}"][data-card-id="${p.to?.cardId}"]`)
+      }))
+      .filter(p=>p.from && p.to);
+    if (!targets.length) return;
+
+    targets.forEach(({from})=> from.classList.add('i2-lift'));
+    await sleep(1500);
+
+    targets.forEach(({from})=> from.classList.add('i2-squeeze'));
+    await sleep(1500);
+
+    const flyers = [];
+    targets.forEach(({from, to})=>{
+      const fromCard = from.querySelector('.card');
+      if (!fromCard) return;
+      const fr = fromCard.getBoundingClientRect();
+      const tr = to.getBoundingClientRect();
+
+      to.classList.add('i2-gap');
+      const fly = fromCard.cloneNode(true);
+      fly.classList.add('m43-fly-card');
+      fly.style.left = `${fr.left}px`;
+      fly.style.top  = `${fr.top}px`;
+      document.body.appendChild(fly);
+      flyers.push({el:fly, toX:tr.left, toY:tr.top});
+    });
+
+    await sleep(80);
+    flyers.forEach(({el,toX,toY})=>{
+      el.style.transition = 'left 1.2s ease, top 1.2s ease';
+      el.style.left = `${toX}px`;
+      el.style.top  = `${toY}px`;
+    });
+    await sleep(1500);
+
+    flyers.forEach(({el})=> el.remove());
+    targets.forEach(({from,to})=>{
+      from.classList.remove('i2-lift','i2-squeeze');
+      to.classList.remove('i2-gap');
+    });
+  }catch(e){ console.warn('[swap-hook anim]', e); }
+}
+
+async function playCharacterSwapHookAnimation(tableIdx){
+  const wrap = document.querySelector(`.table[data-table-idx="${tableIdx}"] .char-col, .table[data-table-idx="${tableIdx}"] .m61-stack`);
+  const card = wrap?.querySelector('.char-card, .m61-mini');
+  if (!card) return;
+  card.animate([
+    { transform:'translateY(0px)' },
+    { transform:'translateY(calc(-1 * var(--char-h)))' },
+    { transform:'translateY(calc(-1 * var(--char-h)))' }
+  ], { duration:1500, easing:'ease', fill:'forwards' });
+  await sleep(1500);
+  card.animate([
+    { transform:'translateY(calc(-1 * var(--char-h)))', opacity:0 },
+    { transform:'translateY(calc(-1 * var(--char-h)))', opacity:0 }
+  ], { duration:1500, easing:'ease', fill:'forwards' });
+  await sleep(1500);
+  card.animate([
+    { transform:'translateY(calc(-1 * var(--char-h)))', opacity:0 },
+    { transform:'translateY(0px)', opacity:1 }
+  ], { duration:1500, easing:'ease', fill:'forwards' });
+  await sleep(1500);
+}
 
 let revealArmState = null;
 function clearRevealArm(){
@@ -2687,7 +2762,7 @@ openMenuAtClick([
       card.appendChild(bot);
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
-const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.classList.add('m43-added'); a.textContent=c.alpha||'';
+const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.classList.add('m43-added'); if ((c?.swapGrayUntil|0) > now()) a.classList.add('swap-gray'); a.textContent=c.alpha||'';
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -6936,6 +7011,7 @@ function openRolePickZoomToPreview(previewEl, faceName, myIdx){
     btnPick.onclick = async ev=>{
       ev.stopPropagation();
       try{
+        await playCharacterSwapHookAnimation(myIdx);
         const room = state?.roomCode || state?.code;
         await update(ref(db, `rooms/${room}/tables/${myIdx}/character`), {
           face: faceName, flipped: false
@@ -7556,6 +7632,11 @@ async function doItem2Swap(A, B){
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
 
+  await playSwapHookAnimation([
+    { from:A, to:B },
+    { from:B, to:A }
+  ]);
+
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
   const insertSortedRight = (hand, card)=>{
@@ -7566,8 +7647,9 @@ async function doItem2Swap(A, B){
   };
 
   const mark = now()+10000; // 10秒
- const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2'};
-   const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2'};
+  const grayUntil = now()+15000;
+ const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2', swapGrayUntil: grayUntil};
+   const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2', swapGrayUntil: grayUntil};
   insertSortedRight(b.hand, toB);
   insertSortedRight(a.hand, toA);
 
