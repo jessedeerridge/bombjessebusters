@@ -47,12 +47,30 @@
   .host-tool{position:fixed;left:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:10}
 
   .items-bar{display:flex;align-items:center;gap:8px;margin-top:0}
-  .items{display:flex;gap:6px;align-items:center;overflow-x:auto}
+  .items{display:flex;gap:6px;align-items:center;overflow-x:auto;overflow-y:visible;padding-top:10px}
   .item{
     position:relative; width:var(--item-w);height:var(--item-h);
     border:1px solid #ddd;border-radius:8px;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
+  .item.alt-rule::after{
+    content:'×';
+    position:absolute;
+    top:-10px;
+    left:50%;
+    transform:translateX(-50%);
+    color:#dc2626;
+    font-size:9px;
+    font-family:'Arial Black','Segoe UI Symbol','Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;
+    font-weight:900;
+    line-height:1;
+    -webkit-text-stroke:.4px #dc2626;
+    text-shadow:0 0 .01px #dc2626;
+    pointer-events:none;
+    z-index:3;
+  }
+  .item.alt-rule.item-raised{ transform:translateY(-2px); }
+  .item.alt-rule.item-raised::after{ display:none; }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
   /* ★ M12：アイテムの下に付ける小型数値バッジ */
   .num-badge{
@@ -2275,6 +2293,36 @@ function renderMissionPanels(v){
 /* ===== Items & DI ===== */
 function renderItemsAndDi(v){
   if(!v || !v.started){ H(itemsBar,true); return; }
+  const missionId = (v?.mission?.id|0);
+  const useAltItemRule = ![15,18,23].includes(missionId);
+
+  const openNormalCountByNum = {};
+  let openYellowCount = 0;
+  (v.tables||[]).forEach(T=>{
+    (T.hand||[]).forEach(c=>{
+      if(c?.open!==true) return;
+      if(c.kind === 'yellow'){
+        openYellowCount += 1;
+        return;
+      }
+      if(c.kind === 'normal'){
+        const n = c.num|0;
+        openNormalCountByNum[n] = (openNormalCountByNum[n]||0) + 1;
+      }
+    });
+  });
+
+  const isAltRuleItemRaised = (itemNo)=>{
+    if(itemNo>=1 && itemNo<=12) return (openNormalCountByNum[itemNo]||0) >= 2;
+    if(itemNo===13) return openYellowCount >= 2;
+    if(itemNo===14) return (openNormalCountByNum[2]||0) >= 2;
+    if(itemNo===15) return (openNormalCountByNum[3]||0) >= 2;
+    if(itemNo===16) return (openNormalCountByNum[10]||0) >= 2;
+    if(itemNo===17) return (openNormalCountByNum[9]||0) >= 2;
+    if(itemNo===18) return (openNormalCountByNum[11]||0) >= 2;
+    return false;
+  };
+
   // ★ #23：広げる前は「アイテムのみ」非表示（DIは残す）
   // ★ #42：☝（ドラッグ＆ドロップ起動中）はアイテムとDIを一時的に非表示
   let hideItems = false;
@@ -2304,6 +2352,10 @@ function renderItemsAndDi(v){
   (v.items||[]).forEach((it, idx)=>{
     const flags = v?.mission?.flags || {};
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
+    if(useAltItemRule){
+      div.classList.add('alt-rule');
+      if(isAltRuleItemRaised(it.no)) div.classList.add('item-raised');
+    }
     if(!it.used){
       // #15: 最初は裏向き表示（使用可だが faceUp===false の間は裏面アートを表示）
       if(flags.itemsFaceDownStart && it.faceUp===false){
