@@ -348,6 +348,7 @@
 
 /* ★ チェック表（テーブル1の真上） */
 .checklist{
+  position:relative;
   display:flex; gap:6px; margin:0 0 0 10px; align-items:center;
 }
 .check-item{
@@ -355,6 +356,36 @@
   border:1px dashed #999; border-radius:4px;
   background:#fff; display:grid; place-items:center;
   font-size:12px; user-select:none; color:#000;
+}
+.check-gap-marker{
+  position:absolute;
+  top:50%;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  overflow:hidden;
+  transform:translate(-50%, -50%);
+  box-shadow:0 0 0 1px rgba(0,0,0,.25);
+  pointer-events:none;
+}
+.check-gap-marker .half{
+  width:100%;
+  height:50%;
+}
+.check-gap-marker .top.fixed{ background:rgba(220,38,38,.95); }
+.check-gap-marker .top.soft{ background:rgba(220,38,38,.45); }
+.check-gap-marker .bottom.fixed{ background:rgba(234,179,8,.95); }
+.check-gap-marker .bottom.soft{ background:rgba(234,179,8,.45); }
+.check-gap-marker .half.none{ background:transparent; }
+.check-gap-marker .center-dot{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:3px;
+  height:3px;
+  border-radius:50%;
+  background:#fff;
+  transform:translate(-50%, -50%);
 }
 .check-mark{
   position:absolute; inset:0; margin:auto;
@@ -1646,6 +1677,16 @@ function executeMixPlan(planList){
   const mixLines = [];
   const chooseLines = [];
 
+  const hintRaw = {
+    red: { fixed:new Set(), soft:new Set() },
+    yellow: { fixed:new Set(), soft:new Set() }
+  };
+  const addHint = (kind, status, codeNum)=>{
+    const gap = Math.floor(Number(codeNum)||0);
+    if (gap < 1 || gap > 11) return;
+    hintRaw[kind][status].add(gap);
+  };
+
   planList.forEach(p=>{
     if(p.type==='redPick'){
       const cand = pickK(MATERIALS.redCodes, p.k);
@@ -1655,11 +1696,14 @@ function executeMixPlan(planList){
     if(p.type==='yellowPick'){
       const cand = pickK(MATERIALS.yellowCodes, p.k);
       cand.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
-　     mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
+      mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
     }
-        if(p.type==='yellowFixed'){
+    if(p.type==='yellowFixed'){
       const cand = (p.list || []).slice();
-      cand.forEach(n => toAdd.push({ num:n, kind:'yellow' }));
+      cand.forEach(n => {
+        toAdd.push({ num:n, kind:'yellow' });
+        addHint('yellow', 'fixed', n);
+      });
       mixLines.push('<span style="color:gold;">▧</span>' + cand.map(v=>`[${v}]`).join(''));
     }
     if(p.type==='redChoose'){
@@ -1667,16 +1711,29 @@ function executeMixPlan(planList){
       chooseLines.push(`<span style="color:red;">●</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
       const take = pickK(cand, p.take);
       take.forEach(n=> toAdd.push({num:n, kind:'red'}));
+      cand.forEach(n=> addHint('red', (p.take>=p.from ? 'fixed' : 'soft'), n));
     }
     if(p.type==='yellowChoose'){
       const cand = pickK(MATERIALS.yellowCodes, p.from);
       chooseLines.push(`<span style="color:gold;">▧</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
       const take = pickK(cand, p.take);
       take.forEach(n=> toAdd.push({num:n, kind:'yellow'}));
+      cand.forEach(n=> addHint('yellow', (p.take>=p.from ? 'fixed' : 'soft'), n));
     }
   });
 
-  return { toAdd, mixLines, chooseLines };
+  const checkHints = {
+    red: {
+      fixed: Array.from(hintRaw.red.fixed),
+      soft: Array.from(hintRaw.red.soft).filter(n=> !hintRaw.red.fixed.has(n))
+    },
+    yellow: {
+      fixed: Array.from(hintRaw.yellow.fixed),
+      soft: Array.from(hintRaw.yellow.soft).filter(n=> !hintRaw.yellow.fixed.has(n))
+    }
+  };
+
+  return { toAdd, mixLines, chooseLines, checkHints };
 }
 
 /* pop positioning */
@@ -2393,9 +2450,39 @@ if ((v.mission?.id|0) === 23) {
           };
         }
       }
-      
+
       cl.appendChild(cell);
     }
+
+    const hints = v?.mission?.flags?.checkHints || {};
+    const hintStatus = { red:{}, yellow:{} };
+    (hints?.red?.soft||[]).forEach(g=>{ hintStatus.red[g|0] = 'soft'; });
+    (hints?.yellow?.soft||[]).forEach(g=>{ hintStatus.yellow[g|0] = 'soft'; });
+    (hints?.red?.fixed||[]).forEach(g=>{ hintStatus.red[g|0] = 'fixed'; });
+    (hints?.yellow?.fixed||[]).forEach(g=>{ hintStatus.yellow[g|0] = 'fixed'; });
+
+    for(let gap=1; gap<=11; gap++){
+      const redSt = hintStatus.red[gap];
+      const yelSt = hintStatus.yellow[gap];
+      if(!redSt && !yelSt) continue;
+      const marker = document.createElement('div');
+      marker.className = 'check-gap-marker';
+      marker.style.left = `${gap*36 - 3}px`;
+
+      const top = document.createElement('div');
+      top.className = `half top ${redSt || 'none'}`;
+      marker.appendChild(top);
+
+      const bottom = document.createElement('div');
+      bottom.className = `half bottom ${yelSt || 'none'}`;
+      marker.appendChild(bottom);
+
+      const dot = document.createElement('div');
+      dot.className = 'center-dot';
+      marker.appendChild(dot);
+      cl.appendChild(marker);
+    }
+
     tablesEl.appendChild(cl); // ← 直後にテーブル1が来るので「真上」になる
   }
 
@@ -8257,7 +8344,7 @@ let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
 
   // ▼ ミッション別：赤/黄の混入プランを取得＆実行
   const planList = buildMixPlan(missionId);
-  const { toAdd, mixLines, chooseLines } = executeMixPlan(planList);
+  const { toAdd, mixLines, chooseLines, checkHints } = executeMixPlan(planList);
 
   // #1/#2の旧実装は planList で包含できるが、互換のためフォールバック
   if(missionId===1 && planList.length===0){
@@ -8279,6 +8366,10 @@ let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
 
   // ミッション表示メタ生成（赤/黄の結果行を先頭に差し込む）
   missionMeta = missionInfo(missionId, { mixLines, chooseLines });
+  if ((checkHints?.red?.fixed?.length||0) || (checkHints?.red?.soft?.length||0) ||
+      (checkHints?.yellow?.fixed?.length||0) || (checkHints?.yellow?.soft?.length||0)) {
+    missionMeta.flags = { ...(missionMeta.flags||{}), checkHints };
+  }
   /* ▼▼ ここから追加：#29 数値カードの配布とセンター初期化 ▼▼ */
   if (missionId === 29) {
     const nums = MATERIALS.numbers.slice(); shuffle(nums); // 1..12 をシャッフル
