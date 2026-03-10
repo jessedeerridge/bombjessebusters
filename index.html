@@ -4905,6 +4905,16 @@ const onRotate = ()=>{
             if (idx>=0){
               hand.splice(idx,1);                 // 詰めて削除
               await set(ref(db, `rooms/${state.roomCode}/tables/${table}/hand`), hand);
+
+              // 公開コードが全て消えたら ☝ モードを自動解除
+              const allTablesSnap = await get(ref(db, `rooms/${state.roomCode}/tables`));
+              const allTables = allTablesSnap.val() || [];
+              const hasOpenCode = allTables.some(tb =>
+                (tb?.hand || []).some(cd => cd?.kind === 'normal' && cd?.open === true)
+              );
+              if (!hasOpenCode){
+                await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_on: false });
+              }
             }
           }finally{
             await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_drag: null });
