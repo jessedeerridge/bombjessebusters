@@ -199,7 +199,9 @@
   .char-card.member5-card,
   .m61-mini.member5-card,
   .char-card.member15-detector,
-  .m61-mini.member15-detector{ position:relative; }
+  .m61-mini.member15-detector,
+  .role-card.member5-card,
+  .role-card.member15-detector{ position:relative; }
 
   .char-card.member5-card::before,
   .m61-mini.member5-card::before,
@@ -7391,7 +7393,11 @@ function openRolePickOverlay(curFaceName, myIdx){
     for (const [normName, originalName] of baseMap.entries()){
       if (usedNorm.has(normName)) continue; // 他席が使用中なら除外
       const c = document.createElement('div');
-      c.className = 'concard'; // アイテムと同サイズの見た目を流用
+      c.className = 'concard role-card'; // アイテムと同サイズの見た目を流用
+      const altMemberMatch = String(originalName||'').match(/member\s*\(([6-9])\)\./i);
+      if (/member\s*\(5\)\./i.test(String(originalName||''))) c.classList.add('member5-card');
+      if (/member\s*\(([1-5])\)\./i.test(String(originalName||''))) c.classList.add('member15-detector');
+      if (altMemberMatch) c.classList.add(`member-alt${altMemberMatch[1]}`);
       c.style.backgroundImage = `url('./${originalName}')`;
       c.title = 'クリックで拡大';
       c.addEventListener('click', ev=>{
