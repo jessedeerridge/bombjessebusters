@@ -7569,8 +7569,8 @@ async function playHookSwapAnimation(A, B, tables){
 
     const alphaA = wa.querySelector('.alpha');
     const alphaB = wb.querySelector('.alpha');
-    if (alphaA && !alphaA.textContent.endsWith('-')) alphaA.textContent = `${alphaA.textContent}-`;
-    if (alphaB && !alphaB.textContent.endsWith('-')) alphaB.textContent = `${alphaB.textContent}-`;
+    const srcAlphaA = String(alphaA?.textContent || '');
+    const srcAlphaB = String(alphaB?.textContent || '');
 
     const setupFly = (el, r)=>{
       el.style.position='fixed';
@@ -7612,26 +7612,6 @@ async function playHookSwapAnimation(A, B, tables){
     const toB = aHand[aIdx];
     const insA = toA ? insertPos(aWithout, toA) : 0;
     const insB = toB ? insertPos(bWithout, toB) : 0;
-
-    const aAfter = aWithout.slice();
-    const bAfter = bWithout.slice();
-    if (toA) aAfter.splice(insA, 0, toA);
-    if (toB) bAfter.splice(insB, 0, toB);
-
-    const alphaSeq = 'abcdefghijklmnopqrstuvwxyz';
-    const alphaMapA = new Map(aAfter.map((c,i)=> [String(c?.id||''), alphaSeq[i%alphaSeq.length]]));
-    const alphaMapB = new Map(bAfter.map((c,i)=> [String(c?.id||''), alphaSeq[i%alphaSeq.length]]));
-
-    const applyAlphaMap = (ti, amap)=>{
-      const wraps = Array.from(handEl(ti)?.querySelectorAll('.card-wrap')||[]);
-      wraps.forEach(w=>{
-        const id = String(w.dataset.cardId||'');
-        const a = w.querySelector('.alpha');
-        if (!a) return;
-        const nxt = amap.get(id);
-        if (nxt) a.textContent = nxt;
-      });
-    };
 
     // 2) 詰める + 挿入位置を空ける（右スライド）
     const shift = cardW + gap;
@@ -7679,17 +7659,13 @@ async function playHookSwapAnimation(A, B, tables){
     cb.style.left = `${ta.x}px`; cb.style.top = `${ta.y}px`; cb.style.transform='translateY(0)';
     await sleep(1500);
 
-    // 到着と同時にアルファベット更新 + 着地カードのα帯をグレー化
-    applyAlphaMap(A.table, alphaMapA);
-    applyAlphaMap(B.table, alphaMapB);
-    if (alphaA) alphaA.classList.add('hook-gray');
-    if (alphaB) alphaB.classList.add('hook-gray');
-
     ca.remove(); cb.remove();
     wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
     moveWraps.forEach(w=>{ w.style.transform=''; w.style.transition=''; });
+    return { srcAlphaA, srcAlphaB };
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
+    return null;
   }
 }
 
@@ -7709,7 +7685,7 @@ async function doItem2Swap(A, B){
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
 
-  await playHookSwapAnimation(A, B, tables);
+  const anim = await playHookSwapAnimation(A, B, tables);
 
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
@@ -7721,6 +7697,8 @@ async function doItem2Swap(A, B){
   };
 
   const mark = now()+10000; // 10秒
+  const srcAlphaA = String(anim?.srcAlphaA || a.card?.alpha || '');
+  const srcAlphaB = String(anim?.srcAlphaB || b.card?.alpha || '');
  const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2', hookGray:true};
    const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2', hookGray:true};
   insertSortedRight(b.hand, toB);
@@ -7728,6 +7706,11 @@ async function doItem2Swap(A, B){
 
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(a.hand); realpha(b.hand);
+
+  const toAInHand = a.hand.find(c=> String(c?.id||'') === String(toA?.id||''));
+  const toBInHand = b.hand.find(c=> String(c?.id||'') === String(toB?.id||''));
+  if (toAInHand) toAInHand.alpha = `${srcAlphaB}-`;
+  if (toBInHand) toBInHand.alpha = `${srcAlphaA}-`;
 
   await Promise.all([
     set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand),
