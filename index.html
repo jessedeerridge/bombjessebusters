@@ -54,16 +54,18 @@
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
   .item.alt-rule::after{
-    content:'✕';
+    content:'×';
     position:absolute;
     top:-10px;
     left:50%;
     transform:translateX(-50%);
     color:#dc2626;
     font-size:9px;
+    font-family:'Arial Black','Segoe UI Symbol','Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;
     font-weight:900;
     line-height:1;
     -webkit-text-stroke:.4px #dc2626;
+    text-shadow:0 0 .01px #dc2626;
     pointer-events:none;
     z-index:3;
   }
