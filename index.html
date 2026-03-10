@@ -356,6 +356,34 @@
   background:#fff; display:grid; place-items:center;
   font-size:12px; user-select:none; color:#000;
 }
+.check-item .check-dot{
+  position:absolute;
+  right:-10px;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:none;
+  border:none;
+  pointer-events:none;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  font-size:3px;
+  font-weight:700;
+  line-height:1;
+  z-index:5;
+}
+.check-item .check-dot.top{ top:-7px; }
+.check-item .check-dot.bottom{ bottom:-7px; }
+.check-item .check-dot.is-certain-red,
+.check-item .check-dot.is-certain-yellow,
+.check-item .check-dot.is-maybe-red,
+.check-item .check-dot.is-maybe-yellow{ display:flex; }
+.check-item .check-dot.is-certain-red{ background:#dc2626; }
+.check-item .check-dot.is-certain-yellow{ background:#eab308; }
+.check-item .check-dot.is-maybe-red{ background:rgba(220,38,38,.45); }
+.check-item .check-dot.is-maybe-yellow{ background:rgba(234,179,8,.5); }
 .check-mark{
   position:absolute; inset:0; margin:auto;
   width:18px; height:18px; border-radius:50%;
@@ -2321,6 +2349,43 @@ function renderMissionComplete(v){
 }
 
 /* ===== Tables ===== */
+function deriveChecklistCodeHints(displayLines){
+  const out = {
+    redCertain: new Set(), redMaybe: new Set(),
+    yellowCertain: new Set(), yellowMaybe: new Set(),
+  };
+  (displayLines||[]).forEach(raw=>{
+    const line = String(raw||'');
+    const isRed = line.includes('●');
+    const isYellow = line.includes('▧');
+    if(!isRed && !isYellow) return;
+
+    const nums = Array.from(line.matchAll(/\[(\d+(?:\.\d+)?)\]/g))
+      .map(m=>Math.floor(Number(m[1])))
+      .filter(n=>Number.isInteger(n) && n>=1 && n<=12);
+    if(nums.length===0) return;
+
+    const takeM = line.match(/のうち\s*(\d+)\s*つ/);
+    const take = takeM ? Number(takeM[1]) : null;
+    const isCertain = (take==null) || (take >= nums.length);
+
+    const add = (certainSet, maybeSet)=>{
+      nums.forEach(n=>{
+        if(isCertain){
+          certainSet.add(n);
+          maybeSet.delete(n);
+        }else if(!certainSet.has(n)){
+          maybeSet.add(n);
+        }
+      });
+    };
+
+    if(isRed) add(out.redCertain, out.redMaybe);
+    if(isYellow) add(out.yellowCertain, out.yellowMaybe);
+  });
+  return out;
+}
+
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
     const seatedNow = (v?.tables||[]).some(T => T.playerId === state.userId);
@@ -2362,12 +2427,27 @@ if ((v.mission?.id|0) === 23) {
 }
 
   
+  const checklistHints = deriveChecklistCodeHints(v?.mission?.display || []);
+
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
     for(let n=1; n<=12; n++){
       const cell = document.createElement('div'); cell.className='check-item';
       cell.textContent = String(n);
+      if(n < 12){
+        const topDot = document.createElement('span');
+        topDot.className = 'check-dot top';
+        if (checklistHints.redCertain.has(n)) topDot.classList.add('is-certain-red');
+        else if (checklistHints.redMaybe.has(n)) { topDot.classList.add('is-maybe-red'); topDot.textContent = '?'; }
+        cell.appendChild(topDot);
+
+        const bottomDot = document.createElement('span');
+        bottomDot.className = 'check-dot bottom';
+        if (checklistHints.yellowCertain.has(n)) bottomDot.classList.add('is-certain-yellow');
+        else if (checklistHints.yellowMaybe.has(n)) { bottomDot.classList.add('is-maybe-yellow'); bottomDot.textContent = '?'; }
+        cell.appendChild(bottomDot);
+      }
       if((openCountByNum[n]||0) === 4){ // 同じ数字が4本全体公開
         const mk = document.createElement('div'); mk.className='check-mark';
         cell.appendChild(mk);
