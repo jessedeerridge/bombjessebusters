@@ -7640,8 +7640,8 @@ async function playHookSwapAnimation(A, B, tables){
       return {x: rf.left + (Math.max(0, ins) * shift), y: rf.top};
     };
 
-    const phA = addAlphaPlaceholder(estimateTarget(A.table, insA).x, estimateTarget(A.table, insA).y, `${srcAlphaB}-`);
-    const phB = addAlphaPlaceholder(estimateTarget(B.table, insB).x, estimateTarget(B.table, insB).y, `${srcAlphaA}-`);
+    const phA = addAlphaPlaceholder(estimateTarget(A.table, insA).x, estimateTarget(A.table, insA).y, `${srcAlphaB}`);
+    const phB = addAlphaPlaceholder(estimateTarget(B.table, insB).x, estimateTarget(B.table, insB).y, `${srcAlphaA}`);
 
     qa.forEach((w,i)=>{
       if (w.dataset.cardId===A.cardId) return;
@@ -7687,6 +7687,9 @@ async function playHookSwapAnimation(A, B, tables){
     cb.style.left = `${ta.x}px`; cb.style.top = `${ta.y}px`; cb.style.transform='translateY(0)';
     await sleep(1500);
 
+    phA.textContent = `${srcAlphaB}-`;
+    phB.textContent = `${srcAlphaA}-`;
+    await sleep(80);
     phA.remove(); phB.remove();
     ca.remove(); cb.remove();
     wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
