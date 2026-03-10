@@ -402,6 +402,10 @@
 .check-item .check-dot.is-certain-yellow{ background:#eab308; }
 .check-item .check-dot.is-maybe-red{ background:rgba(220,38,38,.45); }
 .check-item .check-dot.is-maybe-yellow{ background:rgba(234,179,8,.5); }
+.check-item .check-dot.is-maybe-red,
+.check-item .check-dot.is-maybe-yellow{ color:#111; }
+.check-item .check-dot.is-certain-yellow,
+.check-item .check-dot.is-maybe-yellow{ border-radius:3px; }
 .check-mark{
   position:absolute; inset:0; margin:auto;
   width:18px; height:18px; border-radius:50%;
@@ -2715,14 +2719,14 @@ if ((v.mission?.id|0) === 23) {
       if(n < 12){
         const topDot = document.createElement('span');
         topDot.className = 'check-dot top';
-        if (checklistHints.redCertain.has(n)) topDot.classList.add('is-certain-red');
-        else if (checklistHints.redMaybe.has(n)) { topDot.classList.add('is-maybe-red'); topDot.textContent = '?'; }
+        if (checklistHints.yellowCertain.has(n)) topDot.classList.add('is-certain-yellow');
+        else if (checklistHints.yellowMaybe.has(n)) { topDot.classList.add('is-maybe-yellow'); topDot.textContent = '?'; }
         cell.appendChild(topDot);
 
         const bottomDot = document.createElement('span');
         bottomDot.className = 'check-dot bottom';
-        if (checklistHints.yellowCertain.has(n)) bottomDot.classList.add('is-certain-yellow');
-        else if (checklistHints.yellowMaybe.has(n)) { bottomDot.classList.add('is-maybe-yellow'); bottomDot.textContent = '?'; }
+        if (checklistHints.redCertain.has(n)) bottomDot.classList.add('is-certain-red');
+        else if (checklistHints.redMaybe.has(n)) { bottomDot.classList.add('is-maybe-red'); bottomDot.textContent = '?'; }
         cell.appendChild(bottomDot);
       }
       if((openCountByNum[n]||0) === 4){ // 同じ数字が4本全体公開
