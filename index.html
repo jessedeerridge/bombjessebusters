@@ -1282,6 +1282,33 @@ const imgConstraint = L => `./${String(L).toLowerCase()}.jpg`;
 const imgConstraintBack = () => `./conback.jpg`;
 const imgChallenge = id => `./${id}.png`;
 
+const CARD_IMAGE_PRELOAD_LIST = [
+  ...MATERIALS.numbers.map(n => `./s${n}.jpg`),
+  ...Array.from({ length: 11 }, (_, i) => `./c${i}.png`),
+  ...Array.from({ length: 18 }, (_, i) => `./item${i + 1}.jpg`),
+  ...Array.from({ length: 9 }, (_, i) => `./member (${i + 1}).jpg`),
+  ...Array.from({ length: 7 }, (_, i) => `./di${i}.png`),
+  './numbercardback.jpg', './numberdeck.png', './codeback.jpg', './codeback.png',
+  './itemback.jpg', './conback.jpg', './battery.jpg', './yellowcode.png', './redcode.png',
+  './a.jpg', './b.jpg', './c.jpg', './d.jpg', './e.jpg', './f.jpg', './g.jpg', './h.jpg', './i.jpg', './j.jpg', './k.jpg', './l.jpg',
+  './left2.jpg', './right2.jpg', './left4.jpg', './right4.jpg',
+  './nano0.png', './nano1.png', './nano2.png', './nano3.png', './nano4.png',
+  './nano0left.png', './nano1left.png', './nano2left.png', './nano3left.png', './nano4left.png'
+];
+
+let cardImagePreloadPromise = null;
+function preloadCardImages(){
+  if (cardImagePreloadPromise) return cardImagePreloadPromise;
+  const uniq = [...new Set(CARD_IMAGE_PRELOAD_LIST)];
+  cardImagePreloadPromise = Promise.allSettled(uniq.map((src)=>new Promise((resolve)=>{
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = img.onerror = ()=> resolve();
+    img.src = src;
+  })));
+  return cardImagePreloadPromise;
+}
+
 /* ===== 数値カード一意管理＆重ね表示ユーティリティ ===== */
 /* 同じ数字のカードが同時に存在しないように管理する */
 const NUMCARD_REG = new Map(); // n -> { holder:HTMLDivElement, count:number }
@@ -1726,6 +1753,7 @@ btnJoin.onclick   = ()=>{
 
 async function enter(mode){
   const code=(inputCode.value||"").trim();
+  preloadCardImages();
   if(!code){ alert('コードを入力してください'); return; }
   state.roomCode = code; state.mode=mode;
 
