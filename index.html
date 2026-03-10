@@ -97,7 +97,7 @@
  .conzoom-card{
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     transform:scale(2); transform-origin:center;
-    border-radius:12px; border:2px solid #fff; background:#fff center/cover no-repeat;
+    border-radius:6px; border:2px solid #fff; background:#fff center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.35); cursor:pointer;
   }
   .conzoom-menu{
@@ -11084,7 +11084,6 @@ function missionInfo(id, opts={}){
         id:50, name:'#50', desc:'',
         display:[
           '#50',...linesForMix,
-          '最初にトークンを置くとき、コードの前に置かず、その場所を指示した上で、トークンは手元に置いて見せる。',
           '切断に失敗した時、指し示されたコードにではなく、コードの外側に情報トークンを置く。',
           '',
           '',
