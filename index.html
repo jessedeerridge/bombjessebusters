@@ -131,7 +131,22 @@
     border:1px solid #ccc; background:#f7f7f7; cursor:pointer;
     white-space:nowrap;
   }
-  
+
+  /* role picker preview layering (fix overlap/residue) */
+  .rp-wrap{ position:relative; max-width:min(96vw, 1200px); padding-top:calc(var(--con-h, var(--item-h, 75px)) * 2 + 16px); }
+  .rp-preview{
+    position:absolute; left:50%; top:0; transform:translateX(-50%);
+    z-index:40; display:none; pointer-events:none;
+  }
+  .rp-preview.active{ display:grid; pointer-events:auto; }
+  .rp-lane{ position:relative; z-index:20; }
+  .rp-preview .conzoom-wrap{ z-index:45; }
+  .rp-preview .conzoom-card{
+    transform:none;
+    width:calc(var(--con-w, var(--item-w, 50px)) * 2);
+    height:calc(var(--con-h, var(--item-h, 75px)) * 2);
+  }
+
   /* ★ ミッション12：アイテムの“外側の真下”に並べる帯 */
   .num-under{
     display:grid;
@@ -243,6 +258,9 @@
     pointer-events:none;
   }
 
+  .concard.role-face.member15-detector::after,
+  .conzoom-card.role-face.member15-detector::after{ bottom:12px; }
+
   .char-card.member-alt6,
   .char-card.member-alt7,
   .char-card.member-alt8,
@@ -307,6 +325,15 @@
   .concard.role-face.member-alt9::after,
   .conzoom-card.role-face.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:10px; }
 
+  .concard.role-face.member-alt6::after,
+  .conzoom-card.role-face.member-alt6::after,
+  .concard.role-face.member-alt7::after,
+  .conzoom-card.role-face.member-alt7::after,
+  .concard.role-face.member-alt8::after,
+  .conzoom-card.role-face.member-alt8::after,
+  .concard.role-face.member-alt9::after,
+  .conzoom-card.role-face.member-alt9::after{ bottom:12px; }
+
   .char-card.member-alt8::before,
   .char-card.member-alt9::before,
   .m61-mini.member-alt8::before,
@@ -329,6 +356,11 @@
     z-index:2;
     pointer-events:none;
   }
+
+  .concard.role-face.member-alt8::before,
+  .concard.role-face.member-alt9::before,
+  .conzoom-card.role-face.member-alt8::before,
+  .conzoom-card.role-face.member-alt9::before{ bottom:2px; }
 
   .hand{
     display:flex;align-items:flex-start;gap:var(--card-gap);
@@ -7383,34 +7415,27 @@ function openRolePickOverlay(curFaceName, myIdx){
   ov.addEventListener('click', (e)=>{
     if (e.target !== ov) return;
     const preview = ov.querySelector('.rp-preview');
-    if (preview){ preview.style.visibility='hidden'; preview.style.pointerEvents='none'; preview.innerHTML=''; }
+    if (preview){ preview.classList.remove('active'); preview.innerHTML=''; }
   });
   ov.tabIndex = -1;
   ov.addEventListener('keydown', (e)=>{
     if(e.key==='Escape'){
       e.preventDefault(); e.stopPropagation();
       const preview = ov.querySelector('.rp-preview');
-      if (preview){ preview.style.visibility='hidden'; preview.style.pointerEvents='none'; preview.innerHTML=''; }
+      if (preview){ preview.classList.remove('active'); preview.innerHTML=''; }
     }
   });
 
   // ▼ wrap（既存の conzoom-wrap とは分離）
   const wrap = document.createElement('div');
   wrap.className = 'rp-wrap';
-  Object.assign(wrap.style, { position:'relative', maxWidth:'min(96vw, 1200px)' });
+
   wrap.addEventListener('click', e=>e.stopPropagation());
 
   // ▼ 上部プレビュー（クリックされたら出す）
   const preview = document.createElement('div');
   preview.className = 'rp-preview';
-  Object.assign(preview.style,{
-    display:'grid',
-    placeItems:'center',
-    minHeight:'var(--con-h)',
-    marginBottom:'12px',
-    visibility:'hidden',
-    pointerEvents:'none'
-  });
+
 
   // ▼ 下部：横並び（常時表示・即同期で更新）※ ← 掃除対象の .conlane は使わない！
   const lane = document.createElement('div');
@@ -7479,8 +7504,7 @@ function openRolePickOverlay(curFaceName, myIdx){
 
 // 拡大はプレビューに表示（横並びは常に残す）
 function openRolePickZoomToPreview(previewEl, faceName, myIdx){
-  previewEl.style.visibility = 'visible';
-  previewEl.style.pointerEvents = 'auto';
+  previewEl.classList.add('active');
   previewEl.innerHTML = '';
 
   const wrap = document.createElement('div');
