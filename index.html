@@ -356,6 +356,20 @@
   background:#fff; display:grid; place-items:center;
   font-size:12px; user-select:none; color:#000;
 }
+.check-item:not(:last-child)::before,
+.check-item:not(:last-child)::after{
+  content:"";
+  position:absolute;
+  right:-10px;
+  width:8px;
+  height:8px;
+  border:1px solid #999;
+  border-radius:50%;
+  background:#fff;
+  pointer-events:none;
+}
+.check-item:not(:last-child)::before{ top:-5px; }
+.check-item:not(:last-child)::after{ bottom:-5px; }
 .check-mark{
   position:absolute; inset:0; margin:auto;
   width:18px; height:18px; border-radius:50%;
