@@ -179,7 +179,10 @@
   .char-card.blank{background:#f3f4f6;border:1px dashed #d1d5db;cursor:default;}
 
   .char-card.member5-card,
-  .m61-mini.member5-card{ position:relative; }
+  .m61-mini.member5-card,
+  .char-card.member15-detector,
+  .m61-mini.member15-detector{ position:relative; }
+
   .char-card.member5-card::before,
   .m61-mini.member5-card::before{
     content:'隊長';
@@ -192,6 +195,21 @@
     background:#000;
     border-radius:0;
     padding:1px 2px;
+    z-index:2;
+    pointer-events:none;
+  }
+
+  .char-card.member15-detector::after,
+  .m61-mini.member15-detector::after{
+    content:'フツーノ\A探知機';
+    white-space:pre;
+    position:absolute;
+    left:0;
+    bottom:0;
+    font-size:5px;
+    line-height:1;
+    color:#fff;
+    text-shadow:0 1px 1px rgba(0,0,0,.9);
     z-index:2;
     pointer-events:none;
   }
@@ -2449,7 +2467,10 @@ charCol.className = 'char-col';
 
 const char=document.createElement('div'); 
 char.className='char-card';
-const isMember5Card = /member\s*\(5\)\./i.test(String(t?.character?.face || ''));
+const faceName = String(t?.character?.face || '');
+const isMember5Card = /member\s*\(5\)\./i.test(faceName);
+const isMember1to5Card = /member\s*\(([1-5])\)\./i.test(faceName);
+const isFlippedRole = !!t?.character?.flipped;
 // 自分が未着席  または  この席が空席 → ブランク固定
 const amSeated = seatedNow;           // 先頭で算出済み
 const seatEmpty = !t.playerId;        // 空席判定
@@ -2473,7 +2494,8 @@ if (!amSeated || seatEmpty) {
     };
   }
 }
-if (isMember5Card) char.classList.add('member5-card');
+if (!isFlippedRole && isMember5Card) char.classList.add('member5-card');
+if (!isFlippedRole && isMember1to5Card) char.classList.add('member15-detector');
     if ((state.watching?.mission?.id|0) === 34) {
       // #34：隊長が場に出す「前」だけ、他人の正体カードをブランク固定
       const capIdx = state?.watching?.captainTable;
@@ -3705,10 +3727,14 @@ if (big){
       // 空席：枠だけ
       mini.classList.add('blank');
     }else{
-      const isMember5Card = /member\s*\(5\)\./i.test(String(t?.character?.face || ''));
-      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+      const faceName = String(t?.character?.face || '');
+      const isMember5Card = /member\s*\(5\)\./i.test(faceName);
+      const isMember1to5Card = /member\s*\(([1-5])\)\./i.test(faceName);
+      const isFlippedRole = !!t?.character?.flipped;
+      const face = isFlippedRole ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
       mini.style.backgroundImage = `url("${face}")`;
-      if (isMember5Card) mini.classList.add('member5-card');
+      if (!isFlippedRole && isMember5Card) mini.classList.add('member5-card');
+      if (!isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
       // 本人のみ裏表トグル
       // 本人のみ：member(9)なら拡大→「使う」ポップ、その他は裏表トグル
       if (amMe){
@@ -5811,10 +5837,14 @@ function renderM61(v){
       mini.classList.add('blank');
       mini.onclick = null;
     }else{
-      const isMember5Card = /member\s*\(5\)\./i.test(String(t?.character?.face || ''));
-      const face = t.character?.flipped ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+      const faceName = String(t?.character?.face || '');
+      const isMember5Card = /member\s*\(5\)\./i.test(faceName);
+      const isMember1to5Card = /member\s*\(([1-5])\)\./i.test(faceName);
+      const isFlippedRole = !!t?.character?.flipped;
+      const face = isFlippedRole ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
       mini.style.backgroundImage = `url("${face}")`;
-      if (isMember5Card) mini.classList.add('member5-card');
+      if (!isFlippedRole && isMember5Card) mini.classList.add('member5-card');
+      if (!isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
      // 既存の大キャラ同様、本人のみ裏表トグル
 
       if (amSeatedHere){
