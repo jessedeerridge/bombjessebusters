@@ -199,10 +199,16 @@
   .char-card.member5-card,
   .m61-mini.member5-card,
   .char-card.member15-detector,
-  .m61-mini.member15-detector{ position:relative; }
+  .m61-mini.member15-detector,
+  .concard.role-face.member5-card,
+  .conzoom-card.role-face.member5-card,
+  .concard.role-face.member15-detector,
+  .conzoom-card.role-face.member15-detector{ position:relative; }
 
   .char-card.member5-card::before,
-  .m61-mini.member5-card::before{
+  .m61-mini.member5-card::before,
+  .concard.role-face.member5-card::before,
+  .conzoom-card.role-face.member5-card::before{
     content:'隊長';
     position:absolute;
     left:0;
@@ -218,7 +224,9 @@
   }
 
   .char-card.member15-detector::after,
-  .m61-mini.member15-detector::after{
+  .m61-mini.member15-detector::after,
+  .concard.role-face.member15-detector::after,
+  .conzoom-card.role-face.member15-detector::after{
     content:'フツーノ\A探知機';
     white-space:pre;
     position:absolute;
@@ -242,7 +250,15 @@
   .m61-mini.member-alt6,
   .m61-mini.member-alt7,
   .m61-mini.member-alt8,
-  .m61-mini.member-alt9{ position:relative; }
+  .m61-mini.member-alt9,
+  .concard.role-face.member-alt6,
+  .concard.role-face.member-alt7,
+  .concard.role-face.member-alt8,
+  .concard.role-face.member-alt9,
+  .conzoom-card.role-face.member-alt6,
+  .conzoom-card.role-face.member-alt7,
+  .conzoom-card.role-face.member-alt8,
+  .conzoom-card.role-face.member-alt9{ position:relative; }
 
   .char-card.member-alt6::after,
   .char-card.member-alt7::after,
@@ -251,7 +267,15 @@
   .m61-mini.member-alt6::after,
   .m61-mini.member-alt7::after,
   .m61-mini.member-alt8::after,
-  .m61-mini.member-alt9::after{
+  .m61-mini.member-alt9::after,
+  .concard.role-face.member-alt6::after,
+  .concard.role-face.member-alt7::after,
+  .concard.role-face.member-alt8::after,
+  .concard.role-face.member-alt9::after,
+  .conzoom-card.role-face.member-alt6::after,
+  .conzoom-card.role-face.member-alt7::after,
+  .conzoom-card.role-face.member-alt8::after,
+  .conzoom-card.role-face.member-alt9::after{
     white-space:pre;
     position:absolute;
     left:1px;
@@ -265,19 +289,32 @@
     z-index:2;
     pointer-events:none;
   }
+
   .char-card.member-alt6::after,
-  .m61-mini.member-alt6::after{ content:'ミッツケル\A探知機'; bottom:10px; font-size:4px; }
+  .m61-mini.member-alt6::after,
+  .concard.role-face.member-alt6::after,
+  .conzoom-card.role-face.member-alt6::after{ content:'ミッツケル\A探知機'; bottom:10px; font-size:4px; }
   .char-card.member-alt7::after,
-  .m61-mini.member-alt7::after{ content:'ドッチカ・\Aアタレイ'; bottom:10px; }
+  .m61-mini.member-alt7::after,
+  .concard.role-face.member-alt7::after,
+  .conzoom-card.role-face.member-alt7::after{ content:'ドッチカ・\Aアタレイ'; bottom:10px; }
   .char-card.member-alt8::after,
-  .m61-mini.member-alt8::after{ content:'なんでも\Aレーダー'; bottom:10px; }
+  .m61-mini.member-alt8::after,
+  .concard.role-face.member-alt8::after,
+  .conzoom-card.role-face.member-alt8::after{ content:'なんでも\Aレーダー'; bottom:10px; }
   .char-card.member-alt9::after,
-  .m61-mini.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:10px; }
+  .m61-mini.member-alt9::after,
+  .concard.role-face.member-alt9::after,
+  .conzoom-card.role-face.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:10px; }
 
   .char-card.member-alt8::before,
   .char-card.member-alt9::before,
   .m61-mini.member-alt8::before,
-  .m61-mini.member-alt9::before{
+  .m61-mini.member-alt9::before,
+  .concard.role-face.member-alt8::before,
+  .concard.role-face.member-alt9::before,
+  .conzoom-card.role-face.member-alt8::before,
+  .conzoom-card.role-face.member-alt9::before{
     content:'いつでも使える';
     position:absolute;
     left:1px;
@@ -7298,6 +7335,20 @@ async function maybeOpenRolePickerAfterSeat(){
   }catch(e){ console.error('[role-pick]', e); }
 }
 
+
+function applyRoleFaceOverlayClasses(el, faceName){
+  if (!el) return;
+  const n = String(faceName || '').toLowerCase();
+  const m = n.match(/member\s*\((\d+)\)\./i);
+  if (!m) return;
+  const num = Number(m[1]);
+  if (!Number.isFinite(num)) return;
+  el.classList.add('role-face');
+  if (num === 5) el.classList.add('member5-card');
+  if (num >= 1 && num <= 5) el.classList.add('member15-detector');
+  if (num >= 6 && num <= 9) el.classList.add(`member-alt${num}`);
+}
+
 function openRolePickOverlay(curFaceName, myIdx){
   // 既に開いていれば何もしない（多重防止）
   if (document.getElementById('rolePickOverlay')) return;
@@ -7377,6 +7428,7 @@ function openRolePickOverlay(curFaceName, myIdx){
       const c = document.createElement('div');
       c.className = 'concard'; // アイテムと同サイズの見た目を流用
       c.style.backgroundImage = `url('./${originalName}')`;
+      applyRoleFaceOverlayClasses(c, originalName);
       c.title = 'クリックで拡大';
       c.addEventListener('click', ev=>{
         ev.stopPropagation();
@@ -7437,6 +7489,7 @@ function openRolePickZoomToPreview(previewEl, faceName, myIdx){
   const big = document.createElement('div');
   big.className = 'conzoom-card'; // 拡大見た目は流用でOK（掃除対象ではない）
   big.style.backgroundImage = `url('./${faceName}')`;
+  applyRoleFaceOverlayClasses(big, faceName);
   wrap.appendChild(big);
   previewEl.appendChild(wrap);
 
@@ -7514,6 +7567,7 @@ function openRoleZoomView(faceFileName){
     big.className = 'conzoom-card';
     // member画像をそのまま拡大
     big.style.backgroundImage = `url('./${faceFileName}')`;
+    applyRoleFaceOverlayClasses(big, faceFileName);
     // ▼ 追加：拡大カードをクリックで「使う」ポップ（トグル）
     big.addEventListener('click', (e)=>{
       e.stopPropagation();
