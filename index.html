@@ -94,11 +94,14 @@
     z-index:9999;
   }
   .conzoom-wrap{ position:relative; }
- .conzoom-card{
+  .conzoom-card{
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     transform:scale(2); transform-origin:center;
     border-radius:12px; border:2px solid #fff; background:#fff center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.35); cursor:pointer;
+  }
+  .conzoom-card.char-item-zoom{
+    border-radius:8px;
   }
   .conzoom-menu{
     position:absolute; top:50%; left:50%;
@@ -7323,7 +7326,7 @@ function openRoleZoomView(faceFileName){
     const wrap = document.createElement('div');
     wrap.className = 'conzoom-wrap';
     const big = document.createElement('div');
-    big.className = 'conzoom-card';
+    big.className = 'conzoom-card char-item-zoom';
     // member画像をそのまま拡大
     big.style.backgroundImage = `url('./${faceFileName}')`;
     // ▼ 追加：拡大カードをクリックで「使う」ポップ（トグル）
@@ -7437,7 +7440,7 @@ function openItemZoom(itemNo, itemIdx, opt={}){
     wrap.className = 'conzoom-wrap';
 
     const big = document.createElement('div');
-    big.className = 'conzoom-card';
+    big.className = 'conzoom-card char-item-zoom';
     big.style.backgroundImage = `url('./item${itemNo}.jpg')`;
 
     big.addEventListener('click', async (e)=>{
