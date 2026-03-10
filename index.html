@@ -7376,7 +7376,9 @@ function openRolePickOverlay(curFaceName, myIdx){
     minHeight:'var(--con-h)',
     marginBottom:'12px',
     visibility:'hidden',
-    pointerEvents:'none'
+    pointerEvents:'none',
+    position:'relative',
+    zIndex:'2'
   });
 
   // ▼ 下部：横並び（常時表示・即同期で更新）※ ← 掃除対象の .conlane は使わない！
@@ -7384,7 +7386,9 @@ function openRolePickOverlay(curFaceName, myIdx){
   lane.className = 'rp-lane';
   Object.assign(lane.style, {
     display:'flex', gap:'8px', flexWrap:'nowrap',
-    justifyContent:'center', alignItems:'center', marginTop:'0'
+    justifyContent:'center', alignItems:'center', marginTop:'0',
+    position:'relative',
+    zIndex:'1'
   });
 
   // レーン再描画（usedNorm は正規化名 Set）
