@@ -555,10 +555,25 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
 .audio-volume-dock .row{
   display:flex;
   align-items:center;
+  gap:8px;
 }
 .audio-volume-dock .vol-box{
   min-width:0;
   flex:1;
+}
+.audio-volume-dock .vol-step-btn{
+  width:34px;
+  height:28px;
+  border:1px solid #d1d5db;
+  border-radius:8px;
+  background:#f9fafb;
+  color:#111827;
+  font-size:14px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+  display:grid;
+  place-items:center;
 }
 .audio-volume-dock input[type="range"]{ width:100%; margin:0; }
 /* ▲▲ 音声ミッション用 音量バー ▲▲ */
@@ -934,9 +949,11 @@ main:not(:has(#lobby.hidden)) > * {
 
 <div id="audioVolumeDock" class="audio-volume-dock hidden">
   <div class="row">
+    <button id="audioVolDown" class="vol-step-btn" type="button" aria-label="音量を下げる">◀</button>
     <div class="vol-box">
       <input id="audioVolumeRange" type="range" min="0" max="1" step="0.01" value="1">
     </div>
+    <button id="audioVolUp" class="vol-step-btn" type="button" aria-label="音量を上げる">▶</button>
   </div>
 </div>
 
@@ -1084,6 +1101,8 @@ const btnMpBack = document.getElementById('btnMpBack');
 
 const audioVolumeDock = document.getElementById('audioVolumeDock');
 const audioVolumeRange = document.getElementById('audioVolumeRange');
+const audioVolDown = document.getElementById('audioVolDown');
+const audioVolUp = document.getElementById('audioVolUp');
 const audioVolumes = { m19:1, m30:1, m42:1 };
 const missionAudioGraph = {
   ctx:null,
@@ -1302,14 +1321,25 @@ function renderMissionAudioVolume(v){
   if (!isAudioMission) return;
 
   const key = `m${mid}`;
+  const applyMissionVolume = (next)=>{
+    const clamped = clamp(Number(next), 0, 1);
+    audioVolumes[key] = clamped;
+    if (audioVolumeRange) audioVolumeRange.value = String(clamped);
+    updateMissionAudioVolume(mid);
+  };
+
   const current = Number(audioVolumes[key] ?? 1);
   if (audioVolumeRange){
     audioVolumeRange.value = String(current);
     audioVolumeRange.oninput = ()=>{
-      const next = clamp(Number(audioVolumeRange.value||'1'), 0, 1);
-      audioVolumes[key] = next;
-      updateMissionAudioVolume(mid);
+      applyMissionVolume(audioVolumeRange.value||'1');
     };
+  }
+  if (audioVolDown){
+    audioVolDown.onclick = ()=> applyMissionVolume((Number(audioVolumes[key] ?? 1) - 0.05).toFixed(2));
+  }
+  if (audioVolUp){
+    audioVolUp.onclick = ()=> applyMissionVolume((Number(audioVolumes[key] ?? 1) + 0.05).toFixed(2));
   }
   updateMissionAudioVolume(mid);
 }
