@@ -105,6 +105,7 @@
     border-radius:8px; border:1px solid #ddd;
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
   }
+  .concard.role-face{ --role-scale:calc(var(--con-w, var(--item-w, 50px)) / 40); }
 
   #conZoomOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.4);
@@ -112,12 +113,13 @@
     z-index:9999;
   }
   .conzoom-wrap{ position:relative; }
- .conzoom-card{
+.conzoom-card{
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     transform:scale(2); transform-origin:center;
     border-radius:6px; border:2px solid #fff; background:#fff center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.35); cursor:pointer;
   }
+  .conzoom-card.role-face{ --role-scale:calc(var(--con-w, var(--item-w, 50px)) / 40); }
   .conzoom-menu{
     position:absolute; top:50%; left:50%;
     translate:-50% calc(-50% + 108px);
@@ -174,11 +176,13 @@
   }
 
   .char-card{
+    --role-scale:1;
     width:var(--char-w);height:var(--char-h);background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
   /* ▼ M61: 制約カードの下に置く極小キャラ */
   .m61-mini{
+    --role-scale:0.6;
     width:24px; height:30px;            /* とても小さく */
     border:1px solid #ddd; border-radius:4px;
     background:#f3f4f6 center/cover no-repeat;
@@ -197,17 +201,23 @@
   .char-card.blank{background:#f3f4f6;border:1px dashed #d1d5db;cursor:default;}
 
   .char-card.member5-card,
+  .concard.member5-card,
+  .conzoom-card.member5-card,
   .m61-mini.member5-card,
+  .concard.member15-detector,
+  .conzoom-card.member15-detector,
   .char-card.member15-detector,
   .m61-mini.member15-detector{ position:relative; }
 
   .char-card.member5-card::before,
+  .concard.member5-card::before,
+  .conzoom-card.member5-card::before,
   .m61-mini.member5-card::before{
     content:'隊長';
     position:absolute;
     left:0;
     top:0;
-    font-size:5px;
+    font-size:calc(5px * var(--role-scale, 1));
     line-height:1;
     color:#fff;
     background:#000;
@@ -218,13 +228,15 @@
   }
 
   .char-card.member15-detector::after,
+  .concard.member15-detector::after,
+  .conzoom-card.member15-detector::after,
   .m61-mini.member15-detector::after{
     content:'フツーノ\A探知機';
     white-space:pre;
     position:absolute;
-    left:1px;
-    bottom:10px;
-    font-size:5px;
+    left:calc(1px * var(--role-scale, 1));
+    bottom:calc(10px * var(--role-scale, 1));
+    font-size:calc(5px * var(--role-scale, 1));
     font-family:'Arial Black','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
     font-weight:500;
     line-height:1;
@@ -239,6 +251,14 @@
   .char-card.member-alt7,
   .char-card.member-alt8,
   .char-card.member-alt9,
+  .concard.member-alt6,
+  .concard.member-alt7,
+  .concard.member-alt8,
+  .concard.member-alt9,
+  .conzoom-card.member-alt6,
+  .conzoom-card.member-alt7,
+  .conzoom-card.member-alt8,
+  .conzoom-card.member-alt9,
   .m61-mini.member-alt6,
   .m61-mini.member-alt7,
   .m61-mini.member-alt8,
@@ -248,14 +268,22 @@
   .char-card.member-alt7::after,
   .char-card.member-alt8::after,
   .char-card.member-alt9::after,
+  .concard.member-alt6::after,
+  .concard.member-alt7::after,
+  .concard.member-alt8::after,
+  .concard.member-alt9::after,
+  .conzoom-card.member-alt6::after,
+  .conzoom-card.member-alt7::after,
+  .conzoom-card.member-alt8::after,
+  .conzoom-card.member-alt9::after,
   .m61-mini.member-alt6::after,
   .m61-mini.member-alt7::after,
   .m61-mini.member-alt8::after,
   .m61-mini.member-alt9::after{
     white-space:pre;
     position:absolute;
-    left:1px;
-    font-size:5px;
+    left:calc(1px * var(--role-scale, 1));
+    font-size:calc(5px * var(--role-scale, 1));
     font-family:'Arial Black','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
     font-weight:500;
     line-height:1;
@@ -266,23 +294,35 @@
     pointer-events:none;
   }
   .char-card.member-alt6::after,
-  .m61-mini.member-alt6::after{ content:'ミッツケル\A探知機'; bottom:10px; font-size:4px; }
+  .concard.member-alt6::after,
+  .conzoom-card.member-alt6::after,
+  .m61-mini.member-alt6::after{ content:'ミッツケル\A探知機'; bottom:calc(10px * var(--role-scale, 1)); font-size:calc(4px * var(--role-scale, 1)); }
   .char-card.member-alt7::after,
-  .m61-mini.member-alt7::after{ content:'ドッチカ・\Aアタレイ'; bottom:10px; }
+  .concard.member-alt7::after,
+  .conzoom-card.member-alt7::after,
+  .m61-mini.member-alt7::after{ content:'ドッチカ・\Aアタレイ'; bottom:calc(10px * var(--role-scale, 1)); }
   .char-card.member-alt8::after,
-  .m61-mini.member-alt8::after{ content:'なんでも\Aレーダー'; bottom:10px; }
+  .concard.member-alt8::after,
+  .conzoom-card.member-alt8::after,
+  .m61-mini.member-alt8::after{ content:'なんでも\Aレーダー'; bottom:calc(10px * var(--role-scale, 1)); }
   .char-card.member-alt9::after,
-  .m61-mini.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:10px; }
+  .concard.member-alt9::after,
+  .conzoom-card.member-alt9::after,
+  .m61-mini.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:calc(10px * var(--role-scale, 1)); }
 
   .char-card.member-alt8::before,
   .char-card.member-alt9::before,
+  .concard.member-alt8::before,
+  .concard.member-alt9::before,
+  .conzoom-card.member-alt8::before,
+  .conzoom-card.member-alt9::before,
   .m61-mini.member-alt8::before,
   .m61-mini.member-alt9::before{
     content:'いつでも使える';
     position:absolute;
-    left:1px;
-    bottom:1px;
-    font-size:3px;
+    left:calc(1px * var(--role-scale, 1));
+    bottom:calc(1px * var(--role-scale, 1));
+    font-size:calc(3px * var(--role-scale, 1));
     font-family:'Arial Black','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
     font-weight:500;
     line-height:1;
@@ -7279,6 +7319,18 @@ function closeConstraintZoom(){
 }
 
 
+function applyRoleFaceOverlayClass(node, faceName){
+  if (!node) return;
+  const name = String(faceName || '');
+  const memberMatch = name.match(/member\s*\((\d+)\)\./i);
+  if (!memberMatch) return;
+  const n = Number(memberMatch[1]);
+  if (n === 5) node.classList.add('member5-card');
+  if (n >= 1 && n <= 5) node.classList.add('member15-detector');
+  if (n >= 6 && n <= 9) node.classList.add(`member-alt${n}`);
+  node.classList.add('role-face');
+}
+
 /* ▼▼ M31〜66：正体カードピッカー（専用オーバーレイ・即同期・lane保護） ▼▼ */
 async function maybeOpenRolePickerAfterSeat(){
   try{
@@ -7377,6 +7429,7 @@ function openRolePickOverlay(curFaceName, myIdx){
       const c = document.createElement('div');
       c.className = 'concard'; // アイテムと同サイズの見た目を流用
       c.style.backgroundImage = `url('./${originalName}')`;
+      applyRoleFaceOverlayClass(c, originalName);
       c.title = 'クリックで拡大';
       c.addEventListener('click', ev=>{
         ev.stopPropagation();
@@ -7437,6 +7490,7 @@ function openRolePickZoomToPreview(previewEl, faceName, myIdx){
   const big = document.createElement('div');
   big.className = 'conzoom-card'; // 拡大見た目は流用でOK（掃除対象ではない）
   big.style.backgroundImage = `url('./${faceName}')`;
+  applyRoleFaceOverlayClass(big, faceName);
   wrap.appendChild(big);
   previewEl.appendChild(wrap);
 
@@ -7514,6 +7568,7 @@ function openRoleZoomView(faceFileName){
     big.className = 'conzoom-card';
     // member画像をそのまま拡大
     big.style.backgroundImage = `url('./${faceFileName}')`;
+    applyRoleFaceOverlayClass(big, faceFileName);
     // ▼ 追加：拡大カードをクリックで「使う」ポップ（トグル）
     big.addEventListener('click', (e)=>{
       e.stopPropagation();
