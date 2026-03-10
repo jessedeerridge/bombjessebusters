@@ -189,6 +189,7 @@
   .card-wrap{position:relative;width:var(--card-w);min-height:calc(var(--card-h) + 36px);flex:0 0 auto;}
   .card{
     width:var(--card-w);height:var(--card-h);border-radius:6px;border:1px solid #ddd;position:absolute;left:0;top:0;
+    z-index:2; /* 常にアルファ帯より手前に表示 */
     background:#bbb;display:flex;align-items:flex-start;justify-content:center;cursor:pointer;user-select:none
   }
   .card.back{background:#fff url('./codeback.jpg') center/cover no-repeat;border-color:#ccc}
@@ -201,10 +202,10 @@
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center}
 
-  .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
+  .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:1;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
   .alpha.hook-gray{background:#9ca3af;border-color:#6b7280;color:#fff}
-  .hook-alpha-placeholder{position:fixed;z-index:2147483646;pointer-events:none;}
+  .hook-alpha-placeholder{position:fixed;z-index:2147483639;pointer-events:none;}
   .alpha.m43-added{border:0.4px dashed #000;}
   .m43-fly-card{position:fixed;left:0;top:0;width:var(--card-w);height:var(--card-h);border-radius:6px;z-index:2147483640;pointer-events:none;}
   .m43-fly-card .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;}
@@ -7616,7 +7617,7 @@ async function playHookSwapAnimation(A, B, tables){
 
     // 2) 詰める + 挿入位置を空ける（右スライド）
     const shift = cardW + gap;
-    const moveWraps = [];
+    const moveNodes = [];
     const qa = Array.from(handEl(A.table)?.querySelectorAll('.card-wrap')||[]);
     const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
 
@@ -7643,13 +7644,22 @@ async function playHookSwapAnimation(A, B, tables){
     const phA = addAlphaPlaceholder(estimateTarget(A.table, insA).x, estimateTarget(A.table, insA).y, `${srcAlphaB}`);
     const phB = addAlphaPlaceholder(estimateTarget(B.table, insB).x, estimateTarget(B.table, insB).y, `${srcAlphaA}`);
 
+    const slideCardBody = (w, dx)=>{
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
+      bodyNodes.forEach((node)=>{
+        node.style.transition = 'transform 1.5s ease';
+        node.style.transform = `translateX(${dx}px)`;
+        moveNodes.push(node);
+      });
+    };
+
     qa.forEach((w,i)=>{
       if (w.dataset.cardId===A.cardId) return;
       let dx = 0;
       if (aIdx>=0 && i>aIdx) dx -= shift;
       const ni = i - (i>aIdx?1:0);
       if (ni>=insA) dx += shift;
-      if (dx!==0){ w.style.transition='transform 1.5s ease'; w.style.transform=`translateX(${dx}px)`; moveWraps.push(w); }
+      if (dx!==0) slideCardBody(w, dx);
     });
     qb.forEach((w,i)=>{
       if (w.dataset.cardId===B.cardId) return;
@@ -7657,7 +7667,7 @@ async function playHookSwapAnimation(A, B, tables){
       if (bIdx>=0 && i>bIdx) dx -= shift;
       const ni = i - (i>bIdx?1:0);
       if (ni>=insB) dx += shift;
-      if (dx!==0){ w.style.transition='transform 1.5s ease'; w.style.transform=`translateX(${dx}px)`; moveWraps.push(w); }
+      if (dx!==0) slideCardBody(w, dx);
     });
     await sleep(1500);
 
@@ -7692,7 +7702,7 @@ async function playHookSwapAnimation(A, B, tables){
     phA.remove(); phB.remove();
     ca.remove(); cb.remove();
     wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
-    moveWraps.forEach(w=>{ w.style.transform=''; w.style.transition=''; });
+    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
     return { srcAlphaA, srcAlphaB };
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
