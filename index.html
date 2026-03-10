@@ -204,6 +204,7 @@
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
   .alpha.hook-gray{background:#9ca3af;border-color:#6b7280;color:#fff}
+  .hook-alpha-placeholder{position:fixed;z-index:2147483646;pointer-events:none;}
   .alpha.m43-added{border:0.4px dashed #000;}
   .m43-fly-card{position:fixed;left:0;top:0;width:var(--card-w);height:var(--card-h);border-radius:6px;z-index:2147483640;pointer-events:none;}
   .m43-fly-card .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;}
@@ -7653,12 +7654,27 @@ async function playHookSwapAnimation(A, B, tables){
     const ta = targetPoint(A.table, insA);
     const tb = targetPoint(B.table, insB);
 
+    const addAlphaPlaceholder = (x, y, txt)=>{
+      const el = document.createElement('div');
+      el.className = 'alpha hook-alpha-placeholder';
+      el.textContent = txt;
+      el.style.left = `${x}px`;
+      el.style.top  = `${y + cardH + 2}px`;
+      document.body.appendChild(el);
+      return el;
+    };
+
+    // 空き位置でもアルファ帯を見せる（着地するカードの帯）
+    const phA = addAlphaPlaceholder(ta.x, ta.y, `${srcAlphaB}-`);
+    const phB = addAlphaPlaceholder(tb.x, tb.y, `${srcAlphaA}-`);
+
     // 3) 空き位置へ挿入
     // ca は A から抜いたカードなので B 側へ、cb は B から抜いたカードなので A 側へ移動
     ca.style.left = `${tb.x}px`; ca.style.top = `${tb.y}px`; ca.style.transform='translateY(0)';
     cb.style.left = `${ta.x}px`; cb.style.top = `${ta.y}px`; cb.style.transform='translateY(0)';
     await sleep(1500);
 
+    phA.remove(); phB.remove();
     ca.remove(); cb.remove();
     wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
     moveWraps.forEach(w=>{ w.style.transform=''; w.style.transition=''; });
