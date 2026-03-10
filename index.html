@@ -522,6 +522,39 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
 .mp-actions{ display:flex; justify-content:flex-end; margin-top:6px; }
 /* ▲▲ 画面下部ミッションピッカー ▲▲ */
 
+/* ▼▼ 音声ミッション用 音量バー ▼▼ */
+.audio-volume-dock{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:2147483590;
+  background:#fff;
+  border-top:1px solid #e5e7eb;
+  box-shadow:0 -8px 18px rgba(0,0,0,.08);
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+}
+.audio-volume-dock .row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.audio-volume-dock .title{
+  min-width:74px;
+  font-size:12px;
+  text-decoration:none;
+}
+.audio-volume-dock .vol-box{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  flex:1;
+}
+.audio-volume-dock input[type="range"]{ width:100%; }
+.audio-volume-dock .val{ width:38px; font-size:12px; text-align:right; }
+/* ▲▲ 音声ミッション用 音量バー ▲▲ */
+
 .code-link{ text-decoration: underline; cursor: pointer; }
 
   /* ▼▼ nano 行（itemsBar のすぐ下） ▼▼ */
@@ -891,6 +924,17 @@ main:not(:has(#lobby.hidden)) > * {
 </div>
 <!-- ▲▲ 画面下部ミッションピッカー ▲▲ -->
 
+<div id="audioVolumeDock" class="audio-volume-dock hidden">
+  <div class="row">
+    <div class="title">音量</div>
+    <div class="vol-box">
+      <span id="audioVolumeLabel" class="small">ミッション音声</span>
+      <input id="audioVolumeRange" type="range" min="0" max="1" step="0.01" value="1">
+      <span id="audioVolumeValue" class="val">100%</span>
+    </div>
+  </div>
+</div>
+
 <div id="miniPop" class="mini-pop hidden"></div>
 <div id="popLayer" class="pop-layer"></div>
 <!-- ★ アイテム16の表示先（画面下部） -->
@@ -1033,6 +1077,11 @@ const mpCounts = document.getElementById('mpCounts');
 const mpMissions = document.getElementById('mpMissions');
 const btnMpBack = document.getElementById('btnMpBack');
 
+const audioVolumeDock = document.getElementById('audioVolumeDock');
+const audioVolumeLabel = document.getElementById('audioVolumeLabel');
+const audioVolumeRange = document.getElementById('audioVolumeRange');
+const audioVolumeValue = document.getElementById('audioVolumeValue');
+const audioVolumes = { m19:1, m30:1, m42:1 };
 
 const miniPop = document.getElementById('miniPop');
 document.addEventListener('click', (e)=>{
@@ -1174,6 +1223,67 @@ function getSpTimerAudio(){
   return a;
 }
 
+function getMissionAudio(mid){
+  if ((mid|0) === 19) return document.getElementById('m19Audio');
+  if ((mid|0) === 30) return document.getElementById('m30Audio');
+  if ((mid|0) === 42) return document.getElementById('m42Audio');
+  return null;
+}
+
+function updateMissionAudioVolume(mid){
+  const key = `m${mid|0}`;
+  const vol = Number(audioVolumes[key] ?? 1);
+  const audio = getMissionAudio(mid);
+  if (audio) audio.volume = vol;
+}
+
+function renderMissionAudioVolume(v){
+  const mid = (v?.mission?.id|0);
+  const isAudioMission = (mid === 19 || mid === 30 || mid === 42);
+  H(audioVolumeDock, !isAudioMission);
+  if (!isAudioMission) return;
+
+  const key = `m${mid}`;
+  const current = Number(audioVolumes[key] ?? 1);
+  if (audioVolumeLabel) audioVolumeLabel.textContent = `ミッション#${mid}`;
+  if (audioVolumeRange){
+    audioVolumeRange.value = String(current);
+    audioVolumeRange.oninput = ()=>{
+      const next = clamp(Number(audioVolumeRange.value||'1'), 0, 1);
+      audioVolumes[key] = next;
+      if (audioVolumeValue) audioVolumeValue.textContent = `${Math.round(next*100)}%`;
+      updateMissionAudioVolume(mid);
+    };
+  }
+  if (audioVolumeValue) audioVolumeValue.textContent = `${Math.round(current*100)}%`;
+  updateMissionAudioVolume(mid);
+}
+
+const pendingAudioAutoplay = new Set();
+async function forcePlayAudio(audio){
+  if (!audio) return false;
+  try{
+    await audio.play();
+    pendingAudioAutoplay.delete(audio);
+    return true;
+  }catch(_e){
+    pendingAudioAutoplay.add(audio);
+    return false;
+  }
+}
+function retryPendingAudioAutoplay(){
+  if (!pendingAudioAutoplay.size) return;
+  [...pendingAudioAutoplay].forEach((a)=>{
+    if (!a || a.paused === false){
+      pendingAudioAutoplay.delete(a);
+      return;
+    }
+    a.play().then(()=> pendingAudioAutoplay.delete(a)).catch(()=>{});
+  });
+}
+window.addEventListener('pointerdown', retryPendingAudioAutoplay, { capture:true });
+window.addEventListener('keydown', retryPendingAudioAutoplay, { capture:true });
+window.addEventListener('touchstart', retryPendingAudioAutoplay, { capture:true });
 
 
 let _audioUnlocked = false;
@@ -1944,6 +2054,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
 renderM31(v);
    renderM30Audio(v);
    renderM42Audio(v);
+   renderMissionAudioVolume(v);
     renderM32(v);
     renderM36(v);
     renderM37(v);
@@ -9299,7 +9410,7 @@ deckBtn.onclick = async (ev)=>{
        audio.addEventListener('timeupdate', refreshLocal);
 
        btnPlay.onclick = async ()=>{
-         try{ await audio.play(); }catch(_e){}
+         await forcePlayAudio(audio)
          await writeMeta(true);
        };
        btnPause.onclick = async ()=>{
@@ -9328,19 +9439,7 @@ deckBtn.onclick = async (ev)=>{
          audio.currentTime = target;
        }
        if (data.playing && audio.paused){
-         audio.play().catch(()=>{
-           if (!document.getElementById('m30Unlock')){
-             const div = document.createElement('div');
-             div.id = 'm30Unlock';
-             div.className = 'mini-pop bottom-pop';
-             div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-             div.onclick = async ()=>{
-               try{ await audio.play(); }catch(_e){}
-               div.remove();
-             };
-             document.getElementById('popLayer')?.appendChild(div);
-           }
-         });
+         forcePlayAudio(audio);
        }
        if (!data.playing && !audio.paused){
         audio.pause();
@@ -9371,19 +9470,7 @@ function renderSfx(v){
 
   try{
     audio.currentTime = 0;
-    audio.play().catch(()=>{
-      if (!document.getElementById('sfxUnlock')){
-        const div = document.createElement('div');
-        div.id = 'sfxUnlock';
-        div.className = 'mini-pop bottom-pop';
-        div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-        div.onclick = async ()=>{
-          try{ await audio.play(); }catch(_e){}
-          div.remove();
-        };
-        document.getElementById('popLayer')?.appendChild(div);
-      }
-    });
+    forcePlayAudio(audio);
   }catch(_e){}
 }
 
@@ -9462,7 +9549,7 @@ function renderSfx(v){
        audio.addEventListener('timeupdate', refreshLocal);
 
        btnPlay.onclick = async ()=>{
-         try{ await audio.play(); }catch(_e){}
+         await forcePlayAudio(audio)
          await writeMeta(true);
        };
        btnPause.onclick = async ()=>{
@@ -9491,19 +9578,7 @@ const elapsed = Math.max(0, (serverNow() - (data.at||0)) / 1000); // ←置換
          audio.currentTime = target;
        }
        if (data.playing && audio.paused){
-         audio.play().catch(()=>{
-           if (!document.getElementById('m19Unlock')){
-             const div = document.createElement('div');
-             div.id = 'm19Unlock';
-             div.className = 'mini-pop bottom-pop';
-             div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-             div.onclick = async ()=>{
-               try{ await audio.play(); }catch(_e){}
-               div.remove();
-             };
-             document.getElementById('popLayer')?.appendChild(div);
-           }
-         });
+         forcePlayAudio(audio);
        }
        if (!data.playing && !audio.paused){
          audio.pause();
@@ -9593,7 +9668,7 @@ function renderM42Audio(v){
     audio.addEventListener('timeupdate', refreshLocal);
 
     btnPlay.onclick = async ()=>{
-      try{ await audio.play(); }catch(_e){}
+      await forcePlayAudio(audio)
       await writeMeta(true);
     };
     btnPause.onclick = async ()=>{
@@ -9622,19 +9697,7 @@ function renderM42Audio(v){
       audio.currentTime = target;
     }
     if (data.playing && audio.paused){
-      audio.play().catch(()=>{
-        if (!document.getElementById('m42Unlock')){
-          const div = document.createElement('div');
-          div.id = 'm42Unlock';
-          div.className = 'mini-pop bottom-pop';
-          div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-          div.onclick = async ()=>{
-            try{ await audio.play(); }catch(_e){}
-            div.remove();
-          };
-          document.getElementById('popLayer')?.appendChild(div);
-        }
-      });
+      forcePlayAudio(audio);
     }
     if (!data.playing && !audio.paused){
       audio.pause();
