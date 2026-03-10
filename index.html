@@ -203,6 +203,8 @@
 
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:10000;pointer-events:auto;}
   .alpha{width:var(--card-w);text-align:center;font-size:11px;user-select:none;line-height:1;background:#6b21a8;color:#fff;border:1px solid #4c1d95;border-radius:6px;padding:2px 0;cursor:pointer}
+  .alpha.hook-gray{background:#9ca3af;border-color:#6b7280;color:#fff}
+  .hook-alpha-placeholder{position:fixed;z-index:2147483646;pointer-events:none;}
   .alpha.m43-added{border:0.4px dashed #000;}
   .m43-fly-card{position:fixed;left:0;top:0;width:var(--card-w);height:var(--card-h);border-radius:6px;z-index:2147483640;pointer-events:none;}
   .m43-fly-card .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;}
@@ -212,6 +214,10 @@
   .card-wrap.m43-pending-arrival .card,
   .card-wrap.m43-pending-arrival .marker,
   .card-wrap.m43-pending-arrival .tok-col{opacity:0;}
+  /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
+  .card-wrap.hook-anim-origin .card,
+  .card-wrap.hook-anim-origin .marker,
+  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -2687,7 +2693,7 @@ openMenuAtClick([
       card.appendChild(bot);
 
 const badge=document.createElement('div'); badge.className='badge-fixed';
-const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.classList.add('m43-added'); a.textContent=c.alpha||'';
+const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.classList.add('m43-added'); if (c?.hookGray) a.classList.add('hook-gray'); a.textContent=c.alpha||'';
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
@@ -7540,6 +7546,160 @@ function refreshInfo22(vNow){
 
 
 
+
+function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+async function playHookSwapAnimation(A, B, tables){
+  try{
+    const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
+    const wrapEl = (ti, cardId)=> document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
+    const handEl = (ti)=> tableEl(ti)?.querySelector('.hand');
+    const cardW = cssNum('--card-w') || 24;
+    const cardH = cssNum('--card-h') || 40;
+    const gap   = cssNum('--card-gap') || 3;
+
+    const wa = wrapEl(A.table, A.cardId);
+    const wb = wrapEl(B.table, B.cardId);
+    if (!wa || !wb) return;
+
+    const ra = wa.getBoundingClientRect();
+    const rb = wb.getBoundingClientRect();
+    const ca = wa.querySelector('.card')?.cloneNode(true);
+    const cb = wb.querySelector('.card')?.cloneNode(true);
+    if (!ca || !cb) return;
+
+    const alphaA = wa.querySelector('.alpha');
+    const alphaB = wb.querySelector('.alpha');
+    const srcAlphaA = String(alphaA?.textContent || '');
+    const srcAlphaB = String(alphaB?.textContent || '');
+
+    const setupFly = (el, r)=>{
+      el.style.position='fixed';
+      el.style.left=`${r.left}px`;
+      el.style.top =`${r.top}px`;
+      el.style.margin='0';
+      el.style.zIndex='2147483645';
+      el.style.pointerEvents='none';
+      el.style.transition='transform 1.5s ease, left 1.5s ease, top 1.5s ease';
+      document.body.appendChild(el);
+    };
+    setupFly(ca, ra); setupFly(cb, rb);
+
+    wa.classList.add('hook-anim-origin');
+    wb.classList.add('hook-anim-origin');
+
+    // 1) 抜き取りカードを上に飛び出し
+    requestAnimationFrame(()=>{
+      ca.style.transform=`translateY(-${cardH}px)`;
+      cb.style.transform=`translateY(-${cardH}px)`;
+    });
+    await sleep(1500);
+
+    const aHand = (tables[A.table]?.hand)||[];
+    const bHand = (tables[B.table]?.hand)||[];
+    const aIdx = aHand.findIndex(c=>c?.id===A.cardId);
+    const bIdx = bHand.findIndex(c=>c?.id===B.cardId);
+
+    const insertPos = (hand, card)=>{
+      const n = card.num|0;
+      let pos = 0;
+      while(pos < hand.length && ((hand[pos]?.num|0) <= n)) pos++;
+      return pos;
+    };
+
+    const aWithout = aHand.filter(c=>c?.id!==A.cardId);
+    const bWithout = bHand.filter(c=>c?.id!==B.cardId);
+    const toA = bHand[bIdx];
+    const toB = aHand[aIdx];
+    const insA = toA ? insertPos(aWithout, toA) : 0;
+    const insB = toB ? insertPos(bWithout, toB) : 0;
+
+    // 2) 詰める + 挿入位置を空ける（右スライド）
+    const shift = cardW + gap;
+    const moveWraps = [];
+    const qa = Array.from(handEl(A.table)?.querySelectorAll('.card-wrap')||[]);
+    const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
+
+    const addAlphaPlaceholder = (x, y, txt)=>{
+      const el = document.createElement('div');
+      el.className = 'alpha hook-alpha-placeholder';
+      el.textContent = txt;
+      el.style.left = `${x}px`;
+      el.style.top  = `${y + cardH + 2}px`;
+      document.body.appendChild(el);
+      return el;
+    };
+
+    // ステップ2（スライド）中から、空き予定スロットのα帯を表示しておく
+    const estimateTarget = (ti, ins)=>{
+      const h = handEl(ti);
+      if (!h) return {x:0,y:0};
+      const first = h.querySelector('.card-wrap:not(.hook-anim-origin)') || h.querySelector('.card-wrap');
+      if (!first){ const rh = h.getBoundingClientRect(); return {x:rh.left, y:rh.top}; }
+      const rf = first.getBoundingClientRect();
+      return {x: rf.left + (Math.max(0, ins) * shift), y: rf.top};
+    };
+
+    const phA = addAlphaPlaceholder(estimateTarget(A.table, insA).x, estimateTarget(A.table, insA).y, `${srcAlphaB}`);
+    const phB = addAlphaPlaceholder(estimateTarget(B.table, insB).x, estimateTarget(B.table, insB).y, `${srcAlphaA}`);
+
+    qa.forEach((w,i)=>{
+      if (w.dataset.cardId===A.cardId) return;
+      let dx = 0;
+      if (aIdx>=0 && i>aIdx) dx -= shift;
+      const ni = i - (i>aIdx?1:0);
+      if (ni>=insA) dx += shift;
+      if (dx!==0){ w.style.transition='transform 1.5s ease'; w.style.transform=`translateX(${dx}px)`; moveWraps.push(w); }
+    });
+    qb.forEach((w,i)=>{
+      if (w.dataset.cardId===B.cardId) return;
+      let dx = 0;
+      if (bIdx>=0 && i>bIdx) dx -= shift;
+      const ni = i - (i>bIdx?1:0);
+      if (ni>=insB) dx += shift;
+      if (dx!==0){ w.style.transition='transform 1.5s ease'; w.style.transform=`translateX(${dx}px)`; moveWraps.push(w); }
+    });
+    await sleep(1500);
+
+    const targetPoint = (ti, ins)=>{
+      const h = handEl(ti);
+      if (!h) return {x:0,y:0};
+      const wraps = Array.from(h.querySelectorAll('.card-wrap')).filter(w=> w.style.visibility!=='hidden');
+      if (wraps.length===0) {
+        const rh = h.getBoundingClientRect();
+        return {x:rh.left, y:rh.top};
+      }
+      const first = wraps[0].getBoundingClientRect();
+      const clamped = Math.max(0, Math.min(ins, wraps.length));
+      return {x: first.left + (clamped * shift), y: first.top};
+    };
+
+    const ta = targetPoint(A.table, insA);
+    const tb = targetPoint(B.table, insB);
+
+    // 空き位置でもアルファ帯を見せる（着地するカードの帯）
+    // ※ α帯はスライドさせない（生成位置のまま固定）
+
+    // 3) 空き位置へ挿入
+    // ca は A から抜いたカードなので B 側へ、cb は B から抜いたカードなので A 側へ移動
+    ca.style.left = `${tb.x}px`; ca.style.top = `${tb.y}px`; ca.style.transform='translateY(0)';
+    cb.style.left = `${ta.x}px`; cb.style.top = `${ta.y}px`; cb.style.transform='translateY(0)';
+    await sleep(1500);
+
+    phA.textContent = `${srcAlphaB}-`;
+    phB.textContent = `${srcAlphaA}-`;
+    await sleep(80);
+    phA.remove(); phB.remove();
+    ca.remove(); cb.remove();
+    wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
+    moveWraps.forEach(w=>{ w.style.transform=''; w.style.transition=''; });
+    return { srcAlphaA, srcAlphaB };
+  }catch(e){
+    console.warn('playHookSwapAnimation failed', e);
+    return null;
+  }
+}
+
 /* ===== Item 2 swap ===== */
 async function doItem2Swap(A, B){
   if(!A || !B) return;
@@ -7556,6 +7716,8 @@ async function doItem2Swap(A, B){
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
 
+  const anim = await playHookSwapAnimation(A, B, tables);
+
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
   const insertSortedRight = (hand, card)=>{
@@ -7566,13 +7728,20 @@ async function doItem2Swap(A, B){
   };
 
   const mark = now()+10000; // 10秒
- const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2'};
-   const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2'};
+  const srcAlphaA = String(anim?.srcAlphaA || a.card?.alpha || '');
+  const srcAlphaB = String(anim?.srcAlphaB || b.card?.alpha || '');
+ const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2', hookGray:true};
+   const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2', hookGray:true};
   insertSortedRight(b.hand, toB);
   insertSortedRight(a.hand, toA);
 
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(a.hand); realpha(b.hand);
+
+  const toAInHand = a.hand.find(c=> String(c?.id||'') === String(toA?.id||''));
+  const toBInHand = b.hand.find(c=> String(c?.id||'') === String(toB?.id||''));
+  if (toAInHand) toAInHand.alpha = `${srcAlphaB}-`;
+  if (toBInHand) toBInHand.alpha = `${srcAlphaA}-`;
 
   await Promise.all([
     set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand),
