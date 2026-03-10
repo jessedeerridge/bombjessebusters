@@ -1082,6 +1082,12 @@ const audioVolumeLabel = document.getElementById('audioVolumeLabel');
 const audioVolumeRange = document.getElementById('audioVolumeRange');
 const audioVolumeValue = document.getElementById('audioVolumeValue');
 const audioVolumes = { m19:1, m30:1, m42:1 };
+const missionAudioGraph = {
+  ctx:null,
+  gains:{},
+  sources:new WeakMap(),
+  unlocked:false
+};
 
 const miniPop = document.getElementById('miniPop');
 document.addEventListener('click', (e)=>{
@@ -1230,11 +1236,60 @@ function getMissionAudio(mid){
   return null;
 }
 
+function ensureMissionAudioContext(){
+  if (missionAudioGraph.ctx) return missionAudioGraph.ctx;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  try{
+    missionAudioGraph.ctx = new Ctx();
+  }catch(_e){
+    missionAudioGraph.ctx = null;
+  }
+  return missionAudioGraph.ctx;
+}
+
+function ensureMissionAudioGain(mid, audio){
+  if (!audio) return null;
+  const key = `m${mid|0}`;
+  const ctx = ensureMissionAudioContext();
+  if (!ctx) return null;
+  let gain = missionAudioGraph.gains[key];
+  try{
+    if (!missionAudioGraph.sources.has(audio)){
+      const src = ctx.createMediaElementSource(audio);
+      if (!gain){
+        gain = ctx.createGain();
+        missionAudioGraph.gains[key] = gain;
+      }
+      src.connect(gain);
+      gain.connect(ctx.destination);
+      missionAudioGraph.sources.set(audio, src);
+    } else if (!gain){
+      gain = ctx.createGain();
+      missionAudioGraph.gains[key] = gain;
+      const src = missionAudioGraph.sources.get(audio);
+      src.connect(gain);
+      gain.connect(ctx.destination);
+    }
+  }catch(_e){
+    return null;
+  }
+  return gain;
+}
+
 function updateMissionAudioVolume(mid){
   const key = `m${mid|0}`;
-  const vol = Number(audioVolumes[key] ?? 1);
+  const vol = clamp(Number(audioVolumes[key] ?? 1), 0, 1);
   const audio = getMissionAudio(mid);
-  if (audio) audio.volume = vol;
+  if (!audio) return;
+
+  const gain = ensureMissionAudioGain(mid, audio);
+  if (gain){
+    try{ gain.gain.setValueAtTime(vol, gain.context.currentTime); }catch(_e){ gain.gain.value = vol; }
+    audio.volume = 1;
+  } else {
+    audio.volume = vol;
+  }
 }
 
 function renderMissionAudioVolume(v){
@@ -1272,6 +1327,10 @@ async function forcePlayAudio(audio){
   }
 }
 function retryPendingAudioAutoplay(){
+  const ctx = missionAudioGraph.ctx;
+  if (ctx && ctx.state !== 'running'){
+    ctx.resume().then(()=>{ missionAudioGraph.unlocked = true; }).catch(()=>{});
+  }
   if (!pendingAudioAutoplay.size) return;
   [...pendingAudioAutoplay].forEach((a)=>{
     if (!a || a.paused === false){
@@ -1291,6 +1350,11 @@ window.addEventListener('pointerdown', async function _unlockOnce(){
   if (_audioUnlocked) return;
   _audioUnlocked = true;
   window.removeEventListener('pointerdown', _unlockOnce);
+
+  const ctx = ensureMissionAudioContext();
+  if (ctx && ctx.state !== 'running'){
+    try{ await ctx.resume(); missionAudioGraph.unlocked = true; }catch(_e){}
+  }
 
   const a = getCountdownAudio();
   try {
@@ -11038,7 +11102,6 @@ function missionInfo(id, opts={}){
         id:50, name:'#50', desc:'',
         display:[
           '#50',...linesForMix,
-          '最初にトークンを置くとき、場所を指し示して、トークンをタイルの前に置かずに、手元に置いて見せる。',
           '切断に失敗した時、指し示されたコードにではなく、コードの外側に情報トークンを置く。',
           '',
           '',
