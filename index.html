@@ -7678,8 +7678,7 @@ async function playHookSwapAnimation(A, B, tables){
     const tb = targetPoint(B.table, insB);
 
     // 空き位置でもアルファ帯を見せる（着地するカードの帯）
-    phA.style.left = `${ta.x}px`; phA.style.top = `${ta.y + cardH + 2}px`;
-    phB.style.left = `${tb.x}px`; phB.style.top = `${tb.y + cardH + 2}px`;
+    // ※ α帯はスライドさせない（生成位置のまま固定）
 
     // 3) 空き位置へ挿入
     // ca は A から抜いたカードなので B 側へ、cb は B から抜いたカードなので A 側へ移動
