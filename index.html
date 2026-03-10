@@ -1259,6 +1259,32 @@ function renderMissionAudioVolume(v){
   updateMissionAudioVolume(mid);
 }
 
+const pendingAudioAutoplay = new Set();
+async function forcePlayAudio(audio){
+  if (!audio) return false;
+  try{
+    await audio.play();
+    pendingAudioAutoplay.delete(audio);
+    return true;
+  }catch(_e){
+    pendingAudioAutoplay.add(audio);
+    return false;
+  }
+}
+function retryPendingAudioAutoplay(){
+  if (!pendingAudioAutoplay.size) return;
+  [...pendingAudioAutoplay].forEach((a)=>{
+    if (!a || a.paused === false){
+      pendingAudioAutoplay.delete(a);
+      return;
+    }
+    a.play().then(()=> pendingAudioAutoplay.delete(a)).catch(()=>{});
+  });
+}
+window.addEventListener('pointerdown', retryPendingAudioAutoplay, { capture:true });
+window.addEventListener('keydown', retryPendingAudioAutoplay, { capture:true });
+window.addEventListener('touchstart', retryPendingAudioAutoplay, { capture:true });
+
 
 let _audioUnlocked = false;
 window.addEventListener('pointerdown', async function _unlockOnce(){
@@ -9384,7 +9410,7 @@ deckBtn.onclick = async (ev)=>{
        audio.addEventListener('timeupdate', refreshLocal);
 
        btnPlay.onclick = async ()=>{
-         try{ await audio.play(); }catch(_e){}
+         await forcePlayAudio(audio)
          await writeMeta(true);
        };
        btnPause.onclick = async ()=>{
@@ -9413,19 +9439,7 @@ deckBtn.onclick = async (ev)=>{
          audio.currentTime = target;
        }
        if (data.playing && audio.paused){
-         audio.play().catch(()=>{
-           if (!document.getElementById('m30Unlock')){
-             const div = document.createElement('div');
-             div.id = 'm30Unlock';
-             div.className = 'mini-pop bottom-pop';
-             div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-             div.onclick = async ()=>{
-               try{ await audio.play(); }catch(_e){}
-               div.remove();
-             };
-             document.getElementById('popLayer')?.appendChild(div);
-           }
-         });
+         forcePlayAudio(audio);
        }
        if (!data.playing && !audio.paused){
         audio.pause();
@@ -9456,19 +9470,7 @@ function renderSfx(v){
 
   try{
     audio.currentTime = 0;
-    audio.play().catch(()=>{
-      if (!document.getElementById('sfxUnlock')){
-        const div = document.createElement('div');
-        div.id = 'sfxUnlock';
-        div.className = 'mini-pop bottom-pop';
-        div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-        div.onclick = async ()=>{
-          try{ await audio.play(); }catch(_e){}
-          div.remove();
-        };
-        document.getElementById('popLayer')?.appendChild(div);
-      }
-    });
+    forcePlayAudio(audio);
   }catch(_e){}
 }
 
@@ -9547,7 +9549,7 @@ function renderSfx(v){
        audio.addEventListener('timeupdate', refreshLocal);
 
        btnPlay.onclick = async ()=>{
-         try{ await audio.play(); }catch(_e){}
+         await forcePlayAudio(audio)
          await writeMeta(true);
        };
        btnPause.onclick = async ()=>{
@@ -9576,19 +9578,7 @@ const elapsed = Math.max(0, (serverNow() - (data.at||0)) / 1000); // ←置換
          audio.currentTime = target;
        }
        if (data.playing && audio.paused){
-         audio.play().catch(()=>{
-           if (!document.getElementById('m19Unlock')){
-             const div = document.createElement('div');
-             div.id = 'm19Unlock';
-             div.className = 'mini-pop bottom-pop';
-             div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-             div.onclick = async ()=>{
-               try{ await audio.play(); }catch(_e){}
-               div.remove();
-             };
-             document.getElementById('popLayer')?.appendChild(div);
-           }
-         });
+         forcePlayAudio(audio);
        }
        if (!data.playing && !audio.paused){
          audio.pause();
@@ -9678,7 +9668,7 @@ function renderM42Audio(v){
     audio.addEventListener('timeupdate', refreshLocal);
 
     btnPlay.onclick = async ()=>{
-      try{ await audio.play(); }catch(_e){}
+      await forcePlayAudio(audio)
       await writeMeta(true);
     };
     btnPause.onclick = async ()=>{
@@ -9707,19 +9697,7 @@ function renderM42Audio(v){
       audio.currentTime = target;
     }
     if (data.playing && audio.paused){
-      audio.play().catch(()=>{
-        if (!document.getElementById('m42Unlock')){
-          const div = document.createElement('div');
-          div.id = 'm42Unlock';
-          div.className = 'mini-pop bottom-pop';
-          div.innerHTML = `<button class="btn small">音声を有効化（ワンタップ）</button>`;
-          div.onclick = async ()=>{
-            try{ await audio.play(); }catch(_e){}
-            div.remove();
-          };
-          document.getElementById('popLayer')?.appendChild(div);
-        }
-      });
+      forcePlayAudio(audio);
     }
     if (!data.playing && !audio.paused){
       audio.pause();
