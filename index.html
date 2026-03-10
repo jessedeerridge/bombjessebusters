@@ -575,6 +575,13 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   display:grid;
   place-items:center;
 }
+.audio-volume-dock .vol-value{
+  min-width:44px;
+  text-align:right;
+  font-size:12px;
+  font-weight:700;
+  color:#374151;
+}
 .audio-volume-dock input[type="range"]{ width:100%; margin:0; }
 /* ▲▲ 音声ミッション用 音量バー ▲▲ */
 
@@ -954,6 +961,7 @@ main:not(:has(#lobby.hidden)) > * {
       <input id="audioVolumeRange" type="range" min="0" max="1" step="0.01" value="1">
     </div>
     <button id="audioVolUp" class="vol-step-btn" type="button" aria-label="音量を上げる">▶</button>
+    <span id="audioVolumeValue" class="vol-value">100%</span>
   </div>
 </div>
 
@@ -1103,7 +1111,40 @@ const audioVolumeDock = document.getElementById('audioVolumeDock');
 const audioVolumeRange = document.getElementById('audioVolumeRange');
 const audioVolDown = document.getElementById('audioVolDown');
 const audioVolUp = document.getElementById('audioVolUp');
+const audioVolumeValue = document.getElementById('audioVolumeValue');
 const audioVolumes = { m19:1, m30:1, m42:1 };
+const AUDIO_VOL_STEP = 0.01;
+const AUDIO_VOL_HOLD_DELAY_MS = 260;
+const AUDIO_VOL_HOLD_INTERVAL_MS = 70;
+let audioVolHoldDelayTimer = null;
+let audioVolHoldInterval = null;
+
+function clearAudioVolHold(){
+  if (audioVolHoldDelayTimer){
+    clearTimeout(audioVolHoldDelayTimer);
+    audioVolHoldDelayTimer = null;
+  }
+  if (audioVolHoldInterval){
+    clearInterval(audioVolHoldInterval);
+    audioVolHoldInterval = null;
+  }
+}
+
+function bindAudioVolHold(button, stepFn){
+  if (!button) return;
+  button.onpointerdown = (ev)=>{
+    ev.preventDefault();
+    stepFn();
+    clearAudioVolHold();
+    audioVolHoldDelayTimer = setTimeout(()=>{
+      audioVolHoldInterval = setInterval(stepFn, AUDIO_VOL_HOLD_INTERVAL_MS);
+    }, AUDIO_VOL_HOLD_DELAY_MS);
+  };
+  button.onpointerup = clearAudioVolHold;
+  button.onpointercancel = clearAudioVolHold;
+  button.onpointerleave = clearAudioVolHold;
+}
+window.addEventListener('pointerup', clearAudioVolHold, { capture:true });
 const missionAudioGraph = {
   ctx:null,
   gains:{},
@@ -1325,6 +1366,7 @@ function renderMissionAudioVolume(v){
     const clamped = clamp(Number(next), 0, 1);
     audioVolumes[key] = clamped;
     if (audioVolumeRange) audioVolumeRange.value = String(clamped);
+    if (audioVolumeValue) audioVolumeValue.textContent = `${Math.round(clamped * 100)}%`;
     updateMissionAudioVolume(mid);
   };
 
@@ -1335,13 +1377,9 @@ function renderMissionAudioVolume(v){
       applyMissionVolume(audioVolumeRange.value||'1');
     };
   }
-  if (audioVolDown){
-    audioVolDown.onclick = ()=> applyMissionVolume((Number(audioVolumes[key] ?? 1) - 0.05).toFixed(2));
-  }
-  if (audioVolUp){
-    audioVolUp.onclick = ()=> applyMissionVolume((Number(audioVolumes[key] ?? 1) + 0.05).toFixed(2));
-  }
-  updateMissionAudioVolume(mid);
+  bindAudioVolHold(audioVolDown, ()=> applyMissionVolume((Number(audioVolumes[key] ?? 1) - AUDIO_VOL_STEP).toFixed(2)));
+  bindAudioVolHold(audioVolUp, ()=> applyMissionVolume((Number(audioVolumes[key] ?? 1) + AUDIO_VOL_STEP).toFixed(2)));
+  applyMissionVolume(current);
 }
 
 const pendingAudioAutoplay = new Set();
