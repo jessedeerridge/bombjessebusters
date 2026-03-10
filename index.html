@@ -204,12 +204,11 @@
     content:'フツーノ\A探知機';
     white-space:pre;
     position:absolute;
-    left:0;
-    bottom:0;
+    left:1px;
+    bottom:5px;
     font-size:5px;
     line-height:1;
-    color:#fff;
-    text-shadow:0 1px 1px rgba(0,0,0,.9);
+    color:#000;
     z-index:2;
     pointer-events:none;
   }
@@ -2494,8 +2493,8 @@ if (!amSeated || seatEmpty) {
     };
   }
 }
-if (!isFlippedRole && isMember5Card) char.classList.add('member5-card');
-if (!isFlippedRole && isMember1to5Card) char.classList.add('member15-detector');
+if (amSeated && !seatEmpty && !isFlippedRole && isMember5Card) char.classList.add('member5-card');
+if (amSeated && !seatEmpty && !isFlippedRole && isMember1to5Card) char.classList.add('member15-detector');
     if ((state.watching?.mission?.id|0) === 34) {
       // #34：隊長が場に出す「前」だけ、他人の正体カードをブランク固定
       const capIdx = state?.watching?.captainTable;
