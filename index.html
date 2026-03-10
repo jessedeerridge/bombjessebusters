@@ -4840,9 +4840,15 @@ const onRotate = ()=>{
   if (!state._m42DragBound){
     state._m42DragBound = true;
 
-    const onDown = (ev)=>{
+    const getTouchPoint = (ev)=>{
+      const t = ev.touches?.[0] || ev.changedTouches?.[0];
+      if (!t) return null;
+      return { clientX:t.clientX, clientY:t.clientY };
+    };
+
+    const startDrag = ({ target, clientX, clientY })=>{
       if (!isM42 || !canDrag()) return;
-      const wrap = ev.target.closest?.('.card-wrap'); if(!wrap) return;
+      const wrap = target?.closest?.('.card-wrap'); if(!wrap) return;
       const cardEl = wrap.querySelector('.card');     if(!cardEl || !cardEl.classList.contains('open')) return; // 公開のみ
 
       const table  = parseInt(wrap.dataset.table,10);
@@ -4856,10 +4862,12 @@ const onRotate = ()=>{
       blankOrigin(table, cardId, true);
 
       let moved = false;
-      const startX = ev.clientX, startY = ev.clientY;
+      const startX = clientX, startY = clientY;
 
       const move = (e)=>{
-        const x = e.clientX, y = e.clientY;
+        const p = getTouchPoint(e) || e;
+        const x = p.clientX, y = p.clientY;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
         const dx = Math.abs(x - startX), dy = Math.abs(y - startY);
         if (!moved && (dx>2 || dy>2)) moved = true;
 
@@ -4875,13 +4883,17 @@ const onRotate = ()=>{
       const up = async (e)=>{
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup',   up, true);
+        window.removeEventListener('touchmove',   move, { passive:false });
+        window.removeEventListener('touchend',    up,   true);
+        window.removeEventListener('touchcancel', up,   true);
 
         // #m42Box 内に落としたか（④）
         const box = document.getElementById('m42Box');
         let droppedInBox = false;
         if (box){
           const r = box.getBoundingClientRect();
-          const x = e.clientX, y = e.clientY;
+          const p = getTouchPoint(e) || e;
+          const x = p.clientX, y = p.clientY;
           droppedInBox = (x>=r.left && x<=r.right && y>=r.top && y<=r.bottom);
         }
 
@@ -4893,6 +4905,16 @@ const onRotate = ()=>{
             if (idx>=0){
               hand.splice(idx,1);                 // 詰めて削除
               await set(ref(db, `rooms/${state.roomCode}/tables/${table}/hand`), hand);
+
+              // 公開コードが全て消えたら ☝ モードを自動解除
+              const allTablesSnap = await get(ref(db, `rooms/${state.roomCode}/tables`));
+              const allTables = allTablesSnap.val() || [];
+              const hasOpenCode = allTables.some(tb =>
+                (tb?.hand || []).some(cd => cd?.kind === 'normal' && cd?.open === true)
+              );
+              if (!hasOpenCode){
+                await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_on: false });
+              }
             }
           }finally{
             await update(ref(db, `rooms/${state.roomCode}/meta`), { m42_drag: null });
@@ -4908,11 +4930,28 @@ const onRotate = ()=>{
 
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup',   up, true);
+      window.addEventListener('touchmove',   move, { passive:false });
+      window.addEventListener('touchend',    up, true);
+      window.addEventListener('touchcancel', up, true);
+    };
+
+    const onDown = (ev)=>{
+      startDrag(ev);
+    };
+
+    const onTouchStart = (ev)=>{
+      if (!isM42 || !canDrag()) return;
+      const p = getTouchPoint(ev);
+      if (!p) return;
+      ev.preventDefault();
+      startDrag({ target: ev.target, clientX:p.clientX, clientY:p.clientY });
     };
 
     document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('touchstart',  onTouchStart, { capture:true, passive:false });
     state._m42DragUnsub = ()=>{
       document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('touchstart', onTouchStart, true);
     };
   }
 
