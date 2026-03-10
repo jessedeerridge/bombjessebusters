@@ -235,6 +235,64 @@
     pointer-events:none;
   }
 
+  .char-card.member-alt6,
+  .char-card.member-alt7,
+  .char-card.member-alt8,
+  .char-card.member-alt9,
+  .m61-mini.member-alt6,
+  .m61-mini.member-alt7,
+  .m61-mini.member-alt8,
+  .m61-mini.member-alt9{ position:relative; }
+
+  .char-card.member-alt6::after,
+  .char-card.member-alt7::after,
+  .char-card.member-alt8::after,
+  .char-card.member-alt9::after,
+  .m61-mini.member-alt6::after,
+  .m61-mini.member-alt7::after,
+  .m61-mini.member-alt8::after,
+  .m61-mini.member-alt9::after{
+    white-space:pre;
+    position:absolute;
+    left:1px;
+    font-size:5px;
+    font-family:'Arial Black','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
+    font-weight:500;
+    line-height:1;
+    color:#000;
+    -webkit-text-stroke:0.25px #000;
+    text-shadow:0 0 0 #000;
+    z-index:2;
+    pointer-events:none;
+  }
+  .char-card.member-alt6::after,
+  .m61-mini.member-alt6::after{ content:'ミッツケル\A探知機'; bottom:10px; font-size:4px; }
+  .char-card.member-alt7::after,
+  .m61-mini.member-alt7::after{ content:'ドッチカ・\Aアタレイ'; bottom:10px; }
+  .char-card.member-alt8::after,
+  .m61-mini.member-alt8::after{ content:'なんでも\Aレーダー'; bottom:10px; }
+  .char-card.member-alt9::after,
+  .m61-mini.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:10px; }
+
+  .char-card.member-alt8::before,
+  .char-card.member-alt9::before,
+  .m61-mini.member-alt8::before,
+  .m61-mini.member-alt9::before{
+    content:'いつでも使える';
+    position:absolute;
+    left:1px;
+    bottom:1px;
+    font-size:3px;
+    font-family:'Arial Black','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
+    font-weight:500;
+    line-height:1;
+    color:#000;
+    -webkit-text-stroke:0.2px #000;
+    text-shadow:0 0 0 #000;
+    z-index:2;
+    pointer-events:none;
+  }
+
   .hand{
     display:flex;align-items:flex-start;gap:var(--card-gap);
     overflow-y:visible; overflow-x:visible;
@@ -2862,6 +2920,7 @@ char.className='char-card';
 const faceName = String(t?.character?.face || '');
 const isMember5Card = /member\s*\(5\)\./i.test(faceName);
 const isMember1to5Card = /member\s*\(([1-5])\)\./i.test(faceName);
+const altMemberMatch = faceName.match(/member\s*\(([6-9])\)\./i);
 const isFlippedRole = !!t?.character?.flipped;
 // 自分が未着席  または  この席が空席 → ブランク固定
 const amSeated = seatedNow;           // 先頭で算出済み
@@ -2888,6 +2947,7 @@ if (!amSeated || seatEmpty) {
 }
 if (amSeated && !seatEmpty && !isFlippedRole && isMember5Card) char.classList.add('member5-card');
 if (amSeated && !seatEmpty && !isFlippedRole && isMember1to5Card) char.classList.add('member15-detector');
+if (amSeated && !seatEmpty && !isFlippedRole && altMemberMatch) char.classList.add(`member-alt${altMemberMatch[1]}`);
     if ((state.watching?.mission?.id|0) === 34) {
       // #34：隊長が場に出す「前」だけ、他人の正体カードをブランク固定
       const capIdx = state?.watching?.captainTable;
@@ -4122,11 +4182,13 @@ if (big){
       const faceName = String(t?.character?.face || '');
       const isMember5Card = /member\s*\(5\)\./i.test(faceName);
       const isMember1to5Card = /member\s*\(([1-5])\)\./i.test(faceName);
+      const altMemberMatch = faceName.match(/member\s*\(([6-9])\)\./i);
       const isFlippedRole = !!t?.character?.flipped;
       const face = isFlippedRole ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
       mini.style.backgroundImage = `url("${face}")`;
       if (!isFlippedRole && isMember5Card) mini.classList.add('member5-card');
       if (!isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
+      if (!isFlippedRole && altMemberMatch) mini.classList.add(`member-alt${altMemberMatch[1]}`);
       // 本人のみ裏表トグル
       // 本人のみ：member(9)なら拡大→「使う」ポップ、その他は裏表トグル
       if (amMe){
@@ -6232,11 +6294,13 @@ function renderM61(v){
       const faceName = String(t?.character?.face || '');
       const isMember5Card = /member\s*\(5\)\./i.test(faceName);
       const isMember1to5Card = /member\s*\(([1-5])\)\./i.test(faceName);
+      const altMemberMatch = faceName.match(/member\s*\(([6-9])\)\./i);
       const isFlippedRole = !!t?.character?.flipped;
       const face = isFlippedRole ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
       mini.style.backgroundImage = `url("${face}")`;
       if (!isFlippedRole && isMember5Card) mini.classList.add('member5-card');
       if (!isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
+      if (!isFlippedRole && altMemberMatch) mini.classList.add(`member-alt${altMemberMatch[1]}`);
      // 既存の大キャラ同様、本人のみ裏表トグル
 
       if (amSeatedHere){
