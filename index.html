@@ -121,6 +121,44 @@
     white-space:nowrap;
     overflow:hidden;
   }
+  .item-textbox{
+    position:absolute;
+    left:2px;
+    right:2px;
+    bottom:11px;
+    max-height:calc(100% - 41px); /* 上側に最低30px残す */
+    background:#fff;
+    color:#000;
+    border:1px solid #fff;
+    border-radius:2px;
+    padding:1px 2px;
+    overflow:hidden;
+    z-index:2;
+    pointer-events:none;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    gap:1px;
+  }
+  .item-textbox .name{
+    font-size:7px;
+    line-height:1.1;
+    font-weight:700;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .item-textbox .desc{
+    font-size:6px;
+    line-height:1.1;
+    white-space:pre-wrap;
+    overflow:hidden;
+    word-break:break-word;
+  }
+  .item-textbox.compact .desc{
+    font-size:5px;
+    line-height:1.05;
+  }
   .item.alt-rule::after{
     content:'×';
     position:absolute;
@@ -1256,6 +1294,27 @@ const ITEM_USE_TIMINGS = {
   6:'いつでも使える', 7:'いつでも使える', 8:'いつでも使える', 9:'手番開始の前', 10:'手番中に使う',
   11:'相談せずに使う', 12:'いつでも使える', 13:'即時効果', 14:'いつでも使える', 15:'即時効果',
   16:'即時効果', 17:'手番中に使う'
+};
+
+const ITEM_TEXTS = {
+  1:{name:'コトナルラベル',desc:'自分の、隣り合って数字が異なるコード2本の前にコトナルラベルを置く。'},
+  2:{name:'イレカエシーバー',desc:'他プレイヤーの裏向きのコードを選ぶ。\nそして、他プレイヤーが自分の裏向きのコード選ぶ。\n選ばれたコードを交換する。黄/赤コードを選んでもよい。'},
+  3:{name:'ミッツケル探知機',desc:'コードを通常の1本ではなく、3本指し示して、数値を宣言できる。\n黄の宣言は不可。'},
+  4:{name:'ヒント付箋',desc:'自分のコードの前に情報トークンを置く。\n赤/黄は不可。'},
+  5:{name:'スーパー探知機',desc:'コードを通常の1本ではなく、一人のプレイヤーの全てを指し示して、数値を宣言できる。\n黄の宣言は不可。'},
+  6:{name:'失敗帳消し機',desc:'起爆ダイヤルを1つ後退させる。'},
+  7:{name:'非常電池',desc:'使用済のキャラクターカード2枚までを再びオモテにできる。'},
+  8:{name:'なんでもレーダー',desc:'数値を1つ宣言し、そのコードを持っているプレイヤーは全員手をあげる。'},
+  9:{name:'万能氷',desc:'切断に失敗しても起爆ダイヤルが進まず、赤コードを切断しても爆発しない。'},
+  10:{name:'ドッチカ・アタレイ',desc:'1つのコードに対して、数字を2つ宣言できる。'},
+  11:{name:'いつでもコーヒー',desc:'任意のプレイヤーを選び、そのプレイヤーまで手番を飛ばす。'},
+  12:{name:'イコールラベル',desc:'隣り合って数字が同じコード2本の前にイコールラベルを置く。'},
+  13:{name:'ヒミツ底',desc:'新たな装備カードを2枚並べる。'},
+  14:{name:'シングルラベル',desc:'x1の情報トークンを1つのコードの前に置く。'},
+  15:{name:'フタタビボックス',desc:'使用済みの装備カードを全てオモテ向きにする。'},
+  16:{name:'分離銃',desc:'情報トークンをランダムに1枚ひき、その値のコードを全て切断できる。'},
+  17:{name:'優先切断券',desc:'他の2本のコードが切断されていなくても、単独で自分の数値が同じ2本のコードを切断できる。'},
+  18:{name:'ヒッカケフック',desc:'他プレイヤーのコードを1枚選び、自分のスタンドに置く。'}
 };
 
 /* Elements */
@@ -2598,6 +2657,31 @@ function renderItemsAndDi(v){
     return String(itemNo);
   };
 
+  const appendItemTextBox = (el, itemNo)=>{
+    const info = ITEM_TEXTS[itemNo];
+    if(!info) return;
+    const box = document.createElement('div');
+    box.className = 'item-textbox';
+
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = info.name;
+
+    const desc = document.createElement('div');
+    desc.className = 'desc';
+    desc.textContent = `\n${info.desc}`;
+
+    box.appendChild(name);
+    box.appendChild(desc);
+    el.appendChild(box);
+
+    requestAnimationFrame(()=>{
+      if(desc.scrollHeight > desc.clientHeight || box.scrollHeight > box.clientHeight){
+        box.classList.add('compact');
+      }
+    });
+  };
+
   const decorateItemFront = (el, itemNo)=>{
     el.classList.add('item-front-custom');
     const mark = document.createElement('div');
@@ -2666,6 +2750,7 @@ function renderItemsAndDi(v){
         div.style.backgroundImage = `url("./itemback.jpg")`;
       }else{
         decorateItemFront(div, it.no);
+        appendItemTextBox(div, it.no);
       }
     }
 
