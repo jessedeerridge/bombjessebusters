@@ -106,6 +106,7 @@
     font-size:10px;
     line-height:1;
     font-weight:800;
+    white-space:nowrap;
     text-shadow:0 1px 2px rgba(0,0,0,.75);
   }
   .item-front-chip .yellow-square{
@@ -2714,6 +2715,32 @@ function setItemFaceImage(el, itemNo){
   layer.style.backgroundImage = `url("./item${itemNo}.png")`;
 }
 
+function fitBlackguardNumber(numEl){
+  if(!numEl) return;
+  const chip = numEl.closest('.item-front-chip');
+  if(!chip) return;
+
+  const minSize = 5;
+  const maxSize = 10;
+  const widthLimit = chip.clientWidth * 0.7;
+  const heightLimit = chip.clientHeight * 0.55;
+  let size = maxSize;
+  numEl.style.fontSize = `${size}px`;
+
+  while(size > minSize && (numEl.scrollWidth > widthLimit || numEl.scrollHeight > heightLimit)){
+    size = +(size - 0.2).toFixed(2);
+    numEl.style.fontSize = `${size}px`;
+  }
+}
+
+function fitAllBlackguardNumbers(){
+  document.querySelectorAll('.item-front-chip .num').forEach(fitBlackguardNumber);
+}
+
+window.addEventListener('resize', ()=>{
+  requestAnimationFrame(fitAllBlackguardNumbers);
+});
+
 function decorateItemFront(el, itemNo){
   el.classList.add('item-front-custom');
   const mark = document.createElement('div');
@@ -2741,6 +2768,10 @@ function decorateItemFront(el, itemNo){
     mark.appendChild(chip);
   }
   el.appendChild(mark);
+
+  requestAnimationFrame(()=>{
+    mark.querySelectorAll('.num').forEach(fitBlackguardNumber);
+  });
 
 
 }
