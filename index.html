@@ -8637,6 +8637,13 @@ function refreshInfo22(vNow){
 
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
+async function settleHookAnimation(cleanup, waitMs = 320){
+  // DB反映→再描画の 1 ティック分待ってから後始末する。
+  // ここを即時実行すると、横スライド前の位置に一瞬戻って見える（黒トークン/α帯のチラつき）。
+  await sleep(waitMs);
+  cleanup();
+}
+
 function queueSharedHookAnimations(v){
   const i2Anim = v?.meta?.i2Anim;
   if (i2Anim?.id && i2Anim.id !== state._lastI2AnimId && i2Anim.A && i2Anim.B){
@@ -8806,8 +8813,11 @@ async function playHookSwapAnimation(A, B, tables){
     await sleep(80);
     phA.remove(); phB.remove();
     ca.remove(); cb.remove();
-    wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
-    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    await settleHookAnimation(()=>{
+      wa.classList.remove('hook-anim-origin');
+      wb.classList.remove('hook-anim-origin');
+      moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    });
     return { srcAlphaA, srcAlphaB };
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
@@ -8895,8 +8905,10 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(1500);
 
     fly.remove();
-    ws.classList.remove('hook-anim-origin');
-    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    await settleHookAnimation(()=>{
+      ws.classList.remove('hook-anim-origin');
+      moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    });
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
   }
