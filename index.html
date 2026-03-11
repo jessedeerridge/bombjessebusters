@@ -524,7 +524,8 @@
   .m43-fly-card.front{background:#000;border:1px solid #ddd;}
   .card-wrap.m43-pending-arrival .card,
   .card-wrap.m43-pending-arrival .marker,
-  .card-wrap.m43-pending-arrival .tok-col{opacity:0;}
+  .card-wrap.m43-pending-arrival .tok-col,
+  .card-wrap.m43-pending-arrival .alpha{opacity:0;}
   .m54-fly-card{position:fixed;left:0;top:0;width:var(--card-w);height:var(--card-h);border-radius:6px;z-index:2147483640;pointer-events:none;}
   .m54-fly-card .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;}
   .m54-fly-card .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center;}
@@ -532,12 +533,14 @@
   .m54-fly-card.front{background:#000;border:1px solid #ddd;}
   .card-wrap.m54-pending-arrival .card,
   .card-wrap.m54-pending-arrival .marker,
-  .card-wrap.m54-pending-arrival .tok-col{opacity:0;}
+  .card-wrap.m54-pending-arrival .tok-col,
+  .card-wrap.m54-pending-arrival .alpha{opacity:0;}
   .card-wrap.m54-pending-arrival .card{pointer-events:none;}
-  /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
+  /* 入れ替えフックの移動中：元位置の要素は一式隠す（チラつき防止） */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .tok-col,
+  .card-wrap.hook-anim-origin .alpha{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
