@@ -101,7 +101,7 @@
     inset:0;
     display:grid;
     place-items:center;
-    transform:translateY(-4.6px);
+    transform:translateY(-4px);
     color:#fff;
     font-size:10px;
     line-height:1;
@@ -2720,10 +2720,10 @@ function fitBlackguardNumber(numEl){
   const chip = numEl.closest('.item-front-chip');
   if(!chip) return;
 
-  const minSize = 6.8;
-  const maxSize = 10;
-  const widthLimit = chip.clientWidth * 0.9;
-  const heightLimit = chip.clientHeight * 0.72;
+  const minSize = 7.4;
+  const maxSize = 10.8;
+  const widthLimit = chip.clientWidth * 0.95;
+  const heightLimit = chip.clientHeight * 0.78;
   let size = maxSize;
   numEl.style.fontSize = `${size}px`;
 
