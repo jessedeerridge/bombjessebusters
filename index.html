@@ -125,7 +125,7 @@
     line-height:6px;
     font-weight:700;
     text-align:center;
-    border-radius:0 0 7px 7px;
+    border-radius:0 0 9px 9px;
     pointer-events:none;
     z-index:2;
     white-space:nowrap;
@@ -176,6 +176,9 @@
   .item-textbox.compact .desc{
     font-size:6px;
     line-height:1.05;
+  }
+  .item-textbox.desc-five-lines{
+    bottom:6.1px;
   }
   .item.alt-rule::after{
     content:'×';
@@ -243,7 +246,7 @@
     box-shadow:0 10px 30px rgba(0,0,0,.35); cursor:pointer;
     position:relative; overflow:visible;
   }
-  .conzoom-card .item-usebar{ border-radius:0 0 7px 7px; }
+  .conzoom-card .item-usebar{ border-radius:0 0 9px 9px; }
   .conzoom-menu{
     position:absolute; top:50%; left:50%;
     translate:-50% calc(-50% + 108px);
@@ -2670,6 +2673,12 @@ function appendItemTextBox(el, itemNo){
     }
     if(desc.scrollHeight > desc.clientHeight || box.scrollHeight > box.clientHeight){
       box.classList.add('compact');
+    }
+
+    const lineHeight = parseFloat(getComputedStyle(desc).lineHeight) || 0;
+    const descLineCount = lineHeight > 0 ? Math.round(desc.scrollHeight / lineHeight) : 0;
+    if(descLineCount >= 5){
+      box.classList.add('desc-five-lines');
     }
   });
 }
