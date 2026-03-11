@@ -57,21 +57,22 @@
   .item-front-custom{ background:#fd8a21 !important; background-image:none !important; }
   .item-front-mark{
     position:absolute;
-    top:4px;
-    left:4px;
+    top:3px;
+    left:0px;
     display:flex;
-    gap:2px;
+    gap:1px;
     z-index:4;
     pointer-events:none;
   }
-  .item-front-mark.two{ left:2px; }
+  .item-front-mark.two{ left:-1px; gap:0; }
+  .item-front-mark.two .item-front-chip + .item-front-chip{ margin-left:-2px; }
   .item-front-chip{
     position:relative;
     width:18px;
     height:18px;
-    border:1px solid rgba(0,0,0,.35);
-    border-radius:3px;
-    background:#fff;
+    border:none;
+    border-radius:0;
+    background:transparent;
     overflow:visible;
   }
   .item-front-chip img{
