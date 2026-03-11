@@ -2836,7 +2836,7 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
         }else{
          // 通常通り拡大（表状態 or 他ミッション）
          const canFaceUp = !!(flags.itemsFaceDownStart && it.faceUp===false);
-          openItemZoom(it.no, idx, { canFaceUp });
+          openItemZoom(it.no, idx, { canFaceUp }, div);
         }
      }
     };
@@ -2855,7 +2855,7 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
      div2.className = 'item m23-spread';
       div2.style.backgroundImage = `url("./item${no}.jpg")`;
       // 表示のみ（拡大は可）。ゲーム状態は変更しない
-     div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true });
+     div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true }, div2);
       itemsEl.appendChild(div2);
       itemNodes.push(div2);
    }
@@ -7981,7 +7981,7 @@ await update(mRef, {
 
   
 /* ：アイテム拡大ポップ */
-function openItemZoom(itemNo, itemIdx, opt={}){
+function openItemZoom(itemNo, itemIdx, opt={}, sourceEl=null){
   try{
     const old = document.getElementById('conZoomOverlay');
     if (old) old.remove();
@@ -7998,6 +7998,21 @@ function openItemZoom(itemNo, itemIdx, opt={}){
     setItemFaceImage(big, itemNo);
     decorateItemFront(big, itemNo);
     appendItemTextBox(big, itemNo);
+    if(sourceEl){
+      requestAnimationFrame(()=>{
+        const srcBox = sourceEl.querySelector('.item-textbox');
+        const srcName = sourceEl.querySelector('.item-textbox .name');
+        const dstBox = big.querySelector('.item-textbox');
+        const dstName = big.querySelector('.item-textbox .name');
+        if(srcBox && dstBox){
+          dstBox.classList.toggle('compact', srcBox.classList.contains('compact'));
+        }
+        if(srcName && dstName){
+          const s = getComputedStyle(srcName).fontSize;
+          if(s) dstName.style.fontSize = s;
+        }
+      });
+    }
 
     const timingText = ITEM_USE_TIMINGS[itemNo];
     if(timingText){
