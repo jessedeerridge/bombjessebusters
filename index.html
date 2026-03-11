@@ -125,7 +125,7 @@
     line-height:6px;
     font-weight:700;
     text-align:center;
-    border-radius:0 0 7px 7px;
+    border-radius:0 0 9px 9px;
     pointer-events:none;
     z-index:2;
     white-space:nowrap;
@@ -176,6 +176,9 @@
   .item-textbox.compact .desc{
     font-size:6px;
     line-height:1.05;
+  }
+  .item-textbox.desc-five-lines{
+    bottom:6.1px;
   }
   .item.alt-rule::after{
     content:'×';
@@ -239,11 +242,11 @@
  .conzoom-card{
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     transform:scale(2); transform-origin:center;
-    border-radius:6px; border:2px solid #fff; background:#fff center/cover no-repeat;
+    border-radius:8px; border:1px solid #ddd; background:#fff center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.35); cursor:pointer;
-    position:relative; overflow:hidden;
+    position:relative; overflow:visible;
   }
-  .conzoom-card .item-usebar{ border-radius:0; }
+  .conzoom-card .item-usebar{ border-radius:0 0 9px 9px; }
   .conzoom-menu{
     position:absolute; top:50%; left:50%;
     translate:-50% calc(-50% + 108px);
@@ -1317,12 +1320,12 @@ const ITEM_USE_TIMINGS = {
 const ITEM_TEXTS = {
   1:{name:'コトナルラベル',desc:'自分の、隣り合って数字が異なるコード2本の前にコトナルラベルを置く。'},
   2:{name:'イレカエシーバー',desc:'他プレイヤーの裏向きのコードを選ぶ。\nそして、他プレイヤーが自分の裏向きのコード選ぶ。\n選ばれたコードを交換する。黄/赤コードを選んでもよい。'},
-  3:{name:'ミッツケル探知機',desc:'コードを通常の1本ではなく、3本指し示して、数値を宣言できる。\n黄の宣言は不可。'},
+  3:{name:'ミッツケル探知機',desc:'1人に対して3つのコードを指し示して、1つの数値を宣言できる。\n黄は不可。'},
   4:{name:'ヒント付箋',desc:'自分のコードの前に情報トークンを置く。\n赤/黄は不可。'},
-  5:{name:'スーパー探知機',desc:'コードを通常の1本ではなく、一人のプレイヤーの全てを指し示して、数値を宣言できる。\n黄の宣言は不可。'},
+  5:{name:'スーパー探知機',desc:'1人に対して全てのコードを指し示して、1つの数値を宣言できる。\n黄は不可。'},
   6:{name:'失敗帳消し機',desc:'起爆ダイヤルを1つ後退させる。'},
   7:{name:'非常電池',desc:'使用済のキャラクターカード2枚までを再びオモテにできる。'},
-  8:{name:'なんでもレーダー',desc:'数値を1つ宣言し、そのコードを持っているプレイヤーは全員手をあげる。'},
+  8:{name:'なんでもレーダー',desc:'数値を1つ宣言し、そのコードを持っている全プレイヤーは手をあげる。'},
   9:{name:'万能氷',desc:'切断に失敗しても起爆ダイヤルが進まず、赤コードを切断しても爆発しない。'},
   10:{name:'ドッチカ・アタレイ',desc:'1つのコードに対して、数字を2つ宣言できる。'},
   11:{name:'いつでもコーヒー',desc:'任意のプレイヤーを選び、そのプレイヤーまで手番を飛ばす。'},
@@ -2671,6 +2674,12 @@ function appendItemTextBox(el, itemNo){
     if(desc.scrollHeight > desc.clientHeight || box.scrollHeight > box.clientHeight){
       box.classList.add('compact');
     }
+
+    const lineHeight = parseFloat(getComputedStyle(desc).lineHeight) || 0;
+    const descLineCount = lineHeight > 0 ? Math.round(desc.scrollHeight / lineHeight) : 0;
+    if(descLineCount >= 5){
+      box.classList.add('desc-five-lines');
+    }
   });
 }
 
@@ -2682,7 +2691,7 @@ function setItemFaceImage(el, itemNo){
     layer.className = 'item-face-layer';
     el.appendChild(layer);
   }
-  layer.style.backgroundImage = `url("./item${itemNo}.png"), url("./item${itemNo}.jpg")`;
+  layer.style.backgroundImage = `url("./item${itemNo}.png")`;
 }
 
 function decorateItemFront(el, itemNo){
