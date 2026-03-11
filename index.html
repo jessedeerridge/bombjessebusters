@@ -2720,10 +2720,10 @@ function fitBlackguardNumber(numEl){
   const chip = numEl.closest('.item-front-chip');
   if(!chip) return;
 
-  const minSize = 5;
+  const minSize = 6.8;
   const maxSize = 10;
-  const widthLimit = chip.clientWidth * 0.7;
-  const heightLimit = chip.clientHeight * 0.55;
+  const widthLimit = chip.clientWidth * 0.9;
+  const heightLimit = chip.clientHeight * 0.72;
   let size = maxSize;
   numEl.style.fontSize = `${size}px`;
 
