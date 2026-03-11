@@ -131,22 +131,23 @@
     color:#000;
     border:1px solid #fff;
     border-radius:2px;
-    padding:1px 2px;
+    padding:1px;
     overflow:hidden;
     z-index:2;
     pointer-events:none;
     display:flex;
     flex-direction:column;
     justify-content:flex-start;
-    gap:1px;
+    gap:0;
   }
   .item-textbox .name{
     font-size:7px;
-    line-height:1.1;
+    line-height:1.05;
     font-weight:700;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
+    white-space:normal;
+    overflow:visible;
+    text-overflow:clip;
+    word-break:break-word;
   }
   .item-textbox .desc{
     font-size:6px;
