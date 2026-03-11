@@ -247,14 +247,22 @@
     white-space:pre;
     position:absolute;
     left:1px;
-    bottom:10px;
-    font-size:5px;
+    bottom:8px;
+    font-size:6px;
     font-family:'Arial Black','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
-    font-weight:500;
+    font-weight:700;
     line-height:1;
-    color:#000;
-    -webkit-text-stroke:0.25px #000;
-    text-shadow:0 0 0 #000;
+    color:#111;
+    -webkit-text-stroke:0.25px transparent; /* 枠は前面に乗せず、影のみで背面に出す */
+    text-shadow:
+      0.3px 0 #fff,
+      -0.3px 0 #fff,
+      0 0.3px #fff,
+      0 -0.3px #fff,
+      0.22px 0.22px #fff,
+      -0.22px 0.22px #fff,
+      0.22px -0.22px #fff,
+      -0.22px -0.22px #fff;
     z-index:2;
     pointer-events:none;
   }
@@ -287,28 +295,36 @@
     white-space:pre;
     position:absolute;
     left:1px;
-    font-size:5px;
+    font-size:6px;
     font-family:'Arial Black','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
-    font-weight:500;
+    font-weight:700;
     line-height:1;
-    color:#000;
-    -webkit-text-stroke:0.25px #000;
-    text-shadow:0 0 0 #000;
+    color:#111;
+    -webkit-text-stroke:0.25px transparent; /* 枠は前面に乗せず、影のみで背面に出す */
+    text-shadow:
+      0.3px 0 #fff,
+      -0.3px 0 #fff,
+      0 0.3px #fff,
+      0 -0.3px #fff,
+      0.22px 0.22px #fff,
+      -0.22px 0.22px #fff,
+      0.22px -0.22px #fff,
+      -0.22px -0.22px #fff;
     z-index:2;
     pointer-events:none;
   }
   .char-card.member-alt6::after,
   .m61-mini.member-alt6::after,
-  .role-card.member-alt6::after{ content:'ミッツケル\A探知機'; bottom:10px; font-size:4px; }
+  .role-card.member-alt6::after{ content:'ミッツケル\A探知機'; bottom:8px; }
   .char-card.member-alt7::after,
   .m61-mini.member-alt7::after,
-  .role-card.member-alt7::after{ content:'ドッチカ・\Aアタレイ'; bottom:10px; }
+  .role-card.member-alt7::after{ content:'ドッチカ・\Aアタレイ'; bottom:8px; }
   .char-card.member-alt8::after,
   .m61-mini.member-alt8::after,
-  .role-card.member-alt8::after{ content:'なんでも\Aレーダー'; bottom:10px; }
+  .role-card.member-alt8::after{ content:'なんでも\Aレーダー'; bottom:8px; }
   .char-card.member-alt9::after,
   .m61-mini.member-alt9::after,
-  .role-card.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:10px; }
+  .role-card.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:8px; }
 
   .char-card.member-alt8::before,
   .char-card.member-alt9::before,
@@ -320,7 +336,7 @@
     position:absolute;
     left:1px;
     bottom:1px;
-    font-size:3px;
+    font-size:4.5px;
     font-family:'Arial Black','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
     font-weight:500;
     line-height:1;
