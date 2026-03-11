@@ -72,6 +72,19 @@
   .item.alt-rule.item-raised{ transform:translateY(-8px); }
   .item.alt-rule.item-raised::after{ display:none; }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
+  .item-usage-bar{
+    position:absolute;
+    left:0; right:0;
+    bottom:-10px;
+    height:10px;
+    background:#000;
+    color:#fff;
+    font-size:8px;
+    line-height:10px;
+    text-align:center;
+    white-space:nowrap;
+    pointer-events:none;
+  }
   /* ★ M12：アイテムの下に付ける小型数値バッジ */
   .num-badge{
     position:absolute; left:50%; transform:translateX(-50%);
@@ -521,7 +534,7 @@
 .i16-below{
   position:absolute;
   left:50%;
-  top:calc(100% + 4px);
+  top:calc(100% + 14px);
   transform:translateX(-50%);
   z-index:2147483000;
 }
@@ -2439,6 +2452,25 @@ function renderMissionPanels(v){
 
 
 /* ===== Items & DI ===== */
+const ITEM_USAGE_LABELS = {
+  1:'いつでも',
+  2:'いつでも',
+  3:'手番中に使う',
+  4:'いつでも',
+  5:'手番中に使う',
+  6:'いつでも',
+  7:'いつでも',
+  8:'いつでも',
+  9:'手番開始の前',
+  10:'手番中に使う',
+  11:'相談せずに使う',
+  12:'いつでも',
+  13:'即時効果',
+  14:'いつでも',
+  15:'即時効果',
+  16:'即時効果',
+  17:'手番中に使う'
+};
 function renderItemsAndDi(v){
   if(!v || !v.started){ H(itemsBar,true); return; }
   const missionId = (v?.mission?.id|0);
@@ -2533,6 +2565,14 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   // 追加：カードを上に持ち上げて下のトークンがスクロールなしで見えるように
   div.classList.add('i16-lift');
 }
+
+    const usageLabel = ITEM_USAGE_LABELS[it.no];
+    if(usageLabel){
+      const usageBar = document.createElement('div');
+      usageBar.className = 'item-usage-bar';
+      usageBar.textContent = usageLabel;
+      div.appendChild(usageBar);
+    }
 
     div.onclick=(ev)=>{
      const flags = state.watching?.mission?.flags || {};
