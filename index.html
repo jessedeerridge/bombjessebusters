@@ -2741,6 +2741,23 @@ function decorateItemFront(el, itemNo){
     mark.appendChild(chip);
   }
   el.appendChild(mark);
+
+  // blackguard 内の数字は「はみ出さない最大サイズ」に自動調整
+  requestAnimationFrame(()=>{
+    mark.querySelectorAll('.item-front-chip .num').forEach((numEl)=>{
+      fitTextToBox(numEl, { max: 10, min: 6, step: 0.2 });
+    });
+  });
+}
+
+function fitTextToBox(el, { max=12, min=6, step=0.2 } = {}){
+  if(!el) return;
+  let size = max;
+  el.style.fontSize = `${size}px`;
+  while(size > min && (el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight)){
+    size = +(size - step).toFixed(2);
+    el.style.fontSize = `${size}px`;
+  }
 }
 
 function renderItemsAndDi(v){
