@@ -5580,7 +5580,7 @@ function renderM43(v){
       /* ここから追加：#43 回収タップ → A群から1枚を自分の手札へ */
       const code = state.roomCode;
       const myTable = state.seatedTable;
-      const m43AnimTotalMs = 2800; // runM43InsertAnimation の所要時間(余裕込み)
+      const m43AnimTotalMs = 3200; // runM43InsertAnimation の所要時間(余裕込み)
       if (myTable == null) { alert('席に座っているプレイヤーのみ操作できます'); return; }
 
       // メタとテーブルを取得
@@ -5675,6 +5675,7 @@ function runM43InsertAnimation(v){
   const shiftPx = cssNum('--card-w') + cssNum('--card-gap');
   const shiftMs = 260;
   const settleDelayMs = 2000;
+  const flyMs = 520;
 
   const wraps = Array.from(document.querySelectorAll(`.card-wrap[data-table="${tableIdx}"]`));
   wraps.forEach(w=>{
@@ -5736,7 +5737,7 @@ function runM43InsertAnimation(v){
 
     document.body.appendChild(fly);
     requestAnimationFrame(()=>{
-      fly.style.transition = 'left 320ms ease, top 320ms ease';
+      fly.style.transition = `left ${flyMs}ms ease, top ${flyMs}ms ease`;
       fly.style.left = `${b.left}px`;
       fly.style.top = `${b.top}px`;
     });
@@ -5746,7 +5747,7 @@ function runM43InsertAnimation(v){
       hiddenWrap = null;
       state._m43AnimFinishedId = anim.id;
       state._m43AnimRunningId = null;
-    }, 380);
+    }, flyMs + 80);
   }, shiftMs + settleDelayMs);
 }
 
@@ -5765,6 +5766,8 @@ function runM54InsertAnimation(v){
   const insertIndex = anim.insertIndex|0;
   const shiftPx = cssNum('--card-w') + cssNum('--card-gap');
   const shiftMs = 260;
+  const settleDelayMs = 2000;
+  const flyMs = 560;
 
   const wraps = Array.from(document.querySelectorAll(`.card-wrap[data-table="${tableIdx}"]`));
   wraps.forEach(w=>{
@@ -5824,7 +5827,7 @@ function runM54InsertAnimation(v){
 
     document.body.appendChild(fly);
     requestAnimationFrame(()=>{
-      fly.style.transition = 'left 320ms ease, top 320ms ease';
+      fly.style.transition = `left ${flyMs}ms ease, top ${flyMs}ms ease`;
       fly.style.left = `${b.left}px`;
       fly.style.top = `${b.top}px`;
     });
@@ -5834,8 +5837,8 @@ function runM54InsertAnimation(v){
       hiddenWrap = null;
       state._m54AnimFinishedId = anim.id;
       state._m54AnimRunningId = null;
-    }, 380);
-  }, shiftMs + 100);
+    }, flyMs + 80);
+  }, shiftMs + settleDelayMs);
 }
 
 /* ==== ミッション59：各 checklistbox の直上に12数値カード（固定ランダム）
