@@ -54,6 +54,53 @@
     border:1px solid #ddd;border-radius:8px;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
+  .item-front-custom{ background:#fd8a21 !important; background-image:none !important; }
+  .item-front-mark{
+    position:absolute;
+    top:4px;
+    right:4px;
+    display:flex;
+    gap:2px;
+    z-index:4;
+    pointer-events:none;
+  }
+  .item-front-mark.two{ right:2px; }
+  .item-front-chip{
+    position:relative;
+    width:18px;
+    height:18px;
+    border:1px solid rgba(0,0,0,.35);
+    border-radius:3px;
+    background:#fff;
+    overflow:hidden;
+  }
+  .item-front-chip img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .item-front-chip .num{
+    position:absolute;
+    inset:0;
+    display:grid;
+    place-items:center;
+    color:#fff;
+    font-size:11px;
+    line-height:1;
+    font-weight:800;
+    text-shadow:0 1px 2px rgba(0,0,0,.75);
+  }
+  .item-front-chip .yellow-square{
+    position:absolute;
+    width:10px;
+    height:10px;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    background:#fde047;
+    border:1px solid #000;
+  }
   .item-usebar{
     position:absolute;
     left:0;
@@ -2540,6 +2587,44 @@ function renderItemsAndDi(v){
     return false;
   };
 
+  const itemFrontLabel = (itemNo)=>{
+    if(itemNo===14) return '2';
+    if(itemNo===15) return '3';
+    if(itemNo===16) return '10';
+    if(itemNo===17) return '9';
+    if(itemNo===18) return '11';
+    return String(itemNo);
+  };
+
+  const decorateItemFront = (el, itemNo)=>{
+    el.classList.add('item-front-custom');
+    const mark = document.createElement('div');
+    mark.className = 'item-front-mark' + ((itemNo>=14 && itemNo<=18) ? ' two' : '');
+
+    const chipCount = (itemNo>=14 && itemNo<=18) ? 2 : 1;
+    for(let i=0;i<chipCount;i++){
+      const chip = document.createElement('div');
+      chip.className = 'item-front-chip';
+      const img = document.createElement('img');
+      img.src = './blackguard.png';
+      img.alt = '';
+      chip.appendChild(img);
+
+      if(itemNo===13){
+        const sq = document.createElement('span');
+        sq.className = 'yellow-square';
+        chip.appendChild(sq);
+      }else{
+        const num = document.createElement('span');
+        num.className = 'num';
+        num.textContent = itemFrontLabel(itemNo);
+        chip.appendChild(num);
+      }
+      mark.appendChild(chip);
+    }
+    el.appendChild(mark);
+  };
+
   // ★ #23：広げる前は「アイテムのみ」非表示（DIは残す）
   // ★ #42：☝（ドラッグ＆ドロップ起動中）はアイテムとDIを一時的に非表示
   let hideItems = false;
@@ -2578,7 +2663,7 @@ function renderItemsAndDi(v){
       if(flags.itemsFaceDownStart && it.faceUp===false){
         div.style.backgroundImage = `url("./itemback.jpg")`;
       }else{
-        div.style.backgroundImage = `url("./item${it.no}.jpg")`;
+        decorateItemFront(div, it.no);
       }
     }
 
@@ -7787,7 +7872,31 @@ function openItemZoom(itemNo, itemIdx, opt={}){
 
     const big = document.createElement('div');
     big.className = 'conzoom-card';
-    big.style.backgroundImage = `url('./item${itemNo}.jpg')`;
+    big.classList.add('item-front-custom');
+    const mark = document.createElement('div');
+    mark.className = 'item-front-mark' + ((itemNo>=14 && itemNo<=18) ? ' two' : '');
+    const frontNum = (itemNo===14?'2':itemNo===15?'3':itemNo===16?'10':itemNo===17?'9':itemNo===18?'11':String(itemNo));
+    const chipCount = (itemNo>=14 && itemNo<=18) ? 2 : 1;
+    for(let i=0;i<chipCount;i++){
+      const chip = document.createElement('div');
+      chip.className = 'item-front-chip';
+      const img = document.createElement('img');
+      img.src = './blackguard.png';
+      img.alt = '';
+      chip.appendChild(img);
+      if(itemNo===13){
+        const sq = document.createElement('span');
+        sq.className = 'yellow-square';
+        chip.appendChild(sq);
+      }else{
+        const num = document.createElement('span');
+        num.className = 'num';
+        num.textContent = frontNum;
+        chip.appendChild(num);
+      }
+      mark.appendChild(chip);
+    }
+    big.appendChild(mark);
 
     const timingText = ITEM_USE_TIMINGS[itemNo];
     if(timingText){
