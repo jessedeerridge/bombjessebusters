@@ -7997,21 +7997,11 @@ function openItemZoom(itemNo, itemIdx, opt={}, sourceEl=null){
     big.className = 'conzoom-card';
     setItemFaceImage(big, itemNo);
     decorateItemFront(big, itemNo);
-    appendItemTextBox(big, itemNo);
-    if(sourceEl){
-      requestAnimationFrame(()=>{
-        const srcBox = sourceEl.querySelector('.item-textbox');
-        const srcName = sourceEl.querySelector('.item-textbox .name');
-        const dstBox = big.querySelector('.item-textbox');
-        const dstName = big.querySelector('.item-textbox .name');
-        if(srcBox && dstBox){
-          dstBox.classList.toggle('compact', srcBox.classList.contains('compact'));
-        }
-        if(srcName && dstName){
-          const s = getComputedStyle(srcName).fontSize;
-          if(s) dstName.style.fontSize = s;
-        }
-      });
+    const srcBox = sourceEl?.querySelector?.('.item-textbox');
+    if(srcBox){
+      big.appendChild(srcBox.cloneNode(true));
+    }else{
+      appendItemTextBox(big, itemNo);
     }
 
     const timingText = ITEM_USE_TIMINGS[itemNo];
