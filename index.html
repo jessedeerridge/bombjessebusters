@@ -9,6 +9,7 @@
     --card-w:24px; --card-h:40px; --card-gap:3px;
     --char-w:40px; --char-h:60px;
     --item-w:50px; --item-h:75px;
+    --role-char-scale: calc(var(--con-w) / var(--char-w));
     --con-w: var(--item-w); --con-h: var(--item-h); 
     --di-w:70px; --di-h:65px;
     /* テーブルの見えている枠は固定。内部だけ広げる */
@@ -346,6 +347,32 @@
     z-index:2;
     pointer-events:none;
   }
+
+  /* 正体カード選択/拡大は通常キャラカード比率で文字サイズ・位置を拡大 */
+  .role-card.member5-card::before{
+    left:calc(0px * var(--role-char-scale));
+    top:calc(0px * var(--role-char-scale));
+    font-size:calc(5px * var(--role-char-scale));
+    padding:calc(1px * var(--role-char-scale)) calc(2px * var(--role-char-scale));
+  }
+
+  .role-card.member15-detector::after,
+  .role-card.member-alt6::after,
+  .role-card.member-alt7::after,
+  .role-card.member-alt8::after,
+  .role-card.member-alt9::after{
+    left:calc(1px * var(--role-char-scale));
+    font-size:calc(6px * var(--role-char-scale));
+    bottom:calc(8px * var(--role-char-scale));
+  }
+
+  .role-card.member-alt8::before,
+  .role-card.member-alt9::before{
+    left:calc(1px * var(--role-char-scale));
+    bottom:calc(1px * var(--role-char-scale));
+    font-size:calc(4.5px * var(--role-char-scale));
+  }
+
 
   .hand{
     display:flex;align-items:flex-start;gap:var(--card-gap);
