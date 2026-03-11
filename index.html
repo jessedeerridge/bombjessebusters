@@ -4935,12 +4935,20 @@ const onRotate = ()=>{
       window.addEventListener('touchcancel', up, true);
     };
 
+    const isDraggableCardTarget = (target)=>{
+      const wrap = target?.closest?.('.card-wrap');
+      if (!wrap) return false;
+      const cardEl = wrap.querySelector('.card');
+      return !!(cardEl && cardEl.classList.contains('open'));
+    };
+
     const onDown = (ev)=>{
       startDrag(ev);
     };
 
     const onTouchStart = (ev)=>{
       if (!isM42 || !canDrag()) return;
+      if (!isDraggableCardTarget(ev.target)) return;
       const p = getTouchPoint(ev);
       if (!p) return;
       ev.preventDefault();
