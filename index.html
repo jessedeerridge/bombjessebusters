@@ -525,6 +525,15 @@
   .card-wrap.m43-pending-arrival .card,
   .card-wrap.m43-pending-arrival .marker,
   .card-wrap.m43-pending-arrival .tok-col{opacity:0;}
+  .m54-fly-card{position:fixed;left:0;top:0;width:var(--card-w);height:var(--card-h);border-radius:6px;z-index:2147483640;pointer-events:none;}
+  .m54-fly-card .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;}
+  .m54-fly-card .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center;}
+  .m54-fly-card.back{background:#fff url('./codeback.jpg') center/cover no-repeat;border:1px solid #ccc;}
+  .m54-fly-card.front{background:#000;border:1px solid #ddd;}
+  .card-wrap.m54-pending-arrival .card,
+  .card-wrap.m54-pending-arrival .marker,
+  .card-wrap.m54-pending-arrival .tok-col{opacity:0;}
+  .card-wrap.m54-pending-arrival .card{pointer-events:none;}
   /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
@@ -2486,6 +2495,7 @@ renderM31(v);
     renderM49(v);
     renderM53(v);
     renderM54(v);
+    runM54InsertAnimation(v);
     renderM57(v);
 renderM55(state.watching);
     renderM59(v);
@@ -3410,6 +3420,15 @@ wrap.dataset.cardKey = cardKey;
         && (state._m43AnimFinishedId !== m43Anim.id);
       if (isM43PendingCard){
         wrap.classList.add('m43-pending-arrival');
+      }
+
+      const m54Anim = v?.meta?.m54_insertAnim;
+      const isM54PendingCard = ((v?.mission?.id|0) === 54)
+        && !!m54Anim?.id
+        && String(c.id||'') === String(m54Anim.cardId||'')
+        && (state._m54AnimFinishedId !== m54Anim.id);
+      if (isM54PendingCard){
+        wrap.classList.add('m54-pending-arrival');
       }
       
       if (c.gone === true){
@@ -5731,6 +5750,94 @@ function runM43InsertAnimation(v){
   }, shiftMs + settleDelayMs);
 }
 
+function runM54InsertAnimation(v){
+  if ((v?.mission?.id|0) !== 54){
+    state._m54AnimRunningId = null;
+    return;
+  }
+  const anim = v?.meta?.m54_insertAnim;
+  if (!anim?.id) return;
+  if (state._m54AnimFinishedId === anim.id) return;
+  if (state._m54AnimRunningId === anim.id) return;
+  state._m54AnimRunningId = anim.id;
+
+  const tableIdx = anim.table|0;
+  const insertIndex = anim.insertIndex|0;
+  const shiftPx = cssNum('--card-w') + cssNum('--card-gap');
+  const shiftMs = 260;
+
+  const wraps = Array.from(document.querySelectorAll(`.card-wrap[data-table="${tableIdx}"]`));
+  wraps.forEach(w=>{
+    const ci = Number(w.dataset.cardIndex || -1);
+    const cid = String(w.dataset.cardId || '');
+    if (ci > insertIndex && cid !== String(anim.cardId || '')) {
+      w.style.transition = 'none';
+      w.style.transform = `translateX(${-shiftPx}px)`;
+      void w.offsetWidth;
+      w.style.transition = `transform ${shiftMs}ms ease`;
+      w.style.transform = '';
+      setTimeout(()=>{ w.style.transition=''; }, shiftMs + 40);
+    }
+  });
+
+  const targetSelector = `.card-wrap[data-table="${tableIdx}"][data-card-id="${String(anim.cardId||'')}"]`;
+  let hiddenWrap = document.querySelector(targetSelector);
+  if (hiddenWrap) hiddenWrap.classList.add('m54-pending-arrival');
+
+  setTimeout(()=>{
+    const deckBtn = document.querySelector('#m54RedBox .numdeck');
+    const targetWrap = document.querySelector(targetSelector);
+    if (!deckBtn || !targetWrap){
+      if (hiddenWrap) hiddenWrap.classList.remove('m54-pending-arrival');
+      state._m54AnimRunningId = null;
+      return;
+    }
+
+    const targetCard = targetWrap.querySelector('.card') || targetWrap;
+    const table = (v?.tables||[])[tableIdx] || {};
+    const showFront = table.playerId === state.userId;
+
+    const a = deckBtn.getBoundingClientRect();
+    const b = targetCard.getBoundingClientRect();
+    if (!Number.isFinite(a.left) || !Number.isFinite(b.left)) {
+      targetWrap.classList.remove('m54-pending-arrival');
+      state._m54AnimRunningId = null;
+      return;
+    }
+
+    const fly = document.createElement('div');
+    fly.className = `m54-fly-card ${showFront ? 'front' : 'back'}`;
+    fly.style.left = `${a.left + (a.width/2) - (cssNum('--card-w')/2)}px`;
+    fly.style.top = `${a.top + (a.height/2) - (cssNum('--card-h')/2)}px`;
+
+    if (showFront){
+      const num = document.createElement('div');
+      num.className = 'num';
+      num.textContent = String(anim.num ?? '');
+      fly.appendChild(num);
+
+      const bot = document.createElement('div');
+      bot.className = 'img-bottom';
+      bot.style.backgroundImage = 'url("./redcode.png")';
+      fly.appendChild(bot);
+    }
+
+    document.body.appendChild(fly);
+    requestAnimationFrame(()=>{
+      fly.style.transition = 'left 320ms ease, top 320ms ease';
+      fly.style.left = `${b.left}px`;
+      fly.style.top = `${b.top}px`;
+    });
+    setTimeout(()=>{
+      fly.remove();
+      targetWrap.classList.remove('m54-pending-arrival');
+      hiddenWrap = null;
+      state._m54AnimFinishedId = anim.id;
+      state._m54AnimRunningId = null;
+    }, 380);
+  }, shiftMs + 100);
+}
+
 /* ==== ミッション59：各 checklistbox の直上に12数値カード（固定ランダム）
    ＋ nano（カード上半分に重ねる：セル内相対配置版） ==== */
 async function renderM59(v){
@@ -6993,6 +7100,8 @@ async function renderM54(v){
   if (!isM54){
     const x = document.getElementById('m54OxPool'); if (x) x.remove();
     const y = document.getElementById('m54RedBox'); if (y) y.remove();
+    state._m54AnimRunningId = null;
+    state._m54AnimFinishedId = null;
     return;
   }
 
@@ -7221,16 +7330,19 @@ const entries = [1,2,3]
           const tbls = room.tables.slice();
           const T = tbls[myTable];
           const hand = Array.isArray(T.hand)? T.hand.slice() : [];
-          hand.push({
-            id: crypto.randomUUID(),
+          const newId = crypto.randomUUID();
+          const newCard = {
+            id: newId,
             num: top,
             kind: 'red',     // ← 種別は red としておく（必要なら 'normal' に変更）
             open: false,
             ownerId: T.playerId || null,
             tokens: [],
             markUntil: Date.now() + 5000
-          });
-          hand.sort((a,b)=> a.num - b.num);
+          };
+          let insertIndex = 0;
+          while (insertIndex < hand.length && Number(hand[insertIndex]?.num) <= Number(top)) insertIndex++;
+          hand.splice(insertIndex, 0, newCard);
           const alpha = 'abcdefghijklmnopqrstuvwxyz';
           hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
           T.hand = hand;
@@ -7240,7 +7352,17 @@ const entries = [1,2,3]
 
           await Promise.all([
             set(ref(db, `rooms/${state.roomCode}/tables`), tbls),
-            update(mRef, { m54_redUsed: U })
+            update(mRef, {
+              m54_redUsed: U,
+              m54_insertAnim: {
+                id: `${Date.now()}_${newId}`,
+                table: myTable,
+                insertIndex,
+                cardId: newId,
+                num: top,
+                startedAt: Date.now()
+              }
+            })
           ]);
         }catch(e){ console.error(e); }
       });
