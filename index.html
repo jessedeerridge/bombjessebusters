@@ -5561,6 +5561,7 @@ function renderM43(v){
       /* ここから追加：#43 回収タップ → A群から1枚を自分の手札へ */
       const code = state.roomCode;
       const myTable = state.seatedTable;
+      const m43AnimTotalMs = 2800; // runM43InsertAnimation の所要時間(余裕込み)
       if (myTable == null) { alert('席に座っているプレイヤーのみ操作できます'); return; }
 
       // メタとテーブルを取得
@@ -5572,6 +5573,7 @@ function renderM43(v){
       const A = Array.isArray(meta.m43_A) ? meta.m43_A.slice() : [];
 
       // A群から1枚取り出し（先頭＝一番上）
+      let nanoNext = null;
       if (A.length > 0 && tbls[myTable]) {
         const n = A.shift(); // number
         const T = tbls[myTable];
@@ -5612,12 +5614,18 @@ function renderM43(v){
             }
           })
         ]);
+
+        // nano を即時で減らすと他端末で飛び元が消えてアニメ中断するため、
+        // カード移動アニメ完了後に段階を下げる（全員表示のため）
+        const cur = (state.watching?.meta?.m43_nano|0);
+        nanoNext = Math.max(0, cur - 1);
       }
 
-      // 既存の「段階を下げる」もそのまま実行
-      const cur = (state.watching?.meta?.m43_nano|0);
-      const next = Math.max(0, cur - 1);
-      await update(mRef, { m43_nano: next, m43_updatedAt: Date.now() });
+      if (nanoNext != null){
+        setTimeout(()=>{
+          update(mRef, { m43_nano: nanoNext, m43_updatedAt: Date.now() }).catch(()=>{});
+        }, m43AnimTotalMs);
+      }
       }
       }
     ]);
