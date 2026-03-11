@@ -8661,6 +8661,93 @@ async function playHookSwapAnimation(A, B, tables){
   }
 }
 
+async function playHookTakeAnimation(sel, myTable, tables){
+  try{
+    const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
+    const wrapEl = (ti, cardId)=> document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
+    const handEl = (ti)=> tableEl(ti)?.querySelector('.hand');
+    const cardW = cssNum('--card-w') || 24;
+    const cardH = cssNum('--card-h') || 40;
+    const gap   = cssNum('--card-gap') || 3;
+    const shift = cardW + gap;
+
+    const ws = wrapEl(sel.table, sel.cardId);
+    if (!ws) return;
+
+    const srcHand = (tables[sel.table]?.hand)||[];
+    const dstHand = (tables[myTable]?.hand)||[];
+    const srcIdx = srcHand.findIndex(c=> c?.id===sel.cardId);
+    if (srcIdx<0) return;
+    const movingCard = srcHand[srcIdx];
+    const n = movingCard?.num|0;
+    let ins = 0;
+    while(ins<dstHand.length && (dstHand[ins]?.num|0) < n) ins++;
+    while(ins>0 && (dstHand[ins-1]?.num|0)===n) ins--;
+
+    const rs = ws.getBoundingClientRect();
+    const fly = ws.querySelector('.card')?.cloneNode(true);
+    if (!fly) return;
+
+    fly.style.position='fixed';
+    fly.style.left=`${rs.left}px`;
+    fly.style.top =`${rs.top}px`;
+    fly.style.margin='0';
+    fly.style.zIndex='2147483645';
+    fly.style.pointerEvents='none';
+    fly.style.transition='transform 1.5s ease, left 1.5s ease, top 1.5s ease';
+    document.body.appendChild(fly);
+
+    ws.classList.add('hook-anim-origin');
+    requestAnimationFrame(()=>{ fly.style.transform=`translateY(-${cardH}px)`; });
+    await sleep(1500);
+
+    const moveNodes = [];
+    const slideCardBody = (w, dx)=>{
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
+      bodyNodes.forEach((node)=>{
+        node.style.transition = 'transform 1.5s ease';
+        node.style.transform = `translateX(${dx}px)`;
+        moveNodes.push(node);
+      });
+    };
+
+    const qSrc = Array.from(handEl(sel.table)?.querySelectorAll('.card-wrap')||[]);
+    qSrc.forEach((w,i)=>{
+      if (w.dataset.cardId===sel.cardId) return;
+      if (i>srcIdx) slideCardBody(w, -shift);
+    });
+
+    const qDst = Array.from(handEl(myTable)?.querySelectorAll('.card-wrap')||[]);
+    qDst.forEach((w,i)=>{ if (i>=ins) slideCardBody(w, shift); });
+    await sleep(1500);
+
+    const targetPoint = (ti, insPos)=>{
+      const h = handEl(ti);
+      if (!h) return {x:0,y:0};
+      const wraps = Array.from(h.querySelectorAll('.card-wrap')).filter(w=> w.style.visibility!=='hidden');
+      if (wraps.length===0) {
+        const rh = h.getBoundingClientRect();
+        return {x:rh.left, y:rh.top};
+      }
+      const first = wraps[0].getBoundingClientRect();
+      const clamped = Math.max(0, Math.min(insPos, wraps.length));
+      return {x: first.left + (clamped * shift), y: first.top};
+    };
+
+    const t = targetPoint(myTable, ins);
+    fly.style.left = `${t.x}px`;
+    fly.style.top = `${t.y}px`;
+    fly.style.transform = 'translateY(0)';
+    await sleep(1500);
+
+    fly.remove();
+    ws.classList.remove('hook-anim-origin');
+    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+  }catch(e){
+    console.warn('playHookTakeAnimation failed', e);
+  }
+}
+
 /* ===== Item 2 swap ===== */
 async function doItem2Swap(A, B){
   if(!A || !B) return;
@@ -8732,6 +8819,9 @@ async function doItem18Take(sel){
   const srcHand = (tables[sel.table]?.hand)||[];
   const si = srcHand.findIndex(c=> c.id===sel.cardId);
   if(si<0){ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
+
+  await playHookTakeAnimation(sel, myTable, tables);
+
   const card = srcHand.splice(si,1)[0];
 
   const dstHand = (tables[myTable]?.hand)||[];
