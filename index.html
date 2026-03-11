@@ -106,6 +106,7 @@
     font-size:10px;
     line-height:1;
     font-weight:800;
+    white-space:nowrap;
     text-shadow:0 1px 2px rgba(0,0,0,.75);
   }
   .item-front-chip .yellow-square{
@@ -1325,8 +1326,8 @@ const ITEM_USE_TIMINGS = {
 const ITEM_TEXTS = {
   1:{name:'コトナルラベル',desc:'自分の、隣り合って数字が異なるコード2本の前にコトナルラベルを置く。'},
   2:{name:'イレカエシーバー',desc:'お互いに相手のコードを選び、選ばれたコード同士を交換する。黄/赤も可。'},
-  3:{name:'ミッツケル探知機',desc:'1人に対して3つのコードを指し示して、1つの数値を宣言できる。\n黄は不可。'},
-  4:{name:'ヒント付箋',desc:'自分のコードの前に情報トークンを置く。\n赤/黄は不可。'},
+  3:{name:'ミッツケル探知機',desc:'1人に対して3つのコードを指し示して、1つの数値を宣言できる。黄は不可。'},
+  4:{name:'ヒント付箋',desc:'自分のコードの前に情報トークンを置く。赤/黄は不可。'},
   5:{name:'スーパー探知機',desc:'1人に対して全てのコードを指し示して、1つの数値を宣言できる。\n黄は不可。'},
   6:{name:'失敗帳消し機',desc:'起爆ダイヤルを1つ後退させる。'},
   7:{name:'非常電池',desc:'使用済のキャラクターカード2枚までを再びオモテにできる。'},
@@ -2714,6 +2715,32 @@ function setItemFaceImage(el, itemNo){
   layer.style.backgroundImage = `url("./item${itemNo}.png")`;
 }
 
+function fitBlackguardNumber(numEl){
+  if(!numEl) return;
+  const chip = numEl.closest('.item-front-chip');
+  if(!chip) return;
+
+  const minSize = 7.4;
+  const maxSize = 10.8;
+  const widthLimit = chip.clientWidth * 0.95;
+  const heightLimit = chip.clientHeight * 0.78;
+  let size = maxSize;
+  numEl.style.fontSize = `${size}px`;
+
+  while(size > minSize && (numEl.scrollWidth > widthLimit || numEl.scrollHeight > heightLimit)){
+    size = +(size - 0.2).toFixed(2);
+    numEl.style.fontSize = `${size}px`;
+  }
+}
+
+function fitAllBlackguardNumbers(){
+  document.querySelectorAll('.item-front-chip .num').forEach(fitBlackguardNumber);
+}
+
+window.addEventListener('resize', ()=>{
+  requestAnimationFrame(fitAllBlackguardNumbers);
+});
+
 function decorateItemFront(el, itemNo){
   el.classList.add('item-front-custom');
   const mark = document.createElement('div');
@@ -2741,6 +2768,10 @@ function decorateItemFront(el, itemNo){
     mark.appendChild(chip);
   }
   el.appendChild(mark);
+
+  requestAnimationFrame(()=>{
+    mark.querySelectorAll('.num').forEach(fitBlackguardNumber);
+  });
 
 
 }
