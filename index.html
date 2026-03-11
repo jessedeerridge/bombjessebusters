@@ -54,7 +54,7 @@
     border:1px solid #ddd;border-radius:8px;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
-  .item-front-custom{ background:#fd8a21 !important; background-image:none !important; }
+  .item-front-custom{ background-color:#fd8a21 !important; }
   .item-front-mark{
     position:absolute;
     top:3px;
@@ -126,13 +126,12 @@
     left:2px;
     right:2px;
     bottom:11px;
-    max-height:calc(100% - 41px); /* 上側に最低30px残す */
     background:#fff;
     color:#000;
     border:1px solid #fff;
     border-radius:1px;
     padding:1px 0 0;
-    overflow:hidden;
+    overflow:visible;
     z-index:2;
     pointer-events:none;
     display:flex;
@@ -161,7 +160,7 @@
     font-size:7px;
     line-height:1.1;
     white-space:pre-wrap;
-    overflow:hidden;
+    overflow:visible;
     word-break:break-word;
   }
   .item-textbox.compact .desc{
@@ -2766,6 +2765,7 @@ function renderItemsAndDi(v){
         div.style.backgroundImage = `url("./itemback.jpg")`;
       }else{
         setItemFaceImage(div, it.no);
+        decorateItemFront(div, it.no);
         appendItemTextBox(div, it.no);
       }
     }
@@ -7976,6 +7976,7 @@ function openItemZoom(itemNo, itemIdx, opt={}){
     const big = document.createElement('div');
     big.className = 'conzoom-card';
     setItemFaceImage(big, itemNo);
+    decorateItemFront(big, itemNo);
 
     const timingText = ITEM_USE_TIMINGS[itemNo];
     if(timingText){
