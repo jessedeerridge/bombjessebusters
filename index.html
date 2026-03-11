@@ -63,6 +63,7 @@
     color:#fff;
     font-size:6px;
     line-height:6px;
+    font-weight:700;
     text-align:center;
     border-radius:0 0 7px 7px;
     pointer-events:none;
@@ -134,7 +135,9 @@
     transform:scale(2); transform-origin:center;
     border-radius:6px; border:2px solid #fff; background:#fff center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.35); cursor:pointer;
+    position:relative; overflow:hidden;
   }
+  .conzoom-card .item-usebar{ border-radius:0; }
   .conzoom-menu{
     position:absolute; top:50%; left:50%;
     translate:-50% calc(-50% + 108px);
@@ -1156,6 +1159,12 @@ let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
 state._mpAutoOnce = false;  // 「参加」後に自動でピッカーを開いたか（ホストのみ）  
 
+const ITEM_USE_TIMINGS = {
+  1:'いつでも使える', 2:'いつでも使える', 3:'手番中に使う', 4:'いつでも使える', 5:'手番中に使う',
+  6:'いつでも使える', 7:'いつでも使える', 8:'いつでも使える', 9:'手番開始の前', 10:'手番中に使う',
+  11:'相談せずに使う', 12:'いつでも使える', 13:'即時効果', 14:'いつでも使える', 15:'即時効果',
+  16:'即時効果', 17:'手番中に使う'
+};
 
 /* Elements */
 const roomInfo = document.getElementById('roomInfo');
@@ -2513,12 +2522,6 @@ function renderItemsAndDi(v){
 
   itemsEl.innerHTML='';
   const itemNodes = []; // ★ ノード参照を保持
-  const ITEM_USE_TIMINGS = {
-    1:'いつでも使える', 2:'いつでも使える', 3:'手番中に使う', 4:'いつでも使える', 5:'手番中に使う',
-    6:'いつでも使える', 7:'いつでも使える', 8:'いつでも使える', 9:'手番開始の前', 10:'手番中に使う',
-    11:'相談せずに使う', 12:'いつでも使える', 13:'即時効果', 14:'いつでも使える', 15:'即時効果',
-    16:'即時効果', 17:'手番中に使う'
-  };
 
   (v.items||[]).forEach((it, idx)=>{
     const flags = v?.mission?.flags || {};
@@ -2536,8 +2539,9 @@ function renderItemsAndDi(v){
       }
     }
 
+    const isItemFrontFace = !it.used && !(flags.itemsFaceDownStart && it.faceUp===false);
     const timingText = ITEM_USE_TIMINGS[it.no];
-    if(timingText){
+    if(isItemFrontFace && timingText){
       const useBar = document.createElement('div');
       useBar.className = 'item-usebar';
       useBar.textContent = timingText;
@@ -7741,6 +7745,14 @@ function openItemZoom(itemNo, itemIdx, opt={}){
     const big = document.createElement('div');
     big.className = 'conzoom-card';
     big.style.backgroundImage = `url('./item${itemNo}.jpg')`;
+
+    const timingText = ITEM_USE_TIMINGS[itemNo];
+    if(timingText){
+      const useBar = document.createElement('div');
+      useBar.className = 'item-usebar';
+      useBar.textContent = timingText;
+      big.appendChild(useBar);
+    }
 
     big.addEventListener('click', async (e)=>{
       e.stopPropagation();
