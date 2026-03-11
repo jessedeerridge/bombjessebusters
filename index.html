@@ -8753,8 +8753,8 @@ async function playHookSwapAnimation(A, B, tables){
       return {x: rf.left + (Math.max(0, ins) * shift), y: rf.top};
     };
 
-    const phA = addAlphaPlaceholder(estimateTarget(A.table, insA).x, estimateTarget(A.table, insA).y, `${srcAlphaB}`);
-    const phB = addAlphaPlaceholder(estimateTarget(B.table, insB).x, estimateTarget(B.table, insB).y, `${srcAlphaA}`);
+    const phA = addAlphaPlaceholder(estimateTarget(A.table, insA).x, estimateTarget(A.table, insA).y, `${srcAlphaA}`);
+    const phB = addAlphaPlaceholder(estimateTarget(B.table, insB).x, estimateTarget(B.table, insB).y, `${srcAlphaB}`);
 
     const slideCardBody = (w, dx)=>{
       const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
