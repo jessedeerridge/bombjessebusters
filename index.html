@@ -53,6 +53,23 @@
     border:1px solid #ddd;border-radius:8px;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
+  .item-usebar{
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    height:15px;
+    background:#000;
+    color:#fff;
+    font-size:9px;
+    line-height:15px;
+    text-align:center;
+    border-radius:0 0 8px 8px;
+    pointer-events:none;
+    z-index:2;
+    white-space:nowrap;
+    overflow:hidden;
+  }
   .item.alt-rule::after{
     content:'×';
     position:absolute;
@@ -2496,6 +2513,12 @@ function renderItemsAndDi(v){
 
   itemsEl.innerHTML='';
   const itemNodes = []; // ★ ノード参照を保持
+  const ITEM_USE_TIMINGS = {
+    1:'いつでも', 2:'いつでも', 3:'手番中に使う', 4:'いつでも', 5:'手番中に使う',
+    6:'いつでも', 7:'いつでも', 8:'いつでも', 9:'手番開始の前', 10:'手番中に使う',
+    11:'相談せずに使う', 12:'いつでも', 13:'即時効果', 14:'いつでも', 15:'即時効果',
+    16:'即時効果', 17:'手番中に使う'
+  };
 
   (v.items||[]).forEach((it, idx)=>{
     const flags = v?.mission?.flags || {};
@@ -2511,6 +2534,14 @@ function renderItemsAndDi(v){
       }else{
         div.style.backgroundImage = `url("./item${it.no}.jpg")`;
       }
+    }
+
+    const timingText = ITEM_USE_TIMINGS[it.no];
+    if(timingText){
+      const useBar = document.createElement('div');
+      useBar.className = 'item-usebar';
+      useBar.textContent = timingText;
+      div.appendChild(useBar);
     }
 
 
