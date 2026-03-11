@@ -524,7 +524,8 @@
   .m43-fly-card.front{background:#000;border:1px solid #ddd;}
   .card-wrap.m43-pending-arrival .card,
   .card-wrap.m43-pending-arrival .marker,
-  .card-wrap.m43-pending-arrival .tok-col{opacity:0;}
+  .card-wrap.m43-pending-arrival .tok-col,
+  .card-wrap.m43-pending-arrival .badge-fixed{opacity:0;}
   /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
@@ -5674,7 +5675,7 @@ function runM43InsertAnimation(v){
   const targetSelector = `.card-wrap[data-table="${tableIdx}"][data-card-id="${String(anim.cardId||'')}"]`;
   let hiddenWrap = document.querySelector(targetSelector);
   if (hiddenWrap){
-    hiddenWrap.classList.add('m43-pending-arrival'); // α帯は残してカード面だけ隠す
+    hiddenWrap.classList.add('m43-pending-arrival'); // 着地までカード面/トークン/α帯を隠す
   }
 
   setTimeout(()=>{
@@ -5723,7 +5724,7 @@ function runM43InsertAnimation(v){
     });
     setTimeout(()=>{
       fly.remove();
-      targetWrap.classList.remove('m43-pending-arrival');
+      setTimeout(()=>{ targetWrap.classList.remove('m43-pending-arrival'); }, HOOK_ANIM_RELEASE_DELAY_MS);
       hiddenWrap = null;
       state._m43AnimFinishedId = anim.id;
       state._m43AnimRunningId = null;
@@ -8511,6 +8512,8 @@ function refreshInfo22(vNow){
 
 
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+const HOOK_ANIM_DB_WAIT_MS = 4700;
+const HOOK_ANIM_RELEASE_DELAY_MS = 260;
 
 function queueSharedHookAnimations(v){
   const i2Anim = v?.meta?.i2Anim;
@@ -8681,6 +8684,7 @@ async function playHookSwapAnimation(A, B, tables){
     await sleep(80);
     phA.remove(); phB.remove();
     ca.remove(); cb.remove();
+    await sleep(HOOK_ANIM_RELEASE_DELAY_MS);
     wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
     moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
     return { srcAlphaA, srcAlphaB };
@@ -8770,6 +8774,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(1500);
 
     fly.remove();
+    await sleep(HOOK_ANIM_RELEASE_DELAY_MS);
     ws.classList.remove('hook-anim-origin');
     moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
   }catch(e){
@@ -8795,7 +8800,7 @@ async function doItem2Swap(A, B){
 
   const animId = `i2-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Anim:{ id:animId, A, B, at: Date.now() } });
-  await sleep(4700);
+  await sleep(HOOK_ANIM_DB_WAIT_MS);
 
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
@@ -8853,7 +8858,7 @@ async function doItem18Take(sel){
 
   const animId = `i18-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Anim:{ id:animId, sel, myTable, at: Date.now() } });
-  await sleep(4700);
+  await sleep(HOOK_ANIM_DB_WAIT_MS);
 
   const card = srcHand.splice(si,1)[0];
 
