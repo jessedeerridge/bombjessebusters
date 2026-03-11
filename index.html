@@ -241,8 +241,7 @@
   }
 
   .char-card.member15-detector::after,
-  .m61-mini.member15-detector::after,
-  .role-card.member15-detector::after{
+  .m61-mini.member15-detector::after{
     content:'フツーノ\A探知機';
     white-space:pre;
     position:absolute;
@@ -253,8 +252,12 @@
     font-weight:500;
     line-height:1;
     color:#000;
-    -webkit-text-stroke:0.25px #000;
-    text-shadow:0 0 0 #000;
+    -webkit-text-stroke:0;
+    text-shadow:
+      0.5px 0 #fff,
+      -0.5px 0 #fff,
+      0 0.5px #fff,
+      0 -0.5px #fff;
     z-index:2;
     pointer-events:none;
   }
@@ -279,11 +282,7 @@
   .m61-mini.member-alt6::after,
   .m61-mini.member-alt7::after,
   .m61-mini.member-alt8::after,
-  .m61-mini.member-alt9::after,
-  .role-card.member-alt6::after,
-  .role-card.member-alt7::after,
-  .role-card.member-alt8::after,
-  .role-card.member-alt9::after{
+  .m61-mini.member-alt9::after{
     white-space:pre;
     position:absolute;
     left:1px;
@@ -292,30 +291,28 @@
     font-weight:500;
     line-height:1;
     color:#000;
-    -webkit-text-stroke:0.25px #000;
-    text-shadow:0 0 0 #000;
+    -webkit-text-stroke:0;
+    text-shadow:
+      0.5px 0 #fff,
+      -0.5px 0 #fff,
+      0 0.5px #fff,
+      0 -0.5px #fff;
     z-index:2;
     pointer-events:none;
   }
   .char-card.member-alt6::after,
-  .m61-mini.member-alt6::after,
-  .role-card.member-alt6::after{ content:'ミッツケル\A探知機'; bottom:10px; font-size:4px; }
+  .m61-mini.member-alt6::after{ content:'ミッツケル\A探知機'; bottom:10px; font-size:4px; }
   .char-card.member-alt7::after,
-  .m61-mini.member-alt7::after,
-  .role-card.member-alt7::after{ content:'ドッチカ・\Aアタレイ'; bottom:10px; }
+  .m61-mini.member-alt7::after{ content:'ドッチカ・\Aアタレイ'; bottom:10px; }
   .char-card.member-alt8::after,
-  .m61-mini.member-alt8::after,
-  .role-card.member-alt8::after{ content:'なんでも\Aレーダー'; bottom:10px; }
+  .m61-mini.member-alt8::after{ content:'なんでも\Aレーダー'; bottom:10px; }
   .char-card.member-alt9::after,
-  .m61-mini.member-alt9::after,
-  .role-card.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:10px; }
+  .m61-mini.member-alt9::after{ content:'いれかえ\Aシーバー'; bottom:10px; }
 
   .char-card.member-alt8::before,
   .char-card.member-alt9::before,
   .m61-mini.member-alt8::before,
-  .m61-mini.member-alt9::before,
-  .role-card.member-alt8::before,
-  .role-card.member-alt9::before{
+  .m61-mini.member-alt9::before{
     content:'いつでも使える';
     position:absolute;
     left:1px;
@@ -325,8 +322,12 @@
     font-weight:500;
     line-height:1;
     color:#000;
-    -webkit-text-stroke:0.2px #000;
-    text-shadow:0 0 0 #000;
+    -webkit-text-stroke:0;
+    text-shadow:
+      0.5px 0 #fff,
+      -0.5px 0 #fff,
+      0 0.5px #fff,
+      0 -0.5px #fff;
     z-index:2;
     pointer-events:none;
   }
