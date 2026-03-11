@@ -54,7 +54,17 @@
     border:1px solid #ddd;border-radius:8px;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
-  .item-front-custom{ background:#fd8a21 !important; background-image:none !important; }
+  .item-face-layer{
+    position:absolute;
+    inset:0;
+    background-size:cover, cover;
+    background-position:center, center;
+    background-repeat:no-repeat, no-repeat;
+    border-radius:inherit;
+    z-index:3;
+    pointer-events:none;
+  }
+  .item-front-custom{ background-color:#fd8a21 !important; }
   .item-front-mark{
     position:absolute;
     top:3px;
@@ -95,11 +105,11 @@
   }
   .item-front-chip .yellow-square{
     position:absolute;
-    width:10px;
-    height:10px;
+    width:8px;
+    height:8px;
     left:50%;
     top:50%;
-    transform:translate(-50%,-50%);
+    transform:translate(-50%,-50%) translateY(-2.2px);
     background:#fde047;
     border:1px solid #000;
   }
@@ -120,6 +130,52 @@
     z-index:2;
     white-space:nowrap;
     overflow:hidden;
+  }
+  .item-textbox{
+    position:absolute;
+    left:2px;
+    right:2px;
+    bottom:11px;
+    background:#fff;
+    color:#000;
+    border:1px solid #fff;
+    border-radius:1px;
+    padding:1px 0 0;
+    overflow:visible;
+    z-index:2;
+    pointer-events:none;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    gap:0;
+  }
+  .item-textbox .name{
+    margin:0;
+    width:100%;
+    box-sizing:border-box;
+    padding:0;
+    font-size:7px;
+    line-height:1.05;
+    font-weight:700;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:clip;
+    word-break:break-word;
+  }
+  .item-textbox .desc{
+    margin:0;
+    width:100%;
+    box-sizing:border-box;
+    padding:0;
+    font-size:7px;
+    line-height:1.1;
+    white-space:pre-wrap;
+    overflow:visible;
+    word-break:break-word;
+  }
+  .item-textbox.compact .desc{
+    font-size:6px;
+    line-height:1.05;
   }
   .item.alt-rule::after{
     content:'×';
@@ -1256,6 +1312,27 @@ const ITEM_USE_TIMINGS = {
   6:'いつでも使える', 7:'いつでも使える', 8:'いつでも使える', 9:'手番開始の前', 10:'手番中に使う',
   11:'相談せずに使う', 12:'いつでも使える', 13:'即時効果', 14:'いつでも使える', 15:'即時効果',
   16:'即時効果', 17:'手番中に使う'
+};
+
+const ITEM_TEXTS = {
+  1:{name:'コトナルラベル',desc:'自分の、隣り合って数字が異なるコード2本の前にコトナルラベルを置く。'},
+  2:{name:'イレカエシーバー',desc:'他プレイヤーの裏向きのコードを選ぶ。\nそして、他プレイヤーが自分の裏向きのコード選ぶ。\n選ばれたコードを交換する。黄/赤コードを選んでもよい。'},
+  3:{name:'ミッツケル探知機',desc:'コードを通常の1本ではなく、3本指し示して、数値を宣言できる。\n黄の宣言は不可。'},
+  4:{name:'ヒント付箋',desc:'自分のコードの前に情報トークンを置く。\n赤/黄は不可。'},
+  5:{name:'スーパー探知機',desc:'コードを通常の1本ではなく、一人のプレイヤーの全てを指し示して、数値を宣言できる。\n黄の宣言は不可。'},
+  6:{name:'失敗帳消し機',desc:'起爆ダイヤルを1つ後退させる。'},
+  7:{name:'非常電池',desc:'使用済のキャラクターカード2枚までを再びオモテにできる。'},
+  8:{name:'なんでもレーダー',desc:'数値を1つ宣言し、そのコードを持っているプレイヤーは全員手をあげる。'},
+  9:{name:'万能氷',desc:'切断に失敗しても起爆ダイヤルが進まず、赤コードを切断しても爆発しない。'},
+  10:{name:'ドッチカ・アタレイ',desc:'1つのコードに対して、数字を2つ宣言できる。'},
+  11:{name:'いつでもコーヒー',desc:'任意のプレイヤーを選び、そのプレイヤーまで手番を飛ばす。'},
+  12:{name:'イコールラベル',desc:'隣り合って数字が同じコード2本の前にイコールラベルを置く。'},
+  13:{name:'ヒミツ底',desc:'新たな装備カードを2枚並べる。'},
+  14:{name:'シングルラベル',desc:'x1の情報トークンを1つのコードの前に置く。'},
+  15:{name:'フタタビボックス',desc:'使用済みの装備カードを全てオモテ向きにする。'},
+  16:{name:'分離銃',desc:'情報トークンをランダムに1枚ひき、その値のコードを全て切断できる。'},
+  17:{name:'優先切断券',desc:'他の2本のコードが切断されていなくても、単独で自分の数値が同じ2本のコードを切断できる。'},
+  18:{name:'ヒッカケフック',desc:'他プレイヤーのコードを1枚選び、自分のスタンドに置く。'}
 };
 
 /* Elements */
@@ -2557,6 +2634,86 @@ function renderMissionPanels(v){
 
 
 /* ===== Items & DI ===== */
+function itemFrontLabel(itemNo){
+  if(itemNo===14) return '2';
+  if(itemNo===15) return '3';
+  if(itemNo===16) return '10';
+  if(itemNo===17) return '9';
+  if(itemNo===18) return '11';
+  return String(itemNo);
+}
+
+function appendItemTextBox(el, itemNo){
+  const info = ITEM_TEXTS[itemNo];
+  if(!info) return;
+
+  const box = document.createElement('div');
+  box.className = 'item-textbox';
+
+  const name = document.createElement('div');
+  name.className = 'name';
+  name.textContent = info.name;
+
+  const desc = document.createElement('div');
+  desc.className = 'desc';
+  desc.textContent = info.desc;
+
+  box.appendChild(name);
+  box.appendChild(desc);
+  el.appendChild(box);
+
+  requestAnimationFrame(()=>{
+    let size = 7;
+    while(size > 3 && (name.scrollWidth > name.clientWidth || name.scrollHeight > name.clientHeight)){
+      size = +(size - 0.2).toFixed(2);
+      name.style.fontSize = `${size}px`;
+    }
+    if(desc.scrollHeight > desc.clientHeight || box.scrollHeight > box.clientHeight){
+      box.classList.add('compact');
+    }
+  });
+}
+
+function setItemFaceImage(el, itemNo){
+  // PNG を白枠より手前に表示するため、前面レイヤーに描画
+  let layer = el.querySelector(':scope > .item-face-layer');
+  if(!layer){
+    layer = document.createElement('div');
+    layer.className = 'item-face-layer';
+    el.appendChild(layer);
+  }
+  layer.style.backgroundImage = `url("./item${itemNo}.png"), url("./item${itemNo}.jpg")`;
+}
+
+function decorateItemFront(el, itemNo){
+  el.classList.add('item-front-custom');
+  const mark = document.createElement('div');
+  mark.className = 'item-front-mark' + ((itemNo>=14 && itemNo<=18) ? ' two' : '');
+
+  const chipCount = (itemNo>=14 && itemNo<=18) ? 2 : 1;
+  for(let i=0;i<chipCount;i++){
+    const chip = document.createElement('div');
+    chip.className = 'item-front-chip';
+    const img = document.createElement('img');
+    img.src = './blackguard.png';
+    img.alt = '';
+    chip.appendChild(img);
+
+    if(itemNo===13){
+      const sq = document.createElement('span');
+      sq.className = 'yellow-square';
+      chip.appendChild(sq);
+    }else{
+      const num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = itemFrontLabel(itemNo);
+      chip.appendChild(num);
+    }
+    mark.appendChild(chip);
+  }
+  el.appendChild(mark);
+}
+
 function renderItemsAndDi(v){
   if(!v || !v.started){ H(itemsBar,true); return; }
   const missionId = (v?.mission?.id|0);
@@ -2587,44 +2744,6 @@ function renderItemsAndDi(v){
     if(itemNo===17) return (openNormalCountByNum[9]||0) >= 2;
     if(itemNo===18) return (openNormalCountByNum[11]||0) >= 2;
     return false;
-  };
-
-  const itemFrontLabel = (itemNo)=>{
-    if(itemNo===14) return '2';
-    if(itemNo===15) return '3';
-    if(itemNo===16) return '10';
-    if(itemNo===17) return '9';
-    if(itemNo===18) return '11';
-    return String(itemNo);
-  };
-
-  const decorateItemFront = (el, itemNo)=>{
-    el.classList.add('item-front-custom');
-    const mark = document.createElement('div');
-    mark.className = 'item-front-mark' + ((itemNo>=14 && itemNo<=18) ? ' two' : '');
-
-    const chipCount = (itemNo>=14 && itemNo<=18) ? 2 : 1;
-    for(let i=0;i<chipCount;i++){
-      const chip = document.createElement('div');
-      chip.className = 'item-front-chip';
-      const img = document.createElement('img');
-      img.src = './blackguard.png';
-      img.alt = '';
-      chip.appendChild(img);
-
-      if(itemNo===13){
-        const sq = document.createElement('span');
-        sq.className = 'yellow-square';
-        chip.appendChild(sq);
-      }else{
-        const num = document.createElement('span');
-        num.className = 'num';
-        num.textContent = itemFrontLabel(itemNo);
-        chip.appendChild(num);
-      }
-      mark.appendChild(chip);
-    }
-    el.appendChild(mark);
   };
 
   // ★ #23：広げる前は「アイテムのみ」非表示（DIは残す）
@@ -2665,7 +2784,9 @@ function renderItemsAndDi(v){
       if(flags.itemsFaceDownStart && it.faceUp===false){
         div.style.backgroundImage = `url("./itemback.jpg")`;
       }else{
+        setItemFaceImage(div, it.no);
         decorateItemFront(div, it.no);
+        appendItemTextBox(div, it.no);
       }
     }
 
@@ -2715,7 +2836,7 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
         }else{
          // 通常通り拡大（表状態 or 他ミッション）
          const canFaceUp = !!(flags.itemsFaceDownStart && it.faceUp===false);
-          openItemZoom(it.no, idx, { canFaceUp });
+          openItemZoom(it.no, idx, { canFaceUp }, div);
         }
      }
     };
@@ -2734,7 +2855,7 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
      div2.className = 'item m23-spread';
       div2.style.backgroundImage = `url("./item${no}.jpg")`;
       // 表示のみ（拡大は可）。ゲーム状態は変更しない
-     div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true });
+     div2.onclick = () => openItemZoom(no, -1, { canFaceUp: true }, div2);
       itemsEl.appendChild(div2);
       itemNodes.push(div2);
    }
@@ -7860,7 +7981,7 @@ await update(mRef, {
 
   
 /* ：アイテム拡大ポップ */
-function openItemZoom(itemNo, itemIdx, opt={}){
+function openItemZoom(itemNo, itemIdx, opt={}, sourceEl=null){
   try{
     const old = document.getElementById('conZoomOverlay');
     if (old) old.remove();
@@ -7874,31 +7995,14 @@ function openItemZoom(itemNo, itemIdx, opt={}){
 
     const big = document.createElement('div');
     big.className = 'conzoom-card';
-    big.classList.add('item-front-custom');
-    const mark = document.createElement('div');
-    mark.className = 'item-front-mark' + ((itemNo>=14 && itemNo<=18) ? ' two' : '');
-    const frontNum = (itemNo===14?'2':itemNo===15?'3':itemNo===16?'10':itemNo===17?'9':itemNo===18?'11':String(itemNo));
-    const chipCount = (itemNo>=14 && itemNo<=18) ? 2 : 1;
-    for(let i=0;i<chipCount;i++){
-      const chip = document.createElement('div');
-      chip.className = 'item-front-chip';
-      const img = document.createElement('img');
-      img.src = './blackguard.png';
-      img.alt = '';
-      chip.appendChild(img);
-      if(itemNo===13){
-        const sq = document.createElement('span');
-        sq.className = 'yellow-square';
-        chip.appendChild(sq);
-      }else{
-        const num = document.createElement('span');
-        num.className = 'num';
-        num.textContent = frontNum;
-        chip.appendChild(num);
-      }
-      mark.appendChild(chip);
+    setItemFaceImage(big, itemNo);
+    decorateItemFront(big, itemNo);
+    const srcBox = sourceEl?.querySelector?.('.item-textbox');
+    if(srcBox){
+      big.appendChild(srcBox.cloneNode(true));
+    }else{
+      appendItemTextBox(big, itemNo);
     }
-    big.appendChild(mark);
 
     const timingText = ITEM_USE_TIMINGS[itemNo];
     if(timingText){
