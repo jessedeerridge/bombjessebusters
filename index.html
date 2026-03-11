@@ -54,6 +54,16 @@
     border:1px solid #ddd;border-radius:8px;background:#fff;
     background-size:cover;background-position:center;cursor:pointer;flex:0 0 auto
   }
+  .item-face-layer{
+    position:absolute;
+    inset:0;
+    background-size:cover, cover;
+    background-position:center, center;
+    background-repeat:no-repeat, no-repeat;
+    border-radius:inherit;
+    z-index:3;
+    pointer-events:none;
+  }
   .item-front-custom{ background-color:#fd8a21 !important; }
   .item-front-mark{
     position:absolute;
@@ -2665,11 +2675,14 @@ function appendItemTextBox(el, itemNo){
 }
 
 function setItemFaceImage(el, itemNo){
-  // PNG を最前面、JPG をフォールバック層として後ろに配置
-  el.style.backgroundImage = `url("./item${itemNo}.png"), url("./item${itemNo}.jpg")`;
-  el.style.backgroundSize = 'cover, cover';
-  el.style.backgroundPosition = 'center, center';
-  el.style.backgroundRepeat = 'no-repeat, no-repeat';
+  // PNG を白枠より手前に表示するため、前面レイヤーに描画
+  let layer = el.querySelector(':scope > .item-face-layer');
+  if(!layer){
+    layer = document.createElement('div');
+    layer.className = 'item-face-layer';
+    el.appendChild(layer);
+  }
+  layer.style.backgroundImage = `url("./item${itemNo}.png"), url("./item${itemNo}.jpg")`;
 }
 
 function decorateItemFront(el, itemNo){
