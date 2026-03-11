@@ -525,10 +525,11 @@
   .card-wrap.m43-pending-arrival .card,
   .card-wrap.m43-pending-arrival .marker,
   .card-wrap.m43-pending-arrival .tok-col{opacity:0;}
-  /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
+  /* 入れ替えフックの移動中：カード/トークン/α帯を隠して瞬間復活を防ぐ */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .tok-col,
+  .card-wrap.hook-anim-origin .alpha{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -3201,6 +3202,8 @@ if ((v.mission?.id|0) === 23) {
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
   const i2All=v.meta?.i2Flow;
   const i18All=v.meta?.i18Flow;
+  const i2Anim = v.meta?.i2Anim;
+  const i18Anim = v.meta?.i18Anim;
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table'; box.dataset.tableIdx = String(idx);
@@ -3410,6 +3413,17 @@ wrap.dataset.cardKey = cardKey;
         && (state._m43AnimFinishedId !== m43Anim.id);
       if (isM43PendingCard){
         wrap.classList.add('m43-pending-arrival');
+      }
+
+      // i2/i18 の共有移動アニメ中は、再レンダーされても元位置のカード内容を隠して
+      // 「着地直前に一瞬だけ元の黒トークン/α帯が復活する」見え方を防ぐ
+      const isI2AnimSource = !!(i2Anim?.id && (
+        (i2Anim?.A?.table===idx && String(i2Anim?.A?.cardId||'')===String(c.id||'')) ||
+        (i2Anim?.B?.table===idx && String(i2Anim?.B?.cardId||'')===String(c.id||''))
+      ));
+      const isI18AnimSource = !!(i18Anim?.id && i18Anim?.sel?.table===idx && String(i18Anim?.sel?.cardId||'')===String(c.id||''));
+      if (isI2AnimSource || isI18AnimSource){
+        wrap.classList.add('hook-anim-origin');
       }
       
       if (c.gone === true){
