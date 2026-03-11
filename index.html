@@ -95,11 +95,11 @@
   }
   .item-front-chip .yellow-square{
     position:absolute;
-    width:10px;
-    height:10px;
+    width:8px;
+    height:8px;
     left:50%;
     top:50%;
-    transform:translate(-50%,-50%);
+    transform:translate(-50%,-50%) translateY(-2.2px);
     background:#fde047;
     border:1px solid #000;
   }
@@ -147,8 +147,8 @@
     font-size:7px;
     line-height:1.05;
     font-weight:700;
-    white-space:normal;
-    overflow:visible;
+    white-space:nowrap;
+    overflow:hidden;
     text-overflow:clip;
     word-break:break-word;
   }
@@ -2624,6 +2624,83 @@ function renderMissionPanels(v){
 
 
 /* ===== Items & DI ===== */
+function itemFrontLabel(itemNo){
+  if(itemNo===14) return '2';
+  if(itemNo===15) return '3';
+  if(itemNo===16) return '10';
+  if(itemNo===17) return '9';
+  if(itemNo===18) return '11';
+  return String(itemNo);
+}
+
+function appendItemTextBox(el, itemNo){
+  const info = ITEM_TEXTS[itemNo];
+  if(!info) return;
+
+  const box = document.createElement('div');
+  box.className = 'item-textbox';
+
+  const name = document.createElement('div');
+  name.className = 'name';
+  name.textContent = info.name;
+
+  const desc = document.createElement('div');
+  desc.className = 'desc';
+  desc.textContent = info.desc;
+
+  box.appendChild(name);
+  box.appendChild(desc);
+  el.appendChild(box);
+
+  requestAnimationFrame(()=>{
+    let size = 7;
+    while(size > 3 && (name.scrollWidth > name.clientWidth || name.scrollHeight > name.clientHeight)){
+      size = +(size - 0.2).toFixed(2);
+      name.style.fontSize = `${size}px`;
+    }
+    if(desc.scrollHeight > desc.clientHeight || box.scrollHeight > box.clientHeight){
+      box.classList.add('compact');
+    }
+  });
+}
+
+function setItemFaceImage(el, itemNo){
+  // PNG を最前面、JPG をフォールバック層として後ろに配置
+  el.style.backgroundImage = `url("./item${itemNo}.png"), url("./item${itemNo}.jpg")`;
+  el.style.backgroundSize = 'cover, cover';
+  el.style.backgroundPosition = 'center, center';
+  el.style.backgroundRepeat = 'no-repeat, no-repeat';
+}
+
+function decorateItemFront(el, itemNo){
+  el.classList.add('item-front-custom');
+  const mark = document.createElement('div');
+  mark.className = 'item-front-mark' + ((itemNo>=14 && itemNo<=18) ? ' two' : '');
+
+  const chipCount = (itemNo>=14 && itemNo<=18) ? 2 : 1;
+  for(let i=0;i<chipCount;i++){
+    const chip = document.createElement('div');
+    chip.className = 'item-front-chip';
+    const img = document.createElement('img');
+    img.src = './blackguard.png';
+    img.alt = '';
+    chip.appendChild(img);
+
+    if(itemNo===13){
+      const sq = document.createElement('span');
+      sq.className = 'yellow-square';
+      chip.appendChild(sq);
+    }else{
+      const num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = itemFrontLabel(itemNo);
+      chip.appendChild(num);
+    }
+    mark.appendChild(chip);
+  }
+  el.appendChild(mark);
+}
+
 function renderItemsAndDi(v){
   if(!v || !v.started){ H(itemsBar,true); return; }
   const missionId = (v?.mission?.id|0);
@@ -2654,76 +2731,6 @@ function renderItemsAndDi(v){
     if(itemNo===17) return (openNormalCountByNum[9]||0) >= 2;
     if(itemNo===18) return (openNormalCountByNum[11]||0) >= 2;
     return false;
-  };
-
-  const itemFrontLabel = (itemNo)=>{
-    if(itemNo===14) return '2';
-    if(itemNo===15) return '3';
-    if(itemNo===16) return '10';
-    if(itemNo===17) return '9';
-    if(itemNo===18) return '11';
-    return String(itemNo);
-  };
-
-  const appendItemTextBox = (el, itemNo)=>{
-    const info = ITEM_TEXTS[itemNo];
-    if(!info) return;
-    const box = document.createElement('div');
-    box.className = 'item-textbox';
-
-    const name = document.createElement('div');
-    name.className = 'name';
-    name.textContent = info.name;
-
-    const desc = document.createElement('div');
-    desc.className = 'desc';
-    desc.textContent = info.desc;
-
-    box.appendChild(name);
-    box.appendChild(desc);
-    el.appendChild(box);
-
-    requestAnimationFrame(()=>{
-      if(desc.scrollHeight > desc.clientHeight || box.scrollHeight > box.clientHeight){
-        box.classList.add('compact');
-      }
-    });
-  };
-
-  const setItemFaceImage = (el, itemNo)=>{
-    el.style.backgroundImage = `url("./item${itemNo}.png"), url("./item${itemNo}.jpg")`;
-    el.style.backgroundSize = 'cover, cover';
-    el.style.backgroundPosition = 'center, center';
-    el.style.backgroundRepeat = 'no-repeat, no-repeat';
-  };
-
-  const decorateItemFront = (el, itemNo)=>{
-    el.classList.add('item-front-custom');
-    const mark = document.createElement('div');
-    mark.className = 'item-front-mark' + ((itemNo>=14 && itemNo<=18) ? ' two' : '');
-
-    const chipCount = (itemNo>=14 && itemNo<=18) ? 2 : 1;
-    for(let i=0;i<chipCount;i++){
-      const chip = document.createElement('div');
-      chip.className = 'item-front-chip';
-      const img = document.createElement('img');
-      img.src = './blackguard.png';
-      img.alt = '';
-      chip.appendChild(img);
-
-      if(itemNo===13){
-        const sq = document.createElement('span');
-        sq.className = 'yellow-square';
-        chip.appendChild(sq);
-      }else{
-        const num = document.createElement('span');
-        num.className = 'num';
-        num.textContent = itemFrontLabel(itemNo);
-        chip.appendChild(num);
-      }
-      mark.appendChild(chip);
-    }
-    el.appendChild(mark);
   };
 
   // ★ #23：広げる前は「アイテムのみ」非表示（DIは残す）
@@ -7977,6 +7984,7 @@ function openItemZoom(itemNo, itemIdx, opt={}){
     big.className = 'conzoom-card';
     setItemFaceImage(big, itemNo);
     decorateItemFront(big, itemNo);
+    appendItemTextBox(big, itemNo);
 
     const timingText = ITEM_USE_TIMINGS[itemNo];
     if(timingText){
