@@ -525,10 +525,11 @@
   .card-wrap.m43-pending-arrival .card,
   .card-wrap.m43-pending-arrival .marker,
   .card-wrap.m43-pending-arrival .tok-col{opacity:0;}
-  /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
+  /* 入れ替えフックの移動中：カード/トークン/α帯を隠して瞬間復活を防ぐ */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .tok-col,
+  .card-wrap.hook-anim-origin .alpha{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -1310,7 +1311,9 @@ const state = {
   roomCode:null, userId:crypto.randomUUID(), userName:'', // ★未入力なら入室時に採番
   isHost:false, mode:null, gameStarted:false, seatedTable:null, watching:null, seatPick:null,
   m22GaveOnce:false, // ★ #22：自分が渡した一回ガード（即時連打対策）
-  _lastMissionId:null};
+  _lastMissionId:null,
+  _lastI2AnimId:null,
+  _lastI18AnimId:null};
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -2371,7 +2374,7 @@ function updateHeaderInfo(){
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
     players:{}, spectators:{},
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null,
+    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
       /* ▼▼ ：ミッション44用 状態 ▼▼ */
       oxItem: 0,         // アイテム列の下（全体プール）の酸素トークン数
       oxByTable: {}      // 各テーブルごとの酸素トークン所持数 { [tableIndex]: number }
@@ -2447,9 +2450,10 @@ if (v) {
       renderMissionPanels(v);
       renderGlobalReveal(v);
       renderHostTool(v);
-  renderMissionComplete(v);
+      renderMissionComplete(v);
 
     });
+    queueSharedHookAnimations(v);
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
    const midNow  = (v?.mission?.id|0);
     const midPrev = (state._lastMissionId|0);
@@ -3198,6 +3202,8 @@ if ((v.mission?.id|0) === 23) {
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
   const i2All=v.meta?.i2Flow;
   const i18All=v.meta?.i18Flow;
+  const i2Anim = v.meta?.i2Anim;
+  const i18Anim = v.meta?.i18Anim;
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table'; box.dataset.tableIdx = String(idx);
@@ -3407,6 +3413,17 @@ wrap.dataset.cardKey = cardKey;
         && (state._m43AnimFinishedId !== m43Anim.id);
       if (isM43PendingCard){
         wrap.classList.add('m43-pending-arrival');
+      }
+
+      // i2/i18 の共有移動アニメ中は、再レンダーされても元位置のカード内容を隠して
+      // 「着地直前に一瞬だけ元の黒トークン/α帯が復活する」見え方を防ぐ
+      const isI2AnimSource = !!(i2Anim?.id && (
+        (i2Anim?.A?.table===idx && String(i2Anim?.A?.cardId||'')===String(c.id||'')) ||
+        (i2Anim?.B?.table===idx && String(i2Anim?.B?.cardId||'')===String(c.id||''))
+      ));
+      const isI18AnimSource = !!(i18Anim?.id && i18Anim?.sel?.table===idx && String(i18Anim?.sel?.cardId||'')===String(c.id||''));
+      if (isI2AnimSource || isI18AnimSource){
+        wrap.classList.add('hook-anim-origin');
       }
       
       if (c.gone === true){
@@ -5558,6 +5575,7 @@ function renderM43(v){
       /* ここから追加：#43 回収タップ → A群から1枚を自分の手札へ */
       const code = state.roomCode;
       const myTable = state.seatedTable;
+      const m43AnimTotalMs = 2800; // runM43InsertAnimation の所要時間(余裕込み)
       if (myTable == null) { alert('席に座っているプレイヤーのみ操作できます'); return; }
 
       // メタとテーブルを取得
@@ -5569,6 +5587,7 @@ function renderM43(v){
       const A = Array.isArray(meta.m43_A) ? meta.m43_A.slice() : [];
 
       // A群から1枚取り出し（先頭＝一番上）
+      let nanoNext = null;
       if (A.length > 0 && tbls[myTable]) {
         const n = A.shift(); // number
         const T = tbls[myTable];
@@ -5609,12 +5628,18 @@ function renderM43(v){
             }
           })
         ]);
+
+        // nano を即時で減らすと他端末で飛び元が消えてアニメ中断するため、
+        // カード移動アニメ完了後に段階を下げる（全員表示のため）
+        const cur = (state.watching?.meta?.m43_nano|0);
+        nanoNext = Math.max(0, cur - 1);
       }
 
-      // 既存の「段階を下げる」もそのまま実行
-      const cur = (state.watching?.meta?.m43_nano|0);
-      const next = Math.max(0, cur - 1);
-      await update(mRef, { m43_nano: next, m43_updatedAt: Date.now() });
+      if (nanoNext != null){
+        setTimeout(()=>{
+          update(mRef, { m43_nano: nanoNext, m43_updatedAt: Date.now() }).catch(()=>{});
+        }, m43AnimTotalMs);
+      }
       }
       }
     ]);
@@ -8501,6 +8526,24 @@ function refreshInfo22(vNow){
 
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
+function queueSharedHookAnimations(v){
+  const i2Anim = v?.meta?.i2Anim;
+  if (i2Anim?.id && i2Anim.id !== state._lastI2AnimId && i2Anim.A && i2Anim.B){
+    state._lastI2AnimId = i2Anim.id;
+    setTimeout(()=>{
+      playHookSwapAnimation(i2Anim.A, i2Anim.B, state.watching?.tables || v?.tables || []).catch(()=>{});
+    }, 0);
+  }
+
+  const i18Anim = v?.meta?.i18Anim;
+  if (i18Anim?.id && i18Anim.id !== state._lastI18AnimId && i18Anim.sel && Number.isInteger(i18Anim.myTable)){
+    state._lastI18AnimId = i18Anim.id;
+    setTimeout(()=>{
+      playHookTakeAnimation(i18Anim.sel, i18Anim.myTable, state.watching?.tables || v?.tables || []).catch(()=>{});
+    }, 0);
+  }
+}
+
 async function playHookSwapAnimation(A, B, tables){
   try{
     const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
@@ -8764,7 +8807,9 @@ async function doItem2Swap(A, B){
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
 
-  const anim = await playHookSwapAnimation(A, B, tables);
+  const animId = `i2-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Anim:{ id:animId, A, B, at: Date.now() } });
+  await sleep(4700);
 
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
@@ -8776,8 +8821,8 @@ async function doItem2Swap(A, B){
   };
 
   const mark = now()+10000; // 10秒
-  const srcAlphaA = String(anim?.srcAlphaA || a.card?.alpha || '');
-  const srcAlphaB = String(anim?.srcAlphaB || b.card?.alpha || '');
+  const srcAlphaA = String(a.card?.alpha || '');
+  const srcAlphaB = String(b.card?.alpha || '');
  const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2', hookGray:true};
    const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2', hookGray:true};
   insertSortedRight(b.hand, toB);
@@ -8794,7 +8839,7 @@ async function doItem2Swap(A, B){
   await Promise.all([
     set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand),
     set(ref(db, `rooms/${state.roomCode}/tables/${B.table}/hand`), b.hand),
-    update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null })
+    update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null, i2Anim:null })
   ]);
   // 交換後：member(9) を自分が持っているなら枠の9を裏返す
   try{
@@ -8820,7 +8865,9 @@ async function doItem18Take(sel){
   const si = srcHand.findIndex(c=> c.id===sel.cardId);
   if(si<0){ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
 
-  await playHookTakeAnimation(sel, myTable, tables);
+  const animId = `i18-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Anim:{ id:animId, sel, myTable, at: Date.now() } });
+  await sleep(4700);
 
   const card = srcHand.splice(si,1)[0];
 
@@ -8835,7 +8882,7 @@ dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark, markSrc:'
   await Promise.all([
     set(ref(db, `rooms/${state.roomCode}/tables/${sel.table}/hand`), srcHand),
     set(ref(db, `rooms/${state.roomCode}/tables/${myTable}/hand`), dstHand),
-    update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:null })
+    update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:null, i18Anim:null })
   ]);
 }
 
@@ -9311,7 +9358,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
     m29_center: (missionMeta?.id===29 ? [] : null),
  m29_deck:   (missionMeta?.id===29 ? (m29Rest||[]) : null),
     /* ▲▲ ここまで追加 ▼▼ */
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i16Badge:null }
+    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null }
   });
   /* ここから追加：#43 A群と nano 初期値を meta に保存 */
   if (missionId === 43) {
