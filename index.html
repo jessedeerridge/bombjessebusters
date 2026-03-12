@@ -8637,6 +8637,22 @@ function refreshInfo22(vNow){
 
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 const HOOK_ANIM_TOTAL_MS = 5200;
+const HOOK_STEP_MS = 1500;
+const HOOK_STAGE_COUNT = 3;
+const HOOK_LAND_HOLD_MS = Math.max(0, HOOK_ANIM_TOTAL_MS - (HOOK_STEP_MS * HOOK_STAGE_COUNT));
+
+
+
+async function waitForHookArrival(tableIdx, cardId, timeoutMs=2000){
+  const started = Date.now();
+  const selector = `.table[data-table-idx="${tableIdx}"] .card-wrap[data-card-id="${cardId}"] .card`;
+  while ((Date.now() - started) < timeoutMs){
+    const card = document.querySelector(selector);
+    if (card) return true;
+    await sleep(34);
+  }
+  return false;
+}
 
 function queueSharedHookAnimations(v){
   const i2Anim = v?.meta?.i2Anim;
@@ -8682,7 +8698,7 @@ async function playHookSwapAnimation(A, B, tables){
       el.style.margin='0';
       el.style.zIndex='2147483645';
       el.style.pointerEvents='none';
-      el.style.transition='transform 1.5s ease, left 1.5s ease, top 1.5s ease';
+      el.style.transition=`transform ${HOOK_STEP_MS}ms ease, left ${HOOK_STEP_MS}ms ease, top ${HOOK_STEP_MS}ms ease`;
       document.body.appendChild(el);
     };
     setupFly(ca, ra); setupFly(cb, rb);
@@ -8695,7 +8711,7 @@ async function playHookSwapAnimation(A, B, tables){
       ca.style.transform=`translateY(-${cardH}px)`;
       cb.style.transform=`translateY(-${cardH}px)`;
     });
-    await sleep(1500);
+    await sleep(HOOK_STEP_MS);
 
     const aHand = (tables[A.table]?.hand)||[];
     const bHand = (tables[B.table]?.hand)||[];
@@ -8724,7 +8740,7 @@ async function playHookSwapAnimation(A, B, tables){
     const slideCardBody = (w, dx)=>{
       const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
       bodyNodes.forEach((node)=>{
-        node.style.transition = 'transform 1.5s ease';
+        node.style.transition = `transform ${HOOK_STEP_MS}ms ease`;
         node.style.transform = `translateX(${dx}px)`;
       });
     };
@@ -8745,7 +8761,7 @@ async function playHookSwapAnimation(A, B, tables){
       if (ni>=insB) dx += shift;
       if (dx!==0) slideCardBody(w, dx);
     });
-    await sleep(1500);
+    await sleep(HOOK_STEP_MS);
 
     const targetPoint = (ti, ins)=>{
       const h = handEl(ti);
@@ -8767,8 +8783,13 @@ async function playHookSwapAnimation(A, B, tables){
     // ca は A から抜いたカードなので B 側へ、cb は B から抜いたカードなので A 側へ移動
     ca.style.left = `${tb.x}px`; ca.style.top = `${tb.y}px`; ca.style.transform='translateY(0)';
     cb.style.left = `${ta.x}px`; cb.style.top = `${ta.y}px`; cb.style.transform='translateY(0)';
-    await sleep(1500);
+    await sleep(HOOK_STEP_MS);
 
+    if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
+    await Promise.all([
+      waitForHookArrival(B.table, A.cardId),
+      waitForHookArrival(A.table, B.cardId)
+    ]);
     ca.remove(); cb.remove();
     return null;
   }catch(e){
@@ -8810,17 +8831,17 @@ async function playHookTakeAnimation(sel, myTable, tables){
     fly.style.margin='0';
     fly.style.zIndex='2147483645';
     fly.style.pointerEvents='none';
-    fly.style.transition='transform 1.5s ease, left 1.5s ease, top 1.5s ease';
+    fly.style.transition=`transform ${HOOK_STEP_MS}ms ease, left ${HOOK_STEP_MS}ms ease, top ${HOOK_STEP_MS}ms ease`;
     document.body.appendChild(fly);
 
     ws.classList.add('hook-anim-origin');
     requestAnimationFrame(()=>{ fly.style.transform=`translateY(-${cardH}px)`; });
-    await sleep(1500);
+    await sleep(HOOK_STEP_MS);
 
     const slideCardBody = (w, dx)=>{
       const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
       bodyNodes.forEach((node)=>{
-        node.style.transition = 'transform 1.5s ease';
+        node.style.transition = `transform ${HOOK_STEP_MS}ms ease`;
         node.style.transform = `translateX(${dx}px)`;
       });
     };
@@ -8833,7 +8854,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
 
     const qDst = Array.from(handEl(myTable)?.querySelectorAll('.card-wrap')||[]);
     qDst.forEach((w,i)=>{ if (i>=ins) slideCardBody(w, shift); });
-    await sleep(1500);
+    await sleep(HOOK_STEP_MS);
 
     const targetPoint = (ti, insPos)=>{
       const h = handEl(ti);
@@ -8852,8 +8873,10 @@ async function playHookTakeAnimation(sel, myTable, tables){
     fly.style.left = `${t.x}px`;
     fly.style.top = `${t.y}px`;
     fly.style.transform = 'translateY(0)';
-    await sleep(1500);
+    await sleep(HOOK_STEP_MS);
 
+    if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
+    await waitForHookArrival(myTable, sel.cardId);
     fly.remove();
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
