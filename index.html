@@ -534,10 +534,11 @@
   .card-wrap.m54-pending-arrival .marker,
   .card-wrap.m54-pending-arrival .tok-col{opacity:0;}
   .card-wrap.m54-pending-arrival .card{pointer-events:none;}
-  /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
+  /* 入れ替えフックの移動中：カード本体・トークン・α帯を隠す（復活チラつき防止） */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .tok-col,
+  .card-wrap.hook-anim-origin .badge-fixed{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -1321,7 +1322,9 @@ const state = {
   m22GaveOnce:false, // ★ #22：自分が渡した一回ガード（即時連打対策）
   _lastMissionId:null,
   _lastI2AnimId:null,
-  _lastI18AnimId:null};
+  _lastI18AnimId:null,
+  _hookAnimHiddenKeys:new Set(),
+  _hookAnimClearTimer:null};
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -3411,6 +3414,8 @@ wrap.dataset.cardId = String(c.id||'');
 wrap.dataset.cardIndex = String(ci);
 const cardKey = String(c.id || `ci-${ci}`);
 wrap.dataset.cardKey = cardKey;
+
+      if (isHookAnimHidden(idx, c.id)) wrap.classList.add('hook-anim-origin');
 
       // #43: 挿入アニメ対象カードは、nanoから飛ぶ前に見えないよう先に隠す
       const m43Anim = v?.meta?.m43_insertAnim;
@@ -8637,7 +8642,57 @@ function refreshInfo22(vNow){
 
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
+
+function hookAnimKey(tableIdx, cardId){
+  return `${Number(tableIdx)}:${String(cardId||'')}`;
+}
+
+function queueHookAnimKey(tableIdx, cardId){
+  if (cardId == null) return;
+  state._hookAnimHiddenKeys.add(hookAnimKey(tableIdx, cardId));
+}
+
+function isHookAnimHidden(tableIdx, cardId){
+  if (cardId == null) return false;
+  return state._hookAnimHiddenKeys.has(hookAnimKey(tableIdx, cardId));
+}
+
+function applyHookAnimMaskToDom(){
+  document.querySelectorAll('.card-wrap[data-table][data-card-id]').forEach((wrap)=>{
+    const key = hookAnimKey(wrap.dataset.table, wrap.dataset.cardId);
+    if (state._hookAnimHiddenKeys.has(key)) wrap.classList.add('hook-anim-origin');
+    else wrap.classList.remove('hook-anim-origin');
+  });
+}
+
+function syncHookAnimMask(v){
+  const keys = [];
+  const i2 = v?.meta?.i2Anim;
+  if (i2?.id && i2.A && i2.B){
+    keys.push(hookAnimKey(i2.A.table, i2.A.cardId));
+    keys.push(hookAnimKey(i2.B.table, i2.B.cardId));
+  }
+  const i18 = v?.meta?.i18Anim;
+  if (i18?.id && i18.sel){
+    keys.push(hookAnimKey(i18.sel.table, i18.sel.cardId));
+  }
+
+  if (keys.length){
+    if (state._hookAnimClearTimer){ clearTimeout(state._hookAnimClearTimer); state._hookAnimClearTimer = null; }
+    keys.forEach(k=> state._hookAnimHiddenKeys.add(k));
+    applyHookAnimMaskToDom();
+    return;
+  }
+
+  if (state._hookAnimHiddenKeys.size === 0 || state._hookAnimClearTimer) return;
+  state._hookAnimClearTimer = setTimeout(()=>{
+    state._hookAnimHiddenKeys.clear();
+    state._hookAnimClearTimer = null;
+    applyHookAnimMaskToDom();
+  }, 800);
+}
 function queueSharedHookAnimations(v){
+  syncHookAnimMask(v);
   const i2Anim = v?.meta?.i2Anim;
   if (i2Anim?.id && i2Anim.id !== state._lastI2AnimId && i2Anim.A && i2Anim.B){
     state._lastI2AnimId = i2Anim.id;
@@ -8691,8 +8746,11 @@ async function playHookSwapAnimation(A, B, tables){
     };
     setupFly(ca, ra); setupFly(cb, rb);
 
+    queueHookAnimKey(A.table, A.cardId);
+    queueHookAnimKey(B.table, B.cardId);
     wa.classList.add('hook-anim-origin');
     wb.classList.add('hook-anim-origin');
+    applyHookAnimMaskToDom();
 
     // 1) 抜き取りカードを上に飛び出し
     requestAnimationFrame(()=>{
@@ -8806,8 +8864,8 @@ async function playHookSwapAnimation(A, B, tables){
     await sleep(80);
     phA.remove(); phB.remove();
     ca.remove(); cb.remove();
-    wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
     moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    applyHookAnimMaskToDom();
     return { srcAlphaA, srcAlphaB };
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
@@ -8851,7 +8909,9 @@ async function playHookTakeAnimation(sel, myTable, tables){
     fly.style.transition='transform 1.5s ease, left 1.5s ease, top 1.5s ease';
     document.body.appendChild(fly);
 
+    queueHookAnimKey(sel.table, sel.cardId);
     ws.classList.add('hook-anim-origin');
+    applyHookAnimMaskToDom();
     requestAnimationFrame(()=>{ fly.style.transform=`translateY(-${cardH}px)`; });
     await sleep(1500);
 
@@ -8895,8 +8955,8 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(1500);
 
     fly.remove();
-    ws.classList.remove('hook-anim-origin');
     moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    applyHookAnimMaskToDom();
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
   }
