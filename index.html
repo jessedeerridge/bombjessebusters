@@ -534,10 +534,10 @@
   .card-wrap.m54-pending-arrival .marker,
   .card-wrap.m54-pending-arrival .tok-col{opacity:0;}
   .card-wrap.m54-pending-arrival .card{pointer-events:none;}
-  /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
+  /* 入れ替えフックの移動中：カード本体＋バッジ帯を隠して残像チラつきを防ぐ */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .badge-fixed{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -8718,16 +8718,14 @@ async function playHookSwapAnimation(A, B, tables){
 
     // 2) 詰める + 挿入位置を空ける（右スライド）
     const shift = cardW + gap;
-    const moveNodes = [];
     const qa = Array.from(handEl(A.table)?.querySelectorAll('.card-wrap')||[]);
     const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
 
     const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.badge-fixed')].filter(Boolean);
       bodyNodes.forEach((node)=>{
         node.style.transition = 'transform 1.5s ease';
         node.style.transform = `translateX(${dx}px)`;
-        moveNodes.push(node);
       });
     };
 
@@ -8772,8 +8770,6 @@ async function playHookSwapAnimation(A, B, tables){
     await sleep(1500);
 
     ca.remove(); cb.remove();
-    wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
-    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
     return null;
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
@@ -8821,13 +8817,11 @@ async function playHookTakeAnimation(sel, myTable, tables){
     requestAnimationFrame(()=>{ fly.style.transform=`translateY(-${cardH}px)`; });
     await sleep(1500);
 
-    const moveNodes = [];
     const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.badge-fixed')].filter(Boolean);
       bodyNodes.forEach((node)=>{
         node.style.transition = 'transform 1.5s ease';
         node.style.transform = `translateX(${dx}px)`;
-        moveNodes.push(node);
       });
     };
 
@@ -8861,8 +8855,6 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(1500);
 
     fly.remove();
-    ws.classList.remove('hook-anim-origin');
-    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
   }
