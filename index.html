@@ -233,10 +233,55 @@
   .numcard.overlay:nth-child(3){ left:4px; top:4px; opacity:0.85; }
   .numcard.overlay:nth-child(4){ left:6px; top:6px; opacity:0.8; }
  .conlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
-  .concard {
+ .concard {
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
-    border-radius:8px; border:1px solid #ddd;
-    background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
+    border-radius:8px;
+    border-style:solid;
+    border-color:#6e6770;
+    border-width:15px 8px 8px;
+    background:#fff center/cover no-repeat;
+    flex:0 0 auto;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+  }
+
+  .concard[data-letter],
+  .conzoom-card[data-letter]{
+    background-color:#fff;
+    background-image:url('./eyeband.png') !important;
+    background-repeat:no-repeat;
+    background-size:12px 12px;
+    background-position:2px 1px;
+  }
+
+  .concard[data-letter]::before,
+  .conzoom-card[data-letter]::before{
+    content:'制約';
+    position:absolute;
+    left:16px;
+    top:-13px;
+    color:#fff;
+    font-size:8px;
+    line-height:15px;
+    font-weight:700;
+    z-index:3;
+    pointer-events:none;
+  }
+
+  .concard[data-letter]::after,
+  .conzoom-card[data-letter]::after{
+    content:attr(data-letter);
+    position:absolute;
+    right:4px;
+    top:-13px;
+    color:#fff;
+    font-size:12px;
+    line-height:15px;
+    font-weight:700;
+    z-index:3;
+    pointer-events:none;
+    text-transform:uppercase;
   }
 
   #conZoomOverlay{
@@ -248,7 +293,11 @@
  .conzoom-card{
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     transform:scale(2); transform-origin:center;
-    border-radius:8px; border:1px solid #ddd; background:#fff center/cover no-repeat;
+    border-radius:8px;
+    border-style:solid;
+    border-color:#6e6770;
+    border-width:15px 8px 8px;
+    background:#fff center/cover no-repeat;
     box-shadow:0 10px 30px rgba(0,0,0,.35); cursor:pointer;
     position:relative; overflow:visible;
   }
@@ -4649,6 +4698,7 @@ const pool = ['A','B','C','D','E'].filter(ch => !taken.has(ch));
 pool.forEach(ch=>{
   const cc = document.createElement('div');
   cc.className = 'concard';
+  cc.dataset.letter = ch;
   cc.style.backgroundImage = `url('${imgConstraint(ch)}')`;
   cc.title = '拡大';
   cc.onclick = (ev)=>{ 
@@ -4689,8 +4739,10 @@ if (big){
     big.classList.remove('blank');
     // 表/裏で画像を切替
     if (face === 'back'){
+      delete big.dataset.letter;
       big.style.backgroundImage = `url('${imgConstraintBack()}')`;
     }else{
+      big.dataset.letter = picked;
       big.style.backgroundImage = `url('${imgConstraint(picked)}')`;
     }
     big.style.backgroundSize = 'cover';
@@ -4795,6 +4847,8 @@ function openConstraintZoom31Owned(letter, tableIdx){
     big.style.backgroundImage = (face==='back')
       ? `url('${imgConstraintBack()}')`
       : `url('${imgConstraint(letter)}')`;
+  if (face!=='back') big.dataset.letter = letter;
+  else delete big.dataset.letter;
 
     const renderMenu = ()=>{
       // 既存メニューを消してから再生成（ラベルを最新状態に）
@@ -4846,6 +4900,7 @@ function openConstraintZoom31(letter, myIdx){
 
     const big = document.createElement('div');
     big.className = 'conzoom-card';
+    big.dataset.letter = letter;
     big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
 
     // 拡大カード自体のクリックでメニューをトグル
@@ -4904,6 +4959,7 @@ function renderM34(v){
     row.className = 'conlane';
     const c = document.createElement('div');
     c.className = 'concard';
+    c.dataset.letter = myLetter;
     c.style.backgroundImage = `url('${imgConstraint(myLetter)}')`;
     /* ここから変更 */
     c.title = '拡大';
@@ -4926,6 +4982,7 @@ function renderM34(v){
     center.forEach((obj, idx)=>{
       const cell = document.createElement('div');
       cell.className = 'concard';
+      cell.dataset.letter = obj.ch;
       cell.style.backgroundImage = `url('${imgConstraint(obj.ch)}')`;
       cell.title = '戻す';
       cell.onclick = async ()=>{
@@ -5012,6 +5069,7 @@ function renderConDeckSync(v, mid){
     x.forEach((ch, i)=>{
       const node = document.createElement('div');
       node.className = 'concard';
+      node.dataset.letter = ch;
       node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
       node.title = '拡大';
       node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
@@ -6201,6 +6259,7 @@ async function renderM57(v){
         const con = document.createElement('div');
         con.className = 'concard';
         con.style.marginLeft = '-6px';
+        con.dataset.letter = letters[i-1];
         con.style.backgroundImage = `url('${imgConstraint(letters[i-1])}')`;
         con.onclick = () => {
           document.getElementById('conZoomOverlay')?.remove();
@@ -6208,7 +6267,7 @@ async function renderM57(v){
           overlay.id = 'conZoomOverlay';
           overlay.innerHTML = `
             <div class="conzoom-wrap">
-              <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[i-1])}')"></div>
+              <div class="conzoom-card" data-letter="${letters[i-1]}" style="background-image:url('${imgConstraint(letters[i-1])}')"></div>
             </div>`;
           overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
           document.body.appendChild(overlay);
@@ -6231,6 +6290,7 @@ async function renderM57(v){
         img.id = 'm57Sel';
         img.className = 'concard';
         img.style.marginRight = '6px';
+        img.dataset.letter = sel;
         img.style.backgroundImage = `url('${imgConstraint(sel)}')`;
         img.onclick = () => {
           document.getElementById('conZoomOverlay')?.remove();
@@ -6238,7 +6298,7 @@ async function renderM57(v){
           overlay.id = 'conZoomOverlay';
           overlay.innerHTML = `
             <div class="conzoom-wrap">
-              <div class="conzoom-card" style="background-image:url('${imgConstraint(sel)}')"></div>
+              <div class="conzoom-card" data-letter="${sel}" style="background-image:url('${imgConstraint(sel)}')"></div>
             </div>`;
           overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
           document.body.appendChild(overlay);
@@ -6293,6 +6353,7 @@ async function renderM57(v){
         con.style.top  = '0';
         con.style.width  = '100%';
         con.style.height = '100%';
+        con.dataset.letter = letters[n-1];
         con.style.backgroundImage = `url('${imgConstraint(letters[n-1])}')`;
         con.style.zIndex = String(100 + i); // 後のものほど上
         con.onclick = () => {
@@ -6301,7 +6362,7 @@ async function renderM57(v){
           overlay.id = 'conZoomOverlay';
           overlay.innerHTML = `
             <div class="conzoom-wrap">
-              <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[n-1])}')"></div>
+              <div class="conzoom-card" data-letter="${letters[n-1]}" style="background-image:url('${imgConstraint(letters[n-1])}')"></div>
             </div>`;
           overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
           document.body.appendChild(overlay);
@@ -6655,6 +6716,7 @@ function renderM66(v){
       });
     }
     // 表示は今回の描画スナップショットでOK
+    byDi.dataset.letter = slots[0];
     byDi.style.backgroundImage = `url('${imgConstraint(slots[0])}')`;
   }
 
@@ -6755,10 +6817,10 @@ function renderM66(v){
     const ccRight = mid?.querySelector('.m66-slot:nth-child(3) .concard');
     const ccBot = layer.querySelector('.m66-line:nth-child(3) .concard');
 
-    if (ccTop){   ccTop.style.backgroundImage   = `url('${imgConstraint(slots[1])}')`; ccTop.dataset.letter = slots[1]; }
-    if (ccLeft){  ccLeft.style.backgroundImage  = `url('${imgConstraint(slots[3])}')`; ccLeft.dataset.letter = slots[3]; }
-    if (ccRight){ ccRight.style.backgroundImage = `url('${imgConstraint(slots[4])}')`; ccRight.dataset.letter = slots[4]; }
-    if (ccBot){   ccBot.style.backgroundImage   = `url('${imgConstraint(slots[2])}')`; ccBot.dataset.letter = slots[2]; }
+    if (ccTop){   ccTop.dataset.letter = slots[1]; ccTop.style.backgroundImage   = `url('${imgConstraint(slots[1])}')`; }
+    if (ccLeft){  ccLeft.dataset.letter = slots[3]; ccLeft.style.backgroundImage  = `url('${imgConstraint(slots[3])}')`; }
+    if (ccRight){ ccRight.dataset.letter = slots[4]; ccRight.style.backgroundImage = `url('${imgConstraint(slots[4])}')`; }
+    if (ccBot){   ccBot.dataset.letter = slots[2]; ccBot.style.backgroundImage   = `url('${imgConstraint(slots[2])}')`; }
     // ステージ面（1=表 2=裏）
     const stage = layer.querySelector('.m66-stage');
     const face  = (v?.meta?.m66_face|0)===2 ? './2stage.jpg' : './1stage.jpg';
@@ -6979,6 +7041,7 @@ function renderM61(v){
     con.className = 'concard m61-con';
     con.style.width  = 'var(--char-w)';
    con.style.height = 'var(--char-h)';
+    con.dataset.letter = ch;
     con.style.backgroundImage = `url('${imgConstraint(ch)}')`;
     // ミニキャラ
     const mini = document.createElement('div');
@@ -7944,6 +8007,7 @@ function openConstraintZoom(letter, myIdx){
 
     const big = document.createElement('div');
     big.className = 'conzoom-card';
+    big.dataset.letter = letter;
     big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
     big.addEventListener('click', (e)=>{
       e.stopPropagation();
@@ -8220,6 +8284,7 @@ function openConstraintZoomView(letter){
     wrap.className = 'conzoom-wrap';
     const big = document.createElement('div');
     big.className = 'conzoom-card';
+    big.dataset.letter = letter;
     big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
     wrap.appendChild(big);
     ov.appendChild(wrap);
@@ -8287,6 +8352,7 @@ function openConstraintZoom61(letter, myIdx){
     wrap.className = 'conzoom-wrap';
     const big = document.createElement('div');
     big.className = 'conzoom-card';
+    big.dataset.letter = letter;
     big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
     wrap.appendChild(big);
     ov.appendChild(wrap);
@@ -10105,6 +10171,7 @@ function buildConDeckLaneP1(){
     const addToPile = (ch)=>{
       const node = document.createElement('div');
       node.className = 'concard';
+      node.dataset.letter = ch;
       node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
 
       const already = pile.querySelectorAll('.concard').length;
