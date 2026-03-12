@@ -282,21 +282,12 @@
     line-height:1;
     font-weight:700;
     text-transform:uppercase;
-    padding:2px 2px;
-    display:inline-block;
-    z-index:4;
-    pointer-events:none;
-  }
-  .constraint-face .constraint-alpha::before{
-    content:'';
-    position:absolute;
-    left:0;
-    right:0;
-    top:12px;
-    bottom:0;
     background:#6a3f75;
+    padding:2px 2px;
     border-radius:4px 4px 2px 2px;
-    z-index:-1;
+    display:inline-block;
+    clip-path:inset(0 3px 0 0 round 4px 4px 2px 2px);
+    z-index:4;
     pointer-events:none;
   }
   .constraint-face .constraint-desc{
