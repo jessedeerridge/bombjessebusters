@@ -1438,6 +1438,44 @@ const state = {
   _lastMissionId:null,
   _lastI2AnimId:null,
   _lastI18AnimId:null};
+
+function needsRoleSelection(missionId){
+  const mid = Number(missionId) | 0;
+  return (mid >= 31 && mid <= 66 && mid !== 58);
+}
+
+function isRoleSelectionDone(table, missionId){
+  if (!needsRoleSelection(missionId)) return true;
+  if (table?.character?.picked === true) return true;
+  const face = String(table?.character?.face || '');
+  return /member\s*\((6|7|8|9)\)\./i.test(face);
+}
+
+function userKeyForName(name){
+  return `stableUserId:${String(name||'').trim().toLowerCase()}`;
+}
+
+function loadStableUserIdByName(name){
+  const key = userKeyForName(name);
+  try{
+    const saved = localStorage.getItem(key);
+    if (saved) return saved;
+  }catch(_e){}
+  return crypto.randomUUID();
+}
+
+function saveStableUserIdByName(name, uid){
+  if (!name || !uid) return;
+  try{ localStorage.setItem(userKeyForName(name), uid); }catch(_e){}
+}
+
+function getMySeatedTableIndex(v){
+  const sNum = (state?.seatedTable==null) ? null : Number(state.seatedTable);
+  if (Number.isInteger(sNum) && sNum >= 0) return sNum;
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  const idx = tables.findIndex(t => t?.playerId === state.userId);
+  return (idx >= 0 ? idx : null);
+}
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -1504,7 +1542,8 @@ function renderStageStory(v){
   const missionId = Number(v?.mission?.id || 0);
   const def = STAGE_STORIES[missionId];
   if (!def) { H(stageStoryPop, true); return; }
-  if (state.seatedTable != null) { H(stageStoryPop, true); return; }
+  const mySeatIdx = getMySeatedTableIndex(v);
+  if (mySeatIdx != null) { H(stageStoryPop, true); return; }
   stageStoryTitle.textContent = def.title;
   stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
   stageStoryBody.textContent = def.body;
@@ -2535,6 +2574,8 @@ btnJoin.onclick   = ()=>{
   // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
   state.userName = nm ? nm.slice(0,4) : hiragana(4);
   try { localStorage.setItem("savedUserName", state.userName); } catch(_e){}
+  state.userId = loadStableUserIdByName(state.userName);
+  saveStableUserIdByName(state.userName, state.userId);
 
   // ★ルームコード未入力なら英数字5文字を自動採番
   if (!inputCode.value.trim()) {
@@ -2553,8 +2594,20 @@ async function enter(mode){
 
   const roomRef = ref(db, `rooms/${code}`);
   const snap=await get(roomRef);
-  if(!snap.exists()){ state.isHost=true; await set(roomRef, baseRoom(state.userId)); }
-  else{ state.isHost = snap.val()?.hostId === state.userId; }
+  if(!snap.exists()){
+    state.isHost=true;
+    await set(roomRef, baseRoom(state.userId));
+  }
+  else{
+    const room = snap.val() || {};
+    const sameNameEntry = Object.entries(room.players || {}).find(([,p]) => String(p?.name || '') === state.userName);
+    const sameNameUid = sameNameEntry?.[0] || null;
+    if (sameNameUid && sameNameUid !== state.userId){
+      state.userId = sameNameUid;
+      saveStableUserIdByName(state.userName, state.userId);
+    }
+    state.isHost = room?.hostId === state.userId;
+  }
 
   await set(ref(db, `rooms/${code}/players/${state.userId}`), {
     name: state.userName,
@@ -3556,10 +3609,13 @@ const isMember5Card = /member\s*\(5\)\./i.test(faceName);
 const isMember1to5Card = /member\s*\(([1-5])\)\./i.test(faceName);
 const altMemberMatch = faceName.match(/member\s*\(([6-9])\)\./i);
 const isFlippedRole = !!t?.character?.flipped;
-// 自分が未着席  または  この席が空席 → ブランク固定
+const midNow = (v?.mission?.id|0);
+const needRolePick = needsRoleSelection(midNow);
+const rolePicked = isRoleSelectionDone(t, midNow);
+// 自分が未着席 / この席が空席 /（31-66で未選択）→ ブランク固定
 const amSeated = seatedNow;           // 先頭で算出済み
 const seatEmpty = !t.playerId;        // 空席判定
-if (!amSeated || seatEmpty) {
+if (!amSeated || seatEmpty || (needRolePick && !rolePicked)) {
   char.classList.add('blank');
   char.removeAttribute('style');
   char.onclick = null;
@@ -4853,9 +4909,14 @@ if (big){
     const seatEmpty = !t.playerId;
     const amMe = !!t.playerId && t.playerId === state.userId;
 
-    if (seatEmpty){
-      // 空席：枠だけ
+    const mid31 = (v?.mission?.id|0);
+    const rolePicked31 = isRoleSelectionDone(t, mid31);
+    if (seatEmpty || !rolePicked31){
+      // 空席 or 未選択：枠だけ
       mini.classList.add('blank');
+      mini.style.backgroundImage = 'none';
+      mini.onclick = null;
+      mini.style.cursor = 'default';
     }else{
       const faceName = String(t?.character?.face || '');
       const isMember5Card = /member\s*\(5\)\./i.test(faceName);
@@ -7142,9 +7203,13 @@ function renderM61(v){
     const t = (v.tables||[])[ti] || {};
     const seatEmpty = !t.playerId;
     const amSeatedHere = (t.playerId && t.playerId === state.userId);
-    if (seatEmpty){
+    const mid61 = (v?.mission?.id|0);
+    const rolePicked61 = isRoleSelectionDone(t, mid61);
+    if (seatEmpty || !rolePicked61){
       mini.classList.add('blank');
+      mini.style.backgroundImage = 'none';
       mini.onclick = null;
+      mini.style.cursor = 'default';
     }else{
       const faceName = String(t?.character?.face || '');
       const isMember5Card = /member\s*\(5\)\./i.test(faceName);
@@ -7341,7 +7406,7 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       const t = tables[idx] || {};
       const seatedThere = !!t.playerId;
       const face = String(t?.character?.face || '');   // DB実値
-      const picked = seatedThere && face1to9.test(face);
+      const picked = seatedThere && isRoleSelectionDone(t, mid);
 
       tb.dataset.seated = seatedThere ? '1' : '0';
       tb.dataset.picked = picked ? '1' : '0';
@@ -7353,21 +7418,27 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       // 未選択 or（隊長テーブルで未着席）→ 初期画像を確実に消す（オーバーレイと二重化で保険）
       const mustHide = (!picked) || (capIdx === idx && !seatedThere);
       if (charEl){
-        if (mustHide) charEl.style.backgroundImage = 'none';
-        else if (charEl.style.backgroundImage === 'none') charEl.style.removeProperty('background-image');
-        charEl.classList.remove('blank','captain-card'); // 残骸を掃除
+        if (mustHide){
+          charEl.style.backgroundImage = 'none';
+          charEl.classList.remove('blank','captain-card','member5-card','member15-detector','member-alt6','member-alt7','member-alt8','member-alt9'); // 残骸を掃除
+        }else if (charEl.style.backgroundImage === 'none'){
+          charEl.style.removeProperty('background-image');
+        }
       }
       if (miniEl){
-        if (mustHide) miniEl.style.backgroundImage = 'none';
-        else if (miniEl.style.backgroundImage === 'none') miniEl.style.removeProperty('background-image');
-        miniEl.classList.remove('blank','captain-card');
+        if (mustHide){
+          miniEl.style.backgroundImage = 'none';
+          miniEl.classList.remove('blank','captain-card','member5-card','member15-detector','member-alt6','member-alt7','member-alt8','member-alt9');
+        }else if (miniEl.style.backgroundImage === 'none'){
+          miniEl.style.removeProperty('background-image');
+        }
       }
     });
 
     // 隊長の黒枠：閲覧者が1〜9の選択者 & 隊長席が着席かつ「5以外」を選択済み
     // さらに「ミッション31/61では小さい枠にのみ」枠を付与。それ以外では通常の.char-cardに付与。
     const viewerIdx = (state?.seatedTable ?? null);
-    const viewerPicked = (viewerIdx !== null) && face1to9.test(String(tables?.[viewerIdx]?.character?.face || ''));
+    const viewerPicked = (viewerIdx !== null) && isRoleSelectionDone(tables?.[viewerIdx], mid);
 
     // いったん全ての枠を外す（競合排除）
     document.querySelectorAll('#tables .char-card.captain-card, #tables .m61-mini.captain-card')
@@ -7377,7 +7448,7 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       const capT = tables[capIdx] || {};
       const capSeated = !!capT.playerId;
       const capFace = String(capT?.character?.face || '');
-      const capPickedNot5 = capSeated && faceNot5.test(capFace); // 5は除外
+      const capPickedNot5 = capSeated && isRoleSelectionDone(capT, mid) && faceNot5.test(capFace); // 5は除外
 
         if (capPickedNot5){
           const capTableEl = tEls[capIdx];
@@ -8162,6 +8233,7 @@ async function maybeOpenRolePickerAfterSeat(){
     if (myIdx < 0) return;
 
     const t = (v?.tables||[])[myIdx] || {};
+    if (isRoleSelectionDone(t, mid)) return;
     const cur = (t?.character?.face) || 'member (1).jpg';
 
     openRolePickOverlay(cur, myIdx);
@@ -8338,7 +8410,7 @@ function openRolePickZoomToPreview(previewEl, faceName, myIdx){
       try{
         const room = state?.roomCode || state?.code;
         await update(ref(db, `rooms/${room}/tables/${myIdx}/character`), {
-          face: faceName, flipped: false
+          face: faceName, flipped: false, picked: true
         });
       }catch(err){ console.error('[role-pick select]', err); }
       closeRolePickOverlay(); // 決定時のみ閉じる（専用）
@@ -9535,7 +9607,7 @@ tab.textContent = String(i + 1);
         update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), { ownerId: state.userId })
       ));
 // await setupAutoLeaveOnDisconnect(i);   // ★自動退席を無効化
-      state.seatedTable=i; H(seatPop,true); updateMenuButtons();
+      state.seatedTable=i; H(seatPop,true); H(stageStoryPop, true); updateMenuButtons();
 maybeOpenRolePickerAfterSeat();
 
     };
@@ -9564,6 +9636,7 @@ btnSit.onclick = async ()=>{
     ));
     state.seatedTable = sameNameIdx;
     H(seatPop, true); 
+    H(stageStoryPop, true);
     updateMenuButtons();
     maybeOpenRolePickerAfterSeat();
     return;
@@ -9670,7 +9743,7 @@ async function startGame(playerCount, missionId){
 
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
-  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] }); }
+  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false, picked:false}, hand:[] }); }
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
