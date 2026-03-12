@@ -5757,7 +5757,7 @@ function renderM43(v){
   const rb = target.getBoundingClientRect();
   const rrow = row.getBoundingClientRect();
 const x = rb.left - rrow.left + (rb.width/2) - 28; // 56px の半分
-node.style.left = `${Math.max(0, x)}px`;
+node.style.left = `${x}px`;
 node.style.top  = `0px`;
   if (!node.isConnected) row.appendChild(node);
 }
@@ -7524,7 +7524,7 @@ function renderM53(v){
   const rb = target.getBoundingClientRect();
   const rrow = row.getBoundingClientRect();
   const x = rb.left - rrow.left + (rb.width/2) - 28;
-  node.style.left = `${Math.max(0, x)}px`;
+  node.style.left = `${x}px`;
   node.style.top  = `0px`;
   if (!node.isConnected) row.appendChild(node);
 }
