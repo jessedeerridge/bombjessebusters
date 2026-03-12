@@ -387,12 +387,13 @@
     width:var(--char-w);height:var(--char-h);background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
-  /* ▼ M61: 制約カードの下に置く極小キャラ */
+  /* ▼ M61: 制約カードの後ろに重ねる正体カード（通常サイズ） */
   .m61-mini{
-    width:24px; height:30px;            /* とても小さく */
-    border:1px solid #ddd; border-radius:4px;
+    width:var(--char-w); height:var(--char-h);
+    border:1px solid #ddd; border-radius:6px;
     background:#f3f4f6 center/cover no-repeat;
     margin:2px auto 0; user-select:none; cursor:pointer;
+    position:relative; z-index:1;
   }
   .m61-mini.blank{ background:#f3f4f6; border:1px dashed #d1d5db; cursor:default; }
   /* 縦積みラッパー */
@@ -402,6 +403,17 @@
   .char-col{
     display:flex; flex-direction:column; align-items:center; gap:2px;
     width:var(--char-w); flex:0 0 auto;
+    position:relative;
+  }
+  /* #31 / #61: 制約カードの後ろに重ね、上半分を隠す */
+  .char-col > .m61-mini,
+  .m61-stack > .m61-mini{
+    margin-top:calc(var(--char-h) * -0.5);
+  }
+  .char-col > .char-card,
+  .m61-stack > .m61-con{
+    position:relative;
+    z-index:2;
   }
   
   .char-card.blank{background:#f3f4f6;border:1px dashed #d1d5db;cursor:default;}
@@ -4789,12 +4801,14 @@ const big = charCol.querySelector('.char-card');
 if (big){
   big.classList.add('blank');
   big.removeAttribute('style');
+  applyRoleSlotConstraintItemSize(big, false);
   big.onclick = null;
 
   const picked = v?.tables?.[ti]?.m31Con;
   const face   = v?.tables?.[ti]?.m31Face || 'front';  // 'front' | 'back'
   if (picked){
     big.classList.remove('blank');
+    applyRoleSlotConstraintItemSize(big, true);
     // 表/裏で画像を切替
     if (face === 'back'){
       big.classList.remove('constraint-face');
@@ -7075,6 +7089,17 @@ function shouldShowRoleCardTextDecorations(mid){
   return missionId !== 31 && missionId !== 61;
 }
 
+function applyRoleSlotConstraintItemSize(node, enabled){
+  if (!node) return;
+  if (enabled){
+    node.style.width = 'var(--item-w)';
+    node.style.height = 'var(--item-h)';
+  }else{
+    node.style.removeProperty('width');
+    node.style.removeProperty('height');
+  }
+}
+
   
 function renderM61(v){
   const isM61 = ((v?.mission?.id|0) === 61);
@@ -7104,11 +7129,12 @@ function renderM61(v){
     // ▼ M61 専用スタック（制約の下に極小キャラ）
     const stack = document.createElement('div');
     stack.className = 'm61-stack';
+    stack.style.width = 'var(--item-w)';
     // 制約カード
     const con = document.createElement('div');
     con.className = 'concard m61-con';
-    con.style.width  = 'var(--char-w)';
-   con.style.height = 'var(--char-h)';
+    con.style.width  = 'var(--item-w)';
+    con.style.height = 'var(--item-h)';
     paintConstraintCard(con, ch);
     // ミニキャラ
     const mini = document.createElement('div');
@@ -7280,7 +7306,7 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
 }
 
 /* ★ 小さい枠（m61-mini）用の黒枠 — ファイルCSSには定義がないためここで付与 */
-.m61-mini.captain-card{ border:2px solid #000 !important; border-radius:4px; }
+.m61-mini.captain-card{ border:2px solid #000 !important; border-radius:6px; }
 /* === /M31-66 === */
 `;
     let st = document.createElement('style');
