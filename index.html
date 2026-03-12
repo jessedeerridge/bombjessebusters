@@ -740,6 +740,30 @@ background:#a1adbf;
 border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
     padding:10px;z-index:220;display:flex;flex-direction:column;gap:10px;min-width:280px
   }
+  .stage-story-pop{
+    position:fixed;left:50%;top:50%;transform:translate(-50%, -50%);
+    width:min(92vw, 560px);
+    background:#e5e7eb;border:1px solid #9ca3af;border-radius:12px;
+    box-shadow:0 14px 30px rgba(0,0,0,.2);
+    padding:14px 14px 12px;z-index:260;
+  }
+  .stage-story-head{position:relative;min-height:38px;margin-bottom:10px}
+  .stage-story-title{
+    display:inline-block;max-width:calc(100% - 116px);
+    background:#4b5563;color:#fff;font-size:15px;line-height:1.25;
+    padding:7px 12px;border-radius:8px;word-break:break-word;
+  }
+  .stage-story-num{
+    position:absolute;right:34px;top:5px;
+    font-size:16px;font-weight:700;color:#111827;
+  }
+  .stage-story-num .hash{font-size:11px;margin-right:1px;vertical-align:2px}
+  .stage-story-close{
+    position:absolute;right:0;top:2px;width:24px;height:24px;
+    border:1px solid #6b7280;border-radius:4px;
+    background:#fff;color:#111827;font-size:13px;line-height:1;cursor:pointer;padding:0;
+  }
+  .stage-story-body{margin:0;font-size:15px;line-height:1.6;color:#111;white-space:pre-wrap}
   .start-pop .row,.seat-pop .row{display:flex;gap:8px;align-items:center}
   .start-pop label,.seat-pop label{width:84px;font-size:13px}
   .start-pop select{flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;background:#fff}
@@ -1277,6 +1301,15 @@ main:not(:has(#lobby.hidden)) > * {
     <button class="btn small ghost" id="btnSeatCancel">観戦</button>
   </div>
 </div>
+
+<div id="stageStoryPop" class="stage-story-pop hidden" aria-live="polite">
+  <div class="stage-story-head">
+    <div id="stageStoryTitle" class="stage-story-title"></div>
+    <div id="stageStoryNum" class="stage-story-num"></div>
+    <button id="btnStageStoryClose" class="stage-story-close" type="button" aria-label="閉じる">✕</button>
+  </div>
+  <p id="stageStoryBody" class="stage-story-body"></p>
+</div>
 <div id="m42Minus2Pop" class="m42minus2-pop hidden">
   <div class="line12">同じ数字のカードを2枚選ぼう。</div>
   <div class="line12">それを元に戻すんだ。</div>
@@ -1326,6 +1359,40 @@ const state = {
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
 state._mpAutoOnce = false;  // 「参加」後に自動でピッカーを開いたか（ホストのみ）  
+state._stageStoryDismissedMission = null;
+
+const STAGE_STORIES = {
+  31: { title:'誰もが傷ついている', body:'我々が選ぶ制約もあれば、選ばない制約もある……チームメイトについては気にするな！' },
+  32: { title:'いたずら者の攻撃！', body:'君たちはこれまでに悪党を何人も見たことがあるが、今回のは間違いなく邪悪なピエロだ……。君たちは、奴の課す新たなルールに適応しなければならない！' },
+  33: { title:'ベガスで何が起こっているのか…', body:'ピエロは1人では足りないと言わんばかりに、今度はクルーごと11人の仲間がカジノの金庫に爆弾を仕掛けた！ ゲームの始まりだ！' },
+  34: { title:'ウィーケスト・リンク', body:'そうだ、奴らは君たちの中にいる！ それは君かもしれない！' },
+  35: { title:'つながりのない1本のコード', body:'この孤立したコードは爆弾が何かわからない！' },
+  36: { title:'ヤシの木の下の混乱', body:'ボラボラ島へようこそ。ここは楽園だ……しかし、今日は違う！ 今日はプールに飛び込むことはないだろう……。' },
+  37: { title:'ジョーカー！', body:'奴はネジが外れている！ 君たちに進展があるたびに、奴はゴールを動かしてくる！ このピエロには本当にイライラさせられる。' },
+  38: { title:'コードを表編み、コードを裏編み……', body:'隊長はこの反抗的なコードを切断するために認識を活用しなければならない！' },
+  39: { title:'4本の高貴なコード', body:'ストレンジファイヤー博士に任せれば、正しい4本のコードを切断することは多くの前儀をもたらす！' },
+  40: { title:'ダイ・ハード', body:'君たちがクリスマスを祝うためチームでナカトミ・プラザにやって来たとき、これはただの親睦を深める戦いだと思った。しかし、ビルの中のどこかに爆弾の予告があるのは確かだ！ みんなで楽しいひとときにするつもりなのに！' },
+  41: { title:'ラテンの爆弾', body:'「パラ・パイラル・ラ・パンパン……」これはスペイン語で「爆弾をもう一発撃て」という意味だ（まあ、多少ニュアンスが違うが……）。この爆弾は熱い。だから冷静さを保つように！' },
+  42: { title:'これはどういう類のサーカスだ？', body:'気づくべきだった、ジョーカーが君たちをアジトに招待していたなんて！ このため言っておくが、このミッションは得難なものになるだろう。確かなことが一つある――君たちはこの状況に全く準備ができていないということだ。' }
+};
+
+function closeStageStory(){
+  state._stageStoryDismissedMission = Number(state.watching?.mission?.id || 0) || null;
+  H(stageStoryPop, true);
+}
+
+function renderStageStory(v){
+  const missionId = Number(v?.mission?.id || 0);
+  const def = STAGE_STORIES[missionId];
+  if (!def) { H(stageStoryPop, true); return; }
+  if (state.seatedTable != null) { H(stageStoryPop, true); return; }
+  if (state._stageStoryDismissedMission === missionId) { H(stageStoryPop, true); return; }
+
+  stageStoryTitle.textContent = def.title;
+  stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
+  stageStoryBody.textContent = def.body;
+  H(stageStoryPop, false);
+}
 
 const ITEM_USE_TIMINGS = {
   1:'いつでも使える', 2:'いつでも使える', 3:'手番中に使う', 4:'いつでも使える', 5:'手番中に使う',
@@ -1468,7 +1535,13 @@ const m22PickPanel = document.getElementById('m22PickPanel');
 
 const seatPop = document.getElementById('seatPop');
 const seatTabs= document.getElementById('seatTabs');
+const stageStoryPop = document.getElementById('stageStoryPop');
+const stageStoryTitle = document.getElementById('stageStoryTitle');
+const stageStoryNum = document.getElementById('stageStoryNum');
+const stageStoryBody = document.getElementById('stageStoryBody');
+const btnStageStoryClose = document.getElementById('btnStageStoryClose');
 const btnSeatCancel=document.getElementById('btnSeatCancel');
+if (btnStageStoryClose) btnStageStoryClose.onclick = closeStageStory;
 
 
 
@@ -2459,12 +2532,14 @@ if (v) {
       renderGlobalReveal(v);
       renderHostTool(v);
       renderMissionComplete(v);
+      renderStageStory(v);
 
     });
     queueSharedHookAnimations(v);
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
    const midNow  = (v?.mission?.id|0);
     const midPrev = (state._lastMissionId|0);
+    if (midNow !== midPrev) state._stageStoryDismissedMission = null;
 if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classList.contains('hidden')) {
      btnSit.onclick();
     }
