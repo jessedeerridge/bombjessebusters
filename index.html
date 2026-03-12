@@ -238,6 +238,53 @@
     border-radius:8px; border:1px solid #ddd;
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
   }
+  .concard.constraint-face,
+  .conzoom-card.constraint-face{
+    position:relative;
+    border-style:solid;
+    border-color:#6e6770;
+    border-width:15px 8px 8px;
+    background:#fff !important;
+    overflow:hidden;
+  }
+  .concard.constraint-face::before,
+  .conzoom-card.constraint-face::before{
+    content:'';
+    position:absolute;
+    top:-13px;
+    left:2px;
+    width:12px;
+    height:12px;
+    background:url('./eyeband.png') center/contain no-repeat;
+    z-index:1;
+    pointer-events:none;
+  }
+  .concard.constraint-face::after,
+  .conzoom-card.constraint-face::after{
+    content:attr(data-letter);
+    position:absolute;
+    right:2px;
+    top:-13px;
+    font-size:12px;
+    color:#fff;
+    font-weight:700;
+    line-height:1;
+    letter-spacing:.3px;
+    z-index:1;
+    pointer-events:none;
+  }
+  .constraint-tag{
+    position:absolute;
+    top:-13px;
+    right:18px;
+    color:#fff;
+    font-size:8px;
+    font-weight:700;
+    line-height:1;
+    letter-spacing:.2px;
+    pointer-events:none;
+    z-index:1;
+  }
 
   #conZoomOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.4);
@@ -1956,6 +2003,57 @@ const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
 const imgConstraint = L => `./${String(L).toLowerCase()}.jpg`;
 const imgConstraintBack = () => `./conback.jpg`;
 const imgChallenge = id => `./${id}.png`;
+
+function decorateConstraintCardFace(el){
+  if (!el) return;
+  const bg = String(el.style.backgroundImage || '');
+  const m = bg.match(/\/([a-l])\.jpg["']?\)/i);
+  if (!m) {
+    el.classList.remove('constraint-face');
+    delete el.dataset.letter;
+    el.querySelector('.constraint-tag')?.remove();
+    return;
+  }
+  const letter = m[1].toUpperCase();
+  el.classList.add('constraint-face');
+  el.dataset.letter = letter;
+  let tag = el.querySelector('.constraint-tag');
+  if (!tag) {
+    tag = document.createElement('span');
+    tag.className = 'constraint-tag';
+    tag.textContent = '制約';
+    el.appendChild(tag);
+  }
+}
+
+function decorateAllConstraintCardFaces(root = document){
+  root.querySelectorAll('.concard, .conzoom-card').forEach(decorateConstraintCardFace);
+}
+
+const constraintFaceObserver = new MutationObserver((mutations)=>{
+  for (const m of mutations){
+    if (m.type === 'attributes') {
+      decorateConstraintCardFace(m.target);
+      continue;
+    }
+    m.addedNodes.forEach((node)=>{
+      if (!(node instanceof Element)) return;
+      if (node.matches('.concard, .conzoom-card')) decorateConstraintCardFace(node);
+      decorateAllConstraintCardFaces(node);
+    });
+  }
+});
+
+queueMicrotask(()=>{
+  decorateAllConstraintCardFaces();
+  if (!document.body) return;
+  constraintFaceObserver.observe(document.body, {
+    subtree:true,
+    childList:true,
+    attributes:true,
+    attributeFilter:['style','class']
+  });
+});
 
 const CARD_IMAGE_PRELOAD_LIST = [
   ...MATERIALS.numbers.map(n => `./s${n}.jpg`),
