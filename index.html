@@ -8636,6 +8636,7 @@ function refreshInfo22(vNow){
 
 
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+const HOOK_ANIM_TOTAL_MS = 5200;
 
 function queueSharedHookAnimations(v){
   const i2Anim = v?.meta?.i2Anim;
@@ -8673,11 +8674,6 @@ async function playHookSwapAnimation(A, B, tables){
     const ca = wa.querySelector('.card')?.cloneNode(true);
     const cb = wb.querySelector('.card')?.cloneNode(true);
     if (!ca || !cb) return;
-
-    const alphaA = wa.querySelector('.alpha');
-    const alphaB = wb.querySelector('.alpha');
-    const srcAlphaA = String(alphaA?.textContent || '');
-    const srcAlphaB = String(alphaB?.textContent || '');
 
     const setupFly = (el, r)=>{
       el.style.position='fixed';
@@ -8726,29 +8722,6 @@ async function playHookSwapAnimation(A, B, tables){
     const qa = Array.from(handEl(A.table)?.querySelectorAll('.card-wrap')||[]);
     const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
 
-    const addAlphaPlaceholder = (x, y, txt)=>{
-      const el = document.createElement('div');
-      el.className = 'alpha hook-alpha-placeholder';
-      el.textContent = txt;
-      el.style.left = `${x}px`;
-      el.style.top  = `${y + cardH + 2}px`;
-      document.body.appendChild(el);
-      return el;
-    };
-
-    // ステップ2（スライド）中から、空き予定スロットのα帯を表示しておく
-    const estimateTarget = (ti, ins)=>{
-      const h = handEl(ti);
-      if (!h) return {x:0,y:0};
-      const first = h.querySelector('.card-wrap:not(.hook-anim-origin)') || h.querySelector('.card-wrap');
-      if (!first){ const rh = h.getBoundingClientRect(); return {x:rh.left, y:rh.top}; }
-      const rf = first.getBoundingClientRect();
-      return {x: rf.left + (Math.max(0, ins) * shift), y: rf.top};
-    };
-
-    const phA = addAlphaPlaceholder(estimateTarget(A.table, insA).x, estimateTarget(A.table, insA).y, `${srcAlphaB}`);
-    const phB = addAlphaPlaceholder(estimateTarget(B.table, insB).x, estimateTarget(B.table, insB).y, `${srcAlphaA}`);
-
     const slideCardBody = (w, dx)=>{
       const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
       bodyNodes.forEach((node)=>{
@@ -8792,23 +8765,16 @@ async function playHookSwapAnimation(A, B, tables){
     const ta = targetPoint(A.table, insA);
     const tb = targetPoint(B.table, insB);
 
-    // 空き位置でもアルファ帯を見せる（着地するカードの帯）
-    // ※ α帯はスライドさせない（生成位置のまま固定）
-
     // 3) 空き位置へ挿入
     // ca は A から抜いたカードなので B 側へ、cb は B から抜いたカードなので A 側へ移動
     ca.style.left = `${tb.x}px`; ca.style.top = `${tb.y}px`; ca.style.transform='translateY(0)';
     cb.style.left = `${ta.x}px`; cb.style.top = `${ta.y}px`; cb.style.transform='translateY(0)';
     await sleep(1500);
 
-    phA.textContent = `${srcAlphaB}'`;
-    phB.textContent = `${srcAlphaA}'`;
-    await sleep(80);
-    phA.remove(); phB.remove();
     ca.remove(); cb.remove();
     wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
     moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
-    return { srcAlphaA, srcAlphaB };
+    return null;
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
     return null;
@@ -8920,7 +8886,7 @@ async function doItem2Swap(A, B){
 
   const animId = `i2-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Anim:{ id:animId, A, B, at: Date.now() } });
-  await sleep(4700);
+  await sleep(HOOK_ANIM_TOTAL_MS);
 
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
@@ -8978,7 +8944,7 @@ async function doItem18Take(sel){
 
   const animId = `i18-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Anim:{ id:animId, sel, myTable, at: Date.now() } });
-  await sleep(4700);
+  await sleep(HOOK_ANIM_TOTAL_MS);
 
   const card = srcHand.splice(si,1)[0];
 
