@@ -3669,9 +3669,6 @@ if (c.markUntil && now() < c.markUntil) {
                 viewerTable:null
               });
               await doItem2Swap(i2.selA, i2.selB);
-            }},
-            {label:'やり直す', action: async ()=>{
-              await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:i2All?.usingBy || state.userId, phase:'pickOther', selA:i2All?.selA || null, selB:null, viewerTable:null} });
             }}
           ]);
         };
@@ -9287,9 +9284,8 @@ function closeAllMini(e){
   const i2   = meta.i2Flow  || null;
   const i18  = meta.i18Flow || null;
   const inI2  = !!(i2 && (
-    // pickOther（テーブル選択ポップ中）は外クリックで閉じられるように除外
-    (i2.usingBy === state.userId && (i2.phase === 'pickSelf' || i2.phase === 'pickViewerSelf')) ||
-    (i2.phase === 'pickViewerSelf' && i2.viewerTable === (state.watching?.tables||[]).findIndex(T => T.playerId===state.userId))
+    // pickOther / pickViewerSelf は外クリックで閉じて選び直せるようにする
+    (i2.usingBy === state.userId && (i2.phase === 'pickSelf'))
   ));
   const inI18 = !!(i18 && i18.usingBy === state.userId && (i18.phase === 'pickOther'));
 
