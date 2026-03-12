@@ -238,6 +238,74 @@
     border-radius:8px; border:1px solid #ddd;
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
   }
+  .constraint-face{
+    position:relative;
+    border:3px solid #6a3f75 !important;
+    border-top-width:10px !important;
+    background:#fff !important;
+    background-image:none !important;
+    background-size:auto !important;
+    background-position:center !important;
+    background-repeat:no-repeat !important;
+    overflow:visible;
+  }
+  .constraint-face::before{
+    content:'';
+    position:absolute;
+    top:-8px;
+    left:-1px;
+    width:12px;
+    height:12px;
+    background:url('./eyeband.png') center/contain no-repeat;
+    z-index:3;
+    pointer-events:none;
+  }
+  .constraint-face::after{
+    content:'制約';
+    position:absolute;
+    top:-7px;
+    right:10px;
+    color:#fff;
+    font-size:5px;
+    line-height:1;
+    font-weight:700;
+    letter-spacing:.02em;
+    z-index:2;
+    pointer-events:none;
+  }
+  .constraint-face .constraint-alpha{
+    position:absolute;
+    top:-12px;
+    right:-3px;
+    color:#fff;
+    font-size:12px;
+    line-height:1;
+    font-weight:700;
+    text-transform:uppercase;
+    background:#6a3f75;
+    padding:2px 2px;
+    border-radius:4px 4px 2px 2px;
+    display:inline-block;
+    clip-path:inset(0 3px 0 0 round 4px 4px 2px 2px);
+    z-index:4;
+    pointer-events:none;
+  }
+  .constraint-face .constraint-desc{
+    position:absolute;
+    left:3px;
+    right:3px;
+    top:3px;
+    bottom:3px;
+    color:#000;
+    font-size:6px;
+    line-height:1.25;
+    font-weight:700;
+    text-align:left;
+    white-space:pre-wrap;
+    word-break:break-word;
+    overflow:hidden;
+    pointer-events:none;
+  }
 
   #conZoomOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.4);
@@ -1955,6 +2023,47 @@ const imgBack   = `./numbercardback.jpg`;
 const imgRule   = name => `./${name}.jpg`; // right2/left2/right4/left4
 const imgConstraint = L => `./${String(L).toLowerCase()}.jpg`;
 const imgConstraintBack = () => `./conback.jpg`;
+
+const CONSTRAINT_TEXTS = {
+  A:'君は偶数のコードだけを切断しなければならない。',
+  B:'君は奇数のコードだけを切断しなければならない。',
+  C:'君は1〜6のコードだけを切断しなければならない。',
+  D:'君は7〜12のコードだけを切断しなければならない。',
+  E:'君は4〜9のコードだけを切断しなければならない。',
+  F:'君は4〜9のコードを切断することはできない。',
+  G:'君は装備や自分の個人装備を使うことはできない。',
+  H:'君の切断アクションが失敗したため、他プレイヤーが君の手札を切断するのに失敗した場合、情報トークンを置かない（そして数値を公開しない）。また、君は情報トークンで示されているコードを切断することはできない。注意：君は装備（ヒント付箋）を使うことはできない。',
+  I:'君はチームメイトたちのタイルスタンド上にある右端の（最も大きい数値の）コードを切断することはできない。',
+  J:'君はチームメイトたちのタイルスタンド上にある左端の（最も小さい数値の）コードを切断することはできない。',
+  K:'君は単独での切断アクションを実行することはできない。',
+  L:'切断に失敗した場合、起爆ダイヤルを（1スペースではなく）2スペース進める。'
+};
+
+function paintConstraintCard(node, letter){
+  if (!node) return;
+  const raw = String(letter ?? '').trim();
+  const upper = raw ? raw.slice(0,1).toUpperCase() : '';
+  node.classList.add('constraint-face');
+  node.style.backgroundImage = 'none';
+  node.dataset.letter = upper;
+
+  let alpha = node.querySelector('.constraint-alpha');
+  if (!alpha){
+    alpha = document.createElement('span');
+    alpha.className = 'constraint-alpha';
+    node.appendChild(alpha);
+  }
+  alpha.textContent = upper;
+
+  let desc = node.querySelector('.constraint-desc');
+  if (!desc){
+    desc = document.createElement('div');
+    desc.className = 'constraint-desc';
+    node.appendChild(desc);
+  }
+  desc.textContent = upper ? `${upper}、${CONSTRAINT_TEXTS[upper] || ''}` : '';
+}
+
 const imgChallenge = id => `./${id}.png`;
 
 const CARD_IMAGE_PRELOAD_LIST = [
@@ -4649,7 +4758,7 @@ const pool = ['A','B','C','D','E'].filter(ch => !taken.has(ch));
 pool.forEach(ch=>{
   const cc = document.createElement('div');
   cc.className = 'concard';
-  cc.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+  paintConstraintCard(cc, ch);
   cc.title = '拡大';
   cc.onclick = (ev)=>{ 
     ev.stopPropagation(); 
@@ -4689,9 +4798,12 @@ if (big){
     big.classList.remove('blank');
     // 表/裏で画像を切替
     if (face === 'back'){
+      big.classList.remove('constraint-face');
+      big.querySelector('.constraint-alpha')?.remove();
+      big.querySelector('.constraint-desc')?.remove();
       big.style.backgroundImage = `url('${imgConstraintBack()}')`;
     }else{
-      big.style.backgroundImage = `url('${imgConstraint(picked)}')`;
+      paintConstraintCard(big, picked);
     }
     big.style.backgroundSize = 'cover';
     big.style.backgroundPosition = 'center';
@@ -4792,9 +4904,14 @@ function openConstraintZoom31Owned(letter, tableIdx){
 
     // 現在の face を取得して見た目を合わせる
     const face = state?.watching?.tables?.[tableIdx]?.m31Face || 'front';
-    big.style.backgroundImage = (face==='back')
-      ? `url('${imgConstraintBack()}')`
-      : `url('${imgConstraint(letter)}')`;
+    if (face==='back'){
+      big.classList.remove('constraint-face');
+      big.style.backgroundImage = `url('${imgConstraintBack()}')`;
+      big.querySelector('.constraint-alpha')?.remove();
+      big.querySelector('.constraint-desc')?.remove();
+    }else{
+      paintConstraintCard(big, letter);
+    }
 
     const renderMenu = ()=>{
       // 既存メニューを消してから再生成（ラベルを最新状態に）
@@ -4846,7 +4963,7 @@ function openConstraintZoom31(letter, myIdx){
 
     const big = document.createElement('div');
     big.className = 'conzoom-card';
-    big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
+    paintConstraintCard(big, letter);
 
     // 拡大カード自体のクリックでメニューをトグル
     big.addEventListener('click', (e)=>{
@@ -4904,7 +5021,7 @@ function renderM34(v){
     row.className = 'conlane';
     const c = document.createElement('div');
     c.className = 'concard';
-    c.style.backgroundImage = `url('${imgConstraint(myLetter)}')`;
+    paintConstraintCard(c, myLetter);
     /* ここから変更 */
     c.title = '拡大';
     c.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(myLetter, myIdx); };
@@ -4926,7 +5043,7 @@ function renderM34(v){
     center.forEach((obj, idx)=>{
       const cell = document.createElement('div');
       cell.className = 'concard';
-      cell.style.backgroundImage = `url('${imgConstraint(obj.ch)}')`;
+      paintConstraintCard(cell, obj.ch);
       cell.title = '戻す';
       cell.onclick = async ()=>{
         try{
@@ -5012,7 +5129,7 @@ function renderConDeckSync(v, mid){
     x.forEach((ch, i)=>{
       const node = document.createElement('div');
       node.className = 'concard';
-      node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+      paintConstraintCard(node, ch);
       node.title = '拡大';
       node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
       if (i>0){
@@ -6201,15 +6318,18 @@ async function renderM57(v){
         const con = document.createElement('div');
         con.className = 'concard';
         con.style.marginLeft = '-6px';
-        con.style.backgroundImage = `url('${imgConstraint(letters[i-1])}')`;
+        paintConstraintCard(con, letters[i-1]);
         con.onclick = () => {
           document.getElementById('conZoomOverlay')?.remove();
           const overlay = document.createElement('div');
           overlay.id = 'conZoomOverlay';
-          overlay.innerHTML = `
-            <div class="conzoom-wrap">
-              <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[i-1])}')"></div>
-            </div>`;
+          const wrap = document.createElement('div');
+          wrap.className = 'conzoom-wrap';
+          const big = document.createElement('div');
+          big.className = 'conzoom-card';
+          paintConstraintCard(big, letters[i-1]);
+          wrap.appendChild(big);
+          overlay.appendChild(wrap);
           overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
           document.body.appendChild(overlay);
         };
@@ -6231,15 +6351,18 @@ async function renderM57(v){
         img.id = 'm57Sel';
         img.className = 'concard';
         img.style.marginRight = '6px';
-        img.style.backgroundImage = `url('${imgConstraint(sel)}')`;
+        paintConstraintCard(img, sel);
         img.onclick = () => {
           document.getElementById('conZoomOverlay')?.remove();
           const overlay = document.createElement('div');
           overlay.id = 'conZoomOverlay';
-          overlay.innerHTML = `
-            <div class="conzoom-wrap">
-              <div class="conzoom-card" style="background-image:url('${imgConstraint(sel)}')"></div>
-            </div>`;
+          const wrap = document.createElement('div');
+          wrap.className = 'conzoom-wrap';
+          const big = document.createElement('div');
+          big.className = 'conzoom-card';
+          paintConstraintCard(big, sel);
+          wrap.appendChild(big);
+          overlay.appendChild(wrap);
           overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
           document.body.appendChild(overlay);
         };
@@ -6293,16 +6416,19 @@ async function renderM57(v){
         con.style.top  = '0';
         con.style.width  = '100%';
         con.style.height = '100%';
-        con.style.backgroundImage = `url('${imgConstraint(letters[n-1])}')`;
+        paintConstraintCard(con, letters[n-1]);
         con.style.zIndex = String(100 + i); // 後のものほど上
         con.onclick = () => {
           document.getElementById('conZoomOverlay')?.remove();
           const overlay = document.createElement('div');
           overlay.id = 'conZoomOverlay';
-          overlay.innerHTML = `
-            <div class="conzoom-wrap">
-              <div class="conzoom-card" style="background-image:url('${imgConstraint(letters[n-1])}')"></div>
-            </div>`;
+          const wrap = document.createElement('div');
+          wrap.className = 'conzoom-wrap';
+          const big = document.createElement('div');
+          big.className = 'conzoom-card';
+          paintConstraintCard(big, letters[n-1]);
+          wrap.appendChild(big);
+          overlay.appendChild(wrap);
           overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
           document.body.appendChild(overlay);
         };
@@ -6655,7 +6781,7 @@ function renderM66(v){
       });
     }
     // 表示は今回の描画スナップショットでOK
-    byDi.style.backgroundImage = `url('${imgConstraint(slots[0])}')`;
+    paintConstraintCard(byDi, slots[0]);
   }
 
 
@@ -6755,10 +6881,10 @@ function renderM66(v){
     const ccRight = mid?.querySelector('.m66-slot:nth-child(3) .concard');
     const ccBot = layer.querySelector('.m66-line:nth-child(3) .concard');
 
-    if (ccTop){   ccTop.style.backgroundImage   = `url('${imgConstraint(slots[1])}')`; ccTop.dataset.letter = slots[1]; }
-    if (ccLeft){  ccLeft.style.backgroundImage  = `url('${imgConstraint(slots[3])}')`; ccLeft.dataset.letter = slots[3]; }
-    if (ccRight){ ccRight.style.backgroundImage = `url('${imgConstraint(slots[4])}')`; ccRight.dataset.letter = slots[4]; }
-    if (ccBot){   ccBot.style.backgroundImage   = `url('${imgConstraint(slots[2])}')`; ccBot.dataset.letter = slots[2]; }
+    if (ccTop){   paintConstraintCard(ccTop, slots[1]); }
+    if (ccLeft){  paintConstraintCard(ccLeft, slots[3]); }
+    if (ccRight){ paintConstraintCard(ccRight, slots[4]); }
+    if (ccBot){   paintConstraintCard(ccBot, slots[2]); }
     // ステージ面（1=表 2=裏）
     const stage = layer.querySelector('.m66-stage');
     const face  = (v?.meta?.m66_face|0)===2 ? './2stage.jpg' : './1stage.jpg';
@@ -6979,7 +7105,7 @@ function renderM61(v){
     con.className = 'concard m61-con';
     con.style.width  = 'var(--char-w)';
    con.style.height = 'var(--char-h)';
-    con.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+    paintConstraintCard(con, ch);
     // ミニキャラ
     const mini = document.createElement('div');
    mini.className = 'm61-mini';
@@ -7944,7 +8070,7 @@ function openConstraintZoom(letter, myIdx){
 
     const big = document.createElement('div');
     big.className = 'conzoom-card';
-    big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
+    paintConstraintCard(big, letter);
     big.addEventListener('click', (e)=>{
       e.stopPropagation();
       // メニューが無ければ生成／あればトグル
@@ -8220,7 +8346,7 @@ function openConstraintZoomView(letter){
     wrap.className = 'conzoom-wrap';
     const big = document.createElement('div');
     big.className = 'conzoom-card';
-    big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
+    paintConstraintCard(big, letter);
     wrap.appendChild(big);
     ov.appendChild(wrap);
     document.body.appendChild(ov);
@@ -8287,7 +8413,7 @@ function openConstraintZoom61(letter, myIdx){
     wrap.className = 'conzoom-wrap';
     const big = document.createElement('div');
     big.className = 'conzoom-card';
-    big.style.backgroundImage = `url('${imgConstraint(letter)}')`;
+    paintConstraintCard(big, letter);
     wrap.appendChild(big);
     ov.appendChild(wrap);
     document.body.appendChild(ov);
@@ -10105,7 +10231,7 @@ function buildConDeckLaneP1(){
     const addToPile = (ch)=>{
       const node = document.createElement('div');
       node.className = 'concard';
-      node.style.backgroundImage = `url('${imgConstraint(ch)}')`;
+      paintConstraintCard(node, ch);
 
       const already = pile.querySelectorAll('.concard').length;
       const off = already * 2;
