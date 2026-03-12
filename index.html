@@ -742,27 +742,22 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   }
   .stage-story-pop{
     position:fixed;left:50%;top:50%;transform:translate(-50%, -50%);
-    width:min(92vw, 560px);
+    width:min(86vw, 500px);
     background:#e5e7eb;border:1px solid #9ca3af;border-radius:12px;
     box-shadow:0 14px 30px rgba(0,0,0,.2);
     padding:14px 14px 12px;z-index:260;
   }
   .stage-story-head{position:relative;min-height:38px;margin-bottom:10px}
   .stage-story-title{
-    display:inline-block;max-width:calc(100% - 116px);
-    background:#4b5563;color:#fff;font-size:15px;line-height:1.25;
+    display:inline-block;max-width:calc(100% - 96px);
+    background:#4b5563;color:#fff;font-size:18px;line-height:1.25;
     padding:7px 12px;border-radius:8px;word-break:break-word;
   }
   .stage-story-num{
-    position:absolute;right:34px;top:5px;
-    font-size:16px;font-weight:700;color:#111827;
+    position:absolute;right:0;top:2px;
+    font-size:24px;font-weight:800;color:#111827;
   }
   .stage-story-num .hash{font-size:11px;margin-right:1px;vertical-align:2px}
-  .stage-story-close{
-    position:absolute;right:0;top:2px;width:24px;height:24px;
-    border:1px solid #6b7280;border-radius:4px;
-    background:#fff;color:#111827;font-size:13px;line-height:1;cursor:pointer;padding:0;
-  }
   .stage-story-body{margin:0;font-size:15px;line-height:1.6;color:#111;white-space:pre-wrap}
   .start-pop .row,.seat-pop .row{display:flex;gap:8px;align-items:center}
   .start-pop label,.seat-pop label{width:84px;font-size:13px}
@@ -1306,7 +1301,6 @@ main:not(:has(#lobby.hidden)) > * {
   <div class="stage-story-head">
     <div id="stageStoryTitle" class="stage-story-title"></div>
     <div id="stageStoryNum" class="stage-story-num"></div>
-    <button id="btnStageStoryClose" class="stage-story-close" type="button" aria-label="閉じる">✕</button>
   </div>
   <p id="stageStoryBody" class="stage-story-body"></p>
 </div>
@@ -1359,7 +1353,6 @@ const state = {
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
 state._mpAutoOnce = false;  // 「参加」後に自動でピッカーを開いたか（ホストのみ）  
-state._stageStoryDismissedMission = null;
 
 const STAGE_STORIES = {
   31: { title:'誰もが傷ついている', body:'我々が選ぶ制約もあれば、選ばない制約もある……チームメイトについては気にするな！' },
@@ -1376,18 +1369,11 @@ const STAGE_STORIES = {
   42: { title:'これはどういう類のサーカスだ？', body:'気づくべきだった、ジョーカーが君たちをアジトに招待していたなんて！ このため言っておくが、このミッションは得難なものになるだろう。確かなことが一つある――君たちはこの状況に全く準備ができていないということだ。' }
 };
 
-function closeStageStory(){
-  state._stageStoryDismissedMission = Number(state.watching?.mission?.id || 0) || null;
-  H(stageStoryPop, true);
-}
-
 function renderStageStory(v){
   const missionId = Number(v?.mission?.id || 0);
   const def = STAGE_STORIES[missionId];
   if (!def) { H(stageStoryPop, true); return; }
   if (state.seatedTable != null) { H(stageStoryPop, true); return; }
-  if (state._stageStoryDismissedMission === missionId) { H(stageStoryPop, true); return; }
-
   stageStoryTitle.textContent = def.title;
   stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
   stageStoryBody.textContent = def.body;
@@ -1539,9 +1525,7 @@ const stageStoryPop = document.getElementById('stageStoryPop');
 const stageStoryTitle = document.getElementById('stageStoryTitle');
 const stageStoryNum = document.getElementById('stageStoryNum');
 const stageStoryBody = document.getElementById('stageStoryBody');
-const btnStageStoryClose = document.getElementById('btnStageStoryClose');
 const btnSeatCancel=document.getElementById('btnSeatCancel');
-if (btnStageStoryClose) btnStageStoryClose.onclick = closeStageStory;
 
 
 
@@ -2539,7 +2523,6 @@ if (v) {
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
    const midNow  = (v?.mission?.id|0);
     const midPrev = (state._lastMissionId|0);
-    if (midNow !== midPrev) state._stageStoryDismissedMission = null;
 if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classList.contains('hidden')) {
      btnSit.onclick();
     }
