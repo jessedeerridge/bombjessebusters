@@ -1468,6 +1468,14 @@ function saveStableUserIdByName(name, uid){
   if (!name || !uid) return;
   try{ localStorage.setItem(userKeyForName(name), uid); }catch(_e){}
 }
+
+function getMySeatedTableIndex(v){
+  const sNum = (state?.seatedTable==null) ? null : Number(state.seatedTable);
+  if (Number.isInteger(sNum) && sNum >= 0) return sNum;
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  const idx = tables.findIndex(t => t?.playerId === state.userId);
+  return (idx >= 0 ? idx : null);
+}
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -1534,7 +1542,8 @@ function renderStageStory(v){
   const missionId = Number(v?.mission?.id || 0);
   const def = STAGE_STORIES[missionId];
   if (!def) { H(stageStoryPop, true); return; }
-  if (state.seatedTable != null) { H(stageStoryPop, true); return; }
+  const mySeatIdx = getMySeatedTableIndex(v);
+  if (mySeatIdx != null) { H(stageStoryPop, true); return; }
   stageStoryTitle.textContent = def.title;
   stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
   stageStoryBody.textContent = def.body;
@@ -4900,9 +4909,14 @@ if (big){
     const seatEmpty = !t.playerId;
     const amMe = !!t.playerId && t.playerId === state.userId;
 
-    if (seatEmpty){
-      // 空席：枠だけ
+    const mid31 = (v?.mission?.id|0);
+    const rolePicked31 = isRoleSelectionDone(t, mid31);
+    if (seatEmpty || !rolePicked31){
+      // 空席 or 未選択：枠だけ
       mini.classList.add('blank');
+      mini.style.backgroundImage = 'none';
+      mini.onclick = null;
+      mini.style.cursor = 'default';
     }else{
       const faceName = String(t?.character?.face || '');
       const isMember5Card = /member\s*\(5\)\./i.test(faceName);
@@ -7189,9 +7203,13 @@ function renderM61(v){
     const t = (v.tables||[])[ti] || {};
     const seatEmpty = !t.playerId;
     const amSeatedHere = (t.playerId && t.playerId === state.userId);
-    if (seatEmpty){
+    const mid61 = (v?.mission?.id|0);
+    const rolePicked61 = isRoleSelectionDone(t, mid61);
+    if (seatEmpty || !rolePicked61){
       mini.classList.add('blank');
+      mini.style.backgroundImage = 'none';
       mini.onclick = null;
+      mini.style.cursor = 'default';
     }else{
       const faceName = String(t?.character?.face || '');
       const isMember5Card = /member\s*\(5\)\./i.test(faceName);
@@ -7402,12 +7420,12 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       if (charEl){
         if (mustHide) charEl.style.backgroundImage = 'none';
         else if (charEl.style.backgroundImage === 'none') charEl.style.removeProperty('background-image');
-        charEl.classList.remove('blank','captain-card'); // 残骸を掃除
+        charEl.classList.remove('blank','captain-card','member5-card','member15-detector','member-alt6','member-alt7','member-alt8','member-alt9'); // 残骸を掃除
       }
       if (miniEl){
         if (mustHide) miniEl.style.backgroundImage = 'none';
         else if (miniEl.style.backgroundImage === 'none') miniEl.style.removeProperty('background-image');
-        miniEl.classList.remove('blank','captain-card');
+        miniEl.classList.remove('blank','captain-card','member5-card','member15-detector','member-alt6','member-alt7','member-alt8','member-alt9');
       }
     });
 
@@ -9583,7 +9601,7 @@ tab.textContent = String(i + 1);
         update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), { ownerId: state.userId })
       ));
 // await setupAutoLeaveOnDisconnect(i);   // ★自動退席を無効化
-      state.seatedTable=i; H(seatPop,true); updateMenuButtons();
+      state.seatedTable=i; H(seatPop,true); H(stageStoryPop, true); updateMenuButtons();
 maybeOpenRolePickerAfterSeat();
 
     };
@@ -9612,6 +9630,7 @@ btnSit.onclick = async ()=>{
     ));
     state.seatedTable = sameNameIdx;
     H(seatPop, true); 
+    H(stageStoryPop, true);
     updateMenuButtons();
     maybeOpenRolePickerAfterSeat();
     return;
