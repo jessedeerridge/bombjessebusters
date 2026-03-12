@@ -534,8 +534,9 @@
   .card-wrap.m54-pending-arrival .marker,
   .card-wrap.m54-pending-arrival .tok-col{opacity:0;}
   .card-wrap.m54-pending-arrival .card{pointer-events:none;}
-  /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
+  /* 入れ替えフックの移動中：元位置の表示要素を全部隠す（チラつき防止） */
   .card-wrap.hook-anim-origin .card,
+  .card-wrap.hook-anim-origin .alpha,
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
@@ -8637,6 +8638,17 @@ function refreshInfo22(vNow){
 
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
+function scheduleHookVisualReset(originWraps, moveNodes, delayMs = 650){
+  setTimeout(()=>{
+    (originWraps||[]).forEach((w)=> w?.classList?.remove('hook-anim-origin'));
+    (moveNodes||[]).forEach((node)=>{
+      if (!node || !node.isConnected) return;
+      node.style.transform='';
+      node.style.transition='';
+    });
+  }, delayMs);
+}
+
 function queueSharedHookAnimations(v){
   const i2Anim = v?.meta?.i2Anim;
   if (i2Anim?.id && i2Anim.id !== state._lastI2AnimId && i2Anim.A && i2Anim.B){
@@ -8806,8 +8818,7 @@ async function playHookSwapAnimation(A, B, tables){
     await sleep(80);
     phA.remove(); phB.remove();
     ca.remove(); cb.remove();
-    wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
-    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    scheduleHookVisualReset([wa, wb], moveNodes);
     return { srcAlphaA, srcAlphaB };
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
@@ -8895,8 +8906,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(1500);
 
     fly.remove();
-    ws.classList.remove('hook-anim-origin');
-    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    scheduleHookVisualReset([ws], moveNodes);
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
   }
