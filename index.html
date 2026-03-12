@@ -9030,11 +9030,14 @@ async function doItem2Swap(A, B){
   if (toAInHand) toAInHand.alpha = `${srcAlphaB}'`;
   if (toBInHand) toBInHand.alpha = `${srcAlphaA}'`;
 
-  await Promise.all([
-    set(ref(db, `rooms/${state.roomCode}/tables/${A.table}/hand`), a.hand),
-    set(ref(db, `rooms/${state.roomCode}/tables/${B.table}/hand`), b.hand),
-    update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null, i2Anim:null })
-  ]);
+  // ★ 観戦側の瞬間的なチラつき対策：手札2箇所＋meta解除を同一tickで反映する
+  //    （個別 set/update だと中間状態が配信され、着地前後に旧表示が一瞬復活する）
+  const i2Updates = {};
+  i2Updates[`rooms/${state.roomCode}/tables/${A.table}/hand`] = a.hand;
+  i2Updates[`rooms/${state.roomCode}/tables/${B.table}/hand`] = b.hand;
+  i2Updates[`rooms/${state.roomCode}/meta/i2Flow`] = null;
+  i2Updates[`rooms/${state.roomCode}/meta/i2Anim`] = null;
+  await update(ref(db), i2Updates);
   // 交換後：member(9) を自分が持っているなら枠の9を裏返す
   try{
     const myIdx = (tables||[]).findIndex(t => t?.playerId === state.userId);
@@ -9073,11 +9076,13 @@ dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark, markSrc:'
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(dstHand); realpha(srcHand);
 
-  await Promise.all([
-    set(ref(db, `rooms/${state.roomCode}/tables/${sel.table}/hand`), srcHand),
-    set(ref(db, `rooms/${state.roomCode}/tables/${myTable}/hand`), dstHand),
-    update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:null, i18Anim:null })
-  ]);
+  // ★ 観戦側の瞬間的なチラつき対策：移動元/移動先/アニメ解除を同時に反映
+  const i18Updates = {};
+  i18Updates[`rooms/${state.roomCode}/tables/${sel.table}/hand`] = srcHand;
+  i18Updates[`rooms/${state.roomCode}/tables/${myTable}/hand`] = dstHand;
+  i18Updates[`rooms/${state.roomCode}/meta/i18Flow`] = null;
+  i18Updates[`rooms/${state.roomCode}/meta/i18Anim`] = null;
+  await update(ref(db), i18Updates);
 }
 
 /* ==== アイテムデッキ制御（ミッション別） ==== */
