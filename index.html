@@ -387,12 +387,13 @@
     width:var(--char-w);height:var(--char-h);background-size:cover;background-position:center;border-radius:6px;border:1px solid #ddd;
     cursor:pointer;user-select:none;flex:0 0 auto;
   }
-  /* ▼ M61: 制約カードの下に置く極小キャラ */
+  /* ▼ M61: 制約カードの後ろに重ねる正体カード（通常サイズ） */
   .m61-mini{
-    width:24px; height:30px;            /* とても小さく */
-    border:1px solid #ddd; border-radius:4px;
+    width:var(--char-w); height:var(--char-h);
+    border:1px solid #ddd; border-radius:6px;
     background:#f3f4f6 center/cover no-repeat;
     margin:2px auto 0; user-select:none; cursor:pointer;
+    position:relative; z-index:1;
   }
   .m61-mini.blank{ background:#f3f4f6; border:1px dashed #d1d5db; cursor:default; }
   /* 縦積みラッパー */
@@ -402,6 +403,17 @@
   .char-col{
     display:flex; flex-direction:column; align-items:center; gap:2px;
     width:var(--char-w); flex:0 0 auto;
+    position:relative;
+  }
+  /* #31 / #61: 制約カードの後ろに重ね、上半分を隠す */
+  .char-col > .m61-mini,
+  .m61-stack > .m61-mini{
+    margin-top:calc(var(--char-h) * -0.5);
+  }
+  .char-col > .char-card,
+  .m61-stack > .m61-con{
+    position:relative;
+    z-index:2;
   }
   
   .char-card.blank{background:#f3f4f6;border:1px dashed #d1d5db;cursor:default;}
@@ -7294,7 +7306,7 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
 }
 
 /* ★ 小さい枠（m61-mini）用の黒枠 — ファイルCSSには定義がないためここで付与 */
-.m61-mini.captain-card{ border:2px solid #000 !important; border-radius:4px; }
+.m61-mini.captain-card{ border:2px solid #000 !important; border-radius:6px; }
 /* === /M31-66 === */
 `;
     let st = document.createElement('style');
