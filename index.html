@@ -238,6 +238,34 @@
     border-radius:8px; border:1px solid #ddd;
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
   }
+  .constraint-card-ui{
+    position:relative;
+    border:1px solid #6e6770 !important;
+    background-color:#fff !important;
+    background-image:none !important;
+    overflow:hidden;
+  }
+  .constraint-eyeband{
+    position:absolute;
+    top:3px;
+    left:3px;
+    width:13px;
+    height:13px;
+    object-fit:contain;
+    pointer-events:none;
+  }
+  .constraint-corner-label{
+    position:absolute;
+    top:2px;
+    right:3px;
+    text-align:right;
+    line-height:1;
+    color:#111;
+    font-weight:700;
+    pointer-events:none;
+  }
+  .constraint-corner-label .jp{ font-size:8px; display:block; }
+  .constraint-corner-label .en{ font-size:12px; display:block; }
 
   #conZoomOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.4);
@@ -1942,6 +1970,56 @@ async function copyText(text){
     prompt('コピーできない場合はこのテキストをコピーしてください', text);
   }
 }
+
+function decorateConstraintCards(root=document){
+  const nodes = root.querySelectorAll('.concard, .conzoom-card');
+  nodes.forEach((el)=>{
+    const bg = String(el.style.backgroundImage || '');
+    const m = bg.match(/\/?([a-l])\.jpg/i);
+    const letter = (el.dataset.letter || (m ? m[1].toUpperCase() : '')).toUpperCase();
+
+    el.querySelectorAll(':scope > .constraint-eyeband, :scope > .constraint-corner-label').forEach(n=>n.remove());
+    if (!/^[A-L]$/.test(letter)){
+      el.classList.remove('constraint-card-ui');
+      return;
+    }
+
+    el.dataset.letter = letter;
+    el.classList.add('constraint-card-ui');
+
+    const eye = document.createElement('img');
+    eye.className = 'constraint-eyeband';
+    eye.src = './eyeband.png';
+    eye.alt = '';
+
+    const label = document.createElement('div');
+    label.className = 'constraint-corner-label';
+    label.innerHTML = `<span class="jp">制約</span><span class="en">${letter}</span>`;
+
+    el.appendChild(eye);
+    el.appendChild(label);
+  });
+}
+
+const constraintCardObserver = new MutationObserver((ms)=>{
+  for (const m of ms){
+    if (m.type === 'childList'){
+      m.addedNodes.forEach((n)=>{ if (n.nodeType === 1) decorateConstraintCards(n); });
+    }
+    if (m.type === 'attributes' && m.target?.nodeType === 1){
+      decorateConstraintCards(m.target);
+    }
+  }
+});
+window.addEventListener('DOMContentLoaded', ()=>{
+  decorateConstraintCards(document);
+  constraintCardObserver.observe(document.body, {
+    childList:true,
+    subtree:true,
+    attributes:true,
+    attributeFilter:['style','class','data-letter']
+  });
+});
   
 /* ==== ミッション素材定義 ==== */
 const MATERIALS = {
