@@ -2443,7 +2443,9 @@ if (v) {
 
       renderM29(v);
       renderM34(v);
-      renderTables(v);
+      if (!shouldSkipTableRenderForHook(v)) {
+        renderTables(v);
+      }
 
 
       // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
@@ -8654,6 +8656,39 @@ async function waitForHookArrival(tableIdx, cardId, timeoutMs=2000){
   return false;
 }
 
+
+function buildHookTableSig(tables){
+  return JSON.stringify((tables||[]).map(t => ({
+    p: t?.playerId || '',
+    h: (t?.hand||[]).map(c => ({
+      id: String(c?.id||''),
+      n: c?.num ?? null,
+      k: c?.kind || '',
+      o: !!c?.open,
+      a: String(c?.alpha||''),
+      hg: !!c?.hookGray,
+      tk: (c?.tokens||[]).map(tk => `${tk?.type||''}:${tk?.value ?? ''}:${tk?.style||''}`)
+    }))
+  })));
+}
+
+function markHookAnimBlocking(tables){
+  state._hookAnimBlock = {
+    startedAt: Date.now(),
+    until: Date.now() + HOOK_ANIM_TOTAL_MS + 2500,
+    startSig: buildHookTableSig(tables)
+  };
+}
+
+function shouldSkipTableRenderForHook(v){
+  const b = state._hookAnimBlock;
+  if (!b) return false;
+  if (Date.now() > (b.until||0)) { state._hookAnimBlock = null; return false; }
+  const sigNow = buildHookTableSig(v?.tables || []);
+  if (sigNow !== b.startSig) { state._hookAnimBlock = null; return false; }
+  return true;
+}
+
 function queueSharedHookAnimations(v){
   const i2Anim = v?.meta?.i2Anim;
   if (i2Anim?.id && i2Anim.id !== state._lastI2AnimId && i2Anim.A && i2Anim.B){
@@ -8674,6 +8709,7 @@ function queueSharedHookAnimations(v){
 
 async function playHookSwapAnimation(A, B, tables){
   try{
+    markHookAnimBlocking(tables);
     const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
     const wrapEl = (ti, cardId)=> document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
     const handEl = (ti)=> tableEl(ti)?.querySelector('.hand');
@@ -8683,13 +8719,13 @@ async function playHookSwapAnimation(A, B, tables){
 
     const wa = wrapEl(A.table, A.cardId);
     const wb = wrapEl(B.table, B.cardId);
-    if (!wa || !wb) return;
+    if (!wa || !wb) { state._hookAnimBlock = null; return; }
 
     const ra = wa.getBoundingClientRect();
     const rb = wb.getBoundingClientRect();
     const ca = wa.querySelector('.card')?.cloneNode(true);
     const cb = wb.querySelector('.card')?.cloneNode(true);
-    if (!ca || !cb) return;
+    if (!ca || !cb) { state._hookAnimBlock = null; return; }
 
     const setupFly = (el, r)=>{
       el.style.position='fixed';
@@ -8791,15 +8827,18 @@ async function playHookSwapAnimation(A, B, tables){
       waitForHookArrival(A.table, B.cardId)
     ]);
     ca.remove(); cb.remove();
+    state._hookAnimBlock = null;
     return null;
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
+    state._hookAnimBlock = null;
     return null;
   }
 }
 
 async function playHookTakeAnimation(sel, myTable, tables){
   try{
+    markHookAnimBlocking(tables);
     const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
     const wrapEl = (ti, cardId)=> document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
     const handEl = (ti)=> tableEl(ti)?.querySelector('.hand');
@@ -8809,12 +8848,12 @@ async function playHookTakeAnimation(sel, myTable, tables){
     const shift = cardW + gap;
 
     const ws = wrapEl(sel.table, sel.cardId);
-    if (!ws) return;
+    if (!ws) { state._hookAnimBlock = null; return; }
 
     const srcHand = (tables[sel.table]?.hand)||[];
     const dstHand = (tables[myTable]?.hand)||[];
     const srcIdx = srcHand.findIndex(c=> c?.id===sel.cardId);
-    if (srcIdx<0) return;
+    if (srcIdx<0) { state._hookAnimBlock = null; return; }
     const movingCard = srcHand[srcIdx];
     const n = movingCard?.num|0;
     let ins = 0;
@@ -8823,7 +8862,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
 
     const rs = ws.getBoundingClientRect();
     const fly = ws.querySelector('.card')?.cloneNode(true);
-    if (!fly) return;
+    if (!fly) { state._hookAnimBlock = null; return; }
 
     fly.style.position='fixed';
     fly.style.left=`${rs.left}px`;
@@ -8878,8 +8917,10 @@ async function playHookTakeAnimation(sel, myTable, tables){
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
     await waitForHookArrival(myTable, sel.cardId);
     fly.remove();
+    state._hookAnimBlock = null;
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
+    state._hookAnimBlock = null;
   }
 }
 
