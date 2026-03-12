@@ -3660,9 +3660,15 @@ if (c.markUntil && now() < c.markUntil) {
           ev.stopPropagation();
           await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
           openMenuAtClick([
-            {label:'交換する', action: async ()=>{
+            {label:'カードを渡す', action: async ()=>{
               const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
-              if(i2?.selA && i2?.selB?.cardId) await doItem2Swap(i2.selA, i2.selB);
+              if(!(i2?.selA && i2?.selB?.cardId)) return;
+              // 実行前に選択フェーズを外して青枠を消す
+              await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
+                phase:'resolving',
+                viewerTable:null
+              });
+              await doItem2Swap(i2.selA, i2.selB);
             }},
             {label:'やり直す', action: async ()=>{
               await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:i2All?.usingBy || state.userId, phase:'pickOther', selA:i2All?.selA || null, selB:null, viewerTable:null} });
@@ -9281,7 +9287,8 @@ function closeAllMini(e){
   const i2   = meta.i2Flow  || null;
   const i18  = meta.i18Flow || null;
   const inI2  = !!(i2 && (
-    (i2.usingBy === state.userId && (i2.phase === 'pickSelf' || i2.phase === 'pickOther' || i2.phase === 'pickViewerSelf')) ||
+    // pickOther（テーブル選択ポップ中）は外クリックで閉じられるように除外
+    (i2.usingBy === state.userId && (i2.phase === 'pickSelf' || i2.phase === 'pickViewerSelf')) ||
     (i2.phase === 'pickViewerSelf' && i2.viewerTable === (state.watching?.tables||[]).findIndex(T => T.playerId===state.userId))
   ));
   const inI18 = !!(i18 && i18.usingBy === state.userId && (i18.phase === 'pickOther'));
