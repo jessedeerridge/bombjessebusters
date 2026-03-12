@@ -247,7 +247,7 @@
     background-size:auto !important;
     background-position:center !important;
     background-repeat:no-repeat !important;
-    overflow:hidden;
+    overflow:visible;
   }
   .constraint-face::before{
     content:'';
@@ -282,11 +282,21 @@
     line-height:1;
     font-weight:700;
     text-transform:uppercase;
-    background:#6a3f75;
     padding:2px 2px;
-    border-radius:4px 4px 2px 2px;
     display:inline-block;
-    z-index:2;
+    z-index:4;
+    pointer-events:none;
+  }
+  .constraint-face .constraint-alpha::before{
+    content:'';
+    position:absolute;
+    left:0;
+    right:0;
+    top:12px;
+    bottom:0;
+    background:#6a3f75;
+    border-radius:4px 4px 2px 2px;
+    z-index:-1;
     pointer-events:none;
   }
   .constraint-face .constraint-desc{
@@ -320,9 +330,6 @@
     position:relative; overflow:visible;
   }
   .conzoom-card .item-usebar{ border-radius:0 0 9px 9px; }
-  .conzoom-card.constraint-face{
-    overflow:hidden;
-  }
   .conzoom-menu{
     position:absolute; top:50%; left:50%;
     translate:-50% calc(-50% + 108px);
