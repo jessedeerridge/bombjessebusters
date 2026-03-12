@@ -2538,6 +2538,7 @@ if (v) {
     }
   }
 }    
+    reconcileHookAnimHiddenCards(v);
     withScrollHold(()=> {
       renderItemsAndDi(v);
   renderSfx(v);                 // ★ 追加：SFX同期再生
@@ -8763,6 +8764,30 @@ function isHookAnimOriginHidden(tableIdx, cardId){
   return !!(state._hookAnimHiddenCards && state._hookAnimHiddenCards.has(hookAnimKey(tableIdx, cardId)));
 }
 
+function reconcileHookAnimHiddenCards(v){
+  if (!state._hookAnimHiddenCards || state._hookAnimHiddenCards.size===0) return;
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  const i2Anim = v?.meta?.i2Anim;
+  const i18Anim = v?.meta?.i18Anim;
+
+  const active = new Set();
+  if (i2Anim?.A?.cardId) active.add(hookAnimKey(i2Anim.A.table, i2Anim.A.cardId));
+  if (i2Anim?.B?.cardId) active.add(hookAnimKey(i2Anim.B.table, i2Anim.B.cardId));
+  if (i18Anim?.sel?.cardId) active.add(hookAnimKey(i18Anim.sel.table, i18Anim.sel.cardId));
+
+  for (const key of Array.from(state._hookAnimHiddenCards)){
+    const [tiRaw, cardId=''] = String(key).split(':');
+    const ti = parseInt(tiRaw, 10);
+    const hand = (Number.isInteger(ti) && tables[ti]?.hand) ? tables[ti].hand : [];
+    const existsHere = hand.some(c=> String(c?.id||'') === cardId);
+    if (!existsHere || !active.has(key)){
+      state._hookAnimHiddenCards.delete(key);
+      const wrap = document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
+      if (wrap) wrap.classList.remove('hook-anim-origin');
+    }
+  }
+}
+
 
 
 async function waitForHookArrival(tableIdx, cardId, timeoutMs=2000){
@@ -8913,15 +8938,10 @@ async function playHookSwapAnimation(A, B, tables){
       waitForHookArrival(A.table, B.cardId)
     ]);
     ca.remove(); cb.remove();
-    hideHookAnimOrigin(A.table, A.cardId, false);
-    hideHookAnimOrigin(B.table, B.cardId, false);
     return null;
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
     return null;
-  }finally{
-    hideHookAnimOrigin(A?.table, A?.cardId, false);
-    hideHookAnimOrigin(B?.table, B?.cardId, false);
   }
 }
 
@@ -9005,11 +9025,8 @@ async function playHookTakeAnimation(sel, myTable, tables){
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
     await waitForHookArrival(myTable, sel.cardId);
     fly.remove();
-    hideHookAnimOrigin(sel.table, sel.cardId, false);
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
-  }finally{
-    hideHookAnimOrigin(sel?.table, sel?.cardId, false);
   }
 }
 
