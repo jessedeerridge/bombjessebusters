@@ -534,10 +534,10 @@
   .card-wrap.m54-pending-arrival .marker,
   .card-wrap.m54-pending-arrival .tok-col{opacity:0;}
   .card-wrap.m54-pending-arrival .card{pointer-events:none;}
-  /* 入れ替えフックの移動中：カード本体＋バッジ帯を隠して残像チラつきを防ぐ */
+  /* 入れ替えフックの移動中：アルファベット帯は固定表示のまま、カード本体＋下トークンのみ隠す */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .badge-fixed{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -8722,7 +8722,7 @@ async function playHookSwapAnimation(A, B, tables){
     const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
 
     const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.badge-fixed')].filter(Boolean);
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
       bodyNodes.forEach((node)=>{
         node.style.transition = 'transform 1.5s ease';
         node.style.transform = `translateX(${dx}px)`;
@@ -8818,7 +8818,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(1500);
 
     const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.badge-fixed')].filter(Boolean);
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
       bodyNodes.forEach((node)=>{
         node.style.transition = 'transform 1.5s ease';
         node.style.transform = `translateX(${dx}px)`;
