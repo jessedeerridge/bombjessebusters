@@ -8780,7 +8780,6 @@ async function playHookSwapAnimation(A, B, tables){
 
     // 2) 詰める + 挿入位置を空ける（右スライド）
     const shift = cardW + gap;
-    const moveNodes = [];
     const qa = Array.from(handEl(A.table)?.querySelectorAll('.card-wrap')||[]);
     const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
 
@@ -8807,13 +8806,9 @@ async function playHookSwapAnimation(A, B, tables){
     const phA = addAlphaPlaceholder(estimateTarget(A.table, insA).x, estimateTarget(A.table, insA).y, `${srcAlphaB}`);
     const phB = addAlphaPlaceholder(estimateTarget(B.table, insB).x, estimateTarget(B.table, insB).y, `${srcAlphaA}`);
 
-    const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
-      bodyNodes.forEach((node)=>{
-        node.style.transition = 'transform 1.5s ease';
-        node.style.transform = `translateX(${dx}px)`;
-        moveNodes.push(node);
-      });
+    const slideWrap = (w, dx)=>{
+      w.style.transition = 'transform 1.5s ease';
+      w.style.transform = `translateX(${dx}px)`;
     };
 
     qa.forEach((w,i)=>{
@@ -8822,7 +8817,7 @@ async function playHookSwapAnimation(A, B, tables){
       if (aIdx>=0 && i>aIdx) dx -= shift;
       const ni = i - (i>aIdx?1:0);
       if (ni>=insA) dx += shift;
-      if (dx!==0) slideCardBody(w, dx);
+      if (dx!==0) slideWrap(w, dx);
     });
     qb.forEach((w,i)=>{
       if (w.dataset.cardId===B.cardId) return;
@@ -8830,7 +8825,7 @@ async function playHookSwapAnimation(A, B, tables){
       if (bIdx>=0 && i>bIdx) dx -= shift;
       const ni = i - (i>bIdx?1:0);
       if (ni>=insB) dx += shift;
-      if (dx!==0) slideCardBody(w, dx);
+      if (dx!==0) slideWrap(w, dx);
     });
     await sleep(1500);
 
@@ -8864,7 +8859,8 @@ async function playHookSwapAnimation(A, B, tables){
     await sleep(80);
     phA.remove(); phB.remove();
     ca.remove(); cb.remove();
-    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    // ここで transform を戻すと、DB反映までの隙間で旧位置が一瞬復活する。
+    // 位置確定は次の再レンダー（tables更新）に任せる。
     applyHookAnimMaskToDom();
     return { srcAlphaA, srcAlphaB };
   }catch(e){
@@ -8915,24 +8911,19 @@ async function playHookTakeAnimation(sel, myTable, tables){
     requestAnimationFrame(()=>{ fly.style.transform=`translateY(-${cardH}px)`; });
     await sleep(1500);
 
-    const moveNodes = [];
-    const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
-      bodyNodes.forEach((node)=>{
-        node.style.transition = 'transform 1.5s ease';
-        node.style.transform = `translateX(${dx}px)`;
-        moveNodes.push(node);
-      });
+    const slideWrap = (w, dx)=>{
+      w.style.transition = 'transform 1.5s ease';
+      w.style.transform = `translateX(${dx}px)`;
     };
 
     const qSrc = Array.from(handEl(sel.table)?.querySelectorAll('.card-wrap')||[]);
     qSrc.forEach((w,i)=>{
       if (w.dataset.cardId===sel.cardId) return;
-      if (i>srcIdx) slideCardBody(w, -shift);
+      if (i>srcIdx) slideWrap(w, -shift);
     });
 
     const qDst = Array.from(handEl(myTable)?.querySelectorAll('.card-wrap')||[]);
-    qDst.forEach((w,i)=>{ if (i>=ins) slideCardBody(w, shift); });
+    qDst.forEach((w,i)=>{ if (i>=ins) slideWrap(w, shift); });
     await sleep(1500);
 
     const targetPoint = (ti, insPos)=>{
@@ -8955,7 +8946,8 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(1500);
 
     fly.remove();
-    moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
+    // ここで transform を戻すと、DB反映までの隙間で旧位置が一瞬復活する。
+    // 位置確定は次の再レンダー（tables更新）に任せる。
     applyHookAnimMaskToDom();
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
@@ -8980,7 +8972,7 @@ async function doItem2Swap(A, B){
 
   const animId = `i2-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Anim:{ id:animId, A, B, at: Date.now() } });
-  await sleep(4700);
+  await sleep(5000);
 
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
@@ -9038,7 +9030,7 @@ async function doItem18Take(sel){
 
   const animId = `i18-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Anim:{ id:animId, sel, myTable, at: Date.now() } });
-  await sleep(4700);
+  await sleep(5000);
 
   const card = srcHand.splice(si,1)[0];
 
