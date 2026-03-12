@@ -3567,9 +3567,10 @@ if (!amSeated || seatEmpty) {
     };
   }
 }
-if (amSeated && !seatEmpty && !isFlippedRole && isMember5Card) char.classList.add('member5-card');
-if (amSeated && !seatEmpty && !isFlippedRole && isMember1to5Card) char.classList.add('member15-detector');
-if (amSeated && !seatEmpty && !isFlippedRole && altMemberMatch) char.classList.add(`member-alt${altMemberMatch[1]}`);
+const showRoleTextDecorations = shouldShowRoleCardTextDecorations(state?.watching?.mission?.id);
+if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && isMember5Card) char.classList.add('member5-card');
+if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && isMember1to5Card) char.classList.add('member15-detector');
+if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && altMemberMatch) char.classList.add(`member-alt${altMemberMatch[1]}`);
     if ((state.watching?.mission?.id|0) === 34) {
       // #34：隊長が場に出す「前」だけ、他人の正体カードをブランク固定
       const capIdx = state?.watching?.captainTable;
@@ -7068,6 +7069,11 @@ nc.onclick = async (ev)=>{
   });
 }
 /* ===== /#65 ===== */
+
+function shouldShowRoleCardTextDecorations(mid){
+  const missionId = Number(mid || 0);
+  return missionId !== 31 && missionId !== 61;
+}
 
   
 function renderM61(v){
