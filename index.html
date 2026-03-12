@@ -538,6 +538,11 @@
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  /* 入れ替え系アニメの観戦側では、帯や黒トークンの一瞬復活を避けるためカード周辺を丸ごと隠す */
+  .card-wrap.hook-anim-observer .card,
+  .card-wrap.hook-anim-observer .marker,
+  .card-wrap.hook-anim-observer .tok-col,
+  .card-wrap.hook-anim-observer .badge-fixed{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -8765,6 +8770,9 @@ async function playHookSwapAnimation(A, B, tables){
     const wb = wrapEl(B.table, B.cardId);
     if (!wa || !wb) return;
 
+    const observerWraps = Array.from(document.querySelectorAll('.table .hand .card-wrap'));
+    observerWraps.forEach(w=> w.classList.add('hook-anim-observer'));
+
     const ra = wa.getBoundingClientRect();
     const rb = wb.getBoundingClientRect();
     const ca = wa.querySelector('.card')?.cloneNode(true);
@@ -8871,8 +8879,10 @@ async function playHookSwapAnimation(A, B, tables){
       waitForHookArrival(A.table, B.cardId)
     ]);
     ca.remove(); cb.remove();
+    observerWraps.forEach(w=> w.classList.remove('hook-anim-observer'));
     return null;
   }catch(e){
+    document.querySelectorAll('.card-wrap.hook-anim-observer').forEach(w=> w.classList.remove('hook-anim-observer'));
     console.warn('playHookSwapAnimation failed', e);
     return null;
   }
@@ -8890,6 +8900,9 @@ async function playHookTakeAnimation(sel, myTable, tables){
 
     const ws = wrapEl(sel.table, sel.cardId);
     if (!ws) return;
+
+    const observerWraps = Array.from(document.querySelectorAll('.table .hand .card-wrap'));
+    observerWraps.forEach(w=> w.classList.add('hook-anim-observer'));
 
     const srcHand = (tables[sel.table]?.hand)||[];
     const dstHand = (tables[myTable]?.hand)||[];
@@ -8958,7 +8971,9 @@ async function playHookTakeAnimation(sel, myTable, tables){
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
     await waitForHookArrival(myTable, sel.cardId);
     fly.remove();
+    observerWraps.forEach(w=> w.classList.remove('hook-anim-observer'));
   }catch(e){
+    document.querySelectorAll('.card-wrap.hook-anim-observer').forEach(w=> w.classList.remove('hook-anim-observer'));
     console.warn('playHookTakeAnimation failed', e);
   }
 }
