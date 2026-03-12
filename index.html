@@ -299,6 +299,15 @@
   transition: height .25s ease;  /* ← 必要時だけ付ける */
 }
   .table.elevated{ z-index:200; }
+  .table.i2-table-selectable{
+    outline:2px dashed #38bdf8;
+    outline-offset:-2px;
+    cursor:pointer;
+  }
+  .table.i2-table-selected{
+    outline:2px solid #38bdf8;
+    outline-offset:-2px;
+  }
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
   .title{text-decoration:underline;padding-right:4px}
@@ -3313,6 +3322,7 @@ if ((v.mission?.id|0) === 23) {
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
   const i2All=v.meta?.i2Flow;
   const i18All=v.meta?.i18Flow;
+  const myTableIndex = (v.tables||[]).findIndex(T => T.playerId===state.userId);
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table'; box.dataset.tableIdx = String(idx);
@@ -3326,6 +3336,30 @@ if ((v.mission?.id|0) === 23) {
     const handInner = n>0 ? (n*W + (n-1)*G) : 0;
     const totalW = CW + 8 + handInner + 16;
     box.style.width = Math.max(totalW, CW + 16) + 'px';
+
+    const isI2Actor = !!(i2All && i2All.usingBy===state.userId);
+    const isI2PickOtherPhase = !!(isI2Actor && i2All?.phase==='pickOther' && i2All?.selA);
+    const canPickOtherTable = !!(isI2PickOtherPhase && t.playerId && t.playerId!==state.userId);
+    if (canPickOtherTable) {
+      box.classList.add('i2-table-selectable');
+      if (i2All?.selB?.table === idx) box.classList.add('i2-table-selected');
+      box.onclick = async (ev)=>{
+        ev?.stopPropagation?.();
+        await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:null} });
+        openMenuAtClick([
+          {label:`${t.playerName || String(t.titleNumber ?? (idx+1))}に見せる`, action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
+              phase:'pickViewerSelf',
+              viewerTable: idx,
+              selB:{table:idx, cardId:null}
+            });
+          }},
+          {label:'やり直す', action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null, viewerTable:null} });
+          }}
+        ]);
+      };
+    }
 
 const header=document.createElement('div'); header.className='t-header';
 const title=document.createElement('div');  title.className='title';
@@ -3556,8 +3590,19 @@ wrap.dataset.cardKey = cardKey;
         const m64Special = isM64 && hasX;                // ★ 位置不問：xmark付きは「自分だけ裏」
 const ownerBlindSpecial = (m38Special || m56Special || m64Special);
 
+        const i2ViewerCanSeeSelA = !!(
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2All.viewerTable===myTableIndex &&
+          i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
+        );
+        const i2ActorCanSeeSelB = !!(
+          i2All && i2All.phase==='resolving' && i2All.usingBy===state.userId &&
+          i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
+        );
+
         if (!c.open) {
-          if (ownerBlindSpecial) {
+          if (i2ViewerCanSeeSelA || i2ActorCanSeeSelB) {
+            // i2 表示中は、見せられたカードを選ばれたプレイヤーだけ表として見る
+          } else if (ownerBlindSpecial) {
             if (t.playerId === state.userId) {
               // 隊長本人：裏（黒背景）
               card.classList.add('back');
@@ -3602,29 +3647,39 @@ if (c.markUntil && now() < c.markUntil) {
       const isI2Actor = i2All && i2All.usingBy===state.userId;
       const canPickSelf  = isI2Actor && i2All?.phase==='pickSelf'  && t.playerId===state.userId;
       const canPickOther = isI2Actor && i2All?.phase==='pickOther' && t.playerId!==state.userId;
+      const canViewerPickSelf = !!(i2All && i2All.phase==='pickViewerSelf' && i2All.viewerTable===myTableIndex && t.playerId===state.userId && !c.open);
 
       const isI18Actor = i18All && i18All.usingBy===state.userId;
       const canI18Pick = isI18Actor && i18All?.phase==='pickOther' && t.playerId!==state.userId;
 
-      if(isI2Actor && (canPickSelf || canPickOther)){
+      if(isI2Actor && canPickSelf){
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
-          if(canPickSelf){
-            await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther' });
-          }else if(canPickOther){
-            await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
-openMenuAtClick([
-  {label:'交換する', action: async ()=>{
-    const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
-    if(i2?.selA && i2?.selB) await doItem2Swap(i2.selA, i2.selB);
-  }},
-  {label:'やり直す', action: async ()=>{
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
-  }}
-]);
-
-          }
+          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther', selB:null, viewerTable:null });
+        };
+      }else if(canViewerPickSelf){
+        card.classList.add('i2-selectable');
+        card.onclick = async (ev)=>{
+          ev.stopPropagation();
+          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
+          openMenuAtClick([
+            {label:'カードを渡す', action: async ()=>{
+              const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
+              if(!(i2?.selA && i2?.selB?.cardId)) return;
+              // 実行前に選択フェーズを外して青枠を消す
+              await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
+                phase:'resolving'
+              });
+              await doItem2Swap(i2.selA, i2.selB);
+            }}
+          ]);
+        };
+      }else if(isI2Actor && canPickOther){
+        // 他プレイヤー側の選択はテーブルクリックで行う（カードクリックもテーブル扱い）
+        card.onclick = async (ev)=>{
+          ev.stopPropagation();
+          box.onclick?.(ev);
         };
       }else if(canI18Pick){
         card.classList.add('i2-selectable');
@@ -3641,7 +3696,7 @@ openMenuAtClick([
          card.onclick = async ()=>{
    if (state.watching?.meta?.m42_on || state.watching?.meta?.m42Swap?.on || state.watching?.meta?.m42M2?.on) return;
           if(isMine){
-            const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther');
+            const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther' || i2All.phase==='pickViewerSelf');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
             if(blockingI2 || blockingI18) return;
             if (c.open){
@@ -3664,7 +3719,15 @@ openMenuAtClick([
       const hasNum = (c.num != null && !Number.isNaN(Number(c.num)));
       if (hasNum) {
         num.textContent = String(c.num);
-        num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
+        const i2ViewerCanSeeSelA = !!(
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2All.viewerTable===myTableIndex &&
+          i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
+        );
+        const i2ActorCanSeeSelB = !!(
+          i2All && i2All.phase==='resolving' && i2All.usingBy===state.userId &&
+          i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
+        );
+        num.style.visibility = (c.open || isMine || i2ViewerCanSeeSelA || i2ActorCanSeeSelB) ? 'visible' : 'hidden';
       } else {
         num.textContent = '';
         num.style.visibility = 'hidden';
@@ -8198,7 +8261,7 @@ btnUse.onclick = async (ev)=>{
   if (isNine){
     // item2 の「使う」と同じ：i2Flow を pickSelf で開始
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      i2Flow: { usingBy: state.userId, phase: 'pickSelf', selA: null, selB: null }
+      i2Flow: { usingBy: state.userId, phase: 'pickSelf', selA: null, selB: null, viewerTable:null }
     });
   }
   closeConstraintZoom();
@@ -8340,7 +8403,7 @@ function openItemZoom(itemNo, itemIdx, opt={}){
         if(itemNo===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
 
         if(itemNo===2){
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null, viewerTable:null} });
         }
         if(itemNo===13){ await addTwoItemsFromDeck(); }
         if(itemNo===16){ await handleItem16(itemIdx); }
@@ -9227,7 +9290,10 @@ function closeAllMini(e){
   const meta = state.watching?.meta || {};
   const i2   = meta.i2Flow  || null;
   const i18  = meta.i18Flow || null;
-  const inI2  = !!(i2  && i2.usingBy === state.userId && (i2.phase === 'pickSelf' || i2.phase === 'pickOther'));
+  const inI2  = !!(i2 && (
+    // pickOther / pickViewerSelf は外クリックで閉じて選び直せるようにする
+    (i2.usingBy === state.userId && (i2.phase === 'pickSelf'))
+  ));
   const inI18 = !!(i18 && i18.usingBy === state.userId && (i18.phase === 'pickOther'));
 
   if (inM42 || inI2 || inI18) return;
