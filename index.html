@@ -884,7 +884,9 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   width:56px; height:56px;
   background-size:contain; background-repeat:no-repeat; background-position:center;
   pointer-events:auto;   /* クリックで回収メニュー */
+  z-index:6;
 }
+.m59-nano{ z-index:2147483602; }
 
 
   
@@ -6026,7 +6028,7 @@ async function renderM59(v){
 
   const node = document.createElement('div');
   node.id = 'm59Nano';
-  node.className = 'm43-nano'; // 56x56 既存CSSを流用
+  node.className = 'm43-nano m59-nano'; // 56x56 既存CSSを流用
   node.style.backgroundImage = `url("${goLeft ? './nano0left.png' : './nano0.png'}")`;
 
   // ★ここが「上半分重ね」：セル内基準で上辺に中心を合わせる
