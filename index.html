@@ -7131,9 +7131,15 @@ function applyRoleSlotConstraintItemSize(node, enabled){
 
 function isRoleSelectionCompleted(v){
   const face1to9 = /member\s*\(([1-9])\)\.(?:jpe?g|png|webp)$/i;
-  const seatedTables = (v?.tables || []).filter(t => !!t?.playerId);
-  if (!seatedTables.length) return false;
-  return seatedTables.every(t => face1to9.test(String(t?.character?.face || '')));
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  if (!tables.length) return false;
+
+  // M61要件：全プレイヤーが着席し、全員がキャラクター決定済みになってから制約カードを重ねる
+  return tables.every(t => {
+    const seated = !!t?.playerId;
+    const decided = face1to9.test(String(t?.character?.face || ''));
+    return seated && decided;
+  });
 }
 
   
