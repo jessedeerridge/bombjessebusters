@@ -4850,10 +4850,9 @@ if (big){
       const isFlippedRole = !!t?.character?.flipped;
       const face = isFlippedRole ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
       mini.style.backgroundImage = `url("${face}")`;
-      const showRoleTextDecorations = shouldShowRoleCardTextDecorations(v?.mission?.id);
-      if (showRoleTextDecorations && !isFlippedRole && isMember5Card) mini.classList.add('member5-card');
-      if (showRoleTextDecorations && !isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
-      if (showRoleTextDecorations && !isFlippedRole && altMemberMatch) mini.classList.add(`member-alt${altMemberMatch[1]}`);
+      if (!isFlippedRole && isMember5Card) mini.classList.add('member5-card');
+      if (!isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
+      if (!isFlippedRole && altMemberMatch) mini.classList.add(`member-alt${altMemberMatch[1]}`);
       // 本人のみ裏表トグル
       // 本人のみ：member(9)なら拡大→「使う」ポップ、その他は裏表トグル
       if (amMe){
@@ -7128,10 +7127,9 @@ function renderM61(v){
       const isFlippedRole = !!t?.character?.flipped;
       const face = isFlippedRole ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
       mini.style.backgroundImage = `url("${face}")`;
-      const showRoleTextDecorations = shouldShowRoleCardTextDecorations(v?.mission?.id);
-      if (showRoleTextDecorations && !isFlippedRole && isMember5Card) mini.classList.add('member5-card');
-      if (showRoleTextDecorations && !isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
-      if (showRoleTextDecorations && !isFlippedRole && altMemberMatch) mini.classList.add(`member-alt${altMemberMatch[1]}`);
+      if (!isFlippedRole && isMember5Card) mini.classList.add('member5-card');
+      if (!isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
+      if (!isFlippedRole && altMemberMatch) mini.classList.add(`member-alt${altMemberMatch[1]}`);
      // 既存の大キャラ同様、本人のみ裏表トグル
 
       if (amSeatedHere){
@@ -8227,10 +8225,9 @@ function openRolePickOverlay(curFaceName, myIdx){
       const c = document.createElement('div');
       c.className = 'concard role-card'; // アイテムと同サイズの見た目を流用
       const altMemberMatch = String(originalName||'').match(/member\s*\(([6-9])\)\./i);
-      const showRoleTextDecorations = shouldShowRoleCardTextDecorations(state?.watching?.mission?.id);
-      if (showRoleTextDecorations && /member\s*\(5\)\./i.test(String(originalName||''))) c.classList.add('member5-card');
-      if (showRoleTextDecorations && /member\s*\(([1-5])\)\./i.test(String(originalName||''))) c.classList.add('member15-detector');
-      if (showRoleTextDecorations && altMemberMatch) c.classList.add(`member-alt${altMemberMatch[1]}`);
+      if (/member\s*\(5\)\./i.test(String(originalName||''))) c.classList.add('member5-card');
+      if (/member\s*\(([1-5])\)\./i.test(String(originalName||''))) c.classList.add('member15-detector');
+      if (altMemberMatch) c.classList.add(`member-alt${altMemberMatch[1]}`);
       c.style.backgroundImage = `url('./${originalName}')`;
       c.title = 'クリックで拡大';
       c.addEventListener('click', ev=>{
@@ -8292,10 +8289,9 @@ function openRolePickZoomToPreview(previewEl, faceName, myIdx){
   const big = document.createElement('div');
   big.className = 'conzoom-card'; // 拡大見た目は流用でOK（掃除対象ではない）
   const altMemberMatch = String(faceName||'').match(/member\s*\(([6-9])\)\./i);
-  const showRoleTextDecorations = shouldShowRoleCardTextDecorations(state?.watching?.mission?.id);
-  if (showRoleTextDecorations && /member\s*\(5\)\./i.test(String(faceName||''))) big.classList.add('member5-card');
-  if (showRoleTextDecorations && /member\s*\(([1-5])\)\./i.test(String(faceName||''))) big.classList.add('member15-detector');
-  if (showRoleTextDecorations && altMemberMatch) big.classList.add(`member-alt${altMemberMatch[1]}`);
+  if (/member\s*\(5\)\./i.test(String(faceName||''))) big.classList.add('member5-card');
+  if (/member\s*\(([1-5])\)\./i.test(String(faceName||''))) big.classList.add('member15-detector');
+  if (altMemberMatch) big.classList.add(`member-alt${altMemberMatch[1]}`);
   big.classList.add('role-card');
   big.style.backgroundImage = `url('./${faceName}')`;
   wrap.appendChild(big);
@@ -8374,10 +8370,9 @@ function openRoleZoomView(faceFileName){
     const big = document.createElement('div');
     big.className = 'conzoom-card';
     const altMemberMatch = String(faceFileName||'').match(/member\s*\(([6-9])\)\./i);
-    const showRoleTextDecorations = shouldShowRoleCardTextDecorations(state?.watching?.mission?.id);
-    if (showRoleTextDecorations && /member\s*\(5\)\./i.test(String(faceFileName||''))) big.classList.add('member5-card');
-    if (showRoleTextDecorations && /member\s*\(([1-5])\)\./i.test(String(faceFileName||''))) big.classList.add('member15-detector');
-    if (showRoleTextDecorations && altMemberMatch) big.classList.add(`member-alt${altMemberMatch[1]}`);
+    if (/member\s*\(5\)\./i.test(String(faceFileName||''))) big.classList.add('member5-card');
+    if (/member\s*\(([1-5])\)\./i.test(String(faceFileName||''))) big.classList.add('member15-detector');
+    if (altMemberMatch) big.classList.add(`member-alt${altMemberMatch[1]}`);
     big.classList.add('role-card');
     // member画像をそのまま拡大
     big.style.backgroundImage = `url('./${faceFileName}')`;
