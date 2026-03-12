@@ -7147,7 +7147,7 @@ function renderM61(v){
   const isM61 = ((v?.mission?.id|0) === 61);
   // 片付け（#61以外になったら痕跡を消す）
   if (!isM61){
-    document.querySelectorAll('.m61-con, .m61-stack').forEach(n=>n.remove());
+    document.querySelectorAll('.m61-con, .m61-mini, .m61-stack').forEach(n=>n.remove());
     if (document.getElementById('conZoomOverlay')) closeConstraintZoom();
     return;
   }
@@ -7161,7 +7161,7 @@ function renderM61(v){
   // 各テーブル：最初は正体カードのみ表示。全員決定後に正体カードの上へ制約カードを重ねる。
   const tableEls = Array.from(document.querySelectorAll('#tables .table'));
   tableEls.forEach((tbEl, ti)=>{
-    tbEl.querySelectorAll('.m61-con, .m61-stack').forEach(n=>n.remove());
+    tbEl.querySelectorAll('.m61-con, .m61-mini, .m61-stack').forEach(n=>n.remove());
     const charCol = tbEl.querySelector('.char-col');
     if (!charCol) return;
 
@@ -7192,8 +7192,52 @@ function renderM61(v){
       con.onclick = ()=> openConstraintZoomView(ch);
     }
 
+    const t = (v.tables||[])[ti] || {};
+    const mini = document.createElement('div');
+    mini.className = 'm61-mini';
+    const seatEmpty = !t.playerId;
+    const amSeatedHere = (t.playerId && t.playerId === state.userId);
+    if (seatEmpty){
+      mini.classList.add('blank');
+      mini.onclick = null;
+    }else{
+      const faceName = String(t?.character?.face || '');
+      const isMember5Card = /member\s*\(5\)\./i.test(faceName);
+      const isMember1to5Card = /member\s*\(([1-5])\)\./i.test(faceName);
+      const altMemberMatch = faceName.match(/member\s*\(([6-9])\)\./i);
+      const isFlippedRole = !!t?.character?.flipped;
+      const face = isFlippedRole ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
+      mini.style.backgroundImage = `url("${face}")`;
+      if (!isFlippedRole && isMember5Card) mini.classList.add('member5-card');
+      if (!isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
+      if (!isFlippedRole && altMemberMatch) mini.classList.add(`member-alt${altMemberMatch[1]}`);
+
+      if (amSeatedHere){
+        const orig = String(t?.character?.face || '');
+        if (orig.includes('member (9).jpg')){
+          mini.style.cursor = 'pointer';
+          mini.onclick = ()=> openRoleZoomView(orig);
+        }else{
+          mini.onclick = async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
+          };
+        }
+      }else{
+        mini.onclick = null;
+      }
+      if (!amSeatedHere) mini.style.cursor = 'default';
+    }
+
     charCol.style.position = 'relative';
+    charCol.appendChild(mini);
     charCol.appendChild(con);
+
+    {
+      const rBox = tbEl.getBoundingClientRect();
+      const rMini = mini.getBoundingClientRect();
+      const needPx = Math.max(96, Math.ceil(rMini.bottom - rBox.top + 6));
+      applyTableHeight(tbEl, needPx);
+    }
   });
 
   const capIdx = v?.captainTable ?? null;
