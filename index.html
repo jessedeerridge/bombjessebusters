@@ -3591,12 +3591,16 @@ wrap.dataset.cardKey = cardKey;
 const ownerBlindSpecial = (m38Special || m56Special || m64Special);
 
         const i2ViewerCanSeeSelA = !!(
-          i2All && i2All.phase==='pickViewerSelf' && i2All.viewerTable===myTableIndex &&
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2All.viewerTable===myTableIndex &&
           i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
+        );
+        const i2ActorCanSeeSelB = !!(
+          i2All && i2All.phase==='resolving' && i2All.usingBy===state.userId &&
+          i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
         );
 
         if (!c.open) {
-          if (i2ViewerCanSeeSelA) {
+          if (i2ViewerCanSeeSelA || i2ActorCanSeeSelB) {
             // i2 表示中は、見せられたカードを選ばれたプレイヤーだけ表として見る
           } else if (ownerBlindSpecial) {
             if (t.playerId === state.userId) {
@@ -3665,8 +3669,7 @@ if (c.markUntil && now() < c.markUntil) {
               if(!(i2?.selA && i2?.selB?.cardId)) return;
               // 実行前に選択フェーズを外して青枠を消す
               await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
-                phase:'resolving',
-                viewerTable:null
+                phase:'resolving'
               });
               await doItem2Swap(i2.selA, i2.selB);
             }}
@@ -3717,10 +3720,14 @@ if (c.markUntil && now() < c.markUntil) {
       if (hasNum) {
         num.textContent = String(c.num);
         const i2ViewerCanSeeSelA = !!(
-          i2All && i2All.phase==='pickViewerSelf' && i2All.viewerTable===myTableIndex &&
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2All.viewerTable===myTableIndex &&
           i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
         );
-        num.style.visibility = (c.open || isMine || i2ViewerCanSeeSelA) ? 'visible' : 'hidden';
+        const i2ActorCanSeeSelB = !!(
+          i2All && i2All.phase==='resolving' && i2All.usingBy===state.userId &&
+          i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
+        );
+        num.style.visibility = (c.open || isMine || i2ViewerCanSeeSelA || i2ActorCanSeeSelB) ? 'visible' : 'hidden';
       } else {
         num.textContent = '';
         num.style.visibility = 'hidden';
