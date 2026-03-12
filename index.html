@@ -538,6 +538,8 @@
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .table.hook-anim-active .badge-fixed,
+  .table.hook-anim-active .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -8673,10 +8675,10 @@ function queueSharedHookAnimations(v){
 }
 
 async function playHookSwapAnimation(A, B, tables){
+  const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
+  const wrapEl = (ti, cardId)=> document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
+  const handEl = (ti)=> tableEl(ti)?.querySelector('.hand');
   try{
-    const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
-    const wrapEl = (ti, cardId)=> document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
-    const handEl = (ti)=> tableEl(ti)?.querySelector('.hand');
     const cardW = cssNum('--card-w') || 24;
     const cardH = cssNum('--card-h') || 40;
     const gap   = cssNum('--card-gap') || 3;
@@ -8705,6 +8707,10 @@ async function playHookSwapAnimation(A, B, tables){
 
     wa.classList.add('hook-anim-origin');
     wb.classList.add('hook-anim-origin');
+    const taEl = tableEl(A.table);
+    const tbEl = tableEl(B.table);
+    taEl?.classList.add('hook-anim-active');
+    tbEl?.classList.add('hook-anim-active');
 
     // 1) 抜き取りカードを上に飛び出し
     requestAnimationFrame(()=>{
@@ -8795,14 +8801,27 @@ async function playHookSwapAnimation(A, B, tables){
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
     return null;
+  }finally{
+    const taEl = tableEl(A?.table);
+    const tbEl = tableEl(B?.table);
+    taEl?.classList.remove('hook-anim-active');
+    tbEl?.classList.remove('hook-anim-active');
+    const waNow = wrapEl(A?.table, A?.cardId);
+    const wbNow = wrapEl(B?.table, B?.cardId);
+    waNow?.classList.remove('hook-anim-origin');
+    wbNow?.classList.remove('hook-anim-origin');
+    document.querySelectorAll('.card-wrap .card, .card-wrap .tok-col').forEach((node)=>{
+      node.style.transition = '';
+      node.style.transform = '';
+    });
   }
 }
 
 async function playHookTakeAnimation(sel, myTable, tables){
+  const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
+  const wrapEl = (ti, cardId)=> document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
+  const handEl = (ti)=> tableEl(ti)?.querySelector('.hand');
   try{
-    const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
-    const wrapEl = (ti, cardId)=> document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
-    const handEl = (ti)=> tableEl(ti)?.querySelector('.hand');
     const cardW = cssNum('--card-w') || 24;
     const cardH = cssNum('--card-h') || 40;
     const gap   = cssNum('--card-gap') || 3;
@@ -8835,6 +8854,10 @@ async function playHookTakeAnimation(sel, myTable, tables){
     document.body.appendChild(fly);
 
     ws.classList.add('hook-anim-origin');
+    const srcTableEl = tableEl(sel.table);
+    const dstTableEl = tableEl(myTable);
+    srcTableEl?.classList.add('hook-anim-active');
+    dstTableEl?.classList.add('hook-anim-active');
     requestAnimationFrame(()=>{ fly.style.transform=`translateY(-${cardH}px)`; });
     await sleep(HOOK_STEP_MS);
 
@@ -8880,6 +8903,17 @@ async function playHookTakeAnimation(sel, myTable, tables){
     fly.remove();
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
+  }finally{
+    const srcTableEl = tableEl(sel?.table);
+    const dstTableEl = tableEl(myTable);
+    srcTableEl?.classList.remove('hook-anim-active');
+    dstTableEl?.classList.remove('hook-anim-active');
+    const wsNow = wrapEl(sel?.table, sel?.cardId);
+    wsNow?.classList.remove('hook-anim-origin');
+    document.querySelectorAll('.card-wrap .card, .card-wrap .tok-col').forEach((node)=>{
+      node.style.transition = '';
+      node.style.transform = '';
+    });
   }
 }
 
