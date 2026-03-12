@@ -247,7 +247,7 @@
     background-size:auto !important;
     background-position:center !important;
     background-repeat:no-repeat !important;
-    overflow:visible;
+    overflow:hidden;
   }
   .constraint-face::before{
     content:'';
@@ -320,6 +320,9 @@
     position:relative; overflow:visible;
   }
   .conzoom-card .item-usebar{ border-radius:0 0 9px 9px; }
+  .conzoom-card.constraint-face{
+    overflow:hidden;
+  }
   .conzoom-menu{
     position:absolute; top:50%; left:50%;
     translate:-50% calc(-50% + 108px);
