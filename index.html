@@ -4796,60 +4796,74 @@ pool.forEach(ch=>{
     // 古いミニ（#31用）を除去して重複防止
     charCol.querySelectorAll('.m31-mini').forEach(n=>n.remove());
 
-    // 大キャラを常にブランク表示に固定
-const big = charCol.querySelector('.char-card');
-if (big){
-  big.classList.add('blank');
-  big.removeAttribute('style');
-  applyRoleSlotConstraintItemSize(big, false);
-  big.onclick = null;
+    const t = (v.tables||[])[ti] || {};
+    const picked = t?.m31Con;
 
-  const picked = v?.tables?.[ti]?.m31Con;
-  const face   = v?.tables?.[ti]?.m31Face || 'front';  // 'front' | 'back'
-  if (picked){
-    big.classList.remove('blank');
-    applyRoleSlotConstraintItemSize(big, true);
-    // 表/裏で画像を切替
-    if (face === 'back'){
-      big.classList.remove('constraint-face');
+    // 制約カード未選択：下段は出さず、正体カードは元の位置に表示
+    const big = charCol.querySelector('.char-card');
+    if (big){
+      big.classList.remove('blank','constraint-face');
       big.querySelector('.constraint-alpha')?.remove();
       big.querySelector('.constraint-desc')?.remove();
-      big.style.backgroundImage = `url('${imgConstraintBack()}')`;
-    }else{
-      paintConstraintCard(big, picked);
-    }
-    big.style.backgroundSize = 'cover';
-    big.style.backgroundPosition = 'center';
+      applyRoleSlotConstraintItemSize(big, false);
 
-    // クリック挙動：自分は裏返しメニュー、他人は閲覧だけ
-    const myIdx = (()=>{
-      const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
-      if (Number.isInteger(sNum) && sNum>=0 && sNum < (state?.watching?.tables||[]).length) return sNum;
-      const alt = (state?.watching?.tables||[]).findIndex(t=> t?.playerId===state.userId);
-      return (alt>=0? alt : null);
-    })();
-    const isMine = (typeof myIdx === 'number' && myIdx === ti);
+      if (!picked){
+        const isFlippedRole = !!t?.character?.flipped;
+        const face = isFlippedRole ? './battery.jpg' : `./${t?.character?.face || 'member (1).jpg'}`;
+        big.style.backgroundImage = `url("${face}")`;
+        big.style.backgroundSize = 'cover';
+        big.style.backgroundPosition = 'center';
 
-    big.onclick = (ev)=>{
-      ev.stopPropagation();
-      if (isMine){
-        // 自分：裏返し可能なズーム
-        openConstraintZoom31Owned(picked, ti);
-      }else{
-        // 他人：閲覧専用ズーム
-        openConstraintZoomView(picked);
+        const amMe = !!t.playerId && t.playerId === state.userId;
+        if (amMe){
+          const orig = String(t?.character?.face || '');
+          if (orig.includes('member (9).jpg')){
+            big.style.cursor = 'pointer';
+            big.onclick = ()=> openRoleZoomView(orig);
+          }else{
+            big.onclick = async ()=>{
+              await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t?.character?.flipped });
+            };
+          }
+        }else{
+          big.onclick = null;
+          big.style.cursor = 'default';
+        }
+
+        applyTableHeight(tbEl, 96);
+        return;
       }
-    };
-  }
-}
 
+      // 制約カード選択後：正体カード位置は制約カードに置換
+      big.classList.remove('blank');
+      applyRoleSlotConstraintItemSize(big, true);
+      const face = t?.m31Face || 'front';  // 'front' | 'back'
+      if (face === 'back'){
+        big.style.backgroundImage = `url('${imgConstraintBack()}')`;
+      }else{
+        paintConstraintCard(big, picked);
+      }
+      big.style.backgroundSize = 'cover';
+      big.style.backgroundPosition = 'center';
 
+      const myIdx = (()=>{
+        const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
+        if (Number.isInteger(sNum) && sNum>=0 && sNum < (state?.watching?.tables||[]).length) return sNum;
+        const alt = (state?.watching?.tables||[]).findIndex(t=> t?.playerId===state.userId);
+        return (alt>=0? alt : null);
+      })();
+      const isMine = (typeof myIdx === 'number' && myIdx === ti);
+      big.onclick = (ev)=>{
+        ev.stopPropagation();
+        if (isMine) openConstraintZoom31Owned(picked, ti);
+        else openConstraintZoomView(picked);
+      };
+    }
 
     // ミニキャラ（#61と同寸の .m61-mini を流用）＋ #31識別用クラスを付与
     const mini = document.createElement('div');
     mini.className = 'm61-mini m31-mini';
 
-    const t = (v.tables||[])[ti] || {};
     const seatEmpty = !t.playerId;
     const amMe = !!t.playerId && t.playerId === state.userId;
 
@@ -7100,6 +7114,13 @@ function applyRoleSlotConstraintItemSize(node, enabled){
   }
 }
 
+function isRoleSelectionCompleted(v){
+  const face1to9 = /member\s*\(([1-9])\)\.(?:jpe?g|png|webp)$/i;
+  const seatedTables = (v?.tables || []).filter(t => !!t?.playerId);
+  if (!seatedTables.length) return false;
+  return seatedTables.every(t => face1to9.test(String(t?.character?.face || '')));
+}
+
   
 function renderM61(v){
   const isM61 = ((v?.mission?.id|0) === 61);
@@ -7114,6 +7135,7 @@ function renderM61(v){
 
   const by = v.meta.m61_byTable.slice();
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
+  const roleSelectionDone = isRoleSelectionCompleted(v);
 
   // 各テーブルのキャラカード「左」に、キャラカードと同サイズで表示
   const tableEls = Array.from(document.querySelectorAll('#tables .table'));
@@ -7136,9 +7158,11 @@ function renderM61(v){
     con.style.width  = 'var(--item-w)';
     con.style.height = 'var(--item-h)';
     paintConstraintCard(con, ch);
-    // ミニキャラ
-    const mini = document.createElement('div');
-   mini.className = 'm61-mini';
+    // ミニキャラ（キャラ選択完了まで表示しない）
+    let mini = null;
+    if (roleSelectionDone){
+      mini = document.createElement('div');
+      mini.className = 'm61-mini';
     const t = (v.tables||[])[ti] || {};
     const seatEmpty = !t.playerId;
     const amSeatedHere = (t.playerId && t.playerId === state.userId);
@@ -7173,9 +7197,10 @@ function renderM61(v){
       }
 
       if (!amSeatedHere) mini.style.cursor = 'default';
-   }
+    }
+    }
     stack.appendChild(con);
-    stack.appendChild(mini);
+    if (mini) stack.appendChild(mini);
     // 旧 .char-col を物理削除して詰める
     content.insertBefore(stack, charCol);
     charCol.remove();
