@@ -237,6 +237,47 @@
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     border-radius:8px; border:1px solid #ddd;
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
+    position:relative;
+    overflow:hidden;
+  }
+
+  .constraint-card-face{
+    background:#fff !important;
+    border:8px solid #6e6770 !important;
+    border-top-width:15px !important;
+    border-radius:8px;
+    background-image:none !important;
+    position:relative;
+    overflow:hidden;
+  }
+  .constraint-eyeband{
+    position:absolute;
+    top:1px;
+    left:2px;
+    width:11px;
+    height:11px;
+    background:url('./eyeband.png') center/contain no-repeat;
+    pointer-events:none;
+  }
+  .constraint-label{
+    position:absolute;
+    top:2px;
+    right:18px;
+    color:#fff;
+    font-size:8px;
+    line-height:1;
+    font-weight:700;
+    pointer-events:none;
+  }
+  .constraint-letter{
+    position:absolute;
+    top:1px;
+    right:4px;
+    color:#fff;
+    font-size:12px;
+    line-height:1;
+    font-weight:700;
+    pointer-events:none;
   }
 
   #conZoomOverlay{
@@ -1957,6 +1998,31 @@ const imgConstraint = L => `./${String(L).toLowerCase()}.jpg`;
 const imgConstraintBack = () => `./conback.jpg`;
 const imgChallenge = id => `./${id}.png`;
 
+function decorateConstraintCards(root=document){
+  const nodes = root.querySelectorAll?.('.concard, .conzoom-card') || [];
+  nodes.forEach((el)=>{
+    const bg = String(el.style.backgroundImage || '');
+    const m = bg.match(/(?:^|\/)([a-l])\.jpg/i);
+    if (!m){
+      el.classList.remove('constraint-card-face');
+      el.dataset.letter = '';
+      el.querySelectorAll('.constraint-eyeband,.constraint-label,.constraint-letter').forEach(n=>n.remove());
+      return;
+    }
+    const letter = m[1].toUpperCase();
+    el.classList.add('constraint-card-face');
+    el.dataset.letter = letter;
+
+    let eye = el.querySelector('.constraint-eyeband');
+    if (!eye){ eye = document.createElement('span'); eye.className = 'constraint-eyeband'; el.appendChild(eye); }
+    let label = el.querySelector('.constraint-label');
+    if (!label){ label = document.createElement('span'); label.className = 'constraint-label'; label.textContent = '制約'; el.appendChild(label); }
+    let letterEl = el.querySelector('.constraint-letter');
+    if (!letterEl){ letterEl = document.createElement('span'); letterEl.className = 'constraint-letter'; el.appendChild(letterEl); }
+    letterEl.textContent = letter;
+  });
+}
+
 const CARD_IMAGE_PRELOAD_LIST = [
   ...MATERIALS.numbers.map(n => `./s${n}.jpg`),
   ...Array.from({ length: 11 }, (_, i) => `./c${i}.png`),
@@ -2570,6 +2636,7 @@ if (v) {
       renderHostTool(v);
       renderMissionComplete(v);
       renderStageStory(v);
+      decorateConstraintCards(document);
 
     });
     queueSharedHookAnimations(v);
