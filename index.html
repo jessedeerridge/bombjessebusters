@@ -8641,6 +8641,19 @@ const HOOK_STEP_MS = 1500;
 const HOOK_STAGE_COUNT = 3;
 const HOOK_LAND_HOLD_MS = Math.max(0, HOOK_ANIM_TOTAL_MS - (HOOK_STEP_MS * HOOK_STAGE_COUNT));
 
+
+
+async function waitForHookArrival(tableIdx, cardId, timeoutMs=2000){
+  const started = Date.now();
+  const selector = `.table[data-table-idx="${tableIdx}"] .card-wrap[data-card-id="${cardId}"] .card`;
+  while ((Date.now() - started) < timeoutMs){
+    const card = document.querySelector(selector);
+    if (card) return true;
+    await sleep(34);
+  }
+  return false;
+}
+
 function queueSharedHookAnimations(v){
   const i2Anim = v?.meta?.i2Anim;
   if (i2Anim?.id && i2Anim.id !== state._lastI2AnimId && i2Anim.A && i2Anim.B){
@@ -8773,6 +8786,10 @@ async function playHookSwapAnimation(A, B, tables){
     await sleep(HOOK_STEP_MS);
 
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
+    await Promise.all([
+      waitForHookArrival(B.table, A.cardId),
+      waitForHookArrival(A.table, B.cardId)
+    ]);
     ca.remove(); cb.remove();
     return null;
   }catch(e){
@@ -8859,6 +8876,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(HOOK_STEP_MS);
 
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
+    await waitForHookArrival(myTable, sel.cardId);
     fly.remove();
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
