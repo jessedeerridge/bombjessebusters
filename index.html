@@ -8645,7 +8645,7 @@ const HOOK_LAND_HOLD_MS = Math.max(0, HOOK_ANIM_TOTAL_MS - (HOOK_STEP_MS * HOOK_
 
 
 
-async function waitForHookArrival(tableIdx, cardId, timeoutMs=2000){
+async function waitForHookArrival(tableIdx, cardId, timeoutMs=9000){
   const started = Date.now();
   const selector = `.table[data-table-idx="${tableIdx}"] .card-wrap[data-card-id="${cardId}"] .card`;
   while ((Date.now() - started) < timeoutMs){
@@ -8675,7 +8675,7 @@ function buildHookTableSig(tables){
 function markHookAnimBlocking(tables){
   state._hookAnimBlock = {
     startedAt: Date.now(),
-    until: Date.now() + HOOK_ANIM_TOTAL_MS + 2500,
+    until: Date.now() + HOOK_ANIM_TOTAL_MS + 12000,
     startSig: buildHookTableSig(tables)
   };
 }
@@ -8827,7 +8827,6 @@ async function playHookSwapAnimation(A, B, tables){
       waitForHookArrival(A.table, B.cardId)
     ]);
     ca.remove(); cb.remove();
-    state._hookAnimBlock = null;
     return null;
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
@@ -8917,7 +8916,6 @@ async function playHookTakeAnimation(sel, myTable, tables){
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
     await waitForHookArrival(myTable, sel.cardId);
     fly.remove();
-    state._hookAnimBlock = null;
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
     state._hookAnimBlock = null;
