@@ -252,10 +252,10 @@
   .constraint-face::before{
     content:'';
     position:absolute;
-    top:1px;
+    top:-8px;
     left:-1px;
-    width:8px;
-    height:8px;
+    width:12px;
+    height:12px;
     background:url('./eyeband.png') center/contain no-repeat;
     z-index:3;
     pointer-events:none;
@@ -263,10 +263,10 @@
   .constraint-face::after{
     content:'制約';
     position:absolute;
-    top:1px;
-    right:20px;
+    top:-7px;
+    right:10px;
     color:#fff;
-    font-size:8px;
+    font-size:5px;
     line-height:1;
     font-weight:700;
     letter-spacing:.02em;
@@ -275,16 +275,17 @@
   }
   .constraint-face .constraint-alpha{
     position:absolute;
-    top:0;
-    right:4px;
+    top:-12px;
+    right:-3px;
     color:#fff;
     font-size:12px;
     line-height:1;
     font-weight:700;
     text-transform:uppercase;
     background:#6a3f75;
-    padding:0 2px;
-    border-radius:2px;
+    padding:2px 2px;
+    border-radius:4px 4px 2px 2px;
+    display:inline-block;
     z-index:2;
     pointer-events:none;
   }
