@@ -3579,7 +3579,7 @@ if (!amSeated || seatEmpty) {
     };
   }
 }
-const showRoleTextDecorations = shouldShowRoleCardTextDecorations(state?.watching?.mission?.id);
+const showRoleTextDecorations = shouldShowRoleCardTextDecorations(state?.watching, { tableIdx: idx });
 if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && isMember5Card) char.classList.add('member5-card');
 if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && isMember1to5Card) char.classList.add('member15-detector');
 if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && altMemberMatch) char.classList.add(`member-alt${altMemberMatch[1]}`);
@@ -7098,9 +7098,24 @@ nc.onclick = async (ev)=>{
 }
 /* ===== /#65 ===== */
 
-function shouldShowRoleCardTextDecorations(mid){
-  const missionId = Number(mid || 0);
-  return missionId !== 31 && missionId !== 61;
+function shouldShowRoleCardTextDecorations(viewOrMid, opts={}){
+  const hasView = viewOrMid && typeof viewOrMid === 'object';
+  const v = hasView ? viewOrMid : null;
+  const missionId = Number(hasView ? (v?.mission?.id || 0) : (viewOrMid || 0));
+
+  if (missionId === 31){
+    if (v && Number.isInteger(opts?.tableIdx)){
+      return !v?.tables?.[opts.tableIdx]?.m31Con;
+    }
+    return true;
+  }
+
+  if (missionId === 61){
+    if (v) return !isRoleSelectionCompleted(v);
+    return true;
+  }
+
+  return true;
 }
 
 function applyRoleSlotConstraintItemSize(node, enabled){
@@ -7137,95 +7152,45 @@ function renderM61(v){
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
   const roleSelectionDone = isRoleSelectionCompleted(v);
 
-  // 各テーブルのキャラカード「左」に、キャラカードと同サイズで表示
+  // 各テーブル：最初は正体カードのみ表示。全員決定後に正体カードの上へ制約カードを重ねる。
   const tableEls = Array.from(document.querySelectorAll('#tables .table'));
   tableEls.forEach((tbEl, ti)=>{
-    // 既存ノードを掃除して1個化
     tbEl.querySelectorAll('.m61-con, .m61-stack').forEach(n=>n.remove());
-    const content = tbEl.querySelector('.t-content');
     const charCol = tbEl.querySelector('.char-col');
-    if (!content || !charCol) return;
+    if (!charCol) return;
+
+    applyTableHeight(tbEl, 96);
+
+    if (!roleSelectionDone) return;
+
     const ch = by[ti];
     if (!ch) return;
 
-    // ▼ M61 専用スタック（制約の下に極小キャラ）
-    const stack = document.createElement('div');
-    stack.className = 'm61-stack';
-    stack.style.width = 'var(--item-w)';
-    // 制約カード
     const con = document.createElement('div');
     con.className = 'concard m61-con';
     con.style.width  = 'var(--item-w)';
     con.style.height = 'var(--item-h)';
+    con.style.position = 'absolute';
+    con.style.left = '50%';
+    con.style.top = '0';
+    con.style.transform = 'translateX(-50%)';
+    con.style.zIndex = '3';
     paintConstraintCard(con, ch);
-    // ミニキャラ（キャラ選択完了まで表示しない）
-    let mini = null;
-    if (roleSelectionDone){
-      mini = document.createElement('div');
-      mini.className = 'm61-mini';
-    const t = (v.tables||[])[ti] || {};
-    const seatEmpty = !t.playerId;
-    const amSeatedHere = (t.playerId && t.playerId === state.userId);
-    if (seatEmpty){
-      mini.classList.add('blank');
-      mini.onclick = null;
-    }else{
-      const faceName = String(t?.character?.face || '');
-      const isMember5Card = /member\s*\(5\)\./i.test(faceName);
-      const isMember1to5Card = /member\s*\(([1-5])\)\./i.test(faceName);
-      const altMemberMatch = faceName.match(/member\s*\(([6-9])\)\./i);
-      const isFlippedRole = !!t?.character?.flipped;
-      const face = isFlippedRole ? './battery.jpg' : `./${t.character?.face || 'member (1).jpg'}`;
-      mini.style.backgroundImage = `url("${face}")`;
-      if (!isFlippedRole && isMember5Card) mini.classList.add('member5-card');
-      if (!isFlippedRole && isMember1to5Card) mini.classList.add('member15-detector');
-      if (!isFlippedRole && altMemberMatch) mini.classList.add(`member-alt${altMemberMatch[1]}`);
-     // 既存の大キャラ同様、本人のみ裏表トグル
-
-      if (amSeatedHere){
-        const orig = String(t?.character?.face || '');
-        if (orig.includes('member (9).jpg')){
-          mini.style.cursor = 'pointer';
-          mini.onclick = ()=> openRoleZoomView(orig);
-        }else{
-          mini.onclick = async ()=>{
-            await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
-          };
-        }
-      }else{
-        mini.onclick = null;
-      }
-
-      if (!amSeatedHere) mini.style.cursor = 'default';
-    }
-    }
-    stack.appendChild(con);
-    if (mini) stack.appendChild(mini);
-    // 旧 .char-col を物理削除して詰める
-    content.insertBefore(stack, charCol);
-    charCol.remove();
-
-
-  {
-      const rBox   = tbEl.getBoundingClientRect();
-      const rStack = stack.getBoundingClientRect();
-      // 既定 96px 以上で、下端 + 余白6px まで確保
-      const needPx = Math.max(96, Math.ceil(rStack.bottom - rBox.top + 6));
-      applyTableHeight(tbEl, needPx);
-    }
 
     // 自分のテーブルだけ「拡大→交換」可能
     if (ti === myIdx){
       con.style.cursor = 'pointer';
       con.onclick = ()=> openConstraintZoom61(ch, ti);
-   }else{
-      // 自分以外：拡大のみ（交換などのポップなし）
+    }else{
       con.style.cursor = 'pointer';
       con.onclick = ()=> openConstraintZoomView(ch);
     }
+
+    charCol.style.position = 'relative';
+    charCol.appendChild(con);
   });
 
-const capIdx = v?.captainTable ?? null;
+  const capIdx = v?.captainTable ?? null;
   const zoneId = 'm61TapZone';
   document.getElementById(zoneId)?.remove();
   if (capIdx >= 0 && capIdx === myIdx){
