@@ -7281,6 +7281,7 @@ function enforceM31to66(v){
   try{
     const mid = (v?.mission?.id|0);
     const inRange = (mid >= 31 && mid <= 66);
+    const needRolePick = inRange && mid !== 58;
     const body = document.body;
 
     // 競合しうる古いスタイルを掃除
@@ -7332,6 +7333,8 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
     const tables = Array.isArray(v?.tables) ? v.tables : [];
     const face1to9   = /member\s*\(([1-9])\)\.(?:jpe?g|png|webp)$/i;
     const faceNot5   = /member\s*\((1|2|3|4|6|7|8|9)\)\.(?:jpe?g|png|webp)$/i; // 黒枠は「5」除外
+    const seatedTables = tables.filter(t => !!t?.playerId);
+    const allSeatedPicked = !needRolePick || (seatedTables.length > 0 && seatedTables.every(t => t?.rolePicked === true));
 
     const tEls = document.querySelectorAll('#tables .table');
     const capIdx = (v?.captainTable ?? null);
@@ -7341,7 +7344,7 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       const t = tables[idx] || {};
       const seatedThere = !!t.playerId;
       const face = String(t?.character?.face || '');   // DB実値
-      const picked = seatedThere && face1to9.test(face);
+      const picked = seatedThere && (needRolePick ? (t?.rolePicked === true) : face1to9.test(face));
 
       tb.dataset.seated = seatedThere ? '1' : '0';
       tb.dataset.picked = picked ? '1' : '0';
@@ -7351,7 +7354,7 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       const miniEl = tb.querySelector('.m61-mini'); // 小さい表示（特にM61で使用）
 
       // 未選択 or（隊長テーブルで未着席）→ 初期画像を確実に消す（オーバーレイと二重化で保険）
-      const mustHide = (!picked) || (capIdx === idx && !seatedThere);
+      const mustHide = (!allSeatedPicked) || (!picked) || (capIdx === idx && !seatedThere);
       if (charEl){
         if (mustHide) charEl.style.backgroundImage = 'none';
         else if (charEl.style.backgroundImage === 'none') charEl.style.removeProperty('background-image');
@@ -8162,6 +8165,7 @@ async function maybeOpenRolePickerAfterSeat(){
     if (myIdx < 0) return;
 
     const t = (v?.tables||[])[myIdx] || {};
+    if (t?.rolePicked === true) return;
     const cur = (t?.character?.face) || 'member (1).jpg';
 
     openRolePickOverlay(cur, myIdx);
@@ -8337,8 +8341,9 @@ function openRolePickZoomToPreview(previewEl, faceName, myIdx){
       ev.stopPropagation();
       try{
         const room = state?.roomCode || state?.code;
-        await update(ref(db, `rooms/${room}/tables/${myIdx}/character`), {
-          face: faceName, flipped: false
+        await update(ref(db, `rooms/${room}/tables/${myIdx}`), {
+          rolePicked: true,
+          character: { face: faceName, flipped: false }
         });
       }catch(err){ console.error('[role-pick select]', err); }
       closeRolePickOverlay(); // 決定時のみ閉じる（専用）
@@ -9670,7 +9675,7 @@ async function startGame(playerCount, missionId){
 
   const captainIndex = Math.floor(Math.random()*playerCount);
   const faces=[1,2,3,4]; shuffle(faces);
-  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false}, hand:[] }); }
+  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, rolePicked:false, character:{face, flipped:false}, hand:[] }); }
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
