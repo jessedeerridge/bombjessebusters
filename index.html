@@ -299,6 +299,7 @@
   transition: height .25s ease;  /* ← 必要時だけ付ける */
 }
   .table.elevated{ z-index:200; }
+  .table.i2-table-selectable{ outline:2px dashed #38bdf8; outline-offset:-2px; cursor:pointer; }
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
   .title{text-decoration:underline;padding-right:4px}
@@ -3313,6 +3314,7 @@ if ((v.mission?.id|0) === 23) {
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
   const i2All=v.meta?.i2Flow;
   const i18All=v.meta?.i18Flow;
+  const m42sAll=v.meta?.m42Swap;
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table'; box.dataset.tableIdx = String(idx);
@@ -3326,6 +3328,44 @@ if ((v.mission?.id|0) === 23) {
     const handInner = n>0 ? (n*W + (n-1)*G) : 0;
     const totalW = CW + 8 + handInner + 16;
     box.style.width = Math.max(totalW, CW + 16) + 'px';
+
+    const isI2Actor = i2All && i2All.usingBy===state.userId;
+    const canI2ChooseTable = isI2Actor && i2All?.phase==='pickOther' && !i2All?.showToTable && t.playerId && t.playerId!==state.userId;
+    if (canI2ChooseTable){
+      box.classList.add('i2-table-selectable');
+      box.addEventListener('click', async (ev)=>{
+        if (ev.target.closest('.card-wrap')) return;
+        ev.stopPropagation();
+        const tableIdx = idx;
+        openMenu(ev.clientX, ev.clientY, [
+          {label:`${t.playerName || String(t.titleNumber ?? (idx+1))}に見せる`, action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { showToTable: tableIdx, selB:null });
+          }},
+          {label:'やり直す', action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null, showToTable:null} });
+          }}
+        ]);
+      });
+    }
+
+    const m42ByMe = !!(m42sAll?.on && m42sAll?.usingBy===state.userId);
+    const canM42ChooseTable = m42ByMe && !!m42sAll?.selA && !m42sAll?.showToTable && t.playerId && t.playerId!==state.userId;
+    if (canM42ChooseTable){
+      box.classList.add('i2-table-selectable');
+      box.addEventListener('click', async (ev)=>{
+        if (ev.target.closest('.card-wrap')) return;
+        ev.stopPropagation();
+        const tableIdx = idx;
+        openMenu(ev.clientX, ev.clientY, [
+          {label:`${t.playerName || String(t.titleNumber ?? (idx+1))}に見せる`, action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m42Swap:{on:true, usingBy:state.userId, selA:m42sAll.selA, selB:null, showToTable:tableIdx} });
+          }},
+          {label:'やり直す', action: async ()=>{
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m42Swap:{on:true, usingBy:state.userId, selA:null, selB:null, showToTable:null} });
+          }}
+        ]);
+      });
+    }
 
 const header=document.createElement('div'); header.className='t-header';
 const title=document.createElement('div');  title.className='title';
@@ -3538,10 +3578,26 @@ wrap.dataset.cardKey = cardKey;
 }
    
  const isMine = ((c.ownerId ?? t.playerId) === state.userId);
+      const i2ShownCardForViewer = !!(
+        i2All
+        && i2All.usingBy !== state.userId
+        && i2All.phase === 'pickOther'
+        && Number(i2All.showToTable) === idx
+        && String(i2All.selA?.cardId || '') === String(c.id || '')
+        && t.playerId === state.userId
+      );
+      const m42ShownCardForViewer = !!(
+        m42sAll?.on
+        && m42sAll.usingBy !== state.userId
+        && Number(m42sAll.showToTable) === idx
+        && String(m42sAll.selA?.cardId || '') === String(c.id || '')
+        && t.playerId === state.userId
+      );
+      const isFaceUpForRender = !!c.open || i2ShownCardForViewer || m42ShownCardForViewer;
 
    const seated = (v?.tables||[]).some(T => T.playerId === state.userId);
       if (!seated) {
-        if (!c.open) card.classList.add('back'); // 数字は .back CSS で隠れる
+        if (!isFaceUpForRender) card.classList.add('back'); // 数字は .back CSS で隠れる
       } else {
         /* ▼▼ 着席後のみ #38/#56 特別表示を適用 ▼▼ */
         const mid = (state.watching?.mission?.id|0);
@@ -3556,7 +3612,7 @@ wrap.dataset.cardKey = cardKey;
         const m64Special = isM64 && hasX;                // ★ 位置不問：xmark付きは「自分だけ裏」
 const ownerBlindSpecial = (m38Special || m56Special || m64Special);
 
-        if (!c.open) {
+        if (!isFaceUpForRender) {
           if (ownerBlindSpecial) {
             if (t.playerId === state.userId) {
               // 隊長本人：裏（黒背景）
@@ -3576,7 +3632,7 @@ const ownerBlindSpecial = (m38Special || m56Special || m64Special);
         }
       }
 
-      if (c.open) card.classList.add('open');
+      if (isFaceUpForRender) card.classList.add('open');
 
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
@@ -3602,17 +3658,28 @@ if (c.markUntil && now() < c.markUntil) {
       const isI2Actor = i2All && i2All.usingBy===state.userId;
       const canPickSelf  = isI2Actor && i2All?.phase==='pickSelf'  && t.playerId===state.userId;
       const canPickOther = isI2Actor && i2All?.phase==='pickOther' && t.playerId!==state.userId;
+      const canI2ChooseTable = canPickOther && !i2All?.showToTable;
+      const canI2PickOnShownTable = canPickOther && i2All?.showToTable===idx;
+      const canI2PickThisCard = canI2PickOnShownTable && !c.open;
+      const canM42PickThisCard = !!(
+        m42sAll?.on
+        && m42sAll?.usingBy !== state.userId
+        && Number(m42sAll?.showToTable)===idx
+        && t.playerId===state.userId
+        && !c.open
+      );
+      if (canM42PickThisCard) card.classList.add('i2-selectable');
 
       const isI18Actor = i18All && i18All.usingBy===state.userId;
       const canI18Pick = isI18Actor && i18All?.phase==='pickOther' && t.playerId!==state.userId;
 
-      if(isI2Actor && (canPickSelf || canPickOther)){
+      if(isI2Actor && (canPickSelf || canI2PickThisCard)){
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
           if(canPickSelf){
-            await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther' });
-          }else if(canPickOther){
+            await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther', showToTable:null });
+          }else if(canI2PickThisCard){
             await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
 openMenuAtClick([
   {label:'交換する', action: async ()=>{
@@ -3620,7 +3687,7 @@ openMenuAtClick([
     if(i2?.selA && i2?.selB) await doItem2Swap(i2.selA, i2.selB);
   }},
   {label:'やり直す', action: async ()=>{
-    await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+    await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null, showToTable:null} });
   }}
 ]);
 
@@ -3664,7 +3731,7 @@ openMenuAtClick([
       const hasNum = (c.num != null && !Number.isNaN(Number(c.num)));
       if (hasNum) {
         num.textContent = String(c.num);
-        num.style.visibility = (c.open || isMine) ? 'visible' : 'hidden';
+        num.style.visibility = (isFaceUpForRender || isMine) ? 'visible' : 'hidden';
       } else {
         num.textContent = '';
         num.style.visibility = 'hidden';
@@ -5441,10 +5508,8 @@ const onRotate = ()=>{
     document.body.setAttribute('data-m42swap','on');
     if (!state._m42swapClick){
       state._m42swapClick = async (ev)=>{
-        const wrap = ev.target.closest?.('.card-wrap'); if (!wrap) return;
-        const cardEl = wrap.querySelector('.card'); if (!cardEl || !cardEl.classList.contains('open')) return;
-        ev.stopPropagation();
-
+        const wrap = ev.target.closest?.('.card-wrap');
+        if (!wrap) return;
         const table = parseInt(wrap.dataset.table,10);
         const cardId = wrap.dataset.cardId;
         if (!Number.isInteger(table) || !cardId) return;
@@ -5453,60 +5518,84 @@ const onRotate = ()=>{
         const mRef = ref(db, `rooms/${state.roomCode}/meta`);
         const mSnap = await get(mRef);
         const meta  = mSnap.val() || {};
-        const flow  = meta.m42Swap && meta.m42Swap.on ? meta.m42Swap : {on:true, usingBy:null, selA:null, selB:null};
+        const flow  = meta.m42Swap && meta.m42Swap.on ? meta.m42Swap : {on:true, usingBy:null, selA:null, selB:null, showToTable:null};
 
-        if (flow.usingBy && flow.usingBy !== me){
-          await update(mRef, { m42Swap:{on:true, usingBy:me, selA:{table, cardId}, selB:null} });
+        if (flow.usingBy && flow.usingBy !== me) return;
+        if (!flow.usingBy){
+          await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null, showToTable:null} });
           return;
         }
+
+        const tSnap = await get(ref(db, `rooms/${state.roomCode}/tables`));
+        const tables = tSnap.val() || [];
+        const t = tables[table] || {};
+        const hand = Array.isArray(t.hand) ? t.hand : [];
+        const card = hand.find(x=> String(x?.id||'')===String(cardId));
+        if (!card) return;
+
         if (!flow.selA){
-          await update(mRef, { m42Swap:{on:true, usingBy:me, selA:{table, cardId}, selB:null} });
+          if (t.playerId !== me) return;
+          await update(mRef, { m42Swap:{on:true, usingBy:me, selA:{table, cardId}, selB:null, showToTable:null} });
           return;
         }
-        if (flow.selA && !flow.selB){
-          const selA = flow.selA, selB = {table, cardId};
-          const tSnap = await get(ref(db, `rooms/${state.roomCode}/tables`));
-          const tables = tSnap.val() || [];
-          const findNum = ({table, cardId})=>{
-            const hand = (tables[table]?.hand)||[];
-            const c = hand.find(x=> x?.id===cardId);
-            return c ? (c.num|0) : null;
-          };
-          const na = findNum(selA), nb = findNum(selB);
-          if (na!=null && nb!=null && na===nb){
-            alert('同じ数字です');
-            await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null} });
-            return;
-          }
 
-          await update(mRef, { m42Swap:{on:true, usingBy:me, selA, selB} });
-          openMenuAtClick([
-            {label:'交換する', action: async ()=>{
-              const ts = (await get(ref(db, `rooms/${state.roomCode}/tables`))).val() || [];
-              const pick = (ti, id)=>{ const hand=(ts[ti]?.hand)||[]; const idx=hand.findIndex(c=> c?.id===id); return {hand, idx, card: idx>=0?hand[idx]:null}; };
-              const A = pick(selA.table, selA.cardId);
-              const B = pick(selB.table, selB.cardId);
-              if (!A.card || !B.card) { await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null} }); return; }
+        if (!flow.showToTable){
+          if (!t.playerId || t.playerId===me) return;
+          openMenu(ev.clientX, ev.clientY, [
+            {label:`${t.playerName || String(t.titleNumber ?? (table+1))}に見せる`, action: async ()=>{
+              await update(mRef, { m42Swap:{on:true, usingBy:me, selA:flow.selA, selB:null, showToTable:table} });
+            }},
+            {label:'やり直す', action: async ()=>{
+              await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null, showToTable:null} });
+            }}
+          ]);
+          return;
+        }
+
+        if (Number(flow.showToTable) !== table) return;
+        if (t.playerId !== me) return;
+        if (card.open) return;
+
+        const selA = flow.selA;
+        const selB = {table, cardId};
+        const findNum = ({table, cardId})=>{
+          const h = (tables[table]?.hand)||[];
+          const c = h.find(x=> String(x?.id||'')===String(cardId));
+          return c ? (c.num|0) : null;
+        };
+        const na = findNum(selA), nb = findNum(selB);
+        if (na!=null && nb!=null && na===nb){
+          alert('同じ数字です');
+          await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null, showToTable:null} });
+          return;
+        }
+
+        await update(mRef, { m42Swap:{on:true, usingBy:me, selA, selB, showToTable:flow.showToTable} });
+        openMenuAtClick([
+          {label:'交換する', action: async ()=>{
+            const ts = (await get(ref(db, `rooms/${state.roomCode}/tables`))).val() || [];
+            const pick = (ti, id)=>{ const hand=(ts[ti]?.hand)||[]; const idx=hand.findIndex(c=> String(c?.id||'')===String(id)); return {hand, idx, card: idx>=0?hand[idx]:null}; };
+            const A = pick(selA.table, selA.cardId);
+            const B = pick(selB.table, selB.cardId);
+            if (!A.card || !B.card) { await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null, showToTable:null} }); return; }
 const toA = { ...B.card, ownerId: (ts[selA.table]?.playerId)||null, markUntil: (now()+6000), markBy: me };
 const toB = { ...A.card, ownerId: (ts[selB.table]?.playerId)||null, markUntil: (now()+6000), markBy: me };
 A.hand[A.idx] = toA;
 B.hand[B.idx] = toB;
 
+            const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
+            realpha(A.hand); realpha(B.hand);
 
-              const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
-              realpha(A.hand); realpha(B.hand);
-
-              await Promise.all([
-                set(ref(db, `rooms/${state.roomCode}/tables/${selA.table}/hand`), A.hand),
-                set(ref(db, `rooms/${state.roomCode}/tables/${selB.table}/hand`), B.hand),
-                update(mRef, { m42Swap: null })
-              ]);
-            }},
-            {label:'やり直す', action: async ()=>{
-              await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null} });
-            }}
-          ]);
-        }
+            await Promise.all([
+              set(ref(db, `rooms/${state.roomCode}/tables/${selA.table}/hand`), A.hand),
+              set(ref(db, `rooms/${state.roomCode}/tables/${selB.table}/hand`), B.hand),
+              update(mRef, { m42Swap: null })
+            ]);
+          }},
+          {label:'やり直す', action: async ()=>{
+            await update(mRef, { m42Swap:{on:true, usingBy:me, selA:null, selB:null, showToTable:null} });
+          }}
+        ]);
       };
       document.addEventListener('click', state._m42swapClick, true);
     }
@@ -8198,7 +8287,7 @@ btnUse.onclick = async (ev)=>{
   if (isNine){
     // item2 の「使う」と同じ：i2Flow を pickSelf で開始
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
-      i2Flow: { usingBy: state.userId, phase: 'pickSelf', selA: null, selB: null }
+      i2Flow: { usingBy: state.userId, phase: 'pickSelf', selA: null, selB: null, showToTable: null }
     });
   }
   closeConstraintZoom();
@@ -8340,7 +8429,7 @@ function openItemZoom(itemNo, itemIdx, opt={}){
         if(itemNo===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
 
         if(itemNo===2){
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null} });
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null, showToTable:null} });
         }
         if(itemNo===13){ await addTwoItemsFromDeck(); }
         if(itemNo===16){ await handleItem16(itemIdx); }
