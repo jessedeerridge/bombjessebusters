@@ -534,8 +534,9 @@
   .card-wrap.m54-pending-arrival .marker,
   .card-wrap.m54-pending-arrival .tok-col{opacity:0;}
   .card-wrap.m54-pending-arrival .card{pointer-events:none;}
-  /* 入れ替えフックの移動中：カード本体だけ隠し、α帯は残す */
+  /* 入れ替えフックの移動中：元位置のカード要素（本体/α帯/トークン）を隠す */
   .card-wrap.hook-anim-origin .card,
+  .card-wrap.hook-anim-origin .alpha,
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
@@ -8806,7 +8807,6 @@ async function playHookSwapAnimation(A, B, tables){
     await sleep(80);
     phA.remove(); phB.remove();
     ca.remove(); cb.remove();
-    wa.classList.remove('hook-anim-origin'); wb.classList.remove('hook-anim-origin');
     moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
     return { srcAlphaA, srcAlphaB };
   }catch(e){
@@ -8895,7 +8895,6 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(1500);
 
     fly.remove();
-    ws.classList.remove('hook-anim-origin');
     moveNodes.forEach((node)=>{ node.style.transform=''; node.style.transition=''; });
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
