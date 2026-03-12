@@ -7418,14 +7418,20 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       // 未選択 or（隊長テーブルで未着席）→ 初期画像を確実に消す（オーバーレイと二重化で保険）
       const mustHide = (!picked) || (capIdx === idx && !seatedThere);
       if (charEl){
-        if (mustHide) charEl.style.backgroundImage = 'none';
-        else if (charEl.style.backgroundImage === 'none') charEl.style.removeProperty('background-image');
-        charEl.classList.remove('blank','captain-card','member5-card','member15-detector','member-alt6','member-alt7','member-alt8','member-alt9'); // 残骸を掃除
+        if (mustHide){
+          charEl.style.backgroundImage = 'none';
+          charEl.classList.remove('blank','captain-card','member5-card','member15-detector','member-alt6','member-alt7','member-alt8','member-alt9'); // 残骸を掃除
+        }else if (charEl.style.backgroundImage === 'none'){
+          charEl.style.removeProperty('background-image');
+        }
       }
       if (miniEl){
-        if (mustHide) miniEl.style.backgroundImage = 'none';
-        else if (miniEl.style.backgroundImage === 'none') miniEl.style.removeProperty('background-image');
-        miniEl.classList.remove('blank','captain-card','member5-card','member15-detector','member-alt6','member-alt7','member-alt8','member-alt9');
+        if (mustHide){
+          miniEl.style.backgroundImage = 'none';
+          miniEl.classList.remove('blank','captain-card','member5-card','member15-detector','member-alt6','member-alt7','member-alt8','member-alt9');
+        }else if (miniEl.style.backgroundImage === 'none'){
+          miniEl.style.removeProperty('background-image');
+        }
       }
     });
 
