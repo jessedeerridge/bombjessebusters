@@ -846,12 +846,16 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   }
   .stage-story-image{
     position:absolute;
-    right:10px;
-    bottom:10px;
-    width:min(96px, 24vw);
+    right:12px;
+    bottom:12px;
+    width:min(150px, 38vw);
     height:auto;
     object-fit:contain;
     pointer-events:none;
+  }
+  .stage-story-pop.has-mission-image .stage-story-body{
+    padding-right:min(170px, 42vw);
+    padding-bottom:78px;
   }
   .stage-story-head{position:relative;min-height:38px;margin-bottom:10px}
   .stage-story-title{
@@ -1569,9 +1573,11 @@ function renderStageStory(v){
   stageStoryBody.textContent = def.body;
   if (stageStoryImageMissions.has(missionId)) {
     stageStoryImage.src = `./P${missionId}.png`;
+    stageStoryPop.classList.add('has-mission-image');
     H(stageStoryImage, false);
   } else {
     stageStoryImage.removeAttribute('src');
+    stageStoryPop.classList.remove('has-mission-image');
     H(stageStoryImage, true);
   }
   H(stageStoryPop, false);
