@@ -4926,6 +4926,9 @@ function buildChallengeBackCard(opts={}){
   const box = document.createElement('div');
   box.className = `challenge-card${opts.zoom ? ' challenge-zoom-face' : ''}`;
   box.style.backgroundImage = `url('./chaura.jpg')`;
+  box.style.backgroundSize = 'contain';
+  box.style.backgroundRepeat = 'no-repeat';
+  box.style.backgroundPosition = 'center';
   return box;
 }
 
