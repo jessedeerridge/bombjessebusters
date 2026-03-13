@@ -242,11 +242,39 @@
   .challenge-lane{ flex-wrap:wrap; overflow-x:visible; row-gap:8px; }
   .challenge-group{ display:flex; align-items:center; gap:2px; }
   .challenge-card{
+    position:relative;
     width:var(--con-h, var(--item-h, 75px));
     height:var(--con-w, var(--item-w, 50px));
+    border:6px solid #de3e34;
+    border-radius:10px;
+    background-color:#fff;
+    background-origin:content-box;
+    background-clip:content-box;
+    background-repeat:no-repeat;
+    background-position:center;
     background-size:contain;
+    overflow:visible;
   }
+  .challenge-num-dot{
+    position:absolute;
+    top:-8px;
+    width:16px;
+    height:16px;
+    border-radius:50%;
+    background:#111;
+    color:#fff;
+    font-size:9px;
+    line-height:16px;
+    font-weight:700;
+    text-align:center;
+    pointer-events:none;
+  }
+  .challenge-num-dot.left{ left:-6px; }
+  .challenge-num-dot.center{ left:50%; transform:translateX(-50%); }
+  .challenge-num-dot.right{ right:-6px; }
   .challenge-side-num{ transform:scale(0.95); }
+  .challenge-side-num.left{ margin-right:-14px; transform:rotate(-10deg) scale(0.95); }
+  .challenge-side-num.right{ margin-left:-14px; transform:rotate(10deg) scale(0.95); }
   .challenge-break{ flex-basis:100%; height:0; }
   .constraint-face{
     position:relative;
@@ -4827,6 +4855,16 @@ function openChallengeZoom(id){
 
   
 /* ===== #55：チャレンジ札（人数分）。c8 のときだけ左右に数値1枚ずつ表示 ===== */
+async function toggleM55CardFace(fname){
+  try{
+    const v = state.watching; if(!v) return;
+    const metaRef = ref(db, `rooms/${state.roomCode}/meta`);
+    const cur = (v?.meta?.m55_faces && typeof v.meta.m55_faces === 'object') ? {...v.meta.m55_faces} : {};
+    cur[fname] = !cur[fname];
+    await update(metaRef, { m55_faces: cur });
+  }catch(e){ console.error(e); }
+}
+
 function renderM55(v){
   const isM55 = ((v?.mission?.id|0) === 55 || (v?.mission?.id|0) === 60);
   const rowId = 'm55Row';
@@ -4844,6 +4882,7 @@ function renderM55(v){
 
   const shown = v.meta.m55_shown || [];
   const sides = v.meta.m55_c8Sides || null;
+  const faces = (v?.meta?.m55_faces && typeof v.meta.m55_faces === 'object') ? v.meta.m55_faces : {};
   const needWrapAfter3 = ((v?.tableCount|0) >= 5);
 
   // 画像URLユーティリティ
@@ -4854,29 +4893,37 @@ function renderM55(v){
     const group = document.createElement('div');
     group.className = 'challenge-group';
 
-    // c8 のときは LEFT数値 → concard → RIGHT数値 の順で横並び
     if (isC8 && Array.isArray(sides) && sides.length===2){
       const leftNum  = document.createElement('div');
-      leftNum.className = 'numcard';
-      leftNum.classList.add('challenge-side-num');
+      leftNum.className = 'numcard challenge-side-num left';
       leftNum.style.backgroundImage = `url('${imgNumber(sides[0])}')`;
       group.appendChild(leftNum);
     }
 
     const cc = document.createElement('div');
-    cc.className = 'concard';
-    cc.classList.add('challenge-card');
-    cc.style.backgroundImage = `url('${imgChallenge(fname)}')`;
-cc.onclick = (ev)=>{
-  ev.stopPropagation();
-openChallengeZoom(fname.replace(/\.(png|jpg)$/,''));
-};
+    cc.className = 'concard challenge-card';
+    const isFront = !!faces[fname];
+    cc.style.backgroundImage = isFront ? `url('${imgChallenge(fname)}')` : "url('./chaura.jpg')";
+    cc.title = 'クリックで表裏切替';
+    cc.onclick = async (ev)=>{
+      ev.stopPropagation();
+      await toggleM55CardFace(fname);
+    };
+
+    const m = String(fname).match(/c(\d+)/i);
+    const cardNo = m ? m[1] : '';
+    ['left','center','right'].forEach(pos=>{
+      const dot = document.createElement('div');
+      dot.className = `challenge-num-dot ${pos}`;
+      dot.textContent = cardNo;
+      cc.appendChild(dot);
+    });
+
     group.appendChild(cc);
 
     if (isC8 && Array.isArray(sides) && sides.length===2){
       const rightNum = document.createElement('div');
-      rightNum.className = 'numcard';
-      rightNum.classList.add('challenge-side-num');
+      rightNum.className = 'numcard challenge-side-num right';
       rightNum.style.backgroundImage = `url('${imgNumber(sides[1])}')`;
       group.appendChild(rightNum);
     }
@@ -4890,8 +4937,7 @@ openChallengeZoom(fname.replace(/\.(png|jpg)$/,''));
     }
   });
 
-  // 既存の「アイテム列の直下に挿入」ヘルパを使用（#15等と同じ）
-  mountLaneUnderItemsBar(lane);  // #15 の末尾と同じ呼び方でOK :contentReference[oaicite:0]{index=0}
+  mountLaneUnderItemsBar(lane);
 }
 
 /* ==== #31：アイテム列の下に A~E、キャラ列はブランク＋直下にミニ ==== */
