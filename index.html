@@ -682,6 +682,14 @@
     font-size:calc(4.5px * var(--role-char-scale));
   }
 
+  /* 正体カードは画像の縦横比を維持して全体を表示する */
+  .role-card{
+    background-size:contain !important;
+    background-repeat:no-repeat;
+    background-position:center;
+    background-color:#fff;
+  }
+
 
   .hand{
     display:flex;align-items:flex-start;gap:var(--card-gap);
