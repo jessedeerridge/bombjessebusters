@@ -3667,8 +3667,14 @@ if (!amSeated || seatEmpty || (needRolePick && !rolePicked)) {
   const isMine = (t.playerId === state.userId);
   const myOrigFace = String(t?.character?.face || '');
   if (isMine && myOrigFace.includes('member (9).jpg')) {
-    // 自分＆member(9) → クリックで拡大（裏返ししない）
-    char.onclick = ()=> openRoleZoomView(myOrigFace);
+    // 自分＆member(9)：表のときは効果使用、裏のときはクリックで表に戻せる
+    char.onclick = async ()=> {
+      if (t.character?.flipped) {
+        await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), { flipped: false });
+        return;
+      }
+      openRoleZoomView(myOrigFace);
+    };
   } else {
     // 従来挙動：自分はクリックで裏返し
     char.onclick = async ()=> {
@@ -3888,7 +3894,7 @@ if (c.markUntil && now() < c.markUntil) {
               await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
                 phase:'resolving'
               });
-              await doItem2Swap(i2.selA, i2.selB);
+              await doItem2Swap(i2.selA, i2.selB, i2.usingBy || null);
             }}
           ]);
         };
@@ -4929,7 +4935,13 @@ pool.forEach(ch=>{
           const orig = String(t?.character?.face || '');
           if (orig.includes('member (9).jpg')){
             big.style.cursor = 'pointer';
-            big.onclick = ()=> openRoleZoomView(orig);
+            big.onclick = async ()=>{
+              if (t.character?.flipped) {
+                await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: false });
+                return;
+              }
+              openRoleZoomView(orig);
+            };
           }else{
             big.onclick = async ()=>{
               await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
@@ -4982,7 +4994,13 @@ pool.forEach(ch=>{
         const orig = String(t?.character?.face || '');
         if (orig.includes('member (9).jpg')){
           mini.style.cursor = 'pointer';
-          mini.onclick = ()=> openRoleZoomView(orig);
+          mini.onclick = async ()=>{
+            if (t.character?.flipped) {
+              await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: false });
+              return;
+            }
+            openRoleZoomView(orig);
+          };
         }else{
           mini.onclick = async ()=>{
             await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
@@ -7279,7 +7297,13 @@ function renderM61(v){
         const orig = String(t?.character?.face || '');
         if (orig.includes('member (9).jpg')){
           mini.style.cursor = 'pointer';
-          mini.onclick = ()=> openRoleZoomView(orig);
+          mini.onclick = async ()=>{
+            if (t.character?.flipped) {
+              await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: false });
+              return;
+            }
+            openRoleZoomView(orig);
+          };
         }else{
           mini.onclick = async ()=>{
             await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
@@ -9329,7 +9353,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
 }
 
 /* ===== Item 2 swap ===== */
-async function doItem2Swap(A, B){
+async function doItem2Swap(A, B, usingByUserId=null){
   if(!A || !B) return;
   const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
   const tables = snap.val() || [];
@@ -9381,14 +9405,17 @@ async function doItem2Swap(A, B){
   i2Updates[`rooms/${state.roomCode}/meta/i2Flow`] = null;
   i2Updates[`rooms/${state.roomCode}/meta/i2Anim`] = null;
   await update(ref(db), i2Updates);
-  // 交換後：member(9) を自分が持っているなら枠の9を裏返す
+  // 交換後：member(9) 使用者の正体カードを裏返す
   try{
-    const myIdx = (tables||[]).findIndex(t => t?.playerId === state.userId);
-    if (myIdx >= 0){
-      const meChar = tables[myIdx]?.character || {};
-      const isNine = String(meChar.face||'').includes('member (9).jpg');
-      if (isNine && !meChar.flipped){
-        await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}/character`), { flipped: true });
+    const actorId = usingByUserId || state.userId || null;
+    if (actorId){
+      const actorIdx = (tables||[]).findIndex(t => t?.playerId === actorId);
+      if (actorIdx >= 0){
+        const actorChar = tables[actorIdx]?.character || {};
+        const isNine = String(actorChar.face||'').includes('member (9).jpg');
+        if (isNine && !actorChar.flipped){
+          await update(ref(db, `rooms/${state.roomCode}/tables/${actorIdx}/character`), { flipped: true });
+        }
       }
     }
   } catch(e){ console.warn('[i2] auto-flip 9 failed', e); }
