@@ -240,7 +240,8 @@
     background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
   }
   .challenge-lane{ flex-wrap:wrap; overflow-x:visible; row-gap:8px; }
-  .challenge-group{ display:flex; align-items:center; gap:2px; }
+  .challenge-group{ display:flex; flex-direction:column; align-items:center; gap:3px; max-width:120px; }
+  .challenge-main{ display:flex; align-items:center; gap:2px; }
   .challenge-card{
     position:relative;
     z-index:1;
@@ -254,28 +255,38 @@
     background-repeat:no-repeat;
     background-position:center;
     background-size:contain;
-    overflow:hidden;
+    overflow:visible;
   }
   .challenge-num-dot{
     position:absolute;
-    top:-8px;
+    top:-13px;
     left:50%;
     transform:translateX(-50%);
-    width:16px;
-    height:16px;
+    min-width:18px;
+    height:18px;
+    padding:0 4px;
     border-radius:50%;
-    border:1px solid #111;
-    background:transparent;
-    color:#111;
+    background:#111;
+    color:#fff;
     font-size:11px;
-    line-height:14px;
+    line-height:18px;
     font-weight:700;
     text-align:center;
     pointer-events:none;
+    z-index:3;
+  }
+  .challenge-desc{
+    width:100%;
+    color:#111;
+    font-size:10px;
+    line-height:1.2;
+    text-align:left;
+    white-space:pre-line;
+    word-break:break-word;
   }
   .challenge-side-num{ position:relative; z-index:2; transform:scale(0.95); }
-  .challenge-side-num.left{ margin-right:-14px; transform:rotate(10deg) scale(0.95); }
-  .challenge-side-num.right{ margin-left:-14px; transform:rotate(-10deg) scale(0.95); }
+  .challenge-side-num.left{ margin-right:-14px; transform:rotate(-10deg) scale(0.95); }
+  .challenge-side-num.right{ margin-left:-14px; transform:rotate(10deg) scale(0.95); }
   .challenge-break{ flex-basis:100%; height:0; }
   .constraint-face{
     position:relative;
@@ -4866,6 +4877,23 @@ async function toggleM55CardFace(fname){
   }catch(e){ console.error(e); }
 }
 
+const M55_CHALLENGE_TEXT = {
+  1:`アクションの代わりに、プレイヤーのうち1人が「これは赤です」と言ってチームメイトのコードを1本切断する。
+そのコードが赤ではなかった場合、爆弾は爆発する。`,
+  2:`4人のプレイヤーが連続して、偶数のコードを切断する。`,
+  3:`1台のタイルスタンド上にある切断されていないコードが、コード2本からなるグループだけを作っている。
+（各グループは切断されているコードによって分断される。）`,
+  4:`最初に置かれた3枚の確定トークンの合計値が18に等しい。`,
+  5:`2人のプレイヤーが連続して、単独での切断アクションを実行する。`,
+  6:`1台のタイルスタンド上で、切断されていないコードが最低5本は孤立している。
+（両隣のコードが切断されている。）`,
+  7:`3人のプレイヤーが連続して、連続した数値のコードを（昇順か降順で）切断する。
+例：8、9、10や5、4、3など。`,
+  8:`最初の2枚の確定トークンをこれらの数値のスペースに置く。`,
+  9:`1台のタイルスタンド上に、切断されていない奇数のコードしかない（最低6本）。
+赤コードと黄コードは無視する。`,
+  10:`1台のタイルスタンドから最低7本のコードが切断されており、その両端のコード2本が切断されていない。`
+};
 function renderM55(v){
   const isM55 = ((v?.mission?.id|0) === 55 || (v?.mission?.id|0) === 60);
   const rowId = 'm55Row';
@@ -4894,17 +4922,20 @@ function renderM55(v){
     const group = document.createElement('div');
     group.className = 'challenge-group';
 
+    const mainRow = document.createElement('div');
+    mainRow.className = 'challenge-main';
+
     if (isC8 && Array.isArray(sides) && sides.length===2){
       const leftNum  = document.createElement('div');
       leftNum.className = 'numcard challenge-side-num left';
       leftNum.style.backgroundImage = `url('${imgNumber(sides[0])}')`;
-      group.appendChild(leftNum);
+      mainRow.appendChild(leftNum);
     }
 
     const cc = document.createElement('div');
     cc.className = 'concard challenge-card';
-    const isFront = !!faces[fname];
-    cc.style.backgroundImage = isFront ? `url('${imgChallenge(fname)}')` : "url('./chaura.jpg')";
+    const isBack = !!faces[fname];
+    cc.style.backgroundImage = isBack ? "url('./chaura.jpg')" : `url('${imgChallenge(fname)}')`;
     cc.title = 'クリックで表裏切替';
     cc.onclick = async (ev)=>{
       ev.stopPropagation();
@@ -4918,14 +4949,21 @@ function renderM55(v){
     dot.textContent = cardNo;
     cc.appendChild(dot);
 
-    group.appendChild(cc);
+    mainRow.appendChild(cc);
 
     if (isC8 && Array.isArray(sides) && sides.length===2){
       const rightNum = document.createElement('div');
       rightNum.className = 'numcard challenge-side-num right';
       rightNum.style.backgroundImage = `url('${imgNumber(sides[1])}')`;
-      group.appendChild(rightNum);
+      mainRow.appendChild(rightNum);
     }
+
+    group.appendChild(mainRow);
+
+    const desc = document.createElement('div');
+    desc.className = 'challenge-desc';
+    desc.textContent = M55_CHALLENGE_TEXT[Number(cardNo)] || '';
+    group.appendChild(desc);
 
     lane.appendChild(group);
 
