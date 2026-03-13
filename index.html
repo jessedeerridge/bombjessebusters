@@ -89,7 +89,7 @@
     border:none;
     border-radius:0;
     background:transparent;
-    overflow:visible;
+    overflow:hidden;
   }
   .item-front-chip img{
     width:100%;
@@ -255,7 +255,7 @@
     background-repeat:no-repeat;
     background-position:center;
     background-size:contain;
-    overflow:visible;
+    overflow:hidden;
   }
   .challenge-num-dot{
     position:absolute;
@@ -274,7 +274,7 @@
     text-align:center;
     pointer-events:none;
     z-index:3;
-    box-shadow:0 0 0 1px #fff, 0 0 0 2px #111;
+    box-shadow:0 0 0 1px transparent, 0 0 0 2px #111;
   }
   .challenge-desc{
     width:100%;
@@ -306,8 +306,6 @@
     display:flex;
     align-items:center;
     gap:0;
-    transform:scale(2);
-    transform-origin:center;
   }
   .challenge-zoom-stack .challenge-side-num.left{ margin-right:-10px; }
   .challenge-zoom-stack .challenge-side-num.right{ margin-left:-10px; }
@@ -4899,7 +4897,7 @@ function openChallengeZoom(fname, sides=null, isBack=false){
     }
 
     const card = document.createElement('div');
-    card.className = 'conzoom-card challenge-card';
+    card.className = 'challenge-card';
     const m = String(fname).match(/c(\d+)/i);
     const cardNo = m ? m[1] : '';
     const applyFace = (back)=>{
