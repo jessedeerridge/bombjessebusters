@@ -3667,8 +3667,14 @@ if (!amSeated || seatEmpty || (needRolePick && !rolePicked)) {
   const isMine = (t.playerId === state.userId);
   const myOrigFace = String(t?.character?.face || '');
   if (isMine && myOrigFace.includes('member (9).jpg')) {
-    // 自分＆member(9) → クリックで拡大（裏返ししない）
-    char.onclick = ()=> openRoleZoomView(myOrigFace);
+    // 自分＆member(9) → 表なら能力UI、裏なら表に戻す
+    char.onclick = async ()=> {
+      if (t.character?.flipped) {
+        await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/character`), { flipped:false });
+        return;
+      }
+      openRoleZoomView(myOrigFace);
+    };
   } else {
     // 従来挙動：自分はクリックで裏返し
     char.onclick = async ()=> {
@@ -4929,7 +4935,13 @@ pool.forEach(ch=>{
           const orig = String(t?.character?.face || '');
           if (orig.includes('member (9).jpg')){
             big.style.cursor = 'pointer';
-            big.onclick = ()=> openRoleZoomView(orig);
+            big.onclick = async ()=>{
+              if (t.character?.flipped) {
+                await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped:false });
+                return;
+              }
+              openRoleZoomView(orig);
+            };
           }else{
             big.onclick = async ()=>{
               await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
@@ -4982,7 +4994,13 @@ pool.forEach(ch=>{
         const orig = String(t?.character?.face || '');
         if (orig.includes('member (9).jpg')){
           mini.style.cursor = 'pointer';
-          mini.onclick = ()=> openRoleZoomView(orig);
+          mini.onclick = async ()=>{
+            if (t.character?.flipped) {
+              await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped:false });
+              return;
+            }
+            openRoleZoomView(orig);
+          };
         }else{
           mini.onclick = async ()=>{
             await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
@@ -7279,7 +7297,13 @@ function renderM61(v){
         const orig = String(t?.character?.face || '');
         if (orig.includes('member (9).jpg')){
           mini.style.cursor = 'pointer';
-          mini.onclick = ()=> openRoleZoomView(orig);
+          mini.onclick = async ()=>{
+            if (t.character?.flipped) {
+              await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped:false });
+              return;
+            }
+            openRoleZoomView(orig);
+          };
         }else{
           mini.onclick = async ()=>{
             await update(ref(db, `rooms/${state.roomCode}/tables/${ti}/character`), { flipped: !t.character?.flipped });
