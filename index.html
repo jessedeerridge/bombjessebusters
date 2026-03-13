@@ -4999,6 +4999,28 @@ function buildChallengeCard(fname, opts={}){
 
     row.appendChild(chips[5]);
     box.appendChild(row);
+  } else if (id === 9){
+    const row = document.createElement('div');
+    row.className = 'challenge-pattern-row';
+    [
+      { n:1, c:'gray'  },
+      { n:2, c:'black' },
+      { n:3, c:'gray'  },
+      { n:3, c:'gray'  },
+      { n:4, c:'black' },
+      { n:5, c:'gray'  },
+      { n:8, c:'black' },
+      { n:9, c:'gray'  },
+      { n:9, c:'black' },
+      { n:11,c:'black' },
+      { n:11,c:'gray'  }
+    ].forEach(({ n, c })=>{
+      const chip = document.createElement('span');
+      chip.className = `challenge-pattern-chip ${c}`;
+      chip.textContent = String(n);
+      row.appendChild(chip);
+    });
+    box.appendChild(row);
   }
 
   return box;
