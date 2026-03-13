@@ -342,6 +342,90 @@
     border:1px solid #ccc; background:#f7f7f7; cursor:pointer;
     white-space:nowrap;
   }
+
+  .m55-row{
+    gap:8px;
+    align-items:flex-start;
+    overflow-x:auto;
+    overflow-y:hidden;
+    padding-top:2px;
+  }
+  .m55-row.wrap3{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+  }
+  .m55-slot{
+    position:relative;
+    min-width:0;
+    overflow:hidden;
+    padding:2px;
+  }
+  .m55-slot-inner{
+    position:relative;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .m55-card{
+    position:relative;
+    width:92px;
+    height:58px;
+    border:2px solid #000;
+    border-radius:8px;
+    background:#fff;
+    overflow:hidden;
+    transition:transform .15s ease;
+    cursor:pointer;
+  }
+  .m55-card.is-back{
+    background:#fff url('./chaura.jpg') center/cover no-repeat;
+  }
+  .m55-card-number{
+    position:absolute;
+    left:50%;
+    top:1px;
+    transform:translateX(-50%);
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    border:1px solid #000;
+    background:#000;
+    color:#fff;
+    font-size:14px;
+    font-weight:800;
+    line-height:1;
+    display:grid;
+    place-items:center;
+    z-index:3;
+  }
+  .m55-card-desc{
+    position:absolute;
+    left:4px;
+    right:4px;
+    top:22px;
+    bottom:4px;
+    color:#000;
+    font-size:8px;
+    line-height:1.2;
+    white-space:pre-wrap;
+    word-break:break-word;
+    overflow:hidden;
+    text-align:left;
+    font-weight:700;
+  }
+  .m55-slot.c8 .m55-side{
+    position:absolute;
+    top:8px;
+    width:32px;
+    height:48px;
+    border:1px solid #ddd;
+    border-radius:6px;
+    background:#fff center/cover no-repeat;
+    z-index:4;
+  }
+  .m55-slot.c8 .m55-side.left{ left:16px; transform:rotate(-10deg); }
+  .m55-slot.c8 .m55-side.right{ right:16px; transform:rotate(10deg); }
   
   /* ★ ミッション12：アイテムの“外側の真下”に並べる帯 */
   .num-under{
@@ -4792,7 +4876,8 @@ async function ensureM55MetaInit(vNow){
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
       m55_deck: deck,
       m55_shown: shown,
-      m55_c8Sides: c8Sides
+      m55_c8Sides: c8Sides,
+      m55_flipped: {}
     });
   }
 }
@@ -4818,6 +4903,19 @@ function openChallengeZoom(id){
 
   
 /* ===== #55：チャレンジ札（人数分）。c8 のときだけ左右に数値1枚ずつ表示 ===== */
+const M55_CHALLENGE_TEXT = {
+  1:'アクションの代わりに、プレイヤーのうち1人が「これは赤です」と言ってチームメイトのコードを1本切断する。\nそのコードが赤ではなかった場合、爆弾は爆発する。',
+  2:'4人のプレイヤーが連続して、偶数のコードを切断する。',
+  3:'1台のタイルスタンド上にある切断されていないコードが、コード2本からなるグループだけを作っている。\n（各グループは切断されているコードによって分断される。）',
+  4:'最初に置かれた3枚の確定トークンの合計値が18に等しい。',
+  5:'2人のプレイヤーが連続して、単独での切断アクションを実行する。',
+  6:'1台のタイルスタンド上で、切断されていないコードが最低5本は孤立している。\n（両隣のコードが切断されている。）',
+  7:'3人のプレイヤーが連続して、連続した数値のコードを（昇順か降順で）切断する。\n例：8、9、10や5、4、3など。',
+  8:'最初の2枚の確定トークンをこれらの数値のスペースに置く。',
+  9:'1台のタイルスタンド上に、切断されていない奇数のコードしかない（最低6本）。\n赤コードと黄コードは無視する。',
+  10:'1台のタイルスタンドから最低7本のコードが切断されており、その両端のコード2本が切断されていない。'
+};
+
 function renderM55(v){
   const isM55 = ((v?.mission?.id|0) === 55 || (v?.mission?.id|0) === 60);
   const rowId = 'm55Row';
@@ -4830,40 +4928,69 @@ function renderM55(v){
   if (old) old.remove();
   const lane = document.createElement('div');
   lane.id = rowId;
-  lane.className = 'conlane'; // concard と並べる既存レーン
+  lane.className = 'conlane m55-row';
 
   const shown = v.meta.m55_shown || [];
   const sides = v.meta.m55_c8Sides || null;
+  const flipped = v.meta.m55_flipped || {};
+  if ((v.tableCount|0) >= 5) lane.classList.add('wrap3');
 
   // 画像URLユーティリティ
   const imgChallenge = (fname)=> `./${fname}`;
 
-  shown.forEach(fname=>{
+  shown.forEach((fname, idx)=>{
     const isC8 = /c8\.(png|jpg)$/i.test(fname);
+    const num = ((fname.match(/c(\d+)/i) || [])[1] | 0);
+    const key = `${idx}:${fname}`;
+
+    const slot = document.createElement('div');
+    slot.className = `m55-slot${isC8 ? ' c8' : ''}`;
+    const inner = document.createElement('div');
+    inner.className = 'm55-slot-inner';
 
     // c8 のときは LEFT数値 → concard → RIGHT数値 の順で横並び
     if (isC8 && Array.isArray(sides) && sides.length===2){
       const leftNum  = document.createElement('div');
-      leftNum.className = 'numcard';
+      leftNum.className = 'm55-side left';
       leftNum.style.backgroundImage = `url('${imgNumber(sides[0])}')`;
-      lane.appendChild(leftNum);
+      inner.appendChild(leftNum);
     }
 
     const cc = document.createElement('div');
-    cc.className = 'concard';
-    cc.style.backgroundImage = `url('${imgChallenge(fname)}')`;
-cc.onclick = (ev)=>{
-  ev.stopPropagation();
-openChallengeZoom(fname.replace(/\.(png|jpg)$/,''));
-};
-    lane.appendChild(cc);
+    cc.className = 'm55-card';
+    const isBack = !!flipped[key];
+    if (isBack){
+      cc.classList.add('is-back');
+    } else {
+      cc.style.backgroundImage = `url('${imgChallenge(fname)}')`;
+      cc.style.backgroundSize = 'cover';
+      const badge = document.createElement('div');
+      badge.className = 'm55-card-number';
+      badge.textContent = String(num);
+      cc.appendChild(badge);
+
+      const desc = document.createElement('div');
+      desc.className = 'm55-card-desc';
+      desc.textContent = M55_CHALLENGE_TEXT[num] || '';
+      cc.appendChild(desc);
+    }
+    cc.onclick = async (ev)=>{
+      ev.stopPropagation();
+      const cur = (state.watching?.meta?.m55_flipped || {});
+      const next = { ...cur, [key]: !cur[key] };
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m55_flipped: next });
+    };
+    inner.appendChild(cc);
 
     if (isC8 && Array.isArray(sides) && sides.length===2){
       const rightNum = document.createElement('div');
-      rightNum.className = 'numcard';
+      rightNum.className = 'm55-side right';
       rightNum.style.backgroundImage = `url('${imgNumber(sides[1])}')`;
-      lane.appendChild(rightNum);
+      inner.appendChild(rightNum);
     }
+
+    slot.appendChild(inner);
+    lane.appendChild(slot);
   });
 
   // 既存の「アイテム列の直下に挿入」ヘルパを使用（#15等と同じ）
