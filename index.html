@@ -243,6 +243,7 @@
   .challenge-group{ display:flex; align-items:center; gap:2px; }
   .challenge-card{
     position:relative;
+    z-index:1;
     width:var(--con-h, var(--item-h, 75px));
     height:var(--con-w, var(--item-w, 50px));
     border:6px solid #de3e34;
@@ -253,28 +254,28 @@
     background-repeat:no-repeat;
     background-position:center;
     background-size:contain;
-    overflow:visible;
+    overflow:hidden;
   }
   .challenge-num-dot{
     position:absolute;
     top:-8px;
+    left:50%;
+    transform:translateX(-50%);
     width:16px;
     height:16px;
     border-radius:50%;
-    background:#111;
-    color:#fff;
-    font-size:9px;
-    line-height:16px;
+    border:1px solid #111;
+    background:transparent;
+    color:#111;
+    font-size:11px;
+    line-height:14px;
     font-weight:700;
     text-align:center;
     pointer-events:none;
   }
-  .challenge-num-dot.left{ left:-6px; }
-  .challenge-num-dot.center{ left:50%; transform:translateX(-50%); }
-  .challenge-num-dot.right{ right:-6px; }
-  .challenge-side-num{ transform:scale(0.95); }
-  .challenge-side-num.left{ margin-right:-14px; transform:rotate(-10deg) scale(0.95); }
-  .challenge-side-num.right{ margin-left:-14px; transform:rotate(10deg) scale(0.95); }
+  .challenge-side-num{ position:relative; z-index:2; transform:scale(0.95); }
+  .challenge-side-num.left{ margin-right:-14px; transform:rotate(10deg) scale(0.95); }
+  .challenge-side-num.right{ margin-left:-14px; transform:rotate(-10deg) scale(0.95); }
   .challenge-break{ flex-basis:100%; height:0; }
   .constraint-face{
     position:relative;
@@ -4912,12 +4913,10 @@ function renderM55(v){
 
     const m = String(fname).match(/c(\d+)/i);
     const cardNo = m ? m[1] : '';
-    ['left','center','right'].forEach(pos=>{
-      const dot = document.createElement('div');
-      dot.className = `challenge-num-dot ${pos}`;
-      dot.textContent = cardNo;
-      cc.appendChild(dot);
-    });
+    const dot = document.createElement('div');
+    dot.className = 'challenge-num-dot';
+    dot.textContent = cardNo;
+    cc.appendChild(dot);
 
     group.appendChild(cc);
 
