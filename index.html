@@ -4926,14 +4926,56 @@ function openChallengeZoom(fname){
   try{
     const old = document.getElementById('conZoomOverlay');
     if (old) old.remove();
+
+    let isBack = false;
+
     const ov = document.createElement('div');
     ov.id = 'conZoomOverlay';
     ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
-    const wrap = document.createElement('div'); wrap.className = 'conzoom-wrap';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'conzoom-wrap';
+
     const big  = document.createElement('div');
     big.className  = 'conzoom-card challenge-zoom';
-    big.appendChild(buildChallengeCard(fname, { zoom:true }));
+
+    const menu = document.createElement('div');
+    menu.className = 'conzoom-menu hidden';
+    const btnFlip = document.createElement('button');
+    btnFlip.type = 'button';
+    btnFlip.textContent = '裏返す';
+    menu.appendChild(btnFlip);
+
+    const render = ()=>{
+      big.innerHTML = '';
+      if (isBack){
+        big.style.backgroundImage = "url('./chaura.jpg')";
+        menu.classList.add('hidden');
+      }else{
+        big.style.backgroundImage = 'none';
+        big.appendChild(buildChallengeCard(fname, { zoom:true }));
+      }
+    };
+
+    big.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      if (isBack){
+        isBack = false;
+        render();
+        return;
+      }
+      menu.classList.toggle('hidden');
+    });
+
+    btnFlip.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      isBack = true;
+      render();
+    });
+
+    render();
     wrap.appendChild(big);
+    wrap.appendChild(menu);
     ov.appendChild(wrap);
     document.body.appendChild(ov);
   }catch(e){ console.error(e); }
