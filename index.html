@@ -313,6 +313,40 @@
     max-height:29px;
     overflow:hidden;
   }
+  .challenge-pattern-row{
+    position:absolute;
+    left:50%;
+    bottom:0;
+    transform:translateX(-50%);
+    display:flex;
+    gap:1px;
+    justify-content:center;
+    align-items:center;
+    z-index:3;
+    pointer-events:none;
+  }
+  .challenge-pattern-chip{
+    min-width:9px;
+    height:11px;
+    padding:0 1px;
+    border-radius:2px;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    color:#fff;
+    font-size:6px;
+    line-height:1;
+    font-weight:800;
+  }
+  .challenge-pattern-chip.black{ background:#000; }
+  .challenge-pattern-chip.gray{ background:#8a8a8a; }
+  .challenge-pattern-group{
+    display:flex;
+    gap:1px;
+    border:1px solid #2563eb;
+    border-radius:2px;
+    padding:0;
+  }
   .m55-c8-side{
     width:32px;
     height:48px;
@@ -4933,6 +4967,61 @@ function buildChallengeCard(fname, opts={}){
   text.className = 'challenge-textbox';
   text.textContent = CHALLENGE_CARD_TEXTS[id] || '';
   box.appendChild(text);
+
+  if (id === 3){
+    const row = document.createElement('div');
+    row.className = 'challenge-pattern-row';
+    const chips = [
+      { n:1, c:'black' },
+      { n:1, c:'black' },
+      { n:3, c:'gray'  },
+      { n:3, c:'black' },
+      { n:4, c:'black' },
+      { n:4, c:'gray'  }
+    ].map(({ n, c })=>{
+      const chip = document.createElement('span');
+      chip.className = `challenge-pattern-chip ${c}`;
+      chip.textContent = String(n);
+      return chip;
+    });
+
+    const pair11 = document.createElement('span');
+    pair11.className = 'challenge-pattern-group';
+    pair11.append(chips[0], chips[1]);
+    row.appendChild(pair11);
+
+    row.appendChild(chips[2]);
+
+    const pair34 = document.createElement('span');
+    pair34.className = 'challenge-pattern-group';
+    pair34.append(chips[3], chips[4]);
+    row.appendChild(pair34);
+
+    row.appendChild(chips[5]);
+    box.appendChild(row);
+  } else if (id === 9){
+    const row = document.createElement('div');
+    row.className = 'challenge-pattern-row';
+    [
+      { n:1, c:'gray'  },
+      { n:2, c:'black' },
+      { n:3, c:'gray'  },
+      { n:3, c:'gray'  },
+      { n:4, c:'black' },
+      { n:5, c:'gray'  },
+      { n:8, c:'black' },
+      { n:9, c:'gray'  },
+      { n:9, c:'black' },
+      { n:11,c:'black' },
+      { n:11,c:'gray'  }
+    ].forEach(({ n, c })=>{
+      const chip = document.createElement('span');
+      chip.className = `challenge-pattern-chip ${c}`;
+      chip.textContent = String(n);
+      row.appendChild(chip);
+    });
+    box.appendChild(row);
+  }
 
   return box;
 }
