@@ -32,7 +32,7 @@
   .small{font-size:12px;opacity:.75}
   .bold{font-weight:700}
 
-  main{padding:10px 12px;display:flex;gap:12px; overflow:visible;}
+  main{padding:10px 12px;display:flex;gap:12px; overflow:hidden;}
   .col{flex:1;min-width:0; overflow:visible;}
   .side{width:38%;max-width:420px}
 
@@ -136,7 +136,7 @@
     pointer-events:none;
     z-index:2;
     white-space:nowrap;
-    overflow:hidden;
+    overflow:visible;
   }
   .item-textbox{
     position:absolute;
@@ -233,11 +233,99 @@
   .numcard.overlay { position:absolute; left:2px; top:2px; opacity:1; }
   .numcard.overlay:nth-child(3){ left:4px; top:4px; opacity:0.85; }
   .numcard.overlay:nth-child(4){ left:6px; top:6px; opacity:0.8; }
- .conlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
+.conlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .concard {
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     border-radius:8px; border:1px solid #ddd;
-    background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
+    background:#fff;
+    background-image:none; flex:0 0 auto; cursor:pointer;
+  }
+  .m55-lane{
+    flex-wrap:wrap;
+    overflow:visible;
+    gap:8px;
+  }
+  .m55-lane.five-plus{
+    max-width:calc(var(--con-h) * 3 + 16px);
+  }
+  .m55-card-wrap{
+    position:relative;
+    flex:0 0 auto;
+  }
+  .challenge-card{
+    position:relative;
+    width:var(--con-h);
+    height:var(--con-w);
+    border-radius:8px;
+    border:5px solid #de3e34;
+    background:#fff;
+    background-image:none;
+    overflow:visible;
+    -webkit-clip-path:inset(0 round 8px);
+    clip-path:inset(0 round 8px);
+  }
+  .challenge-card::before{ display:none; }
+  .challenge-num{
+    position:absolute;
+    left:50%;
+    top:-7px;
+    width:12px;
+    height:12px;
+    display:grid;
+    place-items:center;
+    text-align:center;
+    color:#fff;
+    font-size:10px;
+    font-weight:800;
+    background:#000;
+    border-radius:50%;
+    transform:translateX(-50%);
+    z-index:5;
+    pointer-events:none;
+    line-height:1;
+  }
+  .challenge-textbox{
+    position:absolute;
+    left:1px;
+    right:1px;
+    top:6px;
+    border:1px solid #fff;
+    background:#fff;
+    color:#000;
+    border-radius:4px;
+    padding:0 1px 1px;
+    font-size:5px;
+    line-height:1.15;
+    font-weight:700;
+    white-space:pre-wrap;
+    z-index:2;
+    pointer-events:none;
+    max-height:29px;
+    overflow:hidden;
+  }
+  .m55-c8-side{
+    width:32px;
+    height:48px;
+    border-radius:6px;
+    border:1px solid #ddd;
+    background:#fff center/cover no-repeat;
+    position:absolute;
+    top:50%;
+    z-index:4;
+    box-shadow:0 3px 10px rgba(0,0,0,.18);
+  }
+  .m55-c8-side.left{
+    left:-2px;
+    transform:translate(-45%,-50%) rotate(-10deg);
+  }
+  .m55-c8-side.right{
+    right:-2px;
+    transform:translate(45%,-50%) rotate(10deg);
+  }
+  .conzoom-card.challenge-zoom{
+    width:var(--con-h);
+    height:var(--con-w);
+    overflow:hidden;
   }
   .constraint-face{
     position:relative;
@@ -4798,8 +4886,45 @@ async function ensureM55MetaInit(vNow){
 }
 
 
+const CHALLENGE_CARD_TEXTS = {
+  1:`アクションの代わりに、プレイヤーのうち1人が「これは赤です」と言ってチームメイトのコードを1本切断する。
+そのコードが赤ではなかった場合、爆弾は爆発する。`,
+  2:`4人のプレイヤーが連続して、偶数のコードを切断する。`,
+  3:`1台のタイルスタンド上にある切断されていないコードが、コード2本からなるグループだけを作っている。
+（各グループは切断されているコードによって分断される。）`,
+  4:`最初に置かれた3枚の確定トークンの合計値が18に等しい。`,
+  5:`2人のプレイヤーが連続して、単独での切断アクションを実行する。`,
+  6:`1台のタイルスタンド上で、切断されていないコードが最低5本は孤立している。
+（両隣のコードが切断されている。）`,
+  7:`3人のプレイヤーが連続して、連続した数値のコードを（昇順か降順で）切断する。
+例：8、9、10や5、4、3など。`,
+  8:`最初の2枚の確定トークンをこれらの数値のスペースに置く。`,
+  9:`1台のタイルスタンド上に、切断されていない奇数のコードしかない（最低6本）。
+赤コードと黄コードは無視する。`,
+  10:`1台のタイルスタンドから最低7本のコードが切断されており、その両端のコード2本が切断されていない。`
+};
+
+function buildChallengeCard(fname, opts={}){
+  const id = Number(String(fname).match(/c(\d+)/i)?.[1] || 0);
+  const box = document.createElement('div');
+  box.className = `challenge-card${opts.zoom ? ' challenge-zoom-face' : ''}`;
+  box.style.backgroundImage = `url('./${fname}')`;
+
+  const num = document.createElement('div');
+  num.className = 'challenge-num';
+  num.textContent = id || '';
+  box.appendChild(num);
+
+  const text = document.createElement('div');
+  text.className = 'challenge-textbox';
+  text.textContent = CHALLENGE_CARD_TEXTS[id] || '';
+  box.appendChild(text);
+
+  return box;
+}
+
 // タップ拡大（conZoomOverlayを流用）
-function openChallengeZoom(id){
+function openChallengeZoom(fname){
   try{
     const old = document.getElementById('conZoomOverlay');
     if (old) old.remove();
@@ -4807,8 +4932,9 @@ function openChallengeZoom(id){
     ov.id = 'conZoomOverlay';
     ov.addEventListener('click', (e)=>{ if(e.target===ov) closeConstraintZoom(); });
     const wrap = document.createElement('div'); wrap.className = 'conzoom-wrap';
-    const big  = document.createElement('div'); big.className  = 'conzoom-card';
-    big.style.backgroundImage = `url('${imgChallenge(id)}')`;
+    const big  = document.createElement('div');
+    big.className  = 'conzoom-card challenge-zoom';
+    big.appendChild(buildChallengeCard(fname, { zoom:true }));
     wrap.appendChild(big);
     ov.appendChild(wrap);
     document.body.appendChild(ov);
@@ -4830,44 +4956,42 @@ function renderM55(v){
   if (old) old.remove();
   const lane = document.createElement('div');
   lane.id = rowId;
-  lane.className = 'conlane'; // concard と並べる既存レーン
+  lane.className = 'conlane m55-lane';
 
   const shown = v.meta.m55_shown || [];
   const sides = v.meta.m55_c8Sides || null;
-
-  // 画像URLユーティリティ
-  const imgChallenge = (fname)=> `./${fname}`;
+  if ((v?.tableCount|0) >= 5) lane.classList.add('five-plus');
 
   shown.forEach(fname=>{
     const isC8 = /c8\.(png|jpg)$/i.test(fname);
 
-    // c8 のときは LEFT数値 → concard → RIGHT数値 の順で横並び
+    const wrap = document.createElement('div');
+    wrap.className = 'm55-card-wrap';
+
+    const cc = buildChallengeCard(fname);
+    cc.onclick = (ev)=>{
+      ev.stopPropagation();
+      openChallengeZoom(fname);
+    };
+    wrap.appendChild(cc);
+
     if (isC8 && Array.isArray(sides) && sides.length===2){
       const leftNum  = document.createElement('div');
-      leftNum.className = 'numcard';
+      leftNum.className = 'm55-c8-side left';
       leftNum.style.backgroundImage = `url('${imgNumber(sides[0])}')`;
-      lane.appendChild(leftNum);
-    }
+      wrap.appendChild(leftNum);
 
-    const cc = document.createElement('div');
-    cc.className = 'concard';
-    cc.style.backgroundImage = `url('${imgChallenge(fname)}')`;
-cc.onclick = (ev)=>{
-  ev.stopPropagation();
-openChallengeZoom(fname.replace(/\.(png|jpg)$/,''));
-};
-    lane.appendChild(cc);
-
-    if (isC8 && Array.isArray(sides) && sides.length===2){
       const rightNum = document.createElement('div');
-      rightNum.className = 'numcard';
+      rightNum.className = 'm55-c8-side right';
       rightNum.style.backgroundImage = `url('${imgNumber(sides[1])}')`;
-      lane.appendChild(rightNum);
+      wrap.appendChild(rightNum);
     }
+
+    lane.appendChild(wrap);
   });
 
   // 既存の「アイテム列の直下に挿入」ヘルパを使用（#15等と同じ）
-  mountLaneUnderItemsBar(lane);  // #15 の末尾と同じ呼び方でOK :contentReference[oaicite:0]{index=0}
+  mountLaneUnderItemsBar(lane);
 }
 
 /* ==== #31：アイテム列の下に A~E、キャラ列はブランク＋直下にミニ ==== */
