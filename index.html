@@ -347,6 +347,17 @@
     border-radius:2px;
     padding:0.5px;
   }
+  .challenge-pattern-group.dotted-square{
+    border:1px dashed #111;
+    border-radius:0;
+    padding:0.8px;
+    gap:0.8px;
+  }
+  .challenge-pattern-chip.green-circle{
+    border:1px solid rgba(34,197,94,.9);
+    background:rgba(34,197,94,.28);
+    border-radius:50%;
+  }
   .m55-c8-side{
     width:32px;
     height:48px;
@@ -4998,6 +5009,23 @@ function buildChallengeCard(fname, opts={}){
     row.appendChild(pair34);
 
     row.appendChild(chips[5]);
+    box.appendChild(row);
+  } else if (id === 4){
+    const row = document.createElement('div');
+    row.className = 'challenge-pattern-row';
+
+    const frame = document.createElement('span');
+    frame.className = 'challenge-pattern-group dotted-square';
+
+    [4, 5, 6, 7, 8, 9].forEach((n)=>{
+      const chip = document.createElement('span');
+      chip.className = 'challenge-pattern-chip gray';
+      if ([4, 5, 9].includes(n)) chip.classList.add('green-circle');
+      chip.textContent = String(n);
+      frame.appendChild(chip);
+    });
+
+    row.appendChild(frame);
     box.appendChild(row);
   } else if (id === 6){
     const row = document.createElement('div');
