@@ -316,10 +316,10 @@
   .challenge-pattern-row{
     position:absolute;
     left:50%;
-    bottom:3px;
+    bottom:0;
     transform:translateX(-50%);
     display:flex;
-    gap:2px;
+    gap:1px;
     justify-content:center;
     align-items:center;
     z-index:3;
@@ -327,13 +327,14 @@
   }
   .challenge-pattern-chip{
     min-width:9px;
-    height:9px;
-    padding:0 2px;
+    height:11px;
+    padding:0 1px;
     border-radius:2px;
-    display:grid;
-    place-items:center;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
     color:#fff;
-    font-size:7px;
+    font-size:6px;
     line-height:1;
     font-weight:800;
   }
