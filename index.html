@@ -287,7 +287,7 @@
     color:#fff;
     font-size:10px;
     font-weight:800;
-    background:#3f3f3f;
+    background:#000;
     border-radius:50%;
     transform:translateX(-50%);
     z-index:5;
@@ -5002,21 +5002,16 @@ function buildChallengeCard(fname, opts={}){
   } else if (id === 6){
     const row = document.createElement('div');
     row.className = 'challenge-pattern-row';
-    const framedPositions = new Set([1, 3, 5, 7, 9]);
+    const framedPositions = new Set([2, 7]);
     [
-      { n:1,  c:'gray'  },
-      { n:2,  c:'black' },
+      { n:2,  c:'black'  },
       { n:2,  c:'gray'  },
       { n:3,  c:'black' },
       { n:4,  c:'gray'  },
-      { n:4,  c:'black' },
+      { n:4,  c:'gray' },
+      { n:5,  c:'black'  },
       { n:5,  c:'gray'  },
-      { n:6,  c:'black' },
-      { n:7,  c:'gray'  },
-      { n:7,  c:'black' },
-      { n:8,  c:'black' },
-      { n:9,  c:'gray'  },
-      { n:11, c:'gray'  }
+      { n:6,  c:'black'  },
     ].forEach(({ n, c }, idx)=>{
       const chip = document.createElement('span');
       chip.className = `challenge-pattern-chip ${c}`;
