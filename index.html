@@ -340,6 +340,13 @@
   }
   .challenge-pattern-chip.black{ background:#000; }
   .challenge-pattern-chip.gray{ background:#8a8a8a; }
+  .challenge-pattern-group{
+    display:flex;
+    gap:1px;
+    border:1px solid #2563eb;
+    border-radius:2px;
+    padding:0;
+  }
   .m55-c8-side{
     width:32px;
     height:48px;
@@ -4964,19 +4971,33 @@ function buildChallengeCard(fname, opts={}){
   if (id === 3){
     const row = document.createElement('div');
     row.className = 'challenge-pattern-row';
-    [
+    const chips = [
       { n:1, c:'black' },
       { n:1, c:'black' },
       { n:3, c:'gray'  },
       { n:3, c:'black' },
       { n:4, c:'black' },
       { n:4, c:'gray'  }
-    ].forEach(({ n, c })=>{
+    ].map(({ n, c })=>{
       const chip = document.createElement('span');
       chip.className = `challenge-pattern-chip ${c}`;
       chip.textContent = String(n);
-      row.appendChild(chip);
+      return chip;
     });
+
+    const pair11 = document.createElement('span');
+    pair11.className = 'challenge-pattern-group';
+    pair11.append(chips[0], chips[1]);
+    row.appendChild(pair11);
+
+    row.appendChild(chips[2]);
+
+    const pair34 = document.createElement('span');
+    pair34.className = 'challenge-pattern-group';
+    pair34.append(chips[3], chips[4]);
+    row.appendChild(pair34);
+
+    row.appendChild(chips[5]);
     box.appendChild(row);
   }
 
