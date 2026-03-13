@@ -5049,6 +5049,40 @@ function buildChallengeCard(fname, opts={}){
       row.appendChild(chip);
     });
     box.appendChild(row);
+  } else if (id === 10){
+    const row = document.createElement('div');
+    row.className = 'challenge-pattern-row';
+    const framedPositions = new Set([1, 9]);
+    [
+      { n:1,  c:'gray'  },
+      { n:2,  c:'black' },
+      { n:2,  c:'black' },
+      { n:3,  c:'black' },
+      { n:4,  c:'gray'  },
+      { n:4,  c:'black' },
+      { n:5,  c:'gray'  },
+      { n:6,  c:'black' },
+      { n:7,  c:'gray'  },
+      { n:7,  c:'black' },
+      { n:8,  c:'black' },
+      { n:9,  c:'gray'  },
+      { n:10, c:'gray'  },
+      { n:12, c:'gray'  }
+    ].forEach(({ n, c }, idx)=>{
+      const chip = document.createElement('span');
+      chip.className = `challenge-pattern-chip ${c}`;
+      chip.textContent = String(n);
+
+      if (framedPositions.has(idx + 1)){
+        const frame = document.createElement('span');
+        frame.className = 'challenge-pattern-group';
+        frame.appendChild(chip);
+        row.appendChild(frame);
+      } else {
+        row.appendChild(chip);
+      }
+    });
+    box.appendChild(row);
   }
 
   return box;
