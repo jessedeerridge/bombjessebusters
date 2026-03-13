@@ -268,6 +268,13 @@
     clip-path:inset(0 round 8px);
   }
   .challenge-card::before{ display:none; }
+  .challenge-card.back-face{
+    border:none;
+    background-color:transparent;
+    -webkit-clip-path:none;
+    clip-path:none;
+    overflow:hidden;
+  }
   .challenge-num{
     position:absolute;
     left:50%;
@@ -4924,9 +4931,9 @@ function buildChallengeCard(fname, opts={}){
 
 function buildChallengeBackCard(opts={}){
   const box = document.createElement('div');
-  box.className = `challenge-card${opts.zoom ? ' challenge-zoom-face' : ''}`;
+  box.className = `challenge-card back-face${opts.zoom ? ' challenge-zoom-face' : ''}`;
   box.style.backgroundImage = `url('./chaura.jpg')`;
-  box.style.backgroundSize = 'contain';
+  box.style.backgroundSize = 'cover';
   box.style.backgroundRepeat = 'no-repeat';
   box.style.backgroundPosition = 'center';
   return box;
