@@ -40,6 +40,7 @@
   .join-box input{padding:8px;border:1px solid #ddd;border-radius:6px; font-size:16px;}
   .btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#f8f8f8;cursor:pointer}
   .btn.primary{background:#111;color:#fff;border-color:#111}
+  .btn.menu-ink{background:#111;color:#fff;border-color:#111}
   .btn.small{padding:6px 10px;font-size:12px}
   .btn.big{padding:12px 14px;font-size:16px}
   .btn.ghost{background:transparent}
@@ -2577,11 +2578,15 @@ function openMenu(x,y, entries){
   entries.forEach(ent=>{
     const b=document.createElement('button');
     b.className='btn small';
+    const labelText = (ent?.label ?? '');
+    if (labelText === 'カードを渡す' || labelText.endsWith('に見せる')) {
+      b.classList.add('menu-ink');
+    }
     if (ent && ent.html){ 
       b.innerHTML = ent.html;                // ★ 追加：HTMLで見た目を差し替え
       if (ent.ariaLabel) b.setAttribute('aria-label', ent.ariaLabel);
     } else {
-      b.textContent = (ent?.label ?? '');
+      b.textContent = labelText;
     }
     if (ent && typeof ent.action === 'function') {
       b.onclick = ()=>{ if(div.isConnected) div.remove(); try{ ent.action(); }catch(_e){} };
