@@ -237,7 +237,8 @@
   .concard {
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
     border-radius:8px; border:1px solid #ddd;
-    background:#fff center/cover no-repeat; flex:0 0 auto; cursor:pointer;
+    background:#fff;
+    background-image:none; flex:0 0 auto; cursor:pointer;
   }
   .m55-lane{
     flex-wrap:wrap;
@@ -257,7 +258,8 @@
     height:var(--con-w);
     border-radius:8px;
     border:5px solid #de3e34;
-    background:#fff center/cover no-repeat;
+    background:#fff;
+    background-image:none;
     overflow:visible;
     -webkit-clip-path:inset(0 round 8px);
     clip-path:inset(0 round 8px);
@@ -313,12 +315,12 @@
     box-shadow:0 3px 10px rgba(0,0,0,.18);
   }
   .m55-c8-side.left{
-    left:-10px;
-    transform:translate(-70%,-50%) rotate(10deg);
+    left:-2px;
+    transform:translate(-45%,-50%) rotate(-10deg);
   }
   .m55-c8-side.right{
-    right:-10px;
-    transform:translate(70%,-50%) rotate(-10deg);
+    right:-2px;
+    transform:translate(45%,-50%) rotate(10deg);
   }
   .conzoom-card.challenge-zoom{
     width:var(--con-h);
