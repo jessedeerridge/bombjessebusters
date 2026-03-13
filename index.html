@@ -844,6 +844,15 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
     box-shadow:0 14px 30px rgba(0,0,0,.2);
     padding:14px 14px 12px;z-index:260;
   }
+  .stage-story-image{
+    position:absolute;
+    right:10px;
+    bottom:10px;
+    width:min(96px, 24vw);
+    height:auto;
+    object-fit:contain;
+    pointer-events:none;
+  }
   .stage-story-head{position:relative;min-height:38px;margin-bottom:10px}
   .stage-story-title{
     display:inline-block;max-width:calc(100% - 96px);
@@ -1402,6 +1411,7 @@ main:not(:has(#lobby.hidden)) > * {
     <div id="stageStoryNum" class="stage-story-num"></div>
   </div>
   <p id="stageStoryBody" class="stage-story-body"></p>
+  <img id="stageStoryImage" class="stage-story-image hidden" alt="" />
 </div>
 <div id="m42Minus2Pop" class="m42minus2-pop hidden">
   <div class="line12">同じ数字のカードを2枚選ぼう。</div>
@@ -1557,6 +1567,13 @@ function renderStageStory(v){
   stageStoryTitle.textContent = def.title;
   stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
   stageStoryBody.textContent = def.body;
+  if (stageStoryImageMissions.has(missionId)) {
+    stageStoryImage.src = `./P${missionId}.png`;
+    H(stageStoryImage, false);
+  } else {
+    stageStoryImage.removeAttribute('src');
+    H(stageStoryImage, true);
+  }
   H(stageStoryPop, false);
 }
 
@@ -1705,6 +1722,8 @@ const stageStoryPop = document.getElementById('stageStoryPop');
 const stageStoryTitle = document.getElementById('stageStoryTitle');
 const stageStoryNum = document.getElementById('stageStoryNum');
 const stageStoryBody = document.getElementById('stageStoryBody');
+const stageStoryImage = document.getElementById('stageStoryImage');
+const stageStoryImageMissions = new Set([19, 30, 42, 54, 66]);
 const btnSeatCancel=document.getElementById('btnSeatCancel');
 
 
