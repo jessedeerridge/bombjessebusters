@@ -305,6 +305,15 @@
     pointer-events:none;
   }
 
+  .constraint-face .constraint-desc.constraint-desc-h{
+    left:2px;
+    right:2px;
+    top:2px;
+    bottom:2px;
+    line-height:1.15;
+    font-weight:600;
+  }
+
   #conZoomOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.4);
     display:flex; align-items:center; justify-content:center;
@@ -2120,10 +2129,11 @@ function fitConstraintDesc(node, letter){
   if (!desc) return;
 
   // 要望対応：制約カードHの説明のみ、白枠内に収まるまで自動で縮小
+  desc.classList.toggle('constraint-desc-h', letter === 'H');
   desc.style.fontSize = '';
   if (letter !== 'H') return;
 
-  const minFont = 3;
+  const minFont = 4.8;
   let size = parseFloat(getComputedStyle(desc).fontSize) || 6;
   let retries = 0;
 
@@ -2136,7 +2146,7 @@ function fitConstraintDesc(node, letter){
     }
 
     while (size > minFont && (desc.scrollHeight > desc.clientHeight || desc.scrollWidth > desc.clientWidth)){
-      size = +(size - 0.2).toFixed(2);
+      size = +(size - 0.1).toFixed(2);
       desc.style.fontSize = `${size}px`;
     }
   };
