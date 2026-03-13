@@ -136,7 +136,8 @@
     pointer-events:none;
     z-index:2;
     white-space:nowrap;
-    overflow:hidden;
+    overflow:visible;
+    clip-path:inset(0 round 8px);
   }
   .item-textbox{
     position:absolute;
@@ -258,7 +259,8 @@
     border-radius:8px;
     border:5px solid #de3e34;
     background:#fff center/cover no-repeat;
-    overflow:hidden;
+    overflow:visible;
+    clip-path:inset(0 round 8px);
   }
   .challenge-card::before{ display:none; }
   .challenge-num{
@@ -271,7 +273,7 @@
     place-items:center;
     text-align:center;
     color:#fff;
-    font-size:15px;
+    font-size:13px;
     font-weight:800;
     background:#000;
     border-radius:50%;
@@ -326,7 +328,7 @@
   .conzoom-card.challenge-zoom .challenge-num{
     width:24px;
     height:24px;
-    font-size:20px;
+    font-size:18px;
     top:-12px;
   }
   .conzoom-card.challenge-zoom .challenge-textbox{
