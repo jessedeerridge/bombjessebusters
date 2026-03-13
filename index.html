@@ -846,16 +846,17 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   }
   .stage-story-image{
     position:absolute;
-    right:12px;
+    left:50%;
     bottom:12px;
-    width:min(150px, 38vw);
+    transform:translateX(-50%);
+    width:min(180px, 46vw);
+    max-height:110px;
     height:auto;
     object-fit:contain;
     pointer-events:none;
   }
   .stage-story-pop.has-mission-image .stage-story-body{
-    padding-right:min(170px, 42vw);
-    padding-bottom:78px;
+    padding-bottom:122px;
   }
   .stage-story-head{position:relative;min-height:38px;margin-bottom:10px}
   .stage-story-title{
