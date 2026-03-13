@@ -347,16 +347,17 @@
     border-radius:2px;
     padding:0.5px;
   }
-  .challenge-pattern-group.dotted-square{
-    border:1px dashed #111;
-    border-radius:0;
-    padding:0.8px;
-    gap:0.8px;
+  .challenge-pattern-chip.c4-dashed{
+    border:1px dashed #9ca3af;
+    border-radius:2px;
+    background:transparent;
+    color:#111;
   }
   .challenge-pattern-chip.green-circle{
-    border:1px solid rgba(34,197,94,.9);
+    border:none;
     background:rgba(34,197,94,.28);
     border-radius:50%;
+    color:#111;
   }
   .m55-c8-side{
     width:32px;
@@ -5014,18 +5015,15 @@ function buildChallengeCard(fname, opts={}){
     const row = document.createElement('div');
     row.className = 'challenge-pattern-row';
 
-    const frame = document.createElement('span');
-    frame.className = 'challenge-pattern-group dotted-square';
-
     [4, 5, 6, 7, 8, 9].forEach((n)=>{
       const chip = document.createElement('span');
-      chip.className = 'challenge-pattern-chip gray';
-      if ([4, 5, 9].includes(n)) chip.classList.add('green-circle');
+      chip.className = [4, 5, 9].includes(n)
+        ? 'challenge-pattern-chip green-circle'
+        : 'challenge-pattern-chip c4-dashed';
       chip.textContent = String(n);
-      frame.appendChild(chip);
+      row.appendChild(chip);
     });
 
-    row.appendChild(frame);
     box.appendChild(row);
   } else if (id === 6){
     const row = document.createElement('div');
