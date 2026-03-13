@@ -353,16 +353,22 @@
   .challenge-pattern-chip.c4-dashed{
     width:8px;
     height:8px;
-    border:1px dashed #9ca3af;
+    border:none;
     border-radius:2px;
-    background:transparent;
+    --c4-fill: transparent;
+    background:
+      radial-gradient(circle at center, var(--c4-fill) 0 60%, transparent 61%),
+      repeating-linear-gradient(90deg, #9ca3af 0 0.6px, transparent 0.6px 1.2px) top / calc(100% - 3px) 0.6px no-repeat,
+      repeating-linear-gradient(90deg, #9ca3af 0 0.6px, transparent 0.6px 1.2px) bottom / calc(100% - 3px) 0.6px no-repeat,
+      repeating-linear-gradient(0deg,  #9ca3af 0 0.6px, transparent 0.6px 1.2px) left / 0.6px calc(100% - 3px) no-repeat,
+      repeating-linear-gradient(0deg,  #9ca3af 0 0.6px, transparent 0.6px 1.2px) right / 0.6px calc(100% - 3px) no-repeat;
     color:#111;
     align-items:center;
     line-height:1;
     padding:0;
   }
   .challenge-pattern-chip.green-circle{
-    background:radial-gradient(circle at center, rgba(34,197,94,.30) 0 60%, transparent 61%);
+    --c4-fill: rgba(34,197,94,.30);
     border-radius:2px;
   }
   .m55-c8-side{
