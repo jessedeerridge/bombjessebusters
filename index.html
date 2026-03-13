@@ -252,6 +252,9 @@
     position:relative;
     flex:0 0 auto;
   }
+  .m55-card-wrap.c8-gap{
+    margin-inline:2px;
+  }
   .challenge-card{
     position:relative;
     width:var(--con-h);
@@ -4967,6 +4970,7 @@ function renderM55(v){
 
     const wrap = document.createElement('div');
     wrap.className = 'm55-card-wrap';
+    if (isC8) wrap.classList.add('c8-gap');
 
     const cc = buildChallengeCard(fname);
     cc.onclick = (ev)=>{
