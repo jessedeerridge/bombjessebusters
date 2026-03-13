@@ -2111,6 +2111,37 @@ function paintConstraintCard(node, letter){
     node.appendChild(desc);
   }
   desc.textContent = upper ? (CONSTRAINT_TEXTS[upper] || '') : '';
+
+  fitConstraintDesc(node, upper);
+}
+
+function fitConstraintDesc(node, letter){
+  const desc = node?.querySelector('.constraint-desc');
+  if (!desc) return;
+
+  // 要望対応：制約カードHの説明のみ、白枠内に収まるまで自動で縮小
+  desc.style.fontSize = '';
+  if (letter !== 'H') return;
+
+  const minFont = 3;
+  let size = parseFloat(getComputedStyle(desc).fontSize) || 6;
+  let retries = 0;
+
+  const adjust = () => {
+    // 非表示中などでサイズが取れない場合は少し待って再試行
+    if ((desc.clientHeight === 0 || desc.clientWidth === 0) && retries < 2){
+      retries += 1;
+      requestAnimationFrame(adjust);
+      return;
+    }
+
+    while (size > minFont && (desc.scrollHeight > desc.clientHeight || desc.scrollWidth > desc.clientWidth)){
+      size = +(size - 0.2).toFixed(2);
+      desc.style.fontSize = `${size}px`;
+    }
+  };
+
+  adjust();
 }
 
 const imgChallenge = id => `./${id}.png`;
