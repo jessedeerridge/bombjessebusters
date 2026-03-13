@@ -5002,7 +5002,7 @@ function buildChallengeCard(fname, opts={}){
   } else if (id === 6){
     const row = document.createElement('div');
     row.className = 'challenge-pattern-row';
-    const framedPositions = new Set([2, 7]);
+    const framedGroups = [new Set([1, 2, 3]), new Set([6, 7, 8])];
     [
       { n:2,  c:'black'  },
       { n:2,  c:'gray'  },
@@ -5017,15 +5017,24 @@ function buildChallengeCard(fname, opts={}){
       chip.className = `challenge-pattern-chip ${c}`;
       chip.textContent = String(n);
 
-      if (framedPositions.has(idx + 1)){
-        const frame = document.createElement('span');
-        frame.className = 'challenge-pattern-group';
-        frame.appendChild(chip);
-        row.appendChild(frame);
+      const pos = idx + 1;
+      const targetGroup = framedGroups.find(g => g.has(pos));
+      if (targetGroup){
+        const isGroupStart = pos === Math.min(...targetGroup);
+        if (isGroupStart){
+          const frame = document.createElement('span');
+          frame.className = 'challenge-pattern-group';
+          frame.dataset.group = targetGroup.has(1) ? 'a' : 'b';
+          row.appendChild(frame);
+        }
+        const frame = row.querySelector(`.challenge-pattern-group[data-group="${targetGroup.has(1) ? 'a' : 'b'}"]`);
+        frame && frame.appendChild(chip);
       } else {
         row.appendChild(chip);
       }
     });
+
+    row.querySelectorAll('.challenge-pattern-group[data-group]').forEach(el => el.removeAttribute('data-group'));
     box.appendChild(row);
   } else if (id === 9){
     const row = document.createElement('div');
@@ -5073,15 +5082,24 @@ function buildChallengeCard(fname, opts={}){
       chip.className = `challenge-pattern-chip ${c}`;
       chip.textContent = String(n);
 
-      if (framedPositions.has(idx + 1)){
-        const frame = document.createElement('span');
-        frame.className = 'challenge-pattern-group';
-        frame.appendChild(chip);
-        row.appendChild(frame);
+      const pos = idx + 1;
+      const targetGroup = framedGroups.find(g => g.has(pos));
+      if (targetGroup){
+        const isGroupStart = pos === Math.min(...targetGroup);
+        if (isGroupStart){
+          const frame = document.createElement('span');
+          frame.className = 'challenge-pattern-group';
+          frame.dataset.group = targetGroup.has(1) ? 'a' : 'b';
+          row.appendChild(frame);
+        }
+        const frame = row.querySelector(`.challenge-pattern-group[data-group="${targetGroup.has(1) ? 'a' : 'b'}"]`);
+        frame && frame.appendChild(chip);
       } else {
         row.appendChild(chip);
       }
     });
+
+    row.querySelectorAll('.challenge-pattern-group[data-group]').forEach(el => el.removeAttribute('data-group'));
     box.appendChild(row);
   }
 
