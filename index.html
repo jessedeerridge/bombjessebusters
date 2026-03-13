@@ -4883,7 +4883,8 @@ async function ensureM55MetaInit(vNow){
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
       m55_deck: deck,
       m55_shown: shown,
-      m55_c8Sides: c8Sides
+      m55_c8Sides: c8Sides,
+      m55_backByIndex: shown.map(() => false)
     });
   }
 }
@@ -4921,13 +4922,18 @@ function buildChallengeCard(fname, opts={}){
   return box;
 }
 
+function buildChallengeBackCard(opts={}){
+  const box = document.createElement('div');
+  box.className = `challenge-card${opts.zoom ? ' challenge-zoom-face' : ''}`;
+  box.style.backgroundImage = `url('./chaura.jpg')`;
+  return box;
+}
+
 // タップ拡大（conZoomOverlayを流用）
-function openChallengeZoom(fname){
+function openChallengeZoom(fname, onFlip){
   try{
     const old = document.getElementById('conZoomOverlay');
     if (old) old.remove();
-
-    let isBack = false;
 
     const ov = document.createElement('div');
     ov.id = 'conZoomOverlay';
@@ -4938,6 +4944,8 @@ function openChallengeZoom(fname){
 
     const big  = document.createElement('div');
     big.className  = 'conzoom-card challenge-zoom';
+    big.style.backgroundImage = 'none';
+    big.appendChild(buildChallengeCard(fname, { zoom:true }));
 
     const menu = document.createElement('div');
     menu.className = 'conzoom-menu hidden';
@@ -4946,34 +4954,17 @@ function openChallengeZoom(fname){
     btnFlip.textContent = '裏返す';
     menu.appendChild(btnFlip);
 
-    const render = ()=>{
-      big.innerHTML = '';
-      if (isBack){
-        big.style.backgroundImage = "url('./chaura.jpg')";
-        menu.classList.add('hidden');
-      }else{
-        big.style.backgroundImage = 'none';
-        big.appendChild(buildChallengeCard(fname, { zoom:true }));
-      }
-    };
-
     big.addEventListener('click', (ev)=>{
       ev.stopPropagation();
-      if (isBack){
-        isBack = false;
-        render();
-        return;
-      }
       menu.classList.toggle('hidden');
     });
 
-    btnFlip.addEventListener('click', (ev)=>{
+    btnFlip.addEventListener('click', async (ev)=>{
       ev.stopPropagation();
-      isBack = true;
-      render();
+      try { if (typeof onFlip === 'function') await onFlip(); } catch(e){ console.error(e); }
+      closeConstraintZoom();
     });
 
-    render();
     wrap.appendChild(big);
     wrap.appendChild(menu);
     ov.appendChild(wrap);
@@ -5000,23 +4991,37 @@ function renderM55(v){
 
   const shown = v.meta.m55_shown || [];
   const sides = v.meta.m55_c8Sides || null;
+  const backByIndex = Array.isArray(v?.meta?.m55_backByIndex) ? v.meta.m55_backByIndex : [];
   if ((v?.tableCount|0) >= 5) lane.classList.add('five-plus');
 
-  shown.forEach(fname=>{
+  shown.forEach((fname, idx)=>{
     const isC8 = /c8\.(png|jpg)$/i.test(fname);
+    const isBack = !!backByIndex[idx];
 
     const wrap = document.createElement('div');
     wrap.className = 'm55-card-wrap';
-    if (isC8) wrap.classList.add('c8-spacing');
+    if (isC8 && !isBack) wrap.classList.add('c8-spacing');
 
-    const cc = buildChallengeCard(fname);
-    cc.onclick = (ev)=>{
+    const setCardFace = async(nextBack)=>{
+      const next = backByIndex.slice();
+      next[idx] = !!nextBack;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m55_backByIndex: next });
+    };
+
+    const cc = isBack ? buildChallengeBackCard() : buildChallengeCard(fname);
+    cc.onclick = async (ev)=>{
       ev.stopPropagation();
-      openChallengeZoom(fname);
+      if (isBack){
+        await setCardFace(false);
+        return;
+      }
+      openChallengeZoom(fname, async ()=>{
+        await setCardFace(true);
+      });
     };
     wrap.appendChild(cc);
 
-    if (isC8 && Array.isArray(sides) && sides.length===2){
+    if (!isBack && isC8 && Array.isArray(sides) && sides.length===2){
       const leftNum  = document.createElement('div');
       leftNum.className = 'm55-c8-side left';
       leftNum.style.backgroundImage = `url('${imgNumber(sides[0])}')`;
