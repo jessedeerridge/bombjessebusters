@@ -7178,12 +7178,11 @@ function renderM61(v){
 
   const by = v.meta.m61_byTable.slice();
   const tables = Array.isArray(v?.tables) ? v.tables : [];
-  const allSeated = tables.length > 0 && tables.every(t => !!t?.playerId);
-  const allRolePicked = allSeated && tables.every(t => isRoleSelectionDone(t, 61));
+  const allRolePicked = tables.length > 0 && tables.every(t => isRoleSelectionDone(t, 61));
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
 
-  // 全員着席までは通常位置の正体カードのみ（下段レーンは作らない）
-  if (!allSeated){
+  // 全員のキャラ選択完了までは通常位置の正体カードのみ（下段レーンは作らない）
+  if (!allRolePicked){
     document.querySelectorAll('#tables .m61-stack').forEach(n=>n.remove());
     return;
   }
@@ -7252,7 +7251,7 @@ function renderM61(v){
       if (!amSeatedHere) mini.style.cursor = 'default';
    }
     stack.appendChild(con);
-    if (allRolePicked) stack.appendChild(mini);
+    stack.appendChild(mini);
     // 旧 .char-col を物理削除して詰める
     content.insertBefore(stack, charCol);
     charCol.remove();
