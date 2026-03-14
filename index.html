@@ -12234,11 +12234,7 @@ function attachM23DeckUI(lane){
       const off = already * 2; // 数値山札と同じ2px刻み
       node.style.position = 'absolute';
       node.style.left = off + 'px';
-      node.style.top  = off + 'px';
-      // 見切れ防止：高さと下マージンを増やす
-      const baseH = cssNum('--item-h');
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
+      node.style.top  = '0px';
     }
     pile.appendChild(node);
   };
@@ -12274,7 +12270,6 @@ function attachM23DeckUI(lane){
         // 展開後は右側積みはクリア
         pile.innerHTML = '';
         pile.style.height = cssNum('--item-h') + 'px';
-        lane.style.marginBottom = '0px';
         refreshRest();
           // ★★★ ここから追加：アイテム山札UIを消滅させる ★★★
         try{
