@@ -464,6 +464,12 @@
     line-height:1.15;
     font-weight:600;
   }
+  .constraint-face.constraint-stacked-under::before,
+  .constraint-face.constraint-stacked-under::after,
+  .constraint-face.constraint-stacked-under .constraint-alpha,
+  .constraint-face.constraint-stacked-under .constraint-desc{
+    display:none;
+  }
 
   #conZoomOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.4);
@@ -2307,6 +2313,15 @@ function paintConstraintCard(node, letter){
   desc.textContent = upper ? (CONSTRAINT_TEXTS[upper] || '') : '';
 
   fitConstraintDesc(node, upper);
+}
+
+function refreshConstraintPileFace(pile){
+  if (!pile) return;
+  const cards = Array.from(pile.querySelectorAll('.concard.constraint-face'));
+  cards.forEach((card, idx)=>{
+    const isTop = idx === cards.length - 1;
+    card.classList.toggle('constraint-stacked-under', !isTop);
+  });
 }
 
 function fitConstraintDesc(node, letter){
@@ -5635,6 +5650,7 @@ function renderConDeckSync(v, mid){
         node.style.top  = off + 'px';
       }
       pile.appendChild(node);
+      refreshConstraintPileFace(pile);
       const extra = i*2;
       // 制約カードのサイズは CSS 変数に追従（既存CSS：--con-h / --item-h）
       const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
@@ -10787,6 +10803,7 @@ function buildConDeckLaneP1(){
    node.title = '拡大';
 　　node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
       pile.appendChild(node);
+      refreshConstraintPileFace(pile);
 
       // ★ ここから変更：1枚目でも必ず高さ/余白を更新する
       const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
