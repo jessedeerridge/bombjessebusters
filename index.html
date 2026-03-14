@@ -3919,6 +3919,7 @@ if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && altMe
         char.removeAttribute('style');
         char.onclick = null;
         char.classList.add('blank');
+        char.classList.remove('member5-card','member15-detector','member-alt6','member-alt7','member-alt8','member-alt9');
       }
     }
 
@@ -8005,9 +8006,17 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
               if (miniEl) miniEl.classList.remove('captain-card');
              }
          }else if (mid === 31 || mid === 61){
-             // 小さい枠の方だけに黒枠
-            if (miniEl) miniEl.classList.add('captain-card');
-             if (bigEl)  bigEl.classList.remove('captain-card'); // 念のため外す
+             // #31：制約取得前は通常位置（big）、取得後は小さい枠（mini）に黒枠
+             // #61：常に小さい枠（mini）に黒枠
+             const capPickedCon31 = !!(tables?.[capIdx]?.m31Con);
+             const useBigFor31 = (mid === 31) && !capPickedCon31;
+             if (useBigFor31){
+               if (bigEl)  bigEl.classList.add('captain-card');
+               if (miniEl) miniEl.classList.remove('captain-card');
+             }else{
+               if (miniEl) miniEl.classList.add('captain-card');
+               if (bigEl)  bigEl.classList.remove('captain-card'); // 念のため外す
+             }
           }else{
            // 通常は大きい正体カードに黒枠
            if (bigEl)  bigEl.classList.add('captain-card');
