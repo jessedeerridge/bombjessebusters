@@ -4620,7 +4620,6 @@ function renderM29(v){
         c.title = '場に出す';
         c.onclick = (ev)=>{
           if (centerLocked) {
-            openOneMini(ev.clientX, ev.clientY, '中央場にカードがある間は出せません');
             return;
           }
           openMenu(ev.clientX, ev.clientY, [{
@@ -4714,6 +4713,9 @@ function renderM29(v){
     row.className = 'numlane';
     row.style.justifyContent = 'space-between';
     row.style.width = '100%';
+    row.style.flexWrap = 'wrap';
+    row.style.alignItems = 'flex-start';
+    row.style.overflow = 'visible';
 
     const leftArea = document.createElement('div');
     leftArea.style.display = 'flex';
@@ -4755,6 +4757,8 @@ function renderM29(v){
     centerArea.style.gap = '6px';
     centerArea.style.justifyContent = 'center';
     centerArea.style.flex = '1';
+    centerArea.style.flexWrap = 'wrap';
+    centerArea.style.alignItems = 'flex-start';
 
     center.forEach((obj, idx) => {
       const cardId = obj?.cid || null;
