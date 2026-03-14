@@ -4634,18 +4634,26 @@ function renderM29(v){
   const myHand = (myIdx>=0) ? (v.tables[myIdx]?.m29Hand||[]) : [];
   const centerNow = Array.isArray(v.m29_center) ? v.m29_center : [];
   const centerLocked = centerNow.length > 0;
+  const handForView = myHand.slice();
+  if (myIdx >= 0 && centerNow.length > 0) {
+    centerNow.forEach((cObj)=>{
+      if ((cObj?.by|0) !== myIdx) return;
+      const ix = handForView.indexOf(cObj?.n|0);
+      if (ix >= 0) handForView.splice(ix, 1);
+    });
+  }
 
   // ---- 自分の手札（画面下部：ミッション詳細の上） ----
   const footer = document.getElementById('missionFooter');
   if (footer) {
     const ex = document.getElementById('m29HandRow'); if (ex) ex.remove();
-    if (myIdx>=0 && myHand.length>0) {
+    if (myIdx>=0 && handForView.length>0) {
       const row = document.createElement('div');
       row.id = 'm29HandRow';
       row.className = 'numlane';
       row.style.marginTop = '4px';
 
-      myHand.forEach(n=>{
+      handForView.forEach(n=>{
         const c = document.createElement('div');
         c.className = 'numcard';
         c.style.backgroundImage = `url('${imgNumber(n)}')`;
@@ -4745,9 +4753,9 @@ function renderM29(v){
     const row = document.createElement('div');
     row.id = 'm29CenterRow';
     row.className = 'numlane';
-    row.style.justifyContent = 'space-between';
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = '1fr auto 1fr';
     row.style.width = '100%';
-    row.style.flexWrap = 'wrap';
     row.style.alignItems = 'flex-start';
     row.style.overflow = 'visible';
 
@@ -4755,6 +4763,7 @@ function renderM29(v){
     leftArea.style.display = 'flex';
     leftArea.style.alignItems = 'center';
     leftArea.style.minWidth = '32px';
+    leftArea.style.justifySelf = 'start';
 
     if (stock.length > 0) {
       const holder = document.createElement('div');
@@ -4790,9 +4799,9 @@ function renderM29(v){
     centerArea.style.display = 'flex';
     centerArea.style.gap = '6px';
     centerArea.style.justifyContent = 'center';
-    centerArea.style.flex = '1';
     centerArea.style.flexWrap = 'wrap';
     centerArea.style.alignItems = 'flex-start';
+    centerArea.style.gridColumn = '2';
 
     center.forEach((obj, idx) => {
       const cardId = obj?.cid || null;
