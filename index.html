@@ -4631,7 +4631,6 @@ function renderM29(v){
   if (!isM29) {
     if (oldHand) oldHand.remove();
     if (oldCenter) oldCenter.remove();
-    renderM29._lastStockOffset = 0;
     return;
   }
 
@@ -4754,11 +4753,6 @@ function renderM29(v){
 
   const stackStep = 2;
   const nowStockOffset = stackStep * Math.max(0, stock.length - 1);
-  const prevStockOffset = Number.isFinite(renderM29._lastStockOffset) ? renderM29._lastStockOffset : null;
-  if (prevStockOffset !== null && nowStockOffset > prevStockOffset) {
-    window.scrollBy({ top: nowStockOffset - prevStockOffset, behavior: 'smooth' });
-  }
-  renderM29._lastStockOffset = nowStockOffset;
 
   if (state.isHost) ensureM29AutoDrop(v);
   if (center.length > 0 || stock.length > 0) {
@@ -4871,6 +4865,7 @@ function renderM29(v){
     row.appendChild(leftArea);
     row.appendChild(centerArea);
     row.appendChild(rightSpacer);
+    row.style.marginBottom = `${nowStockOffset}px`;
     bar.insertAdjacentElement('afterend', row);
 
     requestAnimationFrame(() => {
