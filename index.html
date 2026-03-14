@@ -222,8 +222,40 @@
 /* ▼ 数値カードの表示帯（アイテム下など） */
   .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
-  .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
-  .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+  .numdeck {
+    --deck-back-image:url('./numberdeck.png');
+    position:relative;
+    width:32px;
+    height:48px;
+    border-radius:6px;
+    border:1px solid #ddd;
+    background:#fff var(--deck-back-image) center/contain no-repeat;
+    cursor:pointer;
+    user-select:none;
+    display:grid;
+    place-items:center;
+    overflow:visible;
+  }
+  .numdeck::before,
+  .numdeck::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:inherit;
+    border:1px solid #ddd;
+    background:#fff var(--deck-back-image) center/contain no-repeat;
+    pointer-events:none;
+    z-index:-1;
+  }
+  .numdeck::before{ transform:translate(0.3px, 0.3px); }
+  .numdeck::after{ transform:translate(0.6px, 0.6px); }
+  .numdeck.empty{
+    border:1px dashed #bbb;
+    background:#fff;
+  }
+  .numdeck.empty::before,
+  .numdeck.empty::after{ display:none; }
+  .numrest { display:none; }
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
@@ -10730,8 +10762,7 @@ function buildDeckLaneP1(){
         shuffle(deck);
         rest = deck.length;
         restLbl.textContent = `残:${rest}`;
-        deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
-        deckBtn.style.background = '';
+        deckBtn.classList.remove('empty');
         deckBtn.title = 'めくる';
         pile.innerHTML = '';
         pile.style.height = '48px';
@@ -10749,7 +10780,7 @@ function buildDeckLaneP1(){
 
    
     if(rest===0){
-      deckBtn.style.background = `#fff url('${imgBack}') center/contain no-repeat`;
+      deckBtn.classList.add('empty');
       deckBtn.title='山札を作る';
     }
   };
@@ -10772,7 +10803,7 @@ function buildConDeckLaneP1(){
   const deckBtn = document.createElement('div');
   deckBtn.className = 'numdeck';   // 見た目は共通のデッキボタンでOK
   deckBtn.title = 'めくる';
- deckBtn.style.background = "#fff url('./conback.jpg') center/contain no-repeat"; 
+  deckBtn.style.setProperty('--deck-back-image', "url('./conback.jpg')");
   const restLbl = document.createElement('span');
   restLbl.className = 'numrest';
   restLbl.textContent = `残:${rest}`;
@@ -10818,6 +10849,10 @@ function buildConDeckLaneP1(){
     rest -= 1;
     restLbl.textContent = `残:${rest}`;
     addToPile(ch);
+
+    if (rest === 0){
+      deckBtn.classList.add('empty');
+    }
   };
 
   return lane;
