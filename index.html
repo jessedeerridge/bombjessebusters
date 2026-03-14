@@ -4693,8 +4693,9 @@ function renderM29(v){
                 });
 
                 const already4 = ((openCountByNum[n] | 0) >= 4);
-                if (already4) stock.push({ n, by: myIdx, from: 'play' });
-                else center.push({ cid: crypto.randomUUID(), n, by: myIdx, faceUp:true });
+                if (already4) {
+                  if (stock.length < 6) stock.push({ n, by: myIdx, from: 'play' }); // #29: 表山札は最大6枚で固定
+                } else center.push({ cid: crypto.randomUUID(), n, by: myIdx, faceUp:true });
 
                 let drew = false;
                 let nextHand = hand0.slice();
@@ -9541,7 +9542,7 @@ async function ensureM29AutoDrop(roomVal){
 
       // 見つかったら左ストックへ
       if (placed){
-        stock.push({ n, by: ownerIdx, from: 'auto' });
+        if (stock.length < 6) stock.push({ n, by: ownerIdx, from: 'auto' }); // #29: 表山札は最大6枚で固定
         doneMap[n] = true;
       }
     }
@@ -10365,7 +10366,7 @@ let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
       T.m29Hand = [];
       for (let k=0; k<take && pi<nums.length; k++) T.m29Hand.push(nums[pi++]);
     });
-m29Rest = nums.slice(pi);
+m29Rest = nums.slice(pi, pi + 6); // #29: 裏山札は最大6枚で固定
     // センター（場に出した数値カード置き場）
     // 形式: { n: number, by: tableIndex, faceUp: boolean }
     missionMeta.flags = { ...(missionMeta.flags||{}), m29:true };
@@ -11218,6 +11219,7 @@ deckBtn.onclick = async (ev)=>{
     const meta  = mSnap.val()||{};
     const D = Array.isArray(meta.m18_deck) ? meta.m18_deck.slice() : [];
     const Xs = Array.isArray(meta.m18_discards) ? meta.m18_discards.slice() : [];
+    if (Xs.length >= 6) return; // #18: 裏6/表6で固定
 
     const next = D.find(n=> !Xs.includes(n)); // 山札順で次
     if (next==null){
@@ -11685,6 +11687,7 @@ deckBtn.onclick = async (ev)=>{
     const meta  = mSnap.val()||{};
     const D = Array.isArray(meta.m15_deck) ? meta.m15_deck.slice() : [];
     const Xs = Array.isArray(meta.m15_discards) ? meta.m15_discards.slice() : [];
+    if (Xs.length >= 6) return; // #15: 裏6/表6で固定
 
     const next = D.find(n=> !Xs.includes(n)); // 山札順で次
     if (next==null){
@@ -12050,6 +12053,7 @@ function renderM39(v){
       if (meta.m39_dealt) return; // 配布後は止める
       const D = Array.isArray(meta.m39_deck) ? meta.m39_deck.slice() : [];
       const Xs = Array.isArray(meta.m39_discards) ? meta.m39_discards.slice() : [];
+      if (Xs.length >= 6) return; // #39: 裏6/表6で固定
       const next = D.find(n=> !Xs.includes(n)); // 山札順で次
       if (next==null) return;
       Xs.push(next);
