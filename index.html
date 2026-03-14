@@ -10774,6 +10774,17 @@ function mountLaneUnderItemsBar(lane){
   bar.insertAdjacentElement('afterend', lane);
 }
 
+function syncStackPileSpacing(lane, pile, {
+  count = 0,
+  offset = 2,
+  baseHeight = 48,
+} = {}){
+  const safeCount = Math.max(0, count|0);
+  const spread = Math.max(0, safeCount - 1) * Math.max(0, offset|0);
+  if (pile) pile.style.height = `${Math.max(0, baseHeight) + spread}px`;
+  if (lane) lane.style.marginBottom = `${spread}px`;
+}
+
 function renderDeckBackStack(node, remain, opts={}){
   const {
     kind = 'number',
@@ -10847,11 +10858,7 @@ function buildDeckLaneP1(){
       node.style.top  = off + 'px';
     }
     pile.appendChild(node);
-
-    // ★ 高さ調整（見切れ防止）
-    const extraH = already * 2; // 下方向へのズレ分
-    pile.style.height = (48 + extraH) + 'px'; // 48pxはカード高さ
-    lane.style.marginBottom = extraH + 'px'; // テーブルを少し下げる
+    syncStackPileSpacing(lane, pile, { count: already + 1, offset: 2, baseHeight: 48 });
   }
 
   deckBtn.onclick = (ev)=>{
@@ -10928,11 +10935,8 @@ function buildConDeckLaneP1(){
       pile.appendChild(node);
       refreshConstraintPileFace(pile);
 
-      // ★ ここから変更：1枚目でも必ず高さ/余白を更新する
       const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
-      // ★ ここまで変更
+      syncStackPileSpacing(lane, pile, { count: already + 1, offset: 2, baseHeight: baseH });
     };
 
   deckBtn.onclick = ()=>{
@@ -11181,10 +11185,8 @@ async function ensureM23MetaInit(){
           node.style.top  = off+'px';
         }
         pile.appendChild(node);
-        const extra = i*2;
-        pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
      });
+      syncStackPileSpacing(lane, pile, { count: x.length, offset: 2, baseHeight: 48 });
     };
     refresh();
 
@@ -11650,10 +11652,8 @@ function renderM15(v){
         node.style.top  = off+'px';
       }
       pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
     });
+    syncStackPileSpacing(lane, pile, { count: x.length, offset: 2, baseHeight: 48 });
   };
   refresh();
 
@@ -11755,10 +11755,8 @@ function renderM30(v){
         node.style.top  = off+'px';
       }
       pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
     });
+    syncStackPileSpacing(lane, pile, { count: xs.length, offset: 2, baseHeight: 48 });
 
     // 下段：2/3ドローの横並び
     row.innerHTML = '';
@@ -12016,10 +12014,8 @@ function renderM39(v){
         node.style.top  = off+'px';
       }
       pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
     });
+    syncStackPileSpacing(lane, pile, { count: x.length, offset: 2, baseHeight: 48 });
   };
   refresh();
 
@@ -12221,12 +12217,9 @@ function attachM23DeckUI(lane){
       node.style.position = 'absolute';
       node.style.left = off + 'px';
       node.style.top  = off + 'px';
-      // 見切れ防止：高さと下マージンを増やす
-      const baseH = cssNum('--item-h');
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
     }
     pile.appendChild(node);
+    syncStackPileSpacing(lane, pile, { count: already + 1, offset: 2, baseHeight: cssNum('--item-h') });
   };
 
   // ★ 既存の捨て札を描画（リロード/再入室対策）
@@ -12259,8 +12252,7 @@ function attachM23DeckUI(lane){
  ]);
         // 展開後は右側積みはクリア
         pile.innerHTML = '';
-        pile.style.height = cssNum('--item-h') + 'px';
-        lane.style.marginBottom = '0px';
+        syncStackPileSpacing(lane, pile, { count: 0, offset: 2, baseHeight: cssNum('--item-h') });
         refreshRest();
           // ★★★ ここから追加：アイテム山札UIを消滅させる ★★★
         try{
