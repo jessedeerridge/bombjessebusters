@@ -5649,6 +5649,23 @@ function renderConDeckSync(v, mid){
 
   const keyDeck = `m${mid}_deck`;
   const keyDisc = `m${mid}_discards`;
+  const LONG_PRESS_MS = 450;
+
+  const returnConstraintCardToDeckTop = async (ch)=>{
+    if (!state.isHost) return;
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const mSnap = await get(mRef);
+      const meta = mSnap.val() || {};
+      const D  = Array.isArray(meta[keyDeck]) ? meta[keyDeck].slice() : [];
+      const Xs = Array.isArray(meta[keyDisc]) ? meta[keyDisc].slice() : [];
+      if (!D.includes(ch) || !Xs.includes(ch)) return;
+
+      const nextDiscards = Xs.filter(v => v !== ch);
+      const nextDeck = [ch, ...D.filter(v => v !== ch)];
+      await update(mRef, { [keyDeck]: nextDeck, [keyDisc]: nextDiscards });
+    }catch(e){ console.error(e); }
+  };
 
   // 初回：ホストが meta を用意（未用意なら一旦抜けて次の onValue で描画）
   if (!Array.isArray(v?.meta?.[keyDeck])){ ensureConDeckMetaInit(v, mid); if (old) old.remove(); return; }
@@ -5678,26 +5695,57 @@ function renderConDeckSync(v, mid){
     renderDeckBackStack(deckBtn, remain, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'6px' });
     pile.innerHTML = '';
 
-    // discards を積み重ね表示（2px オフセット）
+    const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
+    pile.style.height = baseH + 'px';
+    lane.style.marginBottom = '0px';
+
+    // discards を積み重ね表示（#32/#37：縦はずらさず、横だけ0.5pxずらす）
     x.forEach((ch, i)=>{
       const node = document.createElement('div');
       node.className = 'concard';
       paintConstraintCard(node, ch);
-      node.title = '拡大';
-      node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
+      node.title = state.isHost
+        ? 'タップで拡大 / 長押しで山札トップへ戻す'
+        : '拡大';
+
+      let holdTimer = null;
+      let longPressed = false;
+      const clearHold = ()=>{
+        if (holdTimer){
+          clearTimeout(holdTimer);
+          holdTimer = null;
+        }
+      };
+      node.addEventListener('pointerdown', (ev)=>{
+        if (!state.isHost || ev.button !== 0) return;
+        longPressed = false;
+        clearHold();
+        holdTimer = setTimeout(async ()=>{
+          longPressed = true;
+          await returnConstraintCardToDeckTop(ch);
+        }, LONG_PRESS_MS);
+      });
+      node.addEventListener('pointerup', clearHold);
+      node.addEventListener('pointercancel', clearHold);
+      node.addEventListener('pointerleave', clearHold);
+      node.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        if (longPressed){
+          longPressed = false;
+          ev.preventDefault();
+          return;
+        }
+        openConstraintZoom(ch);
+      });
+
       if (i>0){
-        const off = i*2;
+        const off = i*0.5;
         node.style.position = 'absolute';
         node.style.left = off + 'px';
-        node.style.top  = off + 'px';
+        node.style.top  = '0px';
       }
       pile.appendChild(node);
       refreshConstraintPileFace(pile);
-      const extra = i*2;
-      // 制約カードのサイズは CSS 変数に追従（既存CSS：--con-h / --item-h）
-      const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
-      pile.style.height = (baseH + extra) + 'px';
-      lane.style.marginBottom = extra + 'px';
     });
   };
   refresh();
