@@ -778,6 +778,7 @@
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
 
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
+  .num.tight-code{font-size:calc(var(--font-card) - 1px);}
   .img-bottom{position:absolute;left:1px;right:1px;bottom:1px;height:18px;border-radius:0 0 6px 6px;background-size:cover;background-position:center}
 
   .badge-fixed{position:absolute;left:0;right:0;top:calc(var(--card-h) + 2px);display:flex;flex-direction:column;align-items:center;z-index:1;pointer-events:auto;}
@@ -4166,6 +4167,7 @@ if (c.markUntil && now() < c.markUntil) {
       const hasNum = (c.num != null && !Number.isNaN(Number(c.num)));
       if (hasNum) {
         num.textContent = String(c.num);
+        num.classList.toggle('tight-code', [10.1, 10.5, 11.1, 11.5].includes(Number(c.num)));
         const i2ViewerCanSeeSelA = !!(
           i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2All.viewerTable===myTableIndex &&
           i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
@@ -6607,6 +6609,7 @@ function runM43InsertAnimation(v){
       const num = document.createElement('div');
       num.className = 'num';
       num.textContent = String(anim.num ?? '');
+      num.classList.toggle('tight-code', [10.1, 10.5, 11.1, 11.5].includes(Number(anim.num)));
       fly.appendChild(num);
 
       const bot = document.createElement('div');
@@ -6697,6 +6700,7 @@ function runM54InsertAnimation(v){
       const num = document.createElement('div');
       num.className = 'num';
       num.textContent = String(anim.num ?? '');
+      num.classList.toggle('tight-code', [10.1, 10.5, 11.1, 11.5].includes(Number(anim.num)));
       fly.appendChild(num);
 
       const bot = document.createElement('div');
