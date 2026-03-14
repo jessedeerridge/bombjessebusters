@@ -4628,7 +4628,12 @@ function renderM29(v){
   const isM29 = (v?.mission?.id|0) === 29;
   const oldHand = document.getElementById('m29HandRow');
   const oldCenter = document.getElementById('m29CenterRow');
-  if (!isM29) { if (oldHand) oldHand.remove(); if (oldCenter) oldCenter.remove(); return; }
+  if (!isM29) {
+    if (oldHand) oldHand.remove();
+    if (oldCenter) oldCenter.remove();
+    renderM29._lastStockOffset = 0;
+    return;
+  }
 
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
   const myHand = (myIdx>=0) ? (v.tables[myIdx]?.m29Hand||[]) : [];
@@ -4737,17 +4742,33 @@ function renderM29(v){
   if (!bar) return;
   { const ex = document.getElementById('m29CenterRow'); if (ex) ex.remove(); }
 
-  const center = Array.isArray(v.m29_center) ? v.m29_center : [];
+  const centerRaw = Array.isArray(v.m29_center) ? v.m29_center : [];
   const stock = Array.isArray(v.m29_stock) ? v.m29_stock : [];
+  const centerSeen = new Set();
+  const center = centerRaw.filter((obj, i) => {
+    const key = String(obj?.cid || `${obj?.n}:${obj?.by}:${i}`);
+    if (centerSeen.has(key)) return false;
+    centerSeen.add(key);
+    return true;
+  });
+
+  const stackStep = 2;
+  const nowStockOffset = stackStep * Math.max(0, stock.length - 1);
+  const prevStockOffset = Number.isFinite(renderM29._lastStockOffset) ? renderM29._lastStockOffset : null;
+  if (prevStockOffset !== null && nowStockOffset > prevStockOffset) {
+    window.scrollBy({ top: nowStockOffset - prevStockOffset, behavior: 'smooth' });
+  }
+  renderM29._lastStockOffset = nowStockOffset;
 
   if (state.isHost) ensureM29AutoDrop(v);
   if (center.length > 0 || stock.length > 0) {
     const row = document.createElement('div');
     row.id = 'm29CenterRow';
     row.className = 'numlane';
-    row.style.justifyContent = 'space-between';
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = 'auto minmax(0,1fr) auto';
+    row.style.justifyContent = 'stretch';
     row.style.width = '100%';
-    row.style.flexWrap = 'wrap';
     row.style.alignItems = 'flex-start';
     row.style.overflow = 'visible';
 
@@ -4760,7 +4781,7 @@ function renderM29(v){
       const holder = document.createElement('div');
       holder.className = 'numcard-holder';
       const baseW = 32;
-      const step = 2;
+      const step = stackStep;
       const totalW = baseW + step * Math.max(0, stock.length - 1);
       holder.style.width = `${totalW}px`;
 
@@ -4790,8 +4811,7 @@ function renderM29(v){
     centerArea.style.display = 'flex';
     centerArea.style.gap = '6px';
     centerArea.style.justifyContent = 'center';
-    centerArea.style.flex = '1';
-    centerArea.style.flexWrap = 'wrap';
+    centerArea.style.flexWrap = 'nowrap';
     centerArea.style.alignItems = 'flex-start';
 
     center.forEach((obj, idx) => {
@@ -4845,9 +4865,18 @@ function renderM29(v){
       centerArea.appendChild(cell);
     });
 
+    const rightSpacer = document.createElement('div');
+    rightSpacer.style.minWidth = `${leftArea.getBoundingClientRect().width || 32}px`;
+
     row.appendChild(leftArea);
     row.appendChild(centerArea);
+    row.appendChild(rightSpacer);
     bar.insertAdjacentElement('afterend', row);
+
+    requestAnimationFrame(() => {
+      const w = Math.ceil(leftArea.getBoundingClientRect().width || 32);
+      rightSpacer.style.minWidth = `${w}px`;
+    });
   }
 }
 
