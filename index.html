@@ -222,7 +222,7 @@
 /* ▼ 数値カードの表示帯（アイテム下など） */
   .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
-  .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/70% no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
+  .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
@@ -5599,7 +5599,7 @@ function renderConDeckSync(v, mid){
   const deckBtn = document.createElement('div');
   deckBtn.className = 'numdeck';                        // 使い回し
   deckBtn.title = 'めくる';
-  deckBtn.style.background = "#fff url('./conback.jpg') center/70% no-repeat";
+  deckBtn.style.background = "#fff url('./conback.jpg') center/contain no-repeat";
 
   const restLbl = document.createElement('span');
   restLbl.className = 'numrest';
@@ -10733,7 +10733,7 @@ function buildDeckLaneP1(){
 
    
     if(rest===0){
-      deckBtn.style.background = `#fff url('${imgBack}') center/60% no-repeat`;
+      deckBtn.style.background = `#fff url('${imgBack}') center/contain no-repeat`;
       deckBtn.title='山札を作る';
     }
   };
@@ -10756,7 +10756,7 @@ function buildConDeckLaneP1(){
   const deckBtn = document.createElement('div');
   deckBtn.className = 'numdeck';   // 見た目は共通のデッキボタンでOK
   deckBtn.title = 'めくる';
- deckBtn.style.background = "#fff url('./conback.jpg') center/70% no-repeat"; 
+ deckBtn.style.background = "#fff url('./conback.jpg') center/contain no-repeat"; 
   const restLbl = document.createElement('span');
   restLbl.className = 'numrest';
   restLbl.textContent = `残:${rest}`;
