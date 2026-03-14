@@ -10661,15 +10661,24 @@ try{
     await set(ref(db, `rooms/${code}/items`), nextItems);
   }
 
-  // ===== #20：各テーブルで 1 枚を右端へ移動し、黄色✕トークンを付与 =====
+  // ===== #20/#35/#56：各テーブルで 1 枚を右端へ移動し、黄色✕トークンを付与 =====
   if(v.mission?.flags?.m20_rightmostX){
     const tablesSnap = await get(ref(db, `rooms/${code}/tables`));
     const tbls = tablesSnap.val() || [];
     const alphaStr='abcdefghijklmnopqrstuvwxyz';
+    const isM35 = (v.mission?.id|0) === 35;
     tbls.forEach(T=>{
       const hand = (T.hand||[]).slice().sort((a,b)=> a.num - b.num); // 昇順ベース
       if(hand.length===0) return;
-      const ri = (Math.random()*hand.length)|0;
+      // #35：端に置くランダム摘出カードは x.1 / x.5（黄/赤）を除外
+      const candidateIdx = isM35
+        ? hand
+            .map((c,idx)=> ({c,idx}))
+            .filter(({c})=> Number.isInteger(Number(c?.num)))
+            .map(({idx})=> idx)
+        : hand.map((_,idx)=> idx);
+      if(candidateIdx.length===0) return;
+      const ri = candidateIdx[(Math.random()*candidateIdx.length)|0];
       const chosen = hand.splice(ri,1)[0];
       hand.push(chosen); // 右端へ
       // ✕トークン（黄色）をそのカードに付与
