@@ -4752,7 +4752,7 @@ function renderM29(v){
   });
 
   const stackStep = 2;
-  const nowStockOffset = stackStep * Math.max(0, stock.length - 1);
+  const nowStockOffset = stackSpreadByCount(stock.length, stackStep);
 
   if (state.isHost) ensureM29AutoDrop(v);
   if (center.length > 0 || stock.length > 0) {
@@ -4789,7 +4789,7 @@ function renderM29(v){
         cell.style.backgroundSize = 'cover';
         cell.style.backgroundPosition = 'center';
         if (k > 0) {
-          const off = step * k;
+          const off = stackOffsetForIndex(k, step);
           cell.style.position = 'absolute';
           cell.style.left = `${off}px`;
           cell.style.top = `${off}px`;
@@ -10774,6 +10774,17 @@ function mountLaneUnderItemsBar(lane){
   bar.insertAdjacentElement('afterend', lane);
 }
 
+function stackSpreadByCount(count, step=2, maxLayers=5){
+  const c = Math.max(0, count|0);
+  if (c <= 1) return 0;
+  const layers = Math.min(c, Math.max(1, maxLayers|0));
+  return step * (layers - 1);
+}
+
+function stackOffsetForIndex(index, step=2, maxLayers=5){
+  return stackSpreadByCount((index|0) + 1, step, maxLayers);
+}
+
 function renderDeckBackStack(node, remain, opts={}){
   const {
     kind = 'number',
@@ -10841,7 +10852,7 @@ function buildDeckLaneP1(){
     node.style.backgroundImage = `url('${imgNumber(n)}')`;
 
     if(already>0){
-      const off = already * 2; // 2px刻み
+      const off = stackOffsetForIndex(already, 2); // 2px刻み（表示は最大5層）
       node.style.position = 'absolute';
       node.style.left = off + 'px';
       node.style.top  = off + 'px';
@@ -10849,7 +10860,7 @@ function buildDeckLaneP1(){
     pile.appendChild(node);
 
     // ★ 高さ調整（見切れ防止）
-    const extraH = already * 2; // 下方向へのズレ分
+    const extraH = stackSpreadByCount(already + 1, 2); // 下方向へのズレ分
     pile.style.height = (48 + extraH) + 'px'; // 48pxはカード高さ
     lane.style.marginBottom = extraH + 'px'; // テーブルを少し下げる
   }
@@ -10916,7 +10927,7 @@ function buildConDeckLaneP1(){
       paintConstraintCard(node, ch);
 
       const already = pile.querySelectorAll('.concard').length;
-      const off = already * 2;
+      const off = stackOffsetForIndex(already, 2);
 
       if (already > 0){
         node.style.position = 'absolute';
@@ -10930,8 +10941,9 @@ function buildConDeckLaneP1(){
 
       // ★ ここから変更：1枚目でも必ず高さ/余白を更新する
       const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
+      const spread = stackSpreadByCount(already + 1, 2);
+      pile.style.height = (baseH + spread) + 'px';
+      lane.style.marginBottom = spread + 'px';
       // ★ ここまで変更
     };
 
@@ -11175,16 +11187,16 @@ async function ensureM23MetaInit(){
         node.className = 'numcard';
         node.style.backgroundImage = `url('${imgNumber(n)}')`;
         if (i>0){
-         const off = i*2;
+         const off = stackOffsetForIndex(i, 2);
          node.style.position='absolute';
           node.style.left = off+'px';
           node.style.top  = off+'px';
         }
         pile.appendChild(node);
-        const extra = i*2;
-        pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
      });
+      const extra = stackSpreadByCount(x.length, 2);
+      pile.style.height = (48+extra)+'px';
+      lane.style.marginBottom = extra+'px';
     };
     refresh();
 
@@ -11644,16 +11656,16 @@ function renderM15(v){
       node.className = 'numcard';
       node.style.backgroundImage = `url('${imgNumber(n)}')`;
       if (i>0){
-        const off = i*2;
+        const off = stackOffsetForIndex(i, 2);
         node.style.position='absolute';
         node.style.left = off+'px';
         node.style.top  = off+'px';
       }
       pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
     });
+    const extra = stackSpreadByCount(x.length, 2);
+    pile.style.height = (48+extra)+'px';
+    lane.style.marginBottom = extra+'px';
   };
   refresh();
 
@@ -11749,16 +11761,16 @@ function renderM30(v){
       node.className = 'numcard';
       node.style.backgroundImage = `url('${imgNumber(n)}')`;
       if (i>0){
-        const off = i*2;
+        const off = stackOffsetForIndex(i, 2);
         node.style.position='absolute';
         node.style.left = off+'px';
         node.style.top  = off+'px';
       }
       pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
     });
+    const extra = stackSpreadByCount(xs.length, 2);
+    pile.style.height = (48+extra)+'px';
+    lane.style.marginBottom = extra+'px';
 
     // 下段：2/3ドローの横並び
     row.innerHTML = '';
@@ -12010,16 +12022,16 @@ function renderM39(v){
       node.className = 'numcard';
       node.style.backgroundImage = `url('${imgNumber(n)}')`;
       if (i>0){
-        const off = i*2;
+        const off = stackOffsetForIndex(i, 2);
         node.style.position='absolute';
         node.style.left = off+'px';
         node.style.top  = off+'px';
       }
       pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
     });
+    const extra = stackSpreadByCount(x.length, 2);
+    pile.style.height = (48+extra)+'px';
+    lane.style.marginBottom = extra+'px';
   };
   refresh();
 
@@ -12217,14 +12229,15 @@ function attachM23DeckUI(lane){
     node.className = 'item';
     node.style.backgroundImage = `url("./item${no}.jpg")`;
     if(already>0){
-      const off = already * 2; // 数値山札と同じ2px刻み
+      const off = stackOffsetForIndex(already, 2); // 数値山札と同じ2px刻み（表示は最大5層）
       node.style.position = 'absolute';
       node.style.left = off + 'px';
       node.style.top  = off + 'px';
       // 見切れ防止：高さと下マージンを増やす
       const baseH = cssNum('--item-h');
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
+      const spread = stackSpreadByCount(already + 1, 2);
+      pile.style.height = (baseH + spread) + 'px';
+      lane.style.marginBottom = spread + 'px';
     }
     pile.appendChild(node);
   };
