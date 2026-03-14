@@ -222,8 +222,39 @@
 /* ▼ 数値カードの表示帯（アイテム下など） */
   .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
-  .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
-  .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+  .numdeck {
+    --deck-bg:url('./numberdeck.png');
+    position:relative;
+    width:32px;
+    height:48px;
+    border-radius:6px;
+    border:none;
+    background:#fff var(--deck-bg) center/contain no-repeat;
+    cursor:pointer;
+    user-select:none;
+    display:grid;
+    place-items:center;
+  }
+  .numdeck::before,
+  .numdeck::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:inherit;
+    background:#fff var(--deck-bg) center/contain no-repeat;
+    z-index:-1;
+    pointer-events:none;
+  }
+  .numdeck::before{ transform:translate(0.2px, 0.2px); }
+  .numdeck::after{ transform:translate(0.4px, 0.4px); }
+  .numdeck.is-empty{
+    background:none;
+    border:1px dashed #bbb;
+    cursor:default;
+  }
+  .numdeck.is-empty::before,
+  .numdeck.is-empty::after{ display:none; }
+  .numrest { display:none; }
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
@@ -5592,6 +5623,11 @@ async function ensureConDeckMetaInit(vNow, mid){
   });
 }
 
+function syncDeckVisual(deckBtn, remain){
+  if (!deckBtn) return;
+  deckBtn.classList.toggle('is-empty', (remain|0) <= 0);
+}
+
 // 共有：描画（mid=32/37 を切替）
 function renderConDeckSync(v, mid){
   const isTarget = ((v?.mission?.id|0) === mid);
@@ -5614,7 +5650,7 @@ function renderConDeckSync(v, mid){
   const deckBtn = document.createElement('div');
   deckBtn.className = 'numdeck';                        // 使い回し
   deckBtn.title = 'めくる';
-  deckBtn.style.background = "#fff url('./conback.jpg') center/contain no-repeat";
+  deckBtn.style.setProperty('--deck-bg', "url('./conback.jpg')");
 
   const restLbl = document.createElement('span');
   restLbl.className = 'numrest';
@@ -5633,7 +5669,8 @@ function renderConDeckSync(v, mid){
     const d = (v?.meta?.[keyDeck]||[]);
     const x = (v?.meta?.[keyDisc]||[]);
     const remain = d.filter(ch => !x.includes(ch)).length;
-    restLbl.textContent = `残:${remain}`;
+    restLbl.textContent = '';
+    syncDeckVisual(deckBtn, remain);
     pile.innerHTML = '';
 
     // discards を積み重ね表示（2px オフセット）
@@ -8128,7 +8165,7 @@ const entries = [1,2,3]
     // デッキ画像（numdeck見た目を流用しつつ背景だけ差し替え）
     const deckBtn = document.createElement('div');
     deckBtn.className = 'numdeck';
-    deckBtn.style.backgroundImage = "url('./redcode.png')";
+    deckBtn.style.setProperty('--deck-bg', "url('./redcode.png')");
     deckBtn.title = '赤コード（追加）';
     // 残枚数
     const restLbl = document.createElement('span');
@@ -8144,7 +8181,8 @@ const entries = [1,2,3]
       const D = Array.isArray(v?.meta?.m54_redDeck)? v.meta.m54_redDeck : [];
       const U = Array.isArray(v?.meta?.m54_redUsed)? v.meta.m54_redUsed : [];
       const remain = D.filter(x=> !U.includes(x)).length;
-      restLbl.textContent = `残:${remain}`;
+      restLbl.textContent = '';
+      syncDeckVisual(deckBtn, remain);
     };
     refreshRed();
 
@@ -8220,7 +8258,9 @@ const entries = [1,2,3]
     if (restLbl){
       const D = Array.isArray(v?.meta?.m54_redDeck)? v.meta.m54_redDeck : [];
       const U = Array.isArray(v?.meta?.m54_redUsed)? v.meta.m54_redUsed : [];
-      restLbl.textContent = `残:${D.filter(x=>!U.includes(x)).length}`;
+      const remain = D.filter(x=>!U.includes(x)).length;
+      restLbl.textContent = '';
+      syncDeckVisual(deckBtn, remain);
     }
   }
 }
@@ -10691,7 +10731,8 @@ function buildDeckLaneP1(){
 
   const restLbl = document.createElement('span');
   restLbl.className='numrest';
-  restLbl.textContent=`残:${rest}`;
+  restLbl.textContent='';
+  syncDeckVisual(deckBtn, rest);
 
   // ★ 右側に公開札積み重ね用ホルダー
   const pile = document.createElement('div');
@@ -10729,8 +10770,9 @@ function buildDeckLaneP1(){
         deck.splice(0, deck.length, ...MATERIALS.numbers.slice()); 
         shuffle(deck);
         rest = deck.length;
-        restLbl.textContent = `残:${rest}`;
-        deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
+        restLbl.textContent = '';
+    syncDeckVisual(deckBtn, rest);
+        deckBtn.style.removeProperty('--deck-bg');
         deckBtn.style.background = '';
         deckBtn.title = 'めくる';
         pile.innerHTML = '';
@@ -10743,15 +10785,11 @@ function buildDeckLaneP1(){
 
     const n = deck.pop();
     rest--;
-    restLbl.textContent = `残:${rest}`;
+    restLbl.textContent = '';
+    syncDeckVisual(deckBtn, rest);
     addToPile(n);
 
 
-   
-    if(rest===0){
-      deckBtn.style.background = `#fff url('${imgBack}') center/contain no-repeat`;
-      deckBtn.title='山札を作る';
-    }
   };
 
   return lane;
@@ -10772,10 +10810,11 @@ function buildConDeckLaneP1(){
   const deckBtn = document.createElement('div');
   deckBtn.className = 'numdeck';   // 見た目は共通のデッキボタンでOK
   deckBtn.title = 'めくる';
- deckBtn.style.background = "#fff url('./conback.jpg') center/contain no-repeat"; 
+  deckBtn.style.setProperty('--deck-bg', "url('./conback.jpg')");
   const restLbl = document.createElement('span');
   restLbl.className = 'numrest';
-  restLbl.textContent = `残:${rest}`;
+  restLbl.textContent = '';
+  syncDeckVisual(deckBtn, rest);
 
   // 右側に公開札の積み重ね置き場（制約カードは concard で積む）
   const pile = document.createElement('div');
@@ -10816,7 +10855,8 @@ function buildConDeckLaneP1(){
     if (rest <= 0) return;
     const ch = deck.pop(); // 末尾から1枚
     rest -= 1;
-    restLbl.textContent = `残:${rest}`;
+    restLbl.textContent = '';
+    syncDeckVisual(deckBtn, rest);
     addToPile(ch);
   };
 
@@ -11049,7 +11089,8 @@ async function ensureM23MetaInit(){
       const d = (v?.meta?.m18_deck||[]);
       const x = (v?.meta?.m18_discards||[]);
       const remain = d.filter(n=>!x.includes(n)).length;
-      restLbl.textContent = `残:${remain}`;
+      restLbl.textContent = '';
+      syncDeckVisual(deckBtn, remain);
       pile.innerHTML = '';
       x.forEach((n, i)=>{
        const node = document.createElement('div');
@@ -11517,7 +11558,8 @@ function renderM15(v){
     const d = (v?.meta?.m15_deck||[]);
     const x = (v?.meta?.m15_discards||[]);
     const remain = d.filter(n=>!x.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
+    restLbl.textContent = '';
+    syncDeckVisual(deckBtn, remain);
 
     pile.innerHTML = '';
     x.forEach((n, i)=>{
@@ -11625,7 +11667,8 @@ function renderM30(v){
     const d = (v?.meta?.m30_deck||[]);
     const used = (v?.meta?.m30_used||[]);
     const remain = d.filter(n => !used.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
+    restLbl.textContent = '';
+    syncDeckVisual(deckBtn, remain);
 
     // 右側：1枚公開札の積み重ね（2pxオフセット）
     pile.innerHTML = '';
@@ -11888,7 +11931,8 @@ function renderM39(v){
     const d = (v?.meta?.m39_deck||[]);
     const x = (v?.meta?.m39_discards||[]);
     const remain = d.filter(n=>!x.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
+    restLbl.textContent = '';
+    syncDeckVisual(deckBtn, remain);
 
     pile.innerHTML = '';
     x.forEach((n, i)=>{
@@ -12076,14 +12120,15 @@ async function performM23Spread(){
 function attachM23DeckUI(lane){
   const deckBtn = document.createElement('div');
  deckBtn.className = 'numdeck';
-  deckBtn.style.backgroundImage = `url("./itemback.jpg")`;
+  deckBtn.style.setProperty('--deck-bg', "url('./itemback.jpg')");
   const restLbl = document.createElement('span');
   restLbl.className = 'numrest';
   const refreshRest = ()=>{
     const v=state.watching, meta=v?.meta||{};
     const d=(meta.m23_deck||[]), x=(meta.m23_discards||[]);
     const remain = d.filter(n=>!x.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
+    restLbl.textContent = '';
+    syncDeckVisual(deckBtn, remain);
   };
   refreshRest();
   lane.appendChild(deckBtn);
