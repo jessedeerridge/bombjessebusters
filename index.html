@@ -4626,9 +4626,9 @@ function renderM22PickPanel(v){
 /* ：#29 描画・操作ロジック ▼▼ */
 function renderM29(v){
   const isM29 = (v?.mission?.id|0) === 29;
-  const oldHand = document.getElementById('m29HandRow');
-  const oldCenter = document.getElementById('m29CenterRow');
-  if (!isM29) { if (oldHand) oldHand.remove(); if (oldCenter) oldCenter.remove(); return; }
+  document.querySelectorAll('#m29HandRow').forEach(el => el.remove());
+  document.querySelectorAll('#m29CenterRow').forEach(el => el.remove());
+  if (!isM29) return;
 
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
   const myHand = (myIdx>=0) ? (v.tables[myIdx]?.m29Hand||[]) : [];
@@ -4638,7 +4638,6 @@ function renderM29(v){
   // ---- 自分の手札（画面下部：ミッション詳細の上） ----
   const footer = document.getElementById('missionFooter');
   if (footer) {
-    const ex = document.getElementById('m29HandRow'); if (ex) ex.remove();
     if (myIdx>=0 && myHand.length>0) {
       const row = document.createElement('div');
       row.id = 'm29HandRow';
@@ -4735,7 +4734,6 @@ function renderM29(v){
   // ---- センター（アイテム下） ----
   const bar = document.getElementById('itemsBar');
   if (!bar) return;
-  { const ex = document.getElementById('m29CenterRow'); if (ex) ex.remove(); }
 
   const center = Array.isArray(v.m29_center) ? v.m29_center : [];
   const stock = Array.isArray(v.m29_stock) ? v.m29_stock : [];
@@ -4745,53 +4743,31 @@ function renderM29(v){
     const row = document.createElement('div');
     row.id = 'm29CenterRow';
     row.className = 'numlane';
-    row.style.justifyContent = 'space-between';
-    row.style.width = '100%';
-    row.style.flexWrap = 'wrap';
-    row.style.alignItems = 'flex-start';
-    row.style.overflow = 'visible';
-
-    const leftArea = document.createElement('div');
-    leftArea.style.display = 'flex';
-    leftArea.style.alignItems = 'center';
-    leftArea.style.minWidth = '32px';
+    row.style.justifyContent = 'center';
+    row.style.marginTop = '4px';
+    row.style.marginLeft = 'auto';
+    row.style.marginRight = 'auto';
+    row.style.position = 'relative';
 
     if (stock.length > 0) {
-      const holder = document.createElement('div');
-      holder.className = 'numcard-holder';
-      const baseW = 32;
-      const step = 2;
-      const totalW = baseW + step * Math.max(0, stock.length - 1);
-      holder.style.width = `${totalW}px`;
-
-      stock.forEach((obj, k) => {
-        const cell = document.createElement('div');
-        cell.className = (k === 0) ? 'numcard' : 'numcard overlay';
-        cell.style.display = 'grid';
-        cell.style.placeItems = 'center';
-        cell.style.fontWeight = 'bold';
-        cell.style.backgroundImage = `url('${imgNumber(obj.n)}')`;
-        cell.style.backgroundSize = 'cover';
-        cell.style.backgroundPosition = 'center';
-        if (k > 0) {
-          const off = step * k;
-          cell.style.position = 'absolute';
-          cell.style.left = `${off}px`;
-          cell.style.top = `${off}px`;
-          cell.style.opacity = `${Math.max(0.6, 1 - 0.05 * k)}`;
-          cell.style.zIndex = String(100 + k);
-        }
-        holder.appendChild(cell);
-      });
-      leftArea.appendChild(holder);
+      const stockBadge = document.createElement('div');
+      stockBadge.textContent = `保留:${stock.length}`;
+      stockBadge.style.position = 'absolute';
+      stockBadge.style.left = '-66px';
+      stockBadge.style.top = '14px';
+      stockBadge.style.fontSize = '11px';
+      stockBadge.style.opacity = '.75';
+      row.appendChild(stockBadge);
     }
+
+    const itemCount = Math.max(2, document.querySelectorAll('#items .item').length || 12);
+    row.style.width = `calc((var(--item-w) + 6px) * ${itemCount} - 6px)`;
 
     const centerArea = document.createElement('div');
     centerArea.style.display = 'flex';
     centerArea.style.gap = '6px';
     centerArea.style.justifyContent = 'center';
-    centerArea.style.flex = '1';
-    centerArea.style.flexWrap = 'wrap';
+    centerArea.style.minHeight = '48px';
     centerArea.style.alignItems = 'flex-start';
 
     center.forEach((obj, idx) => {
@@ -4845,7 +4821,6 @@ function renderM29(v){
       centerArea.appendChild(cell);
     });
 
-    row.appendChild(leftArea);
     row.appendChild(centerArea);
     bar.insertAdjacentElement('afterend', row);
   }
