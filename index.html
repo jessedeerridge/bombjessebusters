@@ -8798,6 +8798,12 @@ function openRolePickOverlay(curFaceName, myIdx){
   ]));
   const baseMap     = new Map(baseNames.map(n => [normalizeFace(n), n])); // norm → 表示名
   const baseNormSet = new Set([...baseMap.keys()]);
+  const closePreview = ()=>{
+    preview.style.visibility = 'hidden';
+    preview.style.pointerEvents = 'none';
+    preview.innerHTML = '';
+    delete preview.dataset.faceNorm;
+  };
 
   // －－専用オーバーレイ（他UIに閉じられない）－－
   const ov = document.createElement('div');
@@ -8810,15 +8816,13 @@ function openRolePickOverlay(curFaceName, myIdx){
   // 外側クリック/ESCは「拡大解除」だけ（オーバーレイは閉じない）
   ov.addEventListener('click', (e)=>{
     if (e.target !== ov) return;
-    const preview = ov.querySelector('.rp-preview');
-    if (preview){ preview.style.visibility='hidden'; preview.style.pointerEvents='none'; preview.innerHTML=''; }
+    closePreview();
   });
   ov.tabIndex = -1;
   ov.addEventListener('keydown', (e)=>{
     if(e.key==='Escape'){
       e.preventDefault(); e.stopPropagation();
-      const preview = ov.querySelector('.rp-preview');
-      if (preview){ preview.style.visibility='hidden'; preview.style.pointerEvents='none'; preview.innerHTML=''; }
+      closePreview();
     }
   });
 
@@ -8867,7 +8871,7 @@ function openRolePickOverlay(curFaceName, myIdx){
       c.title = 'クリックで拡大';
       c.addEventListener('click', ev=>{
         ev.stopPropagation();
-        openRolePickZoomToPreview(preview, originalName, myIdx);
+        openRolePickZoomToPreview(preview, originalName, myIdx, normalizeFace);
       });
       lane.appendChild(c);
     }
@@ -8891,6 +8895,9 @@ function openRolePickOverlay(curFaceName, myIdx){
       const nf = normalizeFace(t?.character?.face);
       if (nf && baseNormSet.has(nf)) usedNorm.add(nf);  // 候補に含まれる場合のみ使用中扱い
     }
+    if (preview.dataset.faceNorm && usedNorm.has(preview.dataset.faceNorm)){
+      closePreview();
+    }
     renderLane(usedNorm);
   });
 
@@ -8903,6 +8910,7 @@ function openRolePickOverlay(curFaceName, myIdx){
       const nf = normalizeFace(t?.character?.face);
       if (nf && baseNormSet.has(nf)) used0.add(nf);
     });
+    if (preview.dataset.faceNorm && used0.has(preview.dataset.faceNorm)) closePreview();
     renderLane(used0);
   }catch(_){ renderLane(new Set()); }
 
@@ -8913,10 +8921,11 @@ function openRolePickOverlay(curFaceName, myIdx){
 }
 
 // 拡大はプレビューに表示（横並びは常に残す）
-function openRolePickZoomToPreview(previewEl, faceName, myIdx){
+function openRolePickZoomToPreview(previewEl, faceName, myIdx, normalizeFace){
   previewEl.style.visibility = 'visible';
   previewEl.style.pointerEvents = 'auto';
   previewEl.innerHTML = '';
+  previewEl.dataset.faceNorm = normalizeFace(faceName);
 
   const wrap = document.createElement('div');
   wrap.className = 'conzoom-wrap';
