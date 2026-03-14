@@ -222,8 +222,40 @@
 /* ▼ 数値カードの表示帯（アイテム下など） */
   .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
-  .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
-  .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+  .numdeck {
+    position:relative;
+    width:32px; height:48px;
+    border-radius:6px;
+    border:1px solid #ddd;
+    background:#fff url('./numberdeck.png') center/contain no-repeat;
+    cursor:pointer;
+    user-select:none;
+    display:grid;
+    place-items:center;
+    z-index:1;
+  }
+  .numdeck::before,
+  .numdeck::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:inherit;
+    border:1px solid #ddd;
+    background:#fff;
+    pointer-events:none;
+    z-index:-1;
+  }
+  .numdeck::before{ transform:translate(0.2px, 0.2px); }
+  .numdeck::after{ transform:translate(0.4px, 0.4px); }
+  .numdeck.deck-empty{ display:none; }
+  .numdeck-empty-slot{
+    width:32px;
+    height:48px;
+    border-radius:6px;
+    border:1px dashed #bbb;
+    flex:0 0 auto;
+  }
+  .numrest { display:none; }
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
@@ -1669,6 +1701,55 @@ function getMySeatedTableIndex(v){
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
 state._mpAutoOnce = false;  // 「参加」後に自動でピッカーを開いたか（ホストのみ）  
+
+
+function parseDeckRemainFromLabel(labelEl){
+  const txt = String(labelEl?.textContent || '');
+  const m = txt.match(/-?\d+/);
+  if (!m) return null;
+  return Math.max(0, Number(m[0]) || 0);
+}
+
+function syncDeckVisualByLabel(labelEl){
+  if (!labelEl) return;
+  const remain = parseDeckRemainFromLabel(labelEl);
+  if (remain == null) return;
+  const host = labelEl.parentElement;
+  if (!host) return;
+  const deck = host.querySelector(':scope > .numdeck') || host.querySelector('.numdeck');
+  if (!deck) return;
+
+  let emptySlot = host.querySelector(':scope > .numdeck-empty-slot');
+  if (remain === 0){
+    deck.classList.add('deck-empty');
+    if (!emptySlot){
+      emptySlot = document.createElement('div');
+      emptySlot.className = 'numdeck-empty-slot';
+      host.insertBefore(emptySlot, deck);
+    }
+  }else{
+    deck.classList.remove('deck-empty');
+    if (emptySlot) emptySlot.remove();
+  }
+}
+
+function refreshAllDeckVisuals(){
+  document.querySelectorAll('.numrest').forEach(syncDeckVisualByLabel);
+}
+
+const deckVisualObserver = new MutationObserver((mutations)=>{
+  let shouldRefresh = false;
+  for (const m of mutations){
+    if (m.type === 'childList' || m.type === 'characterData'){
+      shouldRefresh = true;
+      break;
+    }
+  }
+  if (shouldRefresh) refreshAllDeckVisuals();
+});
+
+refreshAllDeckVisuals();
+deckVisualObserver.observe(document.body, { childList:true, subtree:true, characterData:true });
 
 const STAGE_STORIES = {
   1: { title:'訓練 1日目', body:'レッスン1：コードを切断するには？' },
