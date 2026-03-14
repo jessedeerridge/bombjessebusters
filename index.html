@@ -222,8 +222,34 @@
 /* ▼ 数値カードの表示帯（アイテム下など） */
   .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
-  .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
-  .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+  .numdeck {
+    --deck-stack:0px;
+    width:32px;
+    height:48px;
+    position:relative;
+    border-radius:6px;
+    border:1px dashed #bbb;
+    background:#fff url('./numberdeck.png') center/contain no-repeat;
+    cursor:pointer;
+    user-select:none;
+    display:grid;
+    place-items:center;
+    z-index:0;
+  }
+  .numdeck::before,
+  .numdeck::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:inherit;
+    pointer-events:none;
+    z-index:-1;
+    border:1px dashed #cfcfcf;
+    background:#fff;
+  }
+  .numdeck::before{ transform:translate(var(--deck-stack), var(--deck-stack)); }
+  .numdeck::after{ transform:translate(calc(var(--deck-stack) * 0.5), calc(var(--deck-stack) * 0.5)); }
+  .numrest { display:none; }
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
@@ -2196,6 +2222,16 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function cssNum(name){const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return parseFloat(v.replace('px',''))||0;}
 const now=()=>Date.now();
+
+function refreshDeckStacks(){
+  document.querySelectorAll('.numdeck').forEach(deck=>{
+    const lane = deck.closest('.numlane, .conlane, .items-bar, .items') || deck.parentElement;
+    const restLbl = lane?.querySelector?.('.numrest');
+    const remain = Number((restLbl?.textContent || '').match(/\d+/)?.[0] || 0);
+    const spread = clamp(remain * 0.2, 0.2, 2.4);
+    deck.style.setProperty('--deck-stack', `${spread}px`);
+  });
+}
 
 let revealArmState = null;
 function clearRevealArm(){
@@ -13040,6 +13076,14 @@ case 66: {
 
 // 画面タップで各種ポップは外側タップで消える
  document.addEventListener('click',(e)=>{ if(!miniPop.contains(e.target)) H(miniPop,true); }, true);
+
+refreshDeckStacks();
+const deckStackObserver = new MutationObserver(()=> refreshDeckStacks());
+deckStackObserver.observe(document.body, {
+  subtree:true,
+  childList:true,
+  characterData:true
+});
 </script>
 </body>
 </html>
