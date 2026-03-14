@@ -240,6 +240,32 @@
   .numcard.overlay { position:absolute; left:2px; top:2px; opacity:1; }
   .numcard.overlay:nth-child(3){ left:4px; top:4px; opacity:0.85; }
   .numcard.overlay:nth-child(4){ left:6px; top:6px; opacity:0.8; }
+  .m29-center-row{
+    width:100%;
+    display:grid;
+    grid-template-columns:minmax(32px,auto) 1fr minmax(32px,auto);
+    align-items:flex-start;
+    overflow:visible;
+    column-gap:6px;
+  }
+  .m29-center-stock{
+    display:flex;
+    align-items:flex-start;
+    justify-content:flex-start;
+    min-width:32px;
+  }
+  .m29-center-main{
+    display:flex;
+    gap:6px;
+    justify-content:center;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    min-height:48px;
+  }
+  .m29-center-spacer{
+    min-width:32px;
+    min-height:1px;
+  }
 .conlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .concard {
     /* ここから変更 */ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); /* ここまで変更 */
@@ -4744,55 +4770,44 @@ function renderM29(v){
   if (center.length > 0 || stock.length > 0) {
     const row = document.createElement('div');
     row.id = 'm29CenterRow';
-    row.className = 'numlane';
-    row.style.justifyContent = 'space-between';
-    row.style.width = '100%';
-    row.style.flexWrap = 'wrap';
-    row.style.alignItems = 'flex-start';
-    row.style.overflow = 'visible';
+    row.className = 'numlane m29-center-row';
 
     const leftArea = document.createElement('div');
-    leftArea.style.display = 'flex';
-    leftArea.style.alignItems = 'center';
-    leftArea.style.minWidth = '32px';
+    leftArea.className = 'm29-center-stock';
 
     if (stock.length > 0) {
       const holder = document.createElement('div');
       holder.className = 'numcard-holder';
       const baseW = 32;
+      const baseH = 48;
       const step = 2;
-      const totalW = baseW + step * Math.max(0, stock.length - 1);
+      const totalW = baseW + step * Math.max(1, stock.length);
+      const totalH = baseH + step * Math.max(1, stock.length);
       holder.style.width = `${totalW}px`;
+      holder.style.height = `${totalH}px`;
 
       stock.forEach((obj, k) => {
         const cell = document.createElement('div');
-        cell.className = (k === 0) ? 'numcard' : 'numcard overlay';
+        cell.className = 'numcard overlay';
         cell.style.display = 'grid';
         cell.style.placeItems = 'center';
         cell.style.fontWeight = 'bold';
         cell.style.backgroundImage = `url('${imgNumber(obj.n)}')`;
         cell.style.backgroundSize = 'cover';
         cell.style.backgroundPosition = 'center';
-        if (k > 0) {
-          const off = step * k;
-          cell.style.position = 'absolute';
-          cell.style.left = `${off}px`;
-          cell.style.top = `${off}px`;
-          cell.style.opacity = `${Math.max(0.6, 1 - 0.05 * k)}`;
-          cell.style.zIndex = String(100 + k);
-        }
+        const off = step * (k + 1);
+        cell.style.position = 'absolute';
+        cell.style.left = `${off}px`;
+        cell.style.top = `${off}px`;
+        cell.style.opacity = `${Math.max(0.6, 1 - 0.05 * k)}`;
+        cell.style.zIndex = String(100 + k);
         holder.appendChild(cell);
       });
       leftArea.appendChild(holder);
     }
 
     const centerArea = document.createElement('div');
-    centerArea.style.display = 'flex';
-    centerArea.style.gap = '6px';
-    centerArea.style.justifyContent = 'center';
-    centerArea.style.flex = '1';
-    centerArea.style.flexWrap = 'wrap';
-    centerArea.style.alignItems = 'flex-start';
+    centerArea.className = 'm29-center-main';
 
     center.forEach((obj, idx) => {
       const cardId = obj?.cid || null;
@@ -4847,6 +4862,7 @@ function renderM29(v){
 
     row.appendChild(leftArea);
     row.appendChild(centerArea);
+    row.appendChild(document.createElement('div')).className = 'm29-center-spacer';
     bar.insertAdjacentElement('afterend', row);
   }
 }
