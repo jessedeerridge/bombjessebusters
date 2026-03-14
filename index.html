@@ -12207,6 +12207,7 @@ async function performM23Spread(){
 }
   
 function attachM23DeckUI(lane){
+  const LONG_PRESS_MS = 450;
   const deckBtn = document.createElement('div');
   const refreshRest = ()=>{
     const v=state.watching, meta=v?.meta||{};
@@ -12225,6 +12226,22 @@ function attachM23DeckUI(lane){
   pile.style.height = cssNum('--item-h') + 'px';
   lane.appendChild(pile);
 
+  const returnItemToDeckTop = async (no)=>{
+    if (!state.isHost) return;
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const mSnap = await get(mRef);
+      const meta = mSnap.val() || {};
+      const D = Array.isArray(meta.m23_deck) ? meta.m23_deck.slice() : [];
+      const X = Array.isArray(meta.m23_discards) ? meta.m23_discards.slice() : [];
+      if (!D.includes(no) || !X.includes(no)) return;
+      await update(mRef, {
+        m23_deck: [no, ...D.filter(v => v !== no)],
+        m23_discards: X.filter(v => v !== no)
+      });
+    }catch(e){ console.error(e); }
+  };
+
   const addToItemPile = (no)=>{
     const already = pile.querySelectorAll('.item').length;
     const node = document.createElement('div');
@@ -12236,6 +12253,28 @@ function attachM23DeckUI(lane){
       node.style.left = off + 'px';
       node.style.top  = '0px';
     }
+
+    if (state.isHost){
+      node.title = '長押しで山札トップに戻す';
+      let holdTimer = null;
+      const clearHold = ()=>{
+        if (!holdTimer) return;
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      };
+      node.addEventListener('pointerdown', (ev)=>{
+        if (ev.button !== 0) return;
+        clearHold();
+        holdTimer = setTimeout(async ()=>{
+          holdTimer = null;
+          await returnItemToDeckTop(no);
+        }, LONG_PRESS_MS);
+      });
+      node.addEventListener('pointerup', clearHold);
+      node.addEventListener('pointercancel', clearHold);
+      node.addEventListener('pointerleave', clearHold);
+    }
+
     pile.appendChild(node);
   };
 
