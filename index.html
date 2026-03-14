@@ -4721,11 +4721,12 @@ if (center.length > 0) {
   row.className = 'numlane';
 row.style.justifyContent = 'flex-start'; // スクロール前提で左寄せ
 row.style.scrollBehavior = 'smooth';
-  // 「重ね対象」と「通常表示」に振り分け
+  // 「左の自動公開山」と「中央（プレイヤーが出したカード）」に振り分け
   const stackTargets = [];
   const others = [];
   center.forEach((obj, idx) => {
-    const isStack = (obj?.faceUp === true) && ((openCountByNum[obj.n] | 0) >= 4);
+    // 4枚公開由来で自動配置されたカードのみ左の山へ
+    const isStack = (obj?.auto === true);
     (isStack ? stackTargets : others).push({ obj, idx });
   });
 
@@ -9507,7 +9508,7 @@ async function ensureM29AutoDrop(roomVal){
 
       // 見つかったらセンターへ「表で」出す
       if (placed){
-        center.push({ n, by: ownerIdx, faceUp: true });
+        center.push({ n, by: ownerIdx, faceUp: true, auto: true });
         doneMap[n] = true;
       }
     }
