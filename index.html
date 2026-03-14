@@ -226,11 +226,11 @@
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
   .deck-stack{ position:relative; cursor:pointer; user-select:none; flex:0 0 auto; }
   .deck-stack.number{ width:32px; height:48px; }
-  .deck-stack.constraint{ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); }
+  .deck-stack.constraint{ width:32px; height:48px; }
   .deck-stack.empty{ border:1px dashed #bbb; border-radius:8px; background:#fff; }
   .deck-layer{ position:absolute; border:1px solid #ddd; background:#fff center/contain no-repeat; pointer-events:none; }
   .deck-stack.number .deck-layer{ width:32px; height:48px; border-radius:6px; }
-  .deck-stack.constraint .deck-layer{ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); border-radius:8px; }
+  .deck-stack.constraint .deck-layer{ width:32px; height:48px; border-radius:6px; }
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
@@ -5646,7 +5646,7 @@ function renderConDeckSync(v, mid){
     const d = (v?.meta?.[keyDeck]||[]);
     const x = (v?.meta?.[keyDisc]||[]);
     const remain = d.filter(ch => !x.includes(ch)).length;
-    renderDeckBackStack(deckBtn, remain, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'8px' });
+    renderDeckBackStack(deckBtn, remain, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'6px' });
     pile.innerHTML = '';
 
     // discards を積み重ね表示（2px オフセット）
@@ -10713,6 +10713,8 @@ function renderDeckBackStack(node, remain, opts={}){
   node.className = `deck-stack ${kind}`;
   node.innerHTML = '';
   node.style.borderRadius = '';
+  node.style.marginRight = '0px';
+  node.style.marginBottom = '0px';
   const count = Math.max(0, remain|0);
   if (count <= 0){
     node.classList.add('empty');
@@ -10730,8 +10732,11 @@ function renderDeckBackStack(node, remain, opts={}){
     layer.style.backgroundImage = `url('${backImage}')`;
     node.appendChild(layer);
   }
-  node.style.marginRight = ((layers - 1) * offset) + 'px';
+  const spread = (layers - 1) * offset;
+  node.style.marginRight = spread + 'px';
+  node.style.marginBottom = spread + 'px';
 }
+
 
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
@@ -10830,7 +10835,7 @@ function buildConDeckLaneP1(){
 
   lane.appendChild(deckBtn);
   lane.appendChild(pile);
-  renderDeckBackStack(deckBtn, rest, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'8px' });
+  renderDeckBackStack(deckBtn, rest, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'6px' });
 
     // 1枚めくって公開札（右側）に積む：挙動は数値P1と同じ
     const addToPile = (ch)=>{
@@ -10862,7 +10867,7 @@ function buildConDeckLaneP1(){
     if (rest <= 0) return;
     const ch = deck.pop(); // 末尾から1枚
     rest -= 1;
-    renderDeckBackStack(deckBtn, rest, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'8px' });
+    renderDeckBackStack(deckBtn, rest, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'6px' });
     addToPile(ch);
   };
 
@@ -11639,13 +11644,9 @@ function renderM30(v){
   lane.id = rowId;
   lane.className = 'numlane';
 
-  // 山札ボタン + 残表示
+  // 山札ボタン
   const deckBtn = document.createElement('div');
-  deckBtn.className = 'numdeck';
   deckBtn.title = 'めくる';
-
-  const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
 
   // 右：1枚ドローの公開札（積み重ね）
   const pile = document.createElement('div');
@@ -11658,7 +11659,6 @@ function renderM30(v){
   row.style.gap = '6px';
 
   lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
   lane.appendChild(pile);
   lane.appendChild(row);
 
@@ -11667,7 +11667,7 @@ function renderM30(v){
     const d = (v?.meta?.m30_deck||[]);
     const used = (v?.meta?.m30_used||[]);
     const remain = d.filter(n => !used.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
+    renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
 
     // 右側：1枚公開札の積み重ね（2pxオフセット）
     pile.innerHTML = '';
