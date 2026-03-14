@@ -407,6 +407,10 @@
     background-repeat:no-repeat !important;
     overflow:visible;
   }
+  .constraint-face.constraint-face-thin-black{
+    border:0.01px solid #000 !important;
+  }
+
   .constraint-face::before{
     content:'';
     position:absolute;
@@ -5678,26 +5682,28 @@ function renderConDeckSync(v, mid){
     renderDeckBackStack(deckBtn, remain, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'6px' });
     pile.innerHTML = '';
 
-    // discards を積み重ね表示（2px オフセット）
+    // discards を積み重ね表示（横方向 0.5px オフセット）
     x.forEach((ch, i)=>{
       const node = document.createElement('div');
       node.className = 'concard';
       paintConstraintCard(node, ch);
+      node.classList.add('constraint-face-thin-black');
       node.title = '拡大';
       node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
       if (i>0){
-        const off = i*2;
+        const off = i * 0.5;
         node.style.position = 'absolute';
         node.style.left = off + 'px';
-        node.style.top  = off + 'px';
+        node.style.top  = '0px';
       }
       pile.appendChild(node);
       refreshConstraintPileFace(pile);
-      const extra = i*2;
+      const extraX = i * 0.5;
       // 制約カードのサイズは CSS 変数に追従（既存CSS：--con-h / --item-h）
       const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
-      pile.style.height = (baseH + extra) + 'px';
-      lane.style.marginBottom = extra + 'px';
+      pile.style.height = baseH + 'px';
+      lane.style.marginBottom = '0px';
+      pile.style.width = (32 + extraX) + 'px';
     });
   };
   refresh();
@@ -10871,14 +10877,15 @@ function buildConDeckLaneP1(){
       const node = document.createElement('div');
       node.className = 'concard';
       paintConstraintCard(node, ch);
+      node.classList.add('constraint-face-thin-black');
 
       const already = pile.querySelectorAll('.concard').length;
-      const off = already * 2;
+      const off = already * 0.5;
 
       if (already > 0){
         node.style.position = 'absolute';
         node.style.left = off + 'px';
-        node.style.top  = off + 'px';
+        node.style.top  = '0px';
       }
    node.title = '拡大';
 　　node.onclick = (ev)=>{ ev.stopPropagation(); openConstraintZoom(ch); };
@@ -10887,8 +10894,9 @@ function buildConDeckLaneP1(){
 
       // ★ ここから変更：1枚目でも必ず高さ/余白を更新する
       const baseH = cssNum('--con-h') || cssNum('--item-h') || 75;
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
+      pile.style.height = baseH + 'px';
+      lane.style.marginBottom = '0px';
+      pile.style.width = (32 + off) + 'px';
       // ★ ここまで変更
     };
 
@@ -12180,8 +12188,9 @@ function attachM23DeckUI(lane){
       node.style.top  = off + 'px';
       // 見切れ防止：高さと下マージンを増やす
       const baseH = cssNum('--item-h');
-      pile.style.height = (baseH + off) + 'px';
-      lane.style.marginBottom = off + 'px';
+      pile.style.height = baseH + 'px';
+      lane.style.marginBottom = '0px';
+      pile.style.width = (32 + off) + 'px';
     }
     pile.appendChild(node);
   };
