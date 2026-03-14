@@ -222,8 +222,15 @@
 /* ▼ 数値カードの表示帯（アイテム下など） */
   .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
-  .numdeck { width:32px; height:48px; border-radius:6px; border:1px dashed #bbb; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
+  .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+  .deck-stack{ position:relative; cursor:pointer; user-select:none; flex:0 0 auto; }
+  .deck-stack.number{ width:32px; height:48px; }
+  .deck-stack.constraint{ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); }
+  .deck-stack.empty{ border:1px dashed #bbb; border-radius:8px; background:#fff; }
+  .deck-layer{ position:absolute; border:1px solid #ddd; background:#fff center/contain no-repeat; pointer-events:none; }
+  .deck-stack.number .deck-layer{ width:32px; height:48px; border-radius:6px; }
+  .deck-stack.constraint .deck-layer{ width:var(--con-w, var(--item-w, 50px)); height:var(--con-h, var(--item-h, 75px)); border-radius:8px; }
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
@@ -5622,14 +5629,9 @@ function renderConDeckSync(v, mid){
   lane.id = rowId;
   lane.className = 'conlane';  // 制約カード帯（既存CSS）
 
-  // 山札ボタン（制約カード裏面）＋残表示
+  // 山札ボタン（制約カード裏面）
   const deckBtn = document.createElement('div');
-  deckBtn.className = 'numdeck';                        // 使い回し
   deckBtn.title = 'めくる';
-  deckBtn.style.background = "#fff url('./conback.jpg') center/contain no-repeat";
-
-  const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
 
   // 右側：公開札（積み重ね）
   const pile = document.createElement('div');
@@ -5637,7 +5639,6 @@ function renderConDeckSync(v, mid){
   pile.style.position = 'relative';
 
   lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
   lane.appendChild(pile);
 
   // 再描画
@@ -5645,7 +5646,7 @@ function renderConDeckSync(v, mid){
     const d = (v?.meta?.[keyDeck]||[]);
     const x = (v?.meta?.[keyDisc]||[]);
     const remain = d.filter(ch => !x.includes(ch)).length;
-    restLbl.textContent = `残:${remain}`;
+    renderDeckBackStack(deckBtn, remain, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'8px' });
     pile.innerHTML = '';
 
     // discards を積み重ね表示（2px オフセット）
@@ -10701,6 +10702,37 @@ function mountLaneUnderItemsBar(lane){
   bar.insertAdjacentElement('afterend', lane);
 }
 
+function renderDeckBackStack(node, remain, opts={}){
+  const {
+    kind = 'number',
+    backImage = "./numberdeck.png",
+    maxLayers = 5,
+    offset = 2,
+    emptyBorderRadius
+  } = opts;
+  node.className = `deck-stack ${kind}`;
+  node.innerHTML = '';
+  node.style.borderRadius = '';
+  const count = Math.max(0, remain|0);
+  if (count <= 0){
+    node.classList.add('empty');
+    if (emptyBorderRadius) node.style.borderRadius = emptyBorderRadius;
+    return;
+  }
+  node.classList.remove('empty');
+  const layers = Math.min(count, Math.max(1, maxLayers|0));
+  for (let i=0; i<layers; i++){
+    const layer = document.createElement('div');
+    layer.className = 'deck-layer';
+    const off = i * offset;
+    layer.style.left = off + 'px';
+    layer.style.top  = off + 'px';
+    layer.style.backgroundImage = `url('${backImage}')`;
+    node.appendChild(layer);
+  }
+  node.style.marginRight = ((layers - 1) * offset) + 'px';
+}
+
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
   const lane = document.createElement('div'); 
@@ -10711,14 +10743,9 @@ function buildDeckLaneP1(){
   shuffle(deck);
   let rest = deck.length;
 
-  // 山札ボタンと残表示
+  // 山札ボタン
   const deckBtn = document.createElement('div');
-  deckBtn.className='numdeck';
   deckBtn.title='めくる';
-
-  const restLbl = document.createElement('span');
-  restLbl.className='numrest';
-  restLbl.textContent=`残:${rest}`;
 
   // ★ 右側に公開札積み重ね用ホルダー
   const pile = document.createElement('div');
@@ -10726,8 +10753,8 @@ function buildDeckLaneP1(){
   pile.style.position = 'relative';
 
   lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
   lane.appendChild(pile);
+  renderDeckBackStack(deckBtn, rest, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
 
   // 積み重ね追加
   function addToPile(n){
@@ -10756,9 +10783,7 @@ function buildDeckLaneP1(){
         deck.splice(0, deck.length, ...MATERIALS.numbers.slice()); 
         shuffle(deck);
         rest = deck.length;
-        restLbl.textContent = `残:${rest}`;
-        deckBtn.style.backgroundImage = `url('./numberdeck.png')`;
-        deckBtn.style.background = '';
+        renderDeckBackStack(deckBtn, rest, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
         deckBtn.title = 'めくる';
         pile.innerHTML = '';
         pile.style.height = '48px';
@@ -10770,13 +10795,12 @@ function buildDeckLaneP1(){
 
     const n = deck.pop();
     rest--;
-    restLbl.textContent = `残:${rest}`;
+    renderDeckBackStack(deckBtn, rest, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
     addToPile(n);
 
 
    
     if(rest===0){
-      deckBtn.style.background = `#fff url('${imgBack}') center/contain no-repeat`;
       deckBtn.title='山札を作る';
     }
   };
@@ -10795,14 +10819,9 @@ function buildConDeckLaneP1(){
   shuffle(deck);
   let rest = deck.length;
 
-  // 山札ボタンと残表示（数値P1と同じUI部品を流用）
+  // 山札ボタン
   const deckBtn = document.createElement('div');
-  deckBtn.className = 'numdeck';   // 見た目は共通のデッキボタンでOK
   deckBtn.title = 'めくる';
- deckBtn.style.background = "#fff url('./conback.jpg') center/contain no-repeat"; 
-  const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
-  restLbl.textContent = `残:${rest}`;
 
   // 右側に公開札の積み重ね置き場（制約カードは concard で積む）
   const pile = document.createElement('div');
@@ -10810,8 +10829,8 @@ function buildConDeckLaneP1(){
   pile.style.position = 'relative';
 
   lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
   lane.appendChild(pile);
+  renderDeckBackStack(deckBtn, rest, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'8px' });
 
     // 1枚めくって公開札（右側）に積む：挙動は数値P1と同じ
     const addToPile = (ch)=>{
@@ -10843,7 +10862,7 @@ function buildConDeckLaneP1(){
     if (rest <= 0) return;
     const ch = deck.pop(); // 末尾から1枚
     rest -= 1;
-    restLbl.textContent = `残:${rest}`;
+    renderDeckBackStack(deckBtn, rest, { kind:'constraint', backImage:'./conback.jpg', emptyBorderRadius:'8px' });
     addToPile(ch);
   };
 
@@ -11057,26 +11076,22 @@ async function ensureM23MetaInit(){
     lane.id = rowId;
     lane.className = 'numlane';
 
-    // 山札（数値）ボタンと残枚数
+    // 山札（数値）ボタン
    const deckBtn = document.createElement('div');
-   deckBtn.className = 'numdeck';
-  deckBtn.title = 'めくる';
+   deckBtn.title = 'めくる';
 
-    const restLbl = document.createElement('span');
-   restLbl.className = 'numrest';
    // 公開札の積み重ね
     const pile = document.createElement('div');
     pile.className = 'numcard-holder';
    pile.style.position = 'relative';
    lane.appendChild(deckBtn);
-    lane.appendChild(restLbl);
     lane.appendChild(pile);
 
     const refresh = ()=>{
       const d = (v?.meta?.m18_deck||[]);
       const x = (v?.meta?.m18_discards||[]);
       const remain = d.filter(n=>!x.includes(n)).length;
-      restLbl.textContent = `残:${remain}`;
+      renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
       pile.innerHTML = '';
       x.forEach((n, i)=>{
        const node = document.createElement('div');
