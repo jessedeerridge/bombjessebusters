@@ -4636,9 +4636,10 @@ function renderM29(v){
                 const hand0 = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
                 const pos = hand0.indexOf(n);
                 if (pos < 0) return;
-                hand0.splice(pos,1);
 
                 const center = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
+                if (center.length > 0) return;
+                hand0.splice(pos,1);
                 const stock = Array.isArray(R.m29_stock) ? R.m29_stock.slice() : [];
 
                 const openCountByNum = {};
@@ -4653,7 +4654,7 @@ function renderM29(v){
 
                 const already4 = ((openCountByNum[n] | 0) >= 4);
                 if (already4) stock.push({ n, by: myIdx, from: 'play' });
-                else center.push({ n, by: myIdx, faceUp:true });
+                else center.push({ cid: crypto.randomUUID(), n, by: myIdx, faceUp:true });
 
                 let drew = false;
                 let nextHand = hand0.slice();
@@ -4756,6 +4757,7 @@ function renderM29(v){
     centerArea.style.flex = '1';
 
     center.forEach((obj, idx) => {
+      const cardId = obj?.cid || null;
       const cell = document.createElement('div');
       cell.className = 'numcard';
       cell.style.display = 'grid';
@@ -4780,12 +4782,19 @@ function renderM29(v){
               const cur = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
               const hand = Array.isArray(T2.m29Hand) ? T2.m29Hand.slice() : [];
 
-              if (idx < 0 || idx >= cur.length) return;
-              const curObj = cur[idx];
-              if (!curObj) return;
+              let pickIdx = -1;
+              if (cardId) {
+                pickIdx = cur.findIndex(x => x?.cid === cardId);
+              }
+              if (pickIdx < 0 && idx >= 0 && idx < cur.length) {
+                const cand = cur[idx];
+                if (cand && cand.n === obj.n && (cand.by|0) === (obj.by|0)) pickIdx = idx;
+              }
+              if (pickIdx < 0) return;
 
+              const curObj = cur[pickIdx];
               hand.push(curObj.n);
-              cur.splice(idx, 1);
+              cur.splice(pickIdx, 1);
               await Promise.all([
                 update(tRef, { m29Hand: hand }),
                 update(rRef, { m29_center: cur }),
@@ -9356,8 +9365,7 @@ async function ensureM29AutoDrop(roomVal){
       });
     });
 
-    // センター/左ストック/デッキの現状
-    let center = Array.isArray(roomVal.m29_center) ? roomVal.m29_center.slice() : [];
+    // 左ストック/デッキの現状
     let stock  = Array.isArray(roomVal.m29_stock)  ? roomVal.m29_stock.slice()  : [];
     let deck   = Array.isArray(roomVal.m29_deck)   ? roomVal.m29_deck.slice()   : [];
 
@@ -9413,7 +9421,6 @@ async function ensureM29AutoDrop(roomVal){
 
     // まとめてDBへ反映
     const updates = { };
-    updates['rooms/'+state.roomCode+'/m29_center'] = center;
     updates['rooms/'+state.roomCode+'/m29_stock'] = stock;
     updates['rooms/'+state.roomCode+'/meta'] = {
       ...(roomVal.meta||{}),
