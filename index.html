@@ -11615,13 +11615,9 @@ function renderM15(v){
   lane.id = rowId;
   lane.className = 'numlane';
 
-  // 山札（数値）ボタンと残枚数
+  // 山札（数値）ボタン
   const deckBtn = document.createElement('div');
-  deckBtn.className = 'numdeck';
   deckBtn.title = 'めくる';
-
-  const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
 
   // 公開札の積み重ね
   const pile = document.createElement('div');
@@ -11629,16 +11625,17 @@ function renderM15(v){
   pile.style.position = 'relative';
 
   lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
   lane.appendChild(pile);
 
   const refresh = ()=>{
     const d = (v?.meta?.m15_deck||[]);
     const x = (v?.meta?.m15_discards||[]);
     const remain = d.filter(n=>!x.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
+    renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
 
     pile.innerHTML = '';
+    lane.style.marginBottom = '0px';
+    pile.style.height = '48px';
     x.forEach((n, i)=>{
       const node = document.createElement('div');
       node.className = 'numcard';
@@ -12189,19 +12186,14 @@ async function performM23Spread(){
   
 function attachM23DeckUI(lane){
   const deckBtn = document.createElement('div');
- deckBtn.className = 'numdeck';
-  deckBtn.style.backgroundImage = `url("./itemback.jpg")`;
-  const restLbl = document.createElement('span');
-  restLbl.className = 'numrest';
   const refreshRest = ()=>{
     const v=state.watching, meta=v?.meta||{};
     const d=(meta.m23_deck||[]), x=(meta.m23_discards||[]);
     const remain = d.filter(n=>!x.includes(n)).length;
-    restLbl.textContent = `残:${remain}`;
+    renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./itemback.jpg', emptyBorderRadius:'6px' });
   };
   refreshRest();
   lane.appendChild(deckBtn);
-  lane.appendChild(restLbl);
 
   // ★ 追加：表向き捨て札の積み重ね表示（アイテム）
   const pile = document.createElement('div');
@@ -12265,7 +12257,6 @@ function attachM23DeckUI(lane){
           // ★★★ ここから追加：アイテム山札UIを消滅させる ★★★
         try{
           deckBtn.onclick = null;              // 念のため無効化
-          if (restLbl?.parentNode) restLbl.remove();
           if (pile?.parentNode)    pile.remove();
           if (deckBtn?.parentNode) deckBtn.remove();
         }catch(_){}
