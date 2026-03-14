@@ -9437,13 +9437,17 @@ if (shown === 0) cell.classList.add('disabled');
 // ★★★ ここから追加：#29 自動出しヘルパー ★★★
 async function ensureM29AutoDrop(roomVal){
   try{
-    if ((roomVal?.mission?.id|0) !== 29) return;
+    const roomPath = `rooms/${state.roomCode}`;
+    const latestSnap = await get(ref(db, roomPath));
+    const latestRoom = latestSnap.val() || roomVal || {};
+    if ((latestRoom?.mission?.id|0) !== 29) return;
     // すでに処理済みの数字をメタに記録して二重実行を防止
-    const doneMap = (roomVal.meta && roomVal.meta.m29_autoDone) ? { ...roomVal.meta.m29_autoDone } : {};
+    const doneMap = (latestRoom.meta && latestRoom.meta.m29_autoDone) ? { ...latestRoom.meta.m29_autoDone } : {};
+    const beforeDoneJson = JSON.stringify(doneMap);
 
     // 現在公開中コードの「数字別 open:true 枚数」を集計
     const openMap = {};
-    (roomVal.tables||[]).forEach(T=>{
+    (latestRoom.tables||[]).forEach(T=>{
       (T.hand||[]).forEach(c=>{
         if (c?.kind==='normal' && c.open===true){
           const n = c.num|0;
@@ -9453,8 +9457,10 @@ async function ensureM29AutoDrop(roomVal){
     });
 
     // センター/デッキの現状
-    let center = Array.isArray(roomVal.m29_center) ? roomVal.m29_center.slice() : [];
-    let deck   = Array.isArray(roomVal.m29_deck)   ? roomVal.m29_deck.slice()   : [];
+    let center = Array.isArray(latestRoom.m29_center) ? latestRoom.m29_center.slice() : [];
+    let deck   = Array.isArray(latestRoom.m29_deck)   ? latestRoom.m29_deck.slice()   : [];
+    const beforeCenterJson = JSON.stringify(center);
+    const beforeDeckJson = JSON.stringify(deck);
 
     // 1..12 を走査し、「公開4枚」かつ「未処理」の数字を自動で場に出す
     for (let n=1; n<=12; n++){
@@ -9465,7 +9471,7 @@ async function ensureM29AutoDrop(roomVal){
       let placed = false;
       let ownerIdx = -1;
 
-      for (let i=0; i<(roomVal.tables||[]).length; i++){
+      for (let i=0; i<(latestRoom.tables||[]).length; i++){
         const tPath = `rooms/${state.roomCode}/tables/${i}`;
         const tSnap = await get(ref(db, tPath));
         const T = tSnap.val() || {};
@@ -9506,15 +9512,20 @@ async function ensureM29AutoDrop(roomVal){
       }
     }
 
-    // まとめてDBへ反映
+    // 変更があるものだけDBへ反映（他端末の更新を上書きしない）
     const updates = { };
-    updates['rooms/'+state.roomCode+'/m29_center'] = center;
-    updates['rooms/'+state.roomCode+'/meta'] = {
-      ...(roomVal.meta||{}),
-      m29_autoDone: doneMap
-    };
-    updates['rooms/'+state.roomCode+'/m29_deck'] = deck;
-    await update(ref(db), updates);
+    if (JSON.stringify(center) !== beforeCenterJson) {
+      updates[`${roomPath}/m29_center`] = center;
+    }
+    if (JSON.stringify(deck) !== beforeDeckJson) {
+      updates[`${roomPath}/m29_deck`] = deck;
+    }
+    if (JSON.stringify(doneMap) !== beforeDoneJson) {
+      updates[`${roomPath}/meta/m29_autoDone`] = doneMap;
+    }
+    if (Object.keys(updates).length > 0) {
+      await update(ref(db), updates);
+    }
   }catch(e){
     console.error('ensureM29AutoDrop failed', e);
   }
