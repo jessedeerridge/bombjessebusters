@@ -4782,7 +4782,9 @@ function renderM29(v){
   });
 
   const stackStep = 2;
-  const nowStockOffset = stackStep * Math.max(0, stock.length - 1);
+  const maxM29StockLayers = 6;
+  const visibleStock = stock.slice(-maxM29StockLayers);
+  const nowStockOffset = stackStep * Math.max(0, visibleStock.length - 1);
 
   if (state.isHost) ensureM29AutoDrop(v);
   if (center.length > 0 || stock.length > 0) {
@@ -4801,15 +4803,15 @@ function renderM29(v){
     leftArea.style.alignItems = 'center';
     leftArea.style.minWidth = '32px';
 
-    if (stock.length > 0) {
+    if (visibleStock.length > 0) {
       const holder = document.createElement('div');
       holder.className = 'numcard-holder';
       const baseW = 32;
       const step = stackStep;
-      const totalW = baseW + step * Math.max(0, stock.length - 1);
+      const totalW = baseW + step * Math.max(0, visibleStock.length - 1);
       holder.style.width = `${totalW}px`;
 
-      stock.forEach((obj, k) => {
+      visibleStock.forEach((obj, k) => {
         const cell = document.createElement('div');
         cell.className = (k === 0) ? 'numcard' : 'numcard overlay';
         cell.style.display = 'grid';
@@ -10857,6 +10859,35 @@ function renderDeckBackStack(node, remain, opts={}){
   node.style.marginBottom = spread + 'px';
 }
 
+function renderNumberFaceUpStack(pile, nums, opts={}){
+  const {
+    maxLayers = 6,
+    offset = 2
+  } = opts;
+  const list = Array.isArray(nums) ? nums : [];
+  const layers = Math.min(list.length, Math.max(1, maxLayers|0));
+  const visible = layers > 0 ? list.slice(-layers) : [];
+
+  pile.innerHTML = '';
+  pile.style.height = '48px';
+  visible.forEach((n, i)=>{
+    const node = document.createElement('div');
+    node.className = 'numcard';
+    node.style.backgroundImage = `url('${imgNumber(n)}')`;
+    if (i>0){
+      const off = i * offset;
+      node.style.position='absolute';
+      node.style.left = off+'px';
+      node.style.top  = off+'px';
+    }
+    pile.appendChild(node);
+  });
+
+  const spread = Math.max(0, visible.length - 1) * offset;
+  pile.style.height = (48 + spread) + 'px';
+  return spread;
+}
+
 
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
@@ -11216,23 +11247,8 @@ async function ensureM23MetaInit(){
       const d = (v?.meta?.m18_deck||[]);
       const x = (v?.meta?.m18_discards||[]);
       const remain = d.filter(n=>!x.includes(n)).length;
-      renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
-      pile.innerHTML = '';
-      x.forEach((n, i)=>{
-       const node = document.createElement('div');
-        node.className = 'numcard';
-        node.style.backgroundImage = `url('${imgNumber(n)}')`;
-        if (i>0){
-         const off = i*2;
-         node.style.position='absolute';
-          node.style.left = off+'px';
-          node.style.top  = off+'px';
-        }
-        pile.appendChild(node);
-        const extra = i*2;
-        pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
-     });
+      renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', maxLayers:6, emptyBorderRadius:'6px' });
+      lane.style.marginBottom = renderNumberFaceUpStack(pile, x, { maxLayers:6, offset:2 }) + 'px';
     };
     refresh();
 
@@ -11679,26 +11695,8 @@ function renderM15(v){
     const d = (v?.meta?.m15_deck||[]);
     const x = (v?.meta?.m15_discards||[]);
     const remain = d.filter(n=>!x.includes(n)).length;
-    renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
-
-    pile.innerHTML = '';
-    lane.style.marginBottom = '0px';
-    pile.style.height = '48px';
-    x.forEach((n, i)=>{
-      const node = document.createElement('div');
-      node.className = 'numcard';
-      node.style.backgroundImage = `url('${imgNumber(n)}')`;
-      if (i>0){
-        const off = i*2;
-        node.style.position='absolute';
-        node.style.left = off+'px';
-        node.style.top  = off+'px';
-      }
-      pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
-    });
+    renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', maxLayers:6, emptyBorderRadius:'6px' });
+    lane.style.marginBottom = renderNumberFaceUpStack(pile, x, { maxLayers:6, offset:2 }) + 'px';
   };
   refresh();
 
@@ -12047,24 +12045,8 @@ function renderM39(v){
     const x = (v?.meta?.m39_discards||[]);
     const remain = d.filter(n=>!x.includes(n)).length;
     restLbl.textContent = `残:${remain}`;
-    renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
-
-    pile.innerHTML = '';
-    x.forEach((n, i)=>{
-      const node = document.createElement('div');
-      node.className = 'numcard';
-      node.style.backgroundImage = `url('${imgNumber(n)}')`;
-      if (i>0){
-        const off = i*2;
-        node.style.position='absolute';
-        node.style.left = off+'px';
-        node.style.top  = off+'px';
-      }
-      pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
-    });
+    renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', maxLayers:6, emptyBorderRadius:'6px' });
+    lane.style.marginBottom = renderNumberFaceUpStack(pile, x, { maxLayers:6, offset:2 }) + 'px';
   };
   refresh();
 
