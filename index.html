@@ -4634,6 +4634,8 @@ function renderM29(v){
   const myHand = (myIdx>=0) ? (v.tables[myIdx]?.m29Hand||[]) : [];
   const centerNow = Array.isArray(v.m29_center) ? v.m29_center : [];
   const centerLocked = centerNow.length > 0;
+  if (typeof renderM29._playBusy !== 'boolean') renderM29._playBusy = false;
+  if (typeof renderM29._centerTop !== 'number') renderM29._centerTop = null;
 
   // ---- 自分の手札（画面下部：ミッション詳細の上） ----
   const footer = document.getElementById('missionFooter');
@@ -4659,6 +4661,8 @@ function renderM29(v){
           openMenu(ev.clientX, ev.clientY, [{
             label: '場に出す',
             action: async ()=>{
+              if (renderM29._playBusy) return;
+              renderM29._playBusy = true;
               try{
                 const tRef = ref(db, `rooms/${state.roomCode}/tables/${myIdx}`);
                 const mRef = ref(db, `rooms/${state.roomCode}`);
@@ -4720,6 +4724,7 @@ function renderM29(v){
                   }
                 }
               }catch(e){ console.error(e); }
+              finally{ renderM29._playBusy = false; }
             }
           }]);
         };
@@ -4735,7 +4740,13 @@ function renderM29(v){
   // ---- センター（アイテム下） ----
   const bar = document.getElementById('itemsBar');
   if (!bar) return;
-  { const ex = document.getElementById('m29CenterRow'); if (ex) ex.remove(); }
+  {
+    const ex = document.getElementById('m29CenterRow');
+    if (ex){
+      renderM29._centerTop = ex.getBoundingClientRect().top;
+      ex.remove();
+    }
+  }
 
   const center = Array.isArray(v.m29_center) ? v.m29_center : [];
   const stock = Array.isArray(v.m29_stock) ? v.m29_stock : [];
@@ -4745,9 +4756,11 @@ function renderM29(v){
     const row = document.createElement('div');
     row.id = 'm29CenterRow';
     row.className = 'numlane';
-    row.style.justifyContent = 'space-between';
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = 'max-content 1fr max-content';
+    row.style.justifyContent = 'stretch';
     row.style.width = '100%';
-    row.style.flexWrap = 'wrap';
+    row.style.flexWrap = 'nowrap';
     row.style.alignItems = 'flex-start';
     row.style.overflow = 'visible';
 
@@ -4785,6 +4798,10 @@ function renderM29(v){
       });
       leftArea.appendChild(holder);
     }
+
+    const rightSpacer = document.createElement('div');
+    rightSpacer.style.minWidth = `${leftArea.getBoundingClientRect().width || 32}px`;
+    rightSpacer.style.visibility = 'hidden';
 
     const centerArea = document.createElement('div');
     centerArea.style.display = 'flex';
@@ -4847,7 +4864,20 @@ function renderM29(v){
 
     row.appendChild(leftArea);
     row.appendChild(centerArea);
+    row.appendChild(rightSpacer);
     bar.insertAdjacentElement('afterend', row);
+
+    requestAnimationFrame(()=>{
+      const oldTop = renderM29._centerTop;
+      const newTop = row.getBoundingClientRect().top;
+      if (typeof oldTop === 'number'){
+        const delta = Math.round(newTop - oldTop);
+        if (delta > 0) window.scrollBy(0, delta);
+      }
+      renderM29._centerTop = newTop;
+    });
+  }else{
+    renderM29._centerTop = null;
   }
 }
 
