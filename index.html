@@ -206,10 +206,11 @@
   .item.alt-rule.item-raised{ transform:translateY(-8px); }
   .item.alt-rule.item-raised::after{ display:none; }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
+  .item.m12-overlay-host{ overflow:visible; }
   .m12-overlay-num{
     position:absolute;
     left:50%;
-    top:2px;
+    top:40px;
     transform:translateX(-50%);
     z-index:4;
     box-shadow:0 2px 6px rgba(0,0,0,.2);
@@ -3474,6 +3475,7 @@ function renderItemsAndDi(v){
   (v.items||[]).forEach((it, idx)=>{
     const flags = v?.mission?.flags || {};
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
+    if (isM12) div.classList.add('m12-overlay-host');
     if(useAltItemRule){
       div.classList.add('alt-rule');
       if(isAltRuleItemRaised(it.no, idx)) div.classList.add('item-raised');
