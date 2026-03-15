@@ -12020,7 +12020,11 @@ function renderM30(v){
       const inWindow = !!(c && typeof c.startedAt === 'number' && (nowTs - c.startedAt) <= WINDOW_MS);
       const base = inWindow ? c : { startedAt: nowTs, count: 0 };
 
-      if ((base.count|0) >= 3) return;
+      if ((base.count|0) >= 3) {
+        // 6秒ウィンドウ内で3枚に到達した後は、時間切れまで3枚表示で固定
+        // （4回目以降のタップで1枚目に戻らないようにする）
+        if (inWindow) return;
+      }
 
       const nextCard = remain[0];
       if (nextCard == null) return;
@@ -12030,9 +12034,8 @@ function renderM30(v){
       await update(mRef, {
         m30_discards: Xs.concat(nextCard),
         m30_row: nextRow,
-        m30_clickWindow: nextCount >= 3
-          ? null
-          : { startedAt: inWindow ? base.startedAt : nowTs, count: nextCount }
+        // 3枚到達後も startedAt/count を保持し、6秒経過までは同一ウィンドウ扱い
+        m30_clickWindow: { startedAt: inWindow ? base.startedAt : nowTs, count: Math.min(nextCount, 3) }
       });
     }catch(e){ console.error(e); }
   };
