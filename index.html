@@ -209,7 +209,7 @@
   .m12-overlay-num{
     position:absolute;
     left:50%;
-    top:-8px;
+    top:2px;
     transform:translateX(-50%);
     z-index:4;
     box-shadow:0 2px 6px rgba(0,0,0,.2);
@@ -3394,15 +3394,24 @@ function renderItemsAndDi(v){
     });
   });
 
-  const isAltRuleItemRaised = (itemNo)=>{
-    if(itemNo>=1 && itemNo<=12) return (openNormalCountByNum[itemNo]||0) >= 2;
-    if(itemNo===13) return openYellowCount >= 2;
-    if(itemNo===14) return (openNormalCountByNum[2]||0) >= 2;
-    if(itemNo===15) return (openNormalCountByNum[3]||0) >= 2;
-    if(itemNo===16) return (openNormalCountByNum[10]||0) >= 2;
-    if(itemNo===17) return (openNormalCountByNum[9]||0) >= 2;
-    if(itemNo===18) return (openNormalCountByNum[11]||0) >= 2;
-    return false;
+  const isAltRuleItemRaised = (itemNo, idx)=>{
+    let baseRaised = false;
+    if(itemNo>=1 && itemNo<=12) baseRaised = (openNormalCountByNum[itemNo]||0) >= 2;
+    else if(itemNo===13) baseRaised = openYellowCount >= 2;
+    else if(itemNo===14) baseRaised = (openNormalCountByNum[2]||0) >= 2;
+    else if(itemNo===15) baseRaised = (openNormalCountByNum[3]||0) >= 2;
+    else if(itemNo===16) baseRaised = (openNormalCountByNum[10]||0) >= 2;
+    else if(itemNo===17) baseRaised = (openNormalCountByNum[9]||0) >= 2;
+    else if(itemNo===18) baseRaised = (openNormalCountByNum[11]||0) >= 2;
+
+    if (!baseRaised) return false;
+
+    // #12：カード上に重ねた数値カードの数字も、2枚公開済みであることを要求
+    if (missionId === 12){
+      const overlayNum = (m12Under[idx]|0);
+      if (overlayNum > 0 && (openNormalCountByNum[overlayNum]||0) < 2) return false;
+    }
+    return true;
   };
 
   // ★ #23：広げる前は「アイテムのみ」非表示（DIは残す）
@@ -3439,7 +3448,7 @@ function renderItemsAndDi(v){
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
     if(useAltItemRule){
       div.classList.add('alt-rule');
-      if(isAltRuleItemRaised(it.no)) div.classList.add('item-raised');
+      if(isAltRuleItemRaised(it.no, idx)) div.classList.add('item-raised');
     }
     if(!it.used){
       // #15: 最初は裏向き表示（使用可だが faceUp===false の間は裏面アートを表示）
