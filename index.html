@@ -8970,6 +8970,12 @@ function openRolePickOverlay(curFaceName, myIdx){
   const baseNames = Array.from(new Set([
     curFaceName, 'member (6).jpg','member (7).jpg','member (8).jpg','member (9).jpg'
   ]));
+  const mid = (state?.watching?.mission?.id|0);
+  if (mid === 44 || mid === 45) {
+    for (let i = baseNames.length - 1; i >= 0; i--) {
+      if (/member\s*\(5\)\./i.test(String(baseNames[i] || ''))) baseNames.splice(i, 1);
+    }
+  }
   const baseMap     = new Map(baseNames.map(n => [normalizeFace(n), n])); // norm → 表示名
   const baseNormSet = new Set([...baseMap.keys()]);
   const closePreview = ()=>{
@@ -10123,8 +10129,11 @@ function missionNumberRange(missionId){
    26: [10],
    27: [7],
    35: [2],
+   41: [13],
+   44: [10],
    39: [1,2,3,4,5,6,7,8,9,10,11,12,13],
    45: [7,10,11],
+   46: [7],
    47: [10],
    49: [10],
    51: [10],
@@ -10142,15 +10151,17 @@ function missionNumberRange(missionId){
 /* ===== Item helpers ===== */
 /* missionId と “黄コードを使うか”で山札を決定し、除外も適用 */
 function itemDeckNumbers(missionId){
+  let pool;
+
   // 43以降は 1..18 を使用
   if(missionId >= 43){
-    return Array.from({length:18}, (_,i)=> i+1);
+    pool = Array.from({length:18}, (_,i)=> i+1);
+  } else {
+    // 〜42は 1..13（黄コードあり） / 1..12（黄コードなし）
+    const useYellow = missionUsesYellow(missionId);
+    const maxNo = useYellow ? 13 : 12;
+    pool = Array.from({length:maxNo}, (_,i)=> i+1);
   }
-
-  // 〜42は 1..13（黄コードあり） / 1..12（黄コードなし）
-  const useYellow = missionUsesYellow(missionId);
-  const maxNo = useYellow ? 13 : 12;
-  let pool = Array.from({length:maxNo}, (_,i)=> i+1);
 
   // 除外適用
   const ex = ITEM_EXCLUSIONS[missionId] || [];
