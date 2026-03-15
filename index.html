@@ -206,6 +206,16 @@
   .item.alt-rule.item-raised{ transform:translateY(-8px); }
   .item.alt-rule.item-raised::after{ display:none; }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
+  .item.m12-overlay-host{ overflow:visible; }
+  .m12-overlay-num{
+    position:absolute;
+    left:50%;
+    top:40px;
+    transform:translateX(-50%);
+    z-index:4;
+    box-shadow:0 2px 6px rgba(0,0,0,.2);
+    cursor:pointer;
+  }
   /* ★ M12：アイテムの下に付ける小型数値バッジ */
   .num-badge{
     position:absolute; left:50%; transform:translateX(-50%);
@@ -3385,15 +3395,24 @@ function renderItemsAndDi(v){
     });
   });
 
-  const isAltRuleItemRaised = (itemNo)=>{
-    if(itemNo>=1 && itemNo<=12) return (openNormalCountByNum[itemNo]||0) >= 2;
-    if(itemNo===13) return openYellowCount >= 2;
-    if(itemNo===14) return (openNormalCountByNum[2]||0) >= 2;
-    if(itemNo===15) return (openNormalCountByNum[3]||0) >= 2;
-    if(itemNo===16) return (openNormalCountByNum[10]||0) >= 2;
-    if(itemNo===17) return (openNormalCountByNum[9]||0) >= 2;
-    if(itemNo===18) return (openNormalCountByNum[11]||0) >= 2;
-    return false;
+  const isAltRuleItemRaised = (itemNo, idx)=>{
+    let baseRaised = false;
+    if(itemNo>=1 && itemNo<=12) baseRaised = (openNormalCountByNum[itemNo]||0) >= 2;
+    else if(itemNo===13) baseRaised = openYellowCount >= 2;
+    else if(itemNo===14) baseRaised = (openNormalCountByNum[2]||0) >= 2;
+    else if(itemNo===15) baseRaised = (openNormalCountByNum[3]||0) >= 2;
+    else if(itemNo===16) baseRaised = (openNormalCountByNum[10]||0) >= 2;
+    else if(itemNo===17) baseRaised = (openNormalCountByNum[9]||0) >= 2;
+    else if(itemNo===18) baseRaised = (openNormalCountByNum[11]||0) >= 2;
+
+    if (!baseRaised) return false;
+
+    // #12：カード上に重ねた数値カードの数字も、2枚公開済みであることを要求
+    if (missionId === 12){
+      const overlayNum = (m12Under[idx]|0);
+      if (overlayNum > 0 && (openNormalCountByNum[overlayNum]||0) < 2) return false;
+    }
+    return true;
   };
 
   // ★ #23：広げる前は「アイテムのみ」非表示（DIは残す）
@@ -3422,12 +3441,44 @@ function renderItemsAndDi(v){
   itemsEl.innerHTML='';
   const itemNodes = []; // ★ ノード参照を保持
 
+  const isM12 = ((v?.mission?.id|0) === 12);
+  const m12Under = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under : [];
+
+  // #12：ヒミツ底などで新規追加された上乗せ数値が既に公開2本済みなら、2秒だけ表示して消す
+  if (!state._m12FlashUntil) state._m12FlashUntil = {};
+  if (!isM12){
+    state._m12PrevUnderLen = 0;
+    state._m12FlashUntil = {};
+  }else{
+    const prevLen = (state._m12PrevUnderLen|0);
+    const currLen = m12Under.length|0;
+    if (currLen > prevLen){
+      const now = Date.now();
+      for (let i=prevLen; i<currLen; i++){
+        const n = (m12Under[i]|0);
+        if (n > 0 && (openNormalCountByNum[n]||0) >= 2){
+          state._m12FlashUntil[i] = now + 2000;
+          setTimeout(()=>{
+            if ((state.watching?.mission?.id|0) !== 12) return;
+            try{ renderItemsAndDi(state.watching); }catch(_e){}
+          }, 2050);
+        }
+      }
+    }
+    Object.keys(state._m12FlashUntil).forEach(k=>{
+      const idx = k|0;
+      if (idx >= currLen) delete state._m12FlashUntil[k];
+    });
+    state._m12PrevUnderLen = currLen;
+  }
+
   (v.items||[]).forEach((it, idx)=>{
     const flags = v?.mission?.flags || {};
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
+    if (isM12) div.classList.add('m12-overlay-host');
     if(useAltItemRule){
       div.classList.add('alt-rule');
-      if(isAltRuleItemRaised(it.no)) div.classList.add('item-raised');
+      if(isAltRuleItemRaised(it.no, idx)) div.classList.add('item-raised');
     }
     if(!it.used){
       // #15: 最初は裏向き表示（使用可だが faceUp===false の間は裏面アートを表示）
@@ -3490,6 +3541,20 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
         }
      }
     };
+
+    // #12：数値カードをアイテムの上に重ねる（公開2本済みなら非表示）
+    if (isM12 && (m12Under[idx]|0) > 0){
+      const n = m12Under[idx]|0;
+      const alreadyOpened2 = (openNormalCountByNum[n]||0) >= 2;
+      const flashUntil = Number(state._m12FlashUntil?.[idx] || 0);
+      const showByFlash = alreadyOpened2 && Date.now() < flashUntil;
+      if (!alreadyOpened2 || showByFlash){
+        const ov = document.createElement('div');
+        ov.className = 'numcard m12-overlay-num';
+        ov.style.backgroundImage = `url('${imgNumber(n)}')`;
+        div.appendChild(ov);
+      }
+    }
 
     itemsEl.appendChild(div);
     itemNodes.push(div);
@@ -10026,6 +10091,16 @@ function itemDeckNumbers(missionId){
     const exSet = new Set(ex);
     pool = pool.filter(n => !exSet.has(n));
   }
+
+  // ミッション1〜9では「ヒミツ底(13)」は配らない
+  if (missionId >= 1 && missionId <= 9) {
+    pool = pool.filter(n => n !== 13);
+  }
+
+  // ミッション10では「いつでもコーヒー(11)」は配らない
+  if (missionId === 10) {
+    pool = pool.filter(n => n !== 11);
+  }
   return pool;
 }
 
@@ -10485,9 +10560,10 @@ async function setupMissionOnStart(code){
   /* #9：右2 + 異なる数値2枚を決定して meta に保存（ホストのみ実行） */
   if ((v.mission?.id|0) === 9) {
    const pool = MATERIALS.numbers.slice(); shuffle(pool);
-    const picks = pool.slice(0,2);            // 異なる2枚
+    const picks = pool.slice(0,3);            // 異なる3枚
    await update(ref(db, `rooms/${code}/meta`), {
       m9_numbers: picks,
+      m9_faceDown: [],
      m9_rule: 'right2'
     });
   }
@@ -11059,14 +11135,35 @@ function buildFixedLane(list){
     // メタ（ホストが開始時に保存）
     const nums = Array.isArray(v?.meta?.m9_numbers) ? v.meta.m9_numbers : null;
     const rule = v?.meta?.m9_rule || 'right2';
-    if (!nums || nums.length < 2) return; // 未準備なら何もしない（次のonValueで描画）
+    const faceDown = Array.isArray(v?.meta?.m9_faceDown) ? v.meta.m9_faceDown : [];
+    if (!nums || nums.length < 3) return; // 未準備なら何もしない（次のonValueで描画）
    if (old) old.remove();
     // [右2][数][数] をアイテム列の直下に表示
-    const lane = buildNumLaneDOM([
-      {kind:'rule', img: imgRule(rule)},
-      {kind:'num',  img: imgNumber(nums[0])},
-      {kind:'num',  img: imgNumber(nums[1])},
-    ]);
+    const lane = document.createElement('div');
+    lane.className = 'numlane';
+
+    const ruleCard = document.createElement('div');
+    ruleCard.className = 'rulecard';
+    ruleCard.style.backgroundImage = `url('${imgRule(rule)}')`;
+    lane.appendChild(ruleCard);
+
+    nums.slice(0,3).forEach(n=>{
+      const node = document.createElement('div');
+      node.className = 'numcard';
+      const isFaceDown = faceDown.includes(n|0);
+      node.style.backgroundImage = `url('${isFaceDown ? imgBack : imgNumber(n)}')`;
+      node.style.cursor = 'pointer';
+      node.onclick = async (ev)=>{
+        ev.stopPropagation();
+        const now = state.watching;
+        if (((now?.mission?.id|0) !== 9)) return;
+        const cur = Array.isArray(now?.meta?.m9_faceDown) ? now.meta.m9_faceDown.slice() : [];
+        const has = cur.includes(n|0);
+        const next = has ? cur.filter(x=>x!==(n|0)) : cur.concat([n|0]);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m9_faceDown: next });
+      };
+      lane.appendChild(node);
+    });
     lane.id = 'm9Row';
     mountLaneUnderItemsBar(lane);
   }
@@ -11077,10 +11174,12 @@ async function ensureM11MetaInit(vNow){
   if ((v?.meta?.m11_number|0) > 0) return;
   if (!state.isHost) return;
 
-  // まだ場に使われていない数字から1枚選ぶ（重複防止ユーティリティを活用）
-  const pick = (typeof pickUnusedNumbers === 'function')
-    ? pickUnusedNumbers(1)[0]
-    : MATERIALS.numbers[Math.random()*MATERIALS.numbers.length|0];
+  // 配布済みアイテムカードの番号と一致しない数値を優先して選ぶ
+  const itemNos = new Set((v?.items||[]).map(it => it?.no|0));
+  let candidates = MATERIALS.numbers.filter(n => !itemNos.has(n|0));
+  if (!candidates.length) candidates = MATERIALS.numbers.slice();
+  shuffle(candidates);
+  const pick = candidates[0]|0;
 
   await update(ref(db, `rooms/${state.roomCode}/meta`), { m11_number: pick });
 }
@@ -11118,44 +11217,34 @@ function renderM11(v){
   mountLaneUnderItemsBar(lane);
 }
 
+async function ensureM12UnderNumbers(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if ((v?.mission?.id|0) !== 12) return;
+  if (!state.isHost) return;
+
+  const itemCount = Array.isArray(v?.items) ? v.items.length : 0;
+  const current = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under.slice() : [];
+  if (itemCount <= current.length) return;
+
+  const used = new Set(current.map(n=>n|0));
+  const pool = MATERIALS.numbers.filter(n => !used.has(n|0));
+  shuffle(pool);
+  const need = itemCount - current.length;
+  const add = pool.slice(0, need);
+  if (!add.length) return;
+
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m12_under: current.concat(add) });
+}
+
 function renderM12(v){
   const isM12 = ((v?.mission?.id|0) === 12);
   const old = document.getElementById('m12UnderRow');
-  if (!isM12){ if (old) old.remove(); return; }
-
-  const itemsBar = document.getElementById('itemsBar');
-  const items    = document.querySelectorAll('#items .item');
-  const arr      = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under.slice(0, items.length) : null;
-
-  // アイテムがまだ描画されていない／meta 未準備の瞬間はスキップ（次の onValue で描画）
-  if (!itemsBar || items.length === 0 || !arr || arr.length < items.length) return;
-
+  // 旧UI（アイテムの下に表示）は使わない
   if (old) old.remove();
+  if (!isM12) return;
 
-  const under = document.createElement('div');
-  under.id = 'm12UnderRow';
-  under.className = 'num-under';          // 既存CSS。アイテム外側の真下に横並びで配置 :contentReference[oaicite:4]{index=4}
-
-  arr.forEach(n=>{
-    const slot   = document.createElement('div');
-    slot.className = 'slot';
-
-    const holder = document.createElement('div');  // 既存のカード枠（重ね表現と整合）
-    holder.className = 'numcard-holder';           // :contentReference[oaicite:5]{index=5}
-
-    const card   = document.createElement('div');
-    card.className = 'numcard';
-    card.style.backgroundImage = `url('${imgNumber(n)}')`;
-
-    holder.appendChild(card);
-    slot.appendChild(holder);
-    under.appendChild(slot);
-
-    // 他のレーンと同じユニーク管理に合わせる（同数の多重表示を避ける仕様）
-    NUMCARD_REG.set(n, holder);                    // :contentReference[oaicite:6]{index=6}
-  });
-
-  itemsBar.insertAdjacentElement('afterend', under); // 既存ユーティリティ相当の挿入位置 :contentReference[oaicite:7]{index=7}
+  // アイテム枚数が増えた時（ヒミツ底など）に上重ね用の数値を追補
+  ensureM12UnderNumbers(v);
 }
 
 /* ===== #23：数値1枚 固定表示 + 右側にアイテム山札（同期） ===== */
@@ -12114,12 +12203,13 @@ function renderM16(v){
     if (!ok){
       const pool = MATERIALS.numbers.slice(); shuffle(pool);
       const three = pool.slice(0,3); // 重複なし
-      update(ref(db, `rooms/${state.roomCode}/meta`), { m16_nums: three });
+      update(ref(db, `rooms/${state.roomCode}/meta`), { m16_nums: three, m16_faceDown: [] });
       return;
     }
   }
 
   const nums = Array.isArray(v?.meta?.m16_nums) ? v.meta.m16_nums.slice(0,3) : [];
+  const faceDown = Array.isArray(v?.meta?.m16_faceDown) ? v.meta.m16_faceDown : [];
   if (old) old.remove();
  const lane = document.createElement('div');
   lane.id = 'm16Row';
@@ -12131,11 +12221,22 @@ function renderM16(v){
  rule.style.backgroundImage = `url('${imgRule('right4')}')`;
   lane.appendChild(rule);
 
-  // 右側：数値カード3枚（静的表示・操作なし）
+  // 右側：数値カード3枚（クリックで表/裏を切替）
   nums.forEach(n=>{
    const node = document.createElement('div');
     node.className = 'numcard';
-    node.style.backgroundImage = `url('${imgNumber(n)}')`;
+    const isFaceDown = faceDown.includes(n|0);
+    node.style.backgroundImage = `url('${isFaceDown ? imgBack : imgNumber(n)}')`;
+    node.style.cursor = 'pointer';
+    node.onclick = async (ev)=>{
+      ev.stopPropagation();
+      const now = state.watching;
+      if (((now?.mission?.id|0) !== 16)) return;
+      const cur = Array.isArray(now?.meta?.m16_faceDown) ? now.meta.m16_faceDown.slice() : [];
+      const has = cur.includes(n|0);
+      const next = has ? cur.filter(x=>x!==(n|0)) : cur.concat([n|0]);
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m16_faceDown: next });
+    };
     lane.appendChild(node);
   });
 
