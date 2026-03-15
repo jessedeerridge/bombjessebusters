@@ -11924,7 +11924,7 @@ function renderM30(v){
   lane.className = 'numlane';
 
   const deckBtn = document.createElement('div');
-  deckBtn.title = '10秒で連打（回数=枚数）';
+  deckBtn.title = '6秒以内に連打（回数=枚数）';
 
   const row = document.createElement('div');
   row.style.display = 'flex';
@@ -12005,41 +12005,30 @@ function renderM30(v){
       const remain = D.filter(n => !Xs.includes(n));
       if (remain.length <= 0){
         const deck = MATERIALS.numbers.slice(); shuffle(deck);
-        await update(mRef, { m30_deck: deck, m30_discards: [] });
+        await update(mRef, { m30_deck: deck, m30_discards: [], m30_clickWindow: null });
         return;
       }
 
+      const WINDOW_MS = 6000;
       const nowTs = Date.now();
       const c = meta.m30_clickWindow || null;
-      const base = (c && typeof c.startedAt === 'number' && (nowTs - c.startedAt) <= 10000)
-        ? c
-        : { startedAt: nowTs, count: 0, runId: nowTs };
-      const nextCount = Math.min(3, (base.count|0) + 1);
-      const runId = base.runId;
-      await update(mRef, { m30_clickWindow: { startedAt: base.startedAt, count: nextCount, runId } });
+      const inWindow = !!(c && typeof c.startedAt === 'number' && (nowTs - c.startedAt) <= WINDOW_MS);
+      const base = inWindow ? c : { startedAt: nowTs, count: 0 };
 
-      setTimeout(async ()=>{
-        try{
-          const snap2 = await get(mRef);
-          const meta2 = snap2.val() || {};
-          const cur = meta2.m30_clickWindow || null;
-          if (!cur || cur.runId !== runId) return;
-          if (Date.now() - (cur.startedAt||0) < 10000) return;
+      // 6秒ウィンドウ内は最大3枚まで。上限到達後は時間切れまで追加しない。
+      if ((base.count|0) >= 3) return;
 
-          const D2 = Array.isArray(meta2.m30_deck) ? meta2.m30_deck.slice() : [];
-          const X2 = Array.isArray(meta2.m30_discards) ? meta2.m30_discards.slice() : [];
-          const left = D2.filter(n => !X2.includes(n));
-          const take = Math.min(Math.max(1, cur.count|0), 3, left.length);
-          if (take <= 0){
-            await update(mRef, { m30_clickWindow: null });
-            return;
-          }
-          await update(mRef, {
-            m30_discards: X2.concat(left.slice(0, take)),
-            m30_clickWindow: null
-          });
-        }catch(e){ console.error(e); }
-      }, 10100);
+      // クリックしたら即時に1枚公開する
+      const nextCard = remain[0];
+      if (nextCard == null) return;
+      const nextCount = (base.count|0) + 1;
+
+      await update(mRef, {
+        m30_discards: Xs.concat(nextCard),
+        m30_clickWindow: nextCount >= 3
+          ? null
+          : { startedAt: base.startedAt, count: nextCount }
+      });
     }catch(e){ console.error(e); }
   };
 
