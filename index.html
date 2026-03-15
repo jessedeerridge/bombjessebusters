@@ -8967,9 +8967,17 @@ function openRolePickOverlay(curFaceName, myIdx){
   };
 
   // 候補：自分に配られた正体 + member(6)~(9)
+  // ただしミッション44/45では「ドッチカ・アタレイ（member(7)）」を表示しない
+  const missionId = Number(state?.watching?.mission?.id || 0);
+  const selectableFaces = (missionId === 44 || missionId === 45)
+    ? ['member (6).jpg','member (8).jpg','member (9).jpg']
+    : ['member (6).jpg','member (7).jpg','member (8).jpg','member (9).jpg'];
   const baseNames = Array.from(new Set([
-    curFaceName, 'member (6).jpg','member (7).jpg','member (8).jpg','member (9).jpg'
-  ]));
+    curFaceName, ...selectableFaces
+  ])).filter(name => {
+    if (missionId !== 44 && missionId !== 45) return true;
+    return !/member\s*\(7\)\./i.test(String(name || ''));
+  });
   const baseMap     = new Map(baseNames.map(n => [normalizeFace(n), n])); // norm → 表示名
   const baseNormSet = new Set([...baseMap.keys()]);
   const closePreview = ()=>{
