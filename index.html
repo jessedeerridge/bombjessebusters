@@ -1683,6 +1683,51 @@ function getMySeatedTableIndex(v){
   const idx = tables.findIndex(t => t?.playerId === state.userId);
   return (idx >= 0 ? idx : null);
 }
+
+function getDefaultRoleFaceForTable(v, idx){
+  const tableIdx = Number(idx);
+  const captainIdx = Number(v?.captainTable);
+  if (Number.isInteger(captainIdx) && tableIdx === captainIdx) return 'member (5).jpg';
+  return `member (${(tableIdx % 4) + 1}).jpg`;
+}
+
+async function enforceUniqueRolePick(v){
+  try{
+    const mid = Number(v?.mission?.id) | 0;
+    if (!needsRoleSelection(mid)) return;
+
+    const myIdx = getMySeatedTableIndex(v);
+    if (myIdx == null || myIdx < 0) return;
+    const tables = Array.isArray(v?.tables) ? v.tables : [];
+    const me = tables[myIdx] || {};
+    if (!isRoleSelectionDone(me, mid)) return;
+
+    const normalizeFace = (s)=> String(s||'').toLowerCase().replace(/^\.\/+/, '').split(/[?#]/)[0].split('/').pop();
+    const myFace = normalizeFace(me?.character?.face);
+    if (!myFace) return;
+
+    const hasDup = tables.some((t, idx)=>{
+      if (idx === myIdx) return false;
+      if (!isRoleSelectionDone(t, mid)) return false;
+      return normalizeFace(t?.character?.face) === myFace;
+    });
+    if (!hasDup) return;
+
+    if (state._roleDupFixInFlight) return;
+    state._roleDupFixInFlight = true;
+    const fallbackFace = getDefaultRoleFaceForTable(v, myIdx);
+    await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}/character`), {
+      face: fallbackFace,
+      flipped: false,
+      picked: false
+    });
+    setTimeout(()=>{ maybeOpenRolePickerAfterSeat(); }, 0);
+  }catch(e){
+    console.error('[role-pick duplicate]', e);
+  }finally{
+    state._roleDupFixInFlight = false;
+  }
+}
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -2979,6 +3024,7 @@ function baseRoom(hostId){
 function listenRoom(code){
   onValue(ref(db, `rooms/${code}`),(snap)=>{
     const v=snap.val(); state.watching=v;
+    enforceUniqueRolePick(v);
   // ★ #22: 新しいゲーム/ミッション開始時にクライアント側の一度きりガードを解除（全端末）
   const curId = (v?.mission?.id|0) || 0;
   if (state._prevMissionId !== curId) {
