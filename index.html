@@ -3132,6 +3132,14 @@ function allTablesSeated(v){
   return tables.length > 0 && tables.every(t => !!t?.playerId);
 }
 
+function isMission27Or28RoleHidden(v, idx, t){
+  const mid = (v?.mission?.id|0);
+  if (!t?.playerId) return false;
+  if (mid === 27) return !!v?.meta?.m27_autoHiddenAfterSeat;
+  if (mid === 28) return !!v?.meta?.m28_autoHiddenAfterSeat && ((v?.captainTable|0) === (idx|0));
+  return false;
+}
+
 async function applyMission27Or28Hide(code, missionId){
   const roomRef = ref(db, `rooms/${code}`);
   const snap = await get(roomRef);
@@ -3140,35 +3148,14 @@ async function applyMission27Or28Hide(code, missionId){
   if (mid !== missionId) return;
   if (!allTablesSeated(room)) return;
 
-  const tables = Array.isArray(room.tables) ? room.tables.slice() : [];
-  if (!tables.length) return;
-
   if (missionId === 27 && room?.meta?.m27_autoHiddenAfterSeat) return;
   if (missionId === 28 && room?.meta?.m28_autoHiddenAfterSeat) return;
-
-  const cap = room.captainTable|0;
-  let changed = false;
-  const nextTables = tables.map((t, idx)=>{
-    const shouldHide = (missionId === 27) ? !!t?.playerId : (idx === cap && !!t?.playerId);
-    if (!shouldHide) return t;
-    if (t?.character?.flipped) return t;
-    changed = true;
-    return {
-      ...t,
-      character: {
-        ...(t.character || {}),
-        flipped: true
-      }
-    };
-  });
 
   const metaPatch = (missionId === 27)
     ? { m27_autoHiddenAfterSeat: true }
     : { m28_autoHiddenAfterSeat: true };
 
-  const patch = { meta: { ...(room.meta || {}), ...metaPatch } };
-  if (changed) patch.tables = nextTables;
-  await update(roomRef, patch);
+  await update(roomRef, { meta: { ...(room.meta || {}), ...metaPatch } });
 }
 
 async function handleMission27And28AutoHide(v){
@@ -4051,7 +4038,8 @@ const rolePicked = isRoleSelectionDone(t, midNow);
 // 自分が未着席 / この席が空席 /（31-66で未選択）→ ブランク固定
 const amSeated = seatedNow;           // 先頭で算出済み
 const seatEmpty = !t.playerId;        // 空席判定
-if (!amSeated || seatEmpty || (needRolePick && !rolePicked)) {
+const hiddenByMission2728 = isMission27Or28RoleHidden(v, idx, t);
+if (!amSeated || seatEmpty || (needRolePick && !rolePicked) || hiddenByMission2728) {
   char.classList.add('blank');
   char.removeAttribute('style');
   char.onclick = null;
@@ -4078,9 +4066,9 @@ if (!amSeated || seatEmpty || (needRolePick && !rolePicked)) {
   }
 }
 const showRoleTextDecorations = shouldShowRoleCardTextDecorations(state?.watching?.mission?.id);
-if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && isMember5Card) char.classList.add('member5-card');
-if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && isMember1to5Card) char.classList.add('member15-detector');
-if (amSeated && !seatEmpty && showRoleTextDecorations && !isFlippedRole && altMemberMatch) char.classList.add(`member-alt${altMemberMatch[1]}`);
+if (amSeated && !seatEmpty && !hiddenByMission2728 && showRoleTextDecorations && !isFlippedRole && isMember5Card) char.classList.add('member5-card');
+if (amSeated && !seatEmpty && !hiddenByMission2728 && showRoleTextDecorations && !isFlippedRole && isMember1to5Card) char.classList.add('member15-detector');
+if (amSeated && !seatEmpty && !hiddenByMission2728 && showRoleTextDecorations && !isFlippedRole && altMemberMatch) char.classList.add(`member-alt${altMemberMatch[1]}`);
     if ((state.watching?.mission?.id|0) === 34) {
       // #34：隊長が場に出す「前」だけ、他人の正体カードをブランク固定
       const capIdx = state?.watching?.captainTable;
