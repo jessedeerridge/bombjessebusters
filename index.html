@@ -3443,6 +3443,34 @@ function renderItemsAndDi(v){
   const isM12 = ((v?.mission?.id|0) === 12);
   const m12Under = Array.isArray(v?.meta?.m12_under) ? v.meta.m12_under : [];
 
+  // #12：ヒミツ底などで新規追加された上乗せ数値が既に公開2本済みなら、2秒だけ表示して消す
+  if (!state._m12FlashUntil) state._m12FlashUntil = {};
+  if (!isM12){
+    state._m12PrevUnderLen = 0;
+    state._m12FlashUntil = {};
+  }else{
+    const prevLen = (state._m12PrevUnderLen|0);
+    const currLen = m12Under.length|0;
+    if (currLen > prevLen){
+      const now = Date.now();
+      for (let i=prevLen; i<currLen; i++){
+        const n = (m12Under[i]|0);
+        if (n > 0 && (openNormalCountByNum[n]||0) >= 2){
+          state._m12FlashUntil[i] = now + 2000;
+          setTimeout(()=>{
+            if ((state.watching?.mission?.id|0) !== 12) return;
+            try{ renderItemsAndDi(state.watching); }catch(_e){}
+          }, 2050);
+        }
+      }
+    }
+    Object.keys(state._m12FlashUntil).forEach(k=>{
+      const idx = k|0;
+      if (idx >= currLen) delete state._m12FlashUntil[k];
+    });
+    state._m12PrevUnderLen = currLen;
+  }
+
   (v.items||[]).forEach((it, idx)=>{
     const flags = v?.mission?.flags || {};
     const div=document.createElement('div'); div.className='item' + (it.used?' used':'');
@@ -3512,13 +3540,18 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
      }
     };
 
-    // #12：数値カードをアイテムの上に重ねる
+    // #12：数値カードをアイテムの上に重ねる（公開2本済みなら非表示）
     if (isM12 && (m12Under[idx]|0) > 0){
       const n = m12Under[idx]|0;
-      const ov = document.createElement('div');
-      ov.className = 'numcard m12-overlay-num';
-      ov.style.backgroundImage = `url('${imgNumber(n)}')`;
-      div.appendChild(ov);
+      const alreadyOpened2 = (openNormalCountByNum[n]||0) >= 2;
+      const flashUntil = Number(state._m12FlashUntil?.[idx] || 0);
+      const showByFlash = alreadyOpened2 && Date.now() < flashUntil;
+      if (!alreadyOpened2 || showByFlash){
+        const ov = document.createElement('div');
+        ov.className = 'numcard m12-overlay-num';
+        ov.style.backgroundImage = `url('${imgNumber(n)}')`;
+        div.appendChild(ov);
+      }
     }
 
     itemsEl.appendChild(div);
