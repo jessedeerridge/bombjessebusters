@@ -2979,6 +2979,7 @@ function baseRoom(hostId){
 function listenRoom(code){
   onValue(ref(db, `rooms/${code}`),(snap)=>{
     const v=snap.val(); state.watching=v;
+    handleMission27And28AutoHide(v).catch(console.error);
   // ★ #22: 新しいゲーム/ミッション開始時にクライアント側の一度きりガードを解除（全端末）
   const curId = (v?.mission?.id|0) || 0;
   if (state._prevMissionId !== curId) {
@@ -3116,6 +3117,85 @@ enforceM31to66(v);
     const myIdxNow = (v?.tables||[]).findIndex(T => T.playerId === state.userId);
     if (myIdxNow < 0) state.seatedTable = null;
   });
+}
+
+function clearMission27And28AutoHideTimer(){
+  if (state._m2728Timer){
+    try{ clearTimeout(state._m2728Timer); }catch(_e){}
+    state._m2728Timer = null;
+    state._m2728TimerKey = '';
+  }
+}
+
+function allTablesSeated(v){
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  return tables.length > 0 && tables.every(t => !!t?.playerId);
+}
+
+async function applyMission27Or28Hide(code, missionId){
+  const roomRef = ref(db, `rooms/${code}`);
+  const snap = await get(roomRef);
+  const room = snap.val() || {};
+  const mid = (room?.mission?.id|0);
+  if (mid !== missionId) return;
+  if (!allTablesSeated(room)) return;
+
+  const tables = Array.isArray(room.tables) ? room.tables.slice() : [];
+  if (!tables.length) return;
+
+  if (missionId === 27 && room?.meta?.m27_autoHiddenAfterSeat) return;
+  if (missionId === 28 && room?.meta?.m28_autoHiddenAfterSeat) return;
+
+  const cap = room.captainTable|0;
+  let changed = false;
+  const nextTables = tables.map((t, idx)=>{
+    const shouldHide = (missionId === 27) ? !!t?.playerId : (idx === cap && !!t?.playerId);
+    if (!shouldHide) return t;
+    if (t?.character?.flipped) return t;
+    changed = true;
+    return {
+      ...t,
+      character: {
+        ...(t.character || {}),
+        flipped: true
+      }
+    };
+  });
+
+  const metaPatch = (missionId === 27)
+    ? { m27_autoHiddenAfterSeat: true }
+    : { m28_autoHiddenAfterSeat: true };
+
+  const patch = { meta: { ...(room.meta || {}), ...metaPatch } };
+  if (changed) patch.tables = nextTables;
+  await update(roomRef, patch);
+}
+
+async function handleMission27And28AutoHide(v){
+  const mid = (v?.mission?.id|0);
+  if (mid !== 27 && mid !== 28){
+    clearMission27And28AutoHideTimer();
+    return;
+  }
+
+  const done = (mid === 27) ? !!v?.meta?.m27_autoHiddenAfterSeat : !!v?.meta?.m28_autoHiddenAfterSeat;
+  if (done){
+    clearMission27And28AutoHideTimer();
+    return;
+  }
+  if (!state.isHost || !allTablesSeated(v)){
+    clearMission27And28AutoHideTimer();
+    return;
+  }
+
+  const key = `${state.roomCode}:${mid}`;
+  if (state._m2728Timer && state._m2728TimerKey === key) return;
+  clearMission27And28AutoHideTimer();
+  state._m2728TimerKey = key;
+  state._m2728Timer = setTimeout(async ()=>{
+    clearMission27And28AutoHideTimer();
+    await applyMission27Or28Hide(state.roomCode, mid);
+  }, 1000);
 }
 
 
@@ -10421,6 +10501,8 @@ async function startGame(playerCount, missionId){
     await update(ref(db, `rooms/${state.roomCode}/meta`), {
       m22_infoShown:false, m22_given:null,
       m27_row: [], m27_shown:false, m27_taken:null,
+      m27_autoHiddenAfterSeat:false, m28_autoHiddenAfterSeat:false,
+      m30_clickWindow:null,
       // ★ M44 の初期化（ミッション切替時に必ずリセット）
       oxItem: 0,
       oxByTable: {}
@@ -11835,10 +11917,8 @@ async function ensureM30MetaInit(vNow){
   if (!state.isHost) return;                      // 初期化はホストのみ
   const deck = MATERIALS.numbers.slice(); shuffle(deck); // 1..12 をシャッフル
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    m30_deck: deck,       // 山札順
-    m30_used: [],         // 山札から使用済み（1/2/3いずれもここに積む）
-    m30_pile: [],         // 1枚ドロー分（右の公開札に積み重ね表示）
-    m30_row:  []          // 2枚 or 3枚ドローの“横並び表示”の現行セット
+    m30_deck: deck,
+    m30_discards: []
   });
 }
 
@@ -11848,7 +11928,6 @@ function renderM30(v){
   const old   = document.getElementById(rowId);
   if (!isM30){ if (old) old.remove(); return; }
 
-  // 初回：ホストが meta を用意（未用意なら用意して次の onValue で描画）
   if (!Array.isArray(v?.meta?.m30_deck)){ ensureM30MetaInit(v); if (old) old.remove(); return; }
 
   if (old) old.remove();
@@ -11856,113 +11935,126 @@ function renderM30(v){
   lane.id = rowId;
   lane.className = 'numlane';
 
-  // 山札ボタン
   const deckBtn = document.createElement('div');
-  deckBtn.title = 'めくる';
+  deckBtn.title = '10秒で連打（回数=枚数）';
 
-  // 右：1枚ドローの公開札（積み重ね）
-  const pile = document.createElement('div');
-  pile.className = 'numcard-holder';
-  pile.style.position = 'relative';
-
-  // 下：2/3枚ドローの横並び
   const row = document.createElement('div');
   row.style.display = 'flex';
   row.style.gap = '6px';
 
   lane.appendChild(deckBtn);
-  lane.appendChild(pile);
   lane.appendChild(row);
 
-  // 描画リフレッシュ（#15/#39と同じ積み重ねロジック） 
   const refresh = ()=>{
     const d = (v?.meta?.m30_deck||[]);
-    const used = (v?.meta?.m30_used||[]);
-    const remain = d.filter(n => !used.includes(n)).length;
+    const x = (v?.meta?.m30_discards||[]);
+    const remain = d.filter(n => !x.includes(n)).length;
     renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
 
-    // 右側：1枚公開札の積み重ね（2pxオフセット）
-    pile.innerHTML = '';
-    const xs = (v?.meta?.m30_pile||[]);
-    xs.forEach((n,i)=>{
-      const node = document.createElement('div');
-      node.className = 'numcard';
-      node.style.backgroundImage = `url('${imgNumber(n)}')`;
-      if (i>0){
-        const off = i*2;
-        node.style.position='absolute';
-        node.style.left = off+'px';
-        node.style.top  = off+'px';
-      }
-      pile.appendChild(node);
-      const extra = i*2;
-      pile.style.height = (48+extra)+'px';
-      lane.style.marginBottom = extra+'px';
-    });
-
-    // 下段：2/3ドローの横並び
     row.innerHTML = '';
-    (v?.meta?.m30_row||[]).forEach(n=>{
+    const LONG_PRESS_MS = 450;
+    x.forEach(n=>{
       const nc = document.createElement('div');
       nc.className = 'numcard';
       nc.style.backgroundImage = `url('${imgNumber(n)}')`;
+      nc.title = state.isHost ? 'タップで拡大 / 長押しで山札トップへ戻す' : '拡大';
+
+      let holdTimer = null;
+      let longPressed = false;
+      const clearHold = ()=>{
+        if (holdTimer){
+          clearTimeout(holdTimer);
+          holdTimer = null;
+        }
+      };
+
+      nc.addEventListener('pointerdown', (ev)=>{
+        if (!state.isHost || ev.button !== 0) return;
+        longPressed = false;
+        clearHold();
+        holdTimer = setTimeout(async ()=>{
+          longPressed = true;
+          try{
+            const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+            const mSnap = await get(mRef);
+            const meta = mSnap.val() || {};
+            const D = Array.isArray(meta.m30_deck) ? meta.m30_deck.slice() : [];
+            const Xs = Array.isArray(meta.m30_discards) ? meta.m30_discards.slice() : [];
+            if (!D.includes(n) || !Xs.includes(n)) return;
+            await update(mRef, {
+              m30_deck: [n, ...D.filter(v=> v !== n)],
+              m30_discards: Xs.filter(v=> v !== n)
+            });
+          }catch(e){ console.error(e); }
+        }, LONG_PRESS_MS);
+      });
+      nc.addEventListener('pointerup', clearHold);
+      nc.addEventListener('pointercancel', clearHold);
+      nc.addEventListener('pointerleave', clearHold);
+      nc.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        if (longPressed){
+          longPressed = false;
+          ev.preventDefault();
+          return;
+        }
+        openNumberZoom(n);
+      });
+
       row.appendChild(nc);
     });
   };
   refresh();
 
-  // クリックで 1/2/3 を選ぶ（メニューは既存の openMenu を使用）
-  deckBtn.onclick = (ev)=>{
-    const d = (v?.meta?.m30_deck||[]);
-    const used = (v?.meta?.m30_used||[]);
-    const remain = d.filter(n => !used.includes(n)).length;
+  deckBtn.onclick = async ()=>{
+    try{
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const mSnap = await get(mRef);
+      const meta  = mSnap.val()||{};
+      const D = Array.isArray(meta.m30_deck) ? meta.m30_deck.slice() : [];
+      const Xs = Array.isArray(meta.m30_discards) ? meta.m30_discards.slice() : [];
 
-    const make = (k)=> async ()=>{
-      try{
-        const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-        const mSnap = await get(mRef);
-        const meta  = mSnap.val()||{};
-        const D = Array.isArray(meta.m30_deck) ? meta.m30_deck.slice() : [];
-        const U = Array.isArray(meta.m30_used) ? meta.m30_used.slice() : [];
-        const P = Array.isArray(meta.m30_pile) ? meta.m30_pile.slice() : [];
-        // 山札順から未使用を k 枚取得
-        const pick = [];
-        for (const n of D){
-          if (!U.includes(n)){ pick.push(n); if (pick.length===k) break; }
-        }
-        if (pick.length < k) return; // 足りなければ何もしない
-
-          // ★ 以前の挙動に合わせる：常に「1枚目→右に積む」「残り→下段」
-        const first = pick[0];
-        const rest  = pick.slice(1);
-            // ★ 常に“最新のみ可視化”：前回表示は消し、今回分だけを保存
-        const patch = {
-          m30_used: U.concat(pick),  // 使用履歴は蓄積
-          m30_pile: [first],         // 右の公開札は常に1枚だけ（上書き）
-          m30_row : rest             // 下段は今回の残りだけ（置き換え）
-        };
-        await update(mRef, patch);
-      }catch(e){ console.error(e); }
-    };
-
-    const rebuild = async ()=>{
-      try{
+      const remain = D.filter(n => !Xs.includes(n));
+      if (remain.length <= 0){
         const deck = MATERIALS.numbers.slice(); shuffle(deck);
-        await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          m30_deck: deck, m30_used: [], m30_pile: [], m30_row: []
-        });
-      }catch(e){ console.error(e); }
-    };
+        await update(mRef, { m30_deck: deck, m30_discards: [] });
+        return;
+      }
 
-    const menu = [];
-    if (remain >= 1) menu.push({label:'1', action: make(1)});
-    if (remain >= 2) menu.push({label:'2', action: make(2)});
-    if (remain >= 3) menu.push({label:'3', action: make(3)});
-    if (remain === 0) menu.push({label:'山札を作り直す', action: rebuild});
-    openMenu(ev.clientX, ev.clientY, menu);
+      const nowTs = Date.now();
+      const c = meta.m30_clickWindow || null;
+      const base = (c && typeof c.startedAt === 'number' && (nowTs - c.startedAt) <= 10000)
+        ? c
+        : { startedAt: nowTs, count: 0, runId: nowTs };
+      const nextCount = Math.min(3, (base.count|0) + 1);
+      const runId = base.runId;
+      await update(mRef, { m30_clickWindow: { startedAt: base.startedAt, count: nextCount, runId } });
+
+      setTimeout(async ()=>{
+        try{
+          const snap2 = await get(mRef);
+          const meta2 = snap2.val() || {};
+          const cur = meta2.m30_clickWindow || null;
+          if (!cur || cur.runId !== runId) return;
+          if (Date.now() - (cur.startedAt||0) < 10000) return;
+
+          const D2 = Array.isArray(meta2.m30_deck) ? meta2.m30_deck.slice() : [];
+          const X2 = Array.isArray(meta2.m30_discards) ? meta2.m30_discards.slice() : [];
+          const left = D2.filter(n => !X2.includes(n));
+          const take = Math.min(Math.max(1, cur.count|0), 3, left.length);
+          if (take <= 0){
+            await update(mRef, { m30_clickWindow: null });
+            return;
+          }
+          await update(mRef, {
+            m30_discards: X2.concat(left.slice(0, take)),
+            m30_clickWindow: null
+          });
+        }catch(e){ console.error(e); }
+      }, 10100);
+    }catch(e){ console.error(e); }
   };
 
-  // DOM設置：アイテム列の直下（他ミッションと同じ）
   mountLaneUnderItemsBar(lane);
 }
 
