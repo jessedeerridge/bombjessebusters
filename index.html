@@ -11906,7 +11906,8 @@ async function ensureM30MetaInit(vNow){
   const deck = MATERIALS.numbers.slice(); shuffle(deck); // 1..12 をシャッフル
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
     m30_deck: deck,
-    m30_discards: []
+    m30_discards: [],
+    m30_row: []
   });
 }
 
@@ -11935,8 +11936,9 @@ function renderM30(v){
 
   const refresh = ()=>{
     const d = (v?.meta?.m30_deck||[]);
-    const x = (v?.meta?.m30_discards||[]);
-    const remain = d.filter(n => !x.includes(n)).length;
+    const x = (v?.meta?.m30_row||[]);
+    const used = (v?.meta?.m30_discards||[]);
+    const remain = d.filter(n => !used.includes(n)).length;
     renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', emptyBorderRadius:'6px' });
 
     row.innerHTML = '';
@@ -11968,10 +11970,12 @@ function renderM30(v){
             const meta = mSnap.val() || {};
             const D = Array.isArray(meta.m30_deck) ? meta.m30_deck.slice() : [];
             const Xs = Array.isArray(meta.m30_discards) ? meta.m30_discards.slice() : [];
+            const Rw = Array.isArray(meta.m30_row) ? meta.m30_row.slice() : [];
             if (!D.includes(n) || !Xs.includes(n)) return;
             await update(mRef, {
               m30_deck: [n, ...D.filter(v=> v !== n)],
-              m30_discards: Xs.filter(v=> v !== n)
+              m30_discards: Xs.filter(v=> v !== n),
+              m30_row: Rw.filter(v=> v !== n)
             });
           }catch(e){ console.error(e); }
         }, LONG_PRESS_MS);
@@ -12001,11 +12005,12 @@ function renderM30(v){
       const meta  = mSnap.val()||{};
       const D = Array.isArray(meta.m30_deck) ? meta.m30_deck.slice() : [];
       const Xs = Array.isArray(meta.m30_discards) ? meta.m30_discards.slice() : [];
+      const Rw = Array.isArray(meta.m30_row) ? meta.m30_row.slice() : [];
 
       const remain = D.filter(n => !Xs.includes(n));
       if (remain.length <= 0){
         const deck = MATERIALS.numbers.slice(); shuffle(deck);
-        await update(mRef, { m30_deck: deck, m30_discards: [], m30_clickWindow: null });
+        await update(mRef, { m30_deck: deck, m30_discards: [], m30_row: [], m30_clickWindow: null });
         return;
       }
 
@@ -12015,19 +12020,19 @@ function renderM30(v){
       const inWindow = !!(c && typeof c.startedAt === 'number' && (nowTs - c.startedAt) <= WINDOW_MS);
       const base = inWindow ? c : { startedAt: nowTs, count: 0 };
 
-      // 6秒ウィンドウ内は最大3枚まで。上限到達後は時間切れまで追加しない。
       if ((base.count|0) >= 3) return;
 
-      // クリックしたら即時に1枚公開する
       const nextCard = remain[0];
       if (nextCard == null) return;
       const nextCount = (base.count|0) + 1;
+      const nextRow = inWindow ? Rw.concat(nextCard).slice(0,3) : [nextCard];
 
       await update(mRef, {
         m30_discards: Xs.concat(nextCard),
+        m30_row: nextRow,
         m30_clickWindow: nextCount >= 3
           ? null
-          : { startedAt: base.startedAt, count: nextCount }
+          : { startedAt: inWindow ? base.startedAt : nowTs, count: nextCount }
       });
     }catch(e){ console.error(e); }
   };
