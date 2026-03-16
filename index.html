@@ -487,6 +487,57 @@
   .constraint-face.constraint-stacked-under .constraint-desc{
     display:none;
   }
+  .constraint-card-ui{
+    position:relative;
+    border-style:solid !important;
+    border-color:#6e6770 !important;
+    border-width:20px 8px 8px 8px !important;
+    background-color:#fff !important;
+    background-image:none !important;
+    overflow:hidden;
+  }
+  .constraint-eyeband{
+    position:absolute;
+    top:-4px;
+    left:-4px;
+    width:13px;
+    height:13px;
+    object-fit:contain;
+    pointer-events:none;
+    z-index:2;
+  }
+  .constraint-topbar{
+    position:absolute;
+    top:-20px;
+    left:0;
+    right:0;
+    height:20px;
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:3px;
+    padding:1px 2px 1px 4px;
+    pointer-events:none;
+    z-index:1;
+  }
+  .constraint-topbar .jp{
+    font-size:8px;
+    color:#fff;
+    font-weight:700;
+    line-height:1;
+  }
+  .constraint-topbar .en{
+    min-width:15px;
+    height:16px;
+    padding:0 2px;
+    border-radius:3px;
+    background:#6e6770;
+    color:#fff;
+    font-size:12px;
+    font-weight:800;
+    line-height:16px;
+    text-align:center;
+  }
 
   #conZoomOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.4);
@@ -2289,6 +2340,59 @@ async function copyText(text){
     prompt('コピーできない場合はこのテキストをコピーしてください', text);
   }
 }
+
+function decorateConstraintCards(root=document){
+  const nodes = [];
+  if (root?.matches?.('.concard, .conzoom-card')) nodes.push(root);
+  if (root?.querySelectorAll) nodes.push(...root.querySelectorAll('.concard, .conzoom-card'));
+
+  nodes.forEach((el)=>{
+    const bg = String(el.style.backgroundImage || '');
+    const m = bg.match(/\/?([a-l])\.jpg/i);
+    const letter = (el.dataset.letter || (m ? m[1].toUpperCase() : '')).toUpperCase();
+
+    el.querySelectorAll(':scope > .constraint-eyeband, :scope > .constraint-topbar').forEach(n=>n.remove());
+    if (!/^[A-L]$/.test(letter)){
+      el.classList.remove('constraint-card-ui');
+      return;
+    }
+
+    el.dataset.letter = letter;
+    el.classList.add('constraint-card-ui');
+
+    const eye = document.createElement('img');
+    eye.className = 'constraint-eyeband';
+    eye.src = './eyeband.png';
+    eye.alt = '';
+
+    const topbar = document.createElement('div');
+    topbar.className = 'constraint-topbar';
+    topbar.innerHTML = `<span class="jp">制約</span><span class="en">${letter}</span>`;
+
+    el.appendChild(eye);
+    el.appendChild(topbar);
+  });
+}
+
+const constraintCardObserver = new MutationObserver((ms)=>{
+  for (const m of ms){
+    if (m.type === 'childList'){
+      m.addedNodes.forEach((n)=>{ if (n.nodeType === 1) decorateConstraintCards(n); });
+    }
+    if (m.type === 'attributes' && m.target?.nodeType === 1){
+      decorateConstraintCards(m.target);
+    }
+  }
+});
+window.addEventListener('DOMContentLoaded', ()=>{
+  decorateConstraintCards(document);
+  constraintCardObserver.observe(document.body, {
+    childList:true,
+    subtree:true,
+    attributes:true,
+    attributeFilter:['style','class','data-letter']
+  });
+});
   
 /* ==== ミッション素材定義 ==== */
 const MATERIALS = {
