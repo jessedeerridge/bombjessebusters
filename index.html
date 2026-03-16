@@ -3022,13 +3022,24 @@ if (v) {
     }
   }
 }    
+    const nowMs = Date.now();
+    const tableRenderFreeze = state._tableRenderFreeze;
+    const freezeActive = !!(
+      tableRenderFreeze
+      && nowMs < (tableRenderFreeze.until|0)
+      && (v?.mission?.id|0) === (tableRenderFreeze.missionId|0)
+      && String(v?.meta?.[tableRenderFreeze.animKey]?.id || '') === String(tableRenderFreeze.animId || '')
+    );
+
     withScrollHold(()=> {
       renderItemsAndDi(v);
   renderSfx(v);                 // ★ 追加：SFX同期再生
 
       renderM29(v);
       renderM34(v);
-      renderTables(v);
+      if (!freezeActive){
+        renderTables(v);
+      }
 
 
       // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
@@ -6707,11 +6718,26 @@ node.style.top  = `0px`;
 
 
 function runM43InsertAnimation(v){
+  if ((v?.mission?.id|0) !== 43){
+    state._m43AnimRunningId = null;
+    if ((state._tableRenderFreeze?.missionId|0) === 43){
+      state._tableRenderFreeze = null;
+    }
+    return;
+  }
   const anim = v?.meta?.m43_insertAnim;
   if (!anim?.id) return;
   if (state._m43AnimFinishedId === anim.id) return;
   if (state._m43AnimRunningId === anim.id) return;
   state._m43AnimRunningId = anim.id;
+
+  const tableRenderFreezeMs = 3300;
+  state._tableRenderFreeze = {
+    missionId: 43,
+    animKey: 'm43_insertAnim',
+    animId: anim.id,
+    until: Date.now() + tableRenderFreezeMs
+  };
 
   const tableIdx = anim.table|0;
   const insertIndex = anim.insertIndex|0;
@@ -6746,6 +6772,7 @@ function runM43InsertAnimation(v){
     if (!nano || !targetWrap){
       if (hiddenWrap){ hiddenWrap.classList.remove('m43-pending-arrival'); }
       state._m43AnimRunningId = null;
+      state._tableRenderFreeze = null;
       return;
     }
 
@@ -6758,6 +6785,7 @@ function runM43InsertAnimation(v){
     if (!Number.isFinite(a.left) || !Number.isFinite(b.left)) {
       targetWrap.classList.remove('m43-pending-arrival');
       state._m43AnimRunningId = null;
+      state._tableRenderFreeze = null;
       return;
     }
 
@@ -6791,6 +6819,7 @@ function runM43InsertAnimation(v){
       hiddenWrap = null;
       state._m43AnimFinishedId = anim.id;
       state._m43AnimRunningId = null;
+      state._tableRenderFreeze = null;
     }, flyMs + 80);
   }, shiftMs + settleDelayMs);
 }
@@ -6798,6 +6827,9 @@ function runM43InsertAnimation(v){
 function runM54InsertAnimation(v){
   if ((v?.mission?.id|0) !== 54){
     state._m54AnimRunningId = null;
+    if ((state._tableRenderFreeze?.missionId|0) === 54){
+      state._tableRenderFreeze = null;
+    }
     return;
   }
   const anim = v?.meta?.m54_insertAnim;
@@ -6805,6 +6837,14 @@ function runM54InsertAnimation(v){
   if (state._m54AnimFinishedId === anim.id) return;
   if (state._m54AnimRunningId === anim.id) return;
   state._m54AnimRunningId = anim.id;
+
+  const tableRenderFreezeMs = 3300;
+  state._tableRenderFreeze = {
+    missionId: 54,
+    animKey: 'm54_insertAnim',
+    animId: anim.id,
+    until: Date.now() + tableRenderFreezeMs
+  };
 
   const tableIdx = anim.table|0;
   const insertIndex = anim.insertIndex|0;
@@ -6837,6 +6877,7 @@ function runM54InsertAnimation(v){
     if (!deckBtn || !targetWrap){
       if (hiddenWrap) hiddenWrap.classList.remove('m54-pending-arrival');
       state._m54AnimRunningId = null;
+      state._tableRenderFreeze = null;
       return;
     }
 
@@ -6849,6 +6890,7 @@ function runM54InsertAnimation(v){
     if (!Number.isFinite(a.left) || !Number.isFinite(b.left)) {
       targetWrap.classList.remove('m54-pending-arrival');
       state._m54AnimRunningId = null;
+      state._tableRenderFreeze = null;
       return;
     }
 
@@ -6882,6 +6924,7 @@ function runM54InsertAnimation(v){
       hiddenWrap = null;
       state._m54AnimFinishedId = anim.id;
       state._m54AnimRunningId = null;
+      state._tableRenderFreeze = null;
     }, flyMs + 80);
   }, shiftMs + settleDelayMs);
 }
