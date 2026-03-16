@@ -816,7 +816,8 @@
   /* 入れ替えフックの移動中：アルファベット帯は固定表示のまま、カード本体＋下トークンのみ隠す */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .tok-col,
+  .card-wrap.hook-anim-origin .badge-fixed{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -9912,10 +9913,15 @@ async function playHookSwapAnimation(A, B, tables){
       waitForHookArrival(A.table, B.cardId)
     ]);
     ca.remove(); cb.remove();
+    wa.classList.remove('hook-anim-origin');
+    wb.classList.remove('hook-anim-origin');
     return null;
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
     return null;
+  }finally{
+    try{ wa?.classList.remove('hook-anim-origin'); }catch(_e){}
+    try{ wb?.classList.remove('hook-anim-origin'); }catch(_e){}
   }
 }
 
@@ -9999,8 +10005,11 @@ async function playHookTakeAnimation(sel, myTable, tables){
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
     await waitForHookArrival(myTable, sel.cardId);
     fly.remove();
+    ws.classList.remove('hook-anim-origin');
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
+  }finally{
+    try{ ws?.classList.remove('hook-anim-origin'); }catch(_e){}
   }
 }
 
