@@ -813,10 +813,11 @@
   .card-wrap.m54-pending-arrival .marker,
   .card-wrap.m54-pending-arrival .tok-col{opacity:0;}
   .card-wrap.m54-pending-arrival .card{pointer-events:none;}
-  /* 入れ替えフックの移動中：アルファベット帯は固定表示のまま、カード本体＋下トークンのみ隠す */
+  /* 入れ替えフックの移動中：再描画で残像が出ないよう、元位置の表示をまとめて隠す */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .tok-col,
+  .card-wrap.hook-anim-origin .badge-fixed{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -4154,6 +4155,21 @@ wrap.dataset.cardId = String(c.id||'');
 wrap.dataset.cardIndex = String(ci);
 const cardKey = String(c.id || `ci-${ci}`);
 wrap.dataset.cardKey = cardKey;
+
+      // i2/i18 フック演出中に再レンダーが挟まっても、元位置の表示が一瞬復活しないように抑止
+      const i2AnimNow = v?.meta?.i2Anim;
+      const i18AnimNow = v?.meta?.i18Anim;
+      const cardIdStr = String(c.id || '');
+      const isI2AnimOrigin = !!(i2AnimNow?.id) && (
+        (idx === Number(i2AnimNow?.A?.table) && cardIdStr === String(i2AnimNow?.A?.cardId || '')) ||
+        (idx === Number(i2AnimNow?.B?.table) && cardIdStr === String(i2AnimNow?.B?.cardId || ''))
+      );
+      const isI18AnimOrigin = !!(i18AnimNow?.id)
+        && idx === Number(i18AnimNow?.sel?.table)
+        && cardIdStr === String(i18AnimNow?.sel?.cardId || '');
+      if (isI2AnimOrigin || isI18AnimOrigin) {
+        wrap.classList.add('hook-anim-origin');
+      }
 
       // #43: 挿入アニメ対象カードは、nanoから飛ぶ前に見えないよう先に隠す
       const m43Anim = v?.meta?.m43_insertAnim;
