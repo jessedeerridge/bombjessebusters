@@ -3022,6 +3022,7 @@ if (v) {
     }
   }
 }    
+    reconcileHookAnimHiddenCards(v);
     withScrollHold(()=> {
       renderItemsAndDi(v);
   renderSfx(v);                 // ★ 追加：SFX同期再生
@@ -4154,6 +4155,7 @@ wrap.dataset.cardId = String(c.id||'');
 wrap.dataset.cardIndex = String(ci);
 const cardKey = String(c.id || `ci-${ci}`);
 wrap.dataset.cardKey = cardKey;
+      if (isHookAnimOriginHidden(idx, c.id)) wrap.classList.add('hook-anim-origin');
 
       // #43: 挿入アニメ対象カードは、nanoから飛ぶ前に見えないよう先に隠す
       const m43Anim = v?.meta?.m43_insertAnim;
@@ -9762,6 +9764,49 @@ const HOOK_STEP_MS = 1500;
 const HOOK_STAGE_COUNT = 3;
 const HOOK_LAND_HOLD_MS = Math.max(0, HOOK_ANIM_TOTAL_MS - (HOOK_STEP_MS * HOOK_STAGE_COUNT));
 
+function hookAnimKey(tableIdx, cardId){
+  return `${tableIdx}:${String(cardId||'')}`;
+}
+
+function hideHookAnimOrigin(tableIdx, cardId, hidden=true){
+  if (!Number.isInteger(tableIdx) || !cardId) return;
+  if (!state._hookAnimHiddenCards) state._hookAnimHiddenCards = new Set();
+  const key = hookAnimKey(tableIdx, cardId);
+  if (hidden) state._hookAnimHiddenCards.add(key);
+  else state._hookAnimHiddenCards.delete(key);
+
+  const wrap = document.querySelector(`.table[data-table-idx="${tableIdx}"] .card-wrap[data-card-id="${String(cardId)}"]`);
+  if (wrap) wrap.classList.toggle('hook-anim-origin', !!hidden);
+}
+
+function isHookAnimOriginHidden(tableIdx, cardId){
+  return !!(state._hookAnimHiddenCards && state._hookAnimHiddenCards.has(hookAnimKey(tableIdx, cardId)));
+}
+
+function reconcileHookAnimHiddenCards(v){
+  if (!state._hookAnimHiddenCards || state._hookAnimHiddenCards.size===0) return;
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  const i2Anim = v?.meta?.i2Anim;
+  const i18Anim = v?.meta?.i18Anim;
+
+  const active = new Set();
+  if (i2Anim?.A?.cardId) active.add(hookAnimKey(i2Anim.A.table, i2Anim.A.cardId));
+  if (i2Anim?.B?.cardId) active.add(hookAnimKey(i2Anim.B.table, i2Anim.B.cardId));
+  if (i18Anim?.sel?.cardId) active.add(hookAnimKey(i18Anim.sel.table, i18Anim.sel.cardId));
+
+  for (const key of Array.from(state._hookAnimHiddenCards)){
+    const [tiRaw, cardId=''] = String(key).split(':');
+    const ti = parseInt(tiRaw, 10);
+    const hand = (Number.isInteger(ti) && tables[ti]?.hand) ? tables[ti].hand : [];
+    const existsHere = hand.some(c=> String(c?.id||'') === cardId);
+    if (!existsHere || !active.has(key)){
+      state._hookAnimHiddenCards.delete(key);
+      const wrap = document.querySelector(`.table[data-table-idx="${ti}"] .card-wrap[data-card-id="${cardId}"]`);
+      if (wrap) wrap.classList.remove('hook-anim-origin');
+    }
+  }
+}
+
 
 
 async function waitForHookArrival(tableIdx, cardId, timeoutMs=2000){
@@ -9824,8 +9869,8 @@ async function playHookSwapAnimation(A, B, tables){
     };
     setupFly(ca, ra); setupFly(cb, rb);
 
-    wa.classList.add('hook-anim-origin');
-    wb.classList.add('hook-anim-origin');
+    hideHookAnimOrigin(A.table, A.cardId, true);
+    hideHookAnimOrigin(B.table, B.cardId, true);
 
     // 1) 抜き取りカードを上に飛び出し
     requestAnimationFrame(()=>{
@@ -9955,7 +10000,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     fly.style.transition=`transform ${HOOK_STEP_MS}ms ease, left ${HOOK_STEP_MS}ms ease, top ${HOOK_STEP_MS}ms ease`;
     document.body.appendChild(fly);
 
-    ws.classList.add('hook-anim-origin');
+    hideHookAnimOrigin(sel.table, sel.cardId, true);
     requestAnimationFrame(()=>{ fly.style.transform=`translateY(-${cardH}px)`; });
     await sleep(HOOK_STEP_MS);
 
