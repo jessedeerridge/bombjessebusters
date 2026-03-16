@@ -4173,6 +4173,10 @@ wrap.dataset.cardKey = cardKey;
       if (isM54PendingCard){
         wrap.classList.add('m54-pending-arrival');
       }
+
+      if (isHookAnimHidden(c.id)){
+        wrap.classList.add('hook-anim-origin');
+      }
       
       if (c.gone === true){
   wrap.classList.add('m42-gone');     // ★ 数字・トークンなど別レイヤもまとめて不可視
@@ -9793,6 +9797,20 @@ function queueSharedHookAnimations(v){
   }
 }
 
+function setHookAnimHidden(cardId, hidden){
+  const key = String(cardId || '');
+  if (!key) return;
+  if (!(state._hookAnimHiddenCardIds instanceof Set)){
+    state._hookAnimHiddenCardIds = new Set();
+  }
+  if (hidden) state._hookAnimHiddenCardIds.add(key);
+  else state._hookAnimHiddenCardIds.delete(key);
+}
+
+function isHookAnimHidden(cardId){
+  return !!state._hookAnimHiddenCardIds?.has?.(String(cardId || ''));
+}
+
 async function playHookSwapAnimation(A, B, tables){
   try{
     const tableEl = (ti)=> document.querySelector(`.table[data-table-idx="${ti}"]`);
@@ -9824,6 +9842,8 @@ async function playHookSwapAnimation(A, B, tables){
     };
     setupFly(ca, ra); setupFly(cb, rb);
 
+    setHookAnimHidden(A.cardId, true);
+    setHookAnimHidden(B.cardId, true);
     wa.classList.add('hook-anim-origin');
     wb.classList.add('hook-anim-origin');
 
@@ -9911,9 +9931,13 @@ async function playHookSwapAnimation(A, B, tables){
       waitForHookArrival(B.table, A.cardId),
       waitForHookArrival(A.table, B.cardId)
     ]);
+    setHookAnimHidden(A.cardId, false);
+    setHookAnimHidden(B.cardId, false);
     ca.remove(); cb.remove();
     return null;
   }catch(e){
+    setHookAnimHidden(A?.cardId, false);
+    setHookAnimHidden(B?.cardId, false);
     console.warn('playHookSwapAnimation failed', e);
     return null;
   }
@@ -9955,6 +9979,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     fly.style.transition=`transform ${HOOK_STEP_MS}ms ease, left ${HOOK_STEP_MS}ms ease, top ${HOOK_STEP_MS}ms ease`;
     document.body.appendChild(fly);
 
+    setHookAnimHidden(sel.cardId, true);
     ws.classList.add('hook-anim-origin');
     requestAnimationFrame(()=>{ fly.style.transform=`translateY(-${cardH}px)`; });
     await sleep(HOOK_STEP_MS);
@@ -9998,8 +10023,10 @@ async function playHookTakeAnimation(sel, myTable, tables){
 
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
     await waitForHookArrival(myTable, sel.cardId);
+    setHookAnimHidden(sel.cardId, false);
     fly.remove();
   }catch(e){
+    setHookAnimHidden(sel?.cardId, false);
     console.warn('playHookTakeAnimation failed', e);
   }
 }
