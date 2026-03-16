@@ -816,7 +816,8 @@
   /* 入れ替えフックの移動中：アルファベット帯は固定表示のまま、カード本体＋下トークンのみ隠す */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .tok-col,
+  .card-wrap.hook-anim-origin .badge-fixed{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .token{
@@ -9859,7 +9860,7 @@ async function playHookSwapAnimation(A, B, tables){
     const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
 
     const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col'), w.querySelector('.badge-fixed')].filter(Boolean);
       bodyNodes.forEach((node)=>{
         node.style.transition = `transform ${HOOK_STEP_MS}ms ease`;
         node.style.transform = `translateX(${dx}px)`;
@@ -9960,7 +9961,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(HOOK_STEP_MS);
 
     const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col'), w.querySelector('.badge-fixed')].filter(Boolean);
       bodyNodes.forEach((node)=>{
         node.style.transition = `transform ${HOOK_STEP_MS}ms ease`;
         node.style.transform = `translateX(${dx}px)`;
