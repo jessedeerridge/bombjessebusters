@@ -3491,7 +3491,7 @@ function renderItemsAndDi(v){
     const isM42 = ((v?.mission?.id|0) === 42);
     const m23OnlyHideItems = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
     hideItems = m23OnlyHideItems || (isM42 && !!v?.meta?.m42_on);
-    hideDi    = (isM42 && !!v?.meta?.m42_on);
+    hideDi    = (isM42 && !!v?.meta?.m42_on) || missionId===53;
 
     // バー自体は常に表示（m42の箱を置くため）、必要に応じて中身だけ隠す
     H(itemsBar, false);
@@ -3852,6 +3852,8 @@ if ((v.mission?.id|0) === 23) {
 
   
   const checklistHints = deriveChecklistCodeHints(v?.mission?.display || []);
+  const isMission50 = ((v?.mission?.id|0) === 50);
+  const isMission50Hidden = isMission50 && (v?.meta?.m50_hidden === true);
 
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
@@ -3859,7 +3861,7 @@ if ((v.mission?.id|0) === 23) {
     for(let n=1; n<=12; n++){
       const cell = document.createElement('div'); cell.className='check-item';
       cell.textContent = String(n);
-      if(n < 12){
+      if(n < 12 && !isMission50Hidden){
         const topDot = document.createElement('span');
         topDot.className = 'check-dot top';
         if (checklistHints.yellowCertain.has(n)) topDot.classList.add('is-certain-yellow');
@@ -3872,7 +3874,7 @@ if ((v.mission?.id|0) === 23) {
         else if (checklistHints.redMaybe.has(n)) { bottomDot.classList.add('is-maybe-red'); bottomDot.textContent = '?'; }
         cell.appendChild(bottomDot);
       }
-      if((openCountByNum[n]||0) === 4){ // 同じ数字が4本全体公開
+      if((openCountByNum[n]||0) === 4 && !isMission50Hidden){ // 同じ数字が4本全体公開
         const mk = document.createElement('div'); mk.className='check-mark';
         cell.appendChild(mk);
       }
@@ -8968,14 +8970,15 @@ function openRolePickOverlay(curFaceName, myIdx){
 
   // 候補：自分に配られた正体 + member(6)~(9)
   // ただしミッション44/45では「ドッチカ・アタレイ（member(7)）」を表示しない
-  const missionId = Number(state?.watching?.mission?.id || 0);
-  const selectableFaces = (missionId === 44 || missionId === 45)
+ const missionId = Number(state?.watching?.mission?.id || 0);
+  const hideAlt7Missions = new Set([44,45,47,49,51,54]);
+  const selectableFaces = hideAlt7Missions.has(missionId)
     ? ['member (6).jpg','member (8).jpg','member (9).jpg']
     : ['member (6).jpg','member (7).jpg','member (8).jpg','member (9).jpg'];
   const baseNames = Array.from(new Set([
     curFaceName, ...selectableFaces
   ])).filter(name => {
-    if (missionId !== 44 && missionId !== 45) return true;
+    if (!hideAlt7Missions.has(missionId)) return true;
     return !/member\s*\(7\)\./i.test(String(name || ''));
   });
   const baseMap     = new Map(baseNames.map(n => [normalizeFace(n), n])); // norm → 表示名
@@ -10136,12 +10139,14 @@ function missionNumberRange(missionId){
    39: [1,2,3,4,5,6,7,8,9,10,11,12,13],
    45: [10,11],
    46: [7],
-   47: [10],
-   49: [10],
-   51: [10],
-   52: [1,12],
-  53: [6,9],
-  54: [10],
+   47: [2,7,10,11,13],
+   48: [2,7,11,13],
+   49: [2,7,10,11,13],
+   50: [2,7,11,13],
+   51: [2,7,10,11,13],
+   52: [1,2,7,11,12,13],
+   53: [2,6,7,9,11,13],
+   54: [2,7,10,11,13],
    56: [2],
    58: [4,7],
    59: [10],
@@ -10153,22 +10158,18 @@ function missionNumberRange(missionId){
 /* ===== Item helpers ===== */
 /* missionId と “黄コードを使うか”で山札を決定し、除外も適用 */
 function itemDeckNumbers(missionId){
-  // 43以降は 1..18 を使用
+  const exSet = new Set(ITEM_EXCLUSIONS[missionId] || []);
+
+  // 43以降は 1..18 を使用（除外指定は適用）
   if(missionId >= 43){
-    return Array.from({length:18}, (_,i)=> i+1);
+    return Array.from({length:18}, (_,i)=> i+1).filter(n => !exSet.has(n));
   }
 
   // 〜42は 1..13（黄コードあり） / 1..12（黄コードなし）
   const useYellow = missionUsesYellow(missionId);
   const maxNo = useYellow ? 13 : 12;
-  let pool = Array.from({length:maxNo}, (_,i)=> i+1);
+  let pool = Array.from({length:maxNo}, (_,i)=> i+1).filter(n => !exSet.has(n));
 
-  // 除外適用
-  const ex = ITEM_EXCLUSIONS[missionId] || [];
-  if(ex.length){
-    const exSet = new Set(ex);
-    pool = pool.filter(n => !exSet.has(n));
-  }
 
   // ミッション1〜9では「ヒミツ底(13)」は配らない
   if (missionId >= 1 && missionId <= 9) {
@@ -11873,7 +11874,9 @@ function renderM15(v){
     const d = (v?.meta?.m15_deck||[]);
     const x = (v?.meta?.m15_discards||[]);
     const remain = d.filter(n=>!x.includes(n)).length;
-    renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', maxLayers:6, emptyBorderRadius:'6px' });
+    const deckVisible = !(mid===51 && x.length>=4);
+    H(deckBtn, !deckVisible);
+    if (deckVisible) renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', maxLayers:6, emptyBorderRadius:'6px' });
     lane.style.marginBottom = renderNumberFaceUpStack(pile, x, { maxLayers:6, offset:2 }) + 'px';
   };
   refresh();
@@ -11881,6 +11884,7 @@ function renderM15(v){
   // 1枚めくって公開札へ → DB(meta.m15_discards) を更新（全員に即同期）
 // 1枚めくる。空なら「山札を作り直す」タブを出す（全員同期）
 deckBtn.onclick = async (ev)=>{
+  if (mid===51 && (v?.meta?.m15_discards||[]).length>=4) return;
   try{
     const mRef = ref(db, `rooms/${state.roomCode}/meta`);
     const mSnap = await get(mRef);
