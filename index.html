@@ -1395,6 +1395,21 @@ main:not(:has(#lobby.hidden)) > * {
   */
 }
 
+.mission-detail-wrap{
+  position:relative;
+  padding-right:92px;
+  min-height:84px;
+}
+.mission-pop-image{
+  position:absolute;
+  right:0;
+  bottom:0;
+  width:84px;
+  height:auto;
+  object-fit:contain;
+  pointer-events:none;
+}
+
 .card-wrap.m42-hide-origin,
 .card-wrap.m42-hide-origin .card,
 .card-wrap.m42-hide-origin .num,
@@ -1496,8 +1511,11 @@ main:not(:has(#lobby.hidden)) > * {
     <span class="cap">持っていない数値の情報トークンを2つまで選んでください。</span>
   </div>
 
-  <div id="missionDetailTitle" class="bold line"></div>
-  <div id="missionDetailBody"></div>
+  <div class="mission-detail-wrap">
+    <div id="missionDetailTitle" class="bold line"></div>
+    <div id="missionDetailBody"></div>
+    <img id="missionPopImage" class="mission-pop-image hidden" alt="ミッション画像">
+  </div>
 </div>
 
 <div id=""> <!-- 親を新設して stacking context を分ける -->
@@ -1904,6 +1922,7 @@ const btnStartCancel=document.getElementById('btnStartCancel');
 const missionFooter = document.getElementById('missionFooter');
 const missionDetailTitle = document.getElementById('missionDetailTitle');
 const missionDetailBody  = document.getElementById('missionDetailBody');
+const missionPopImage = document.getElementById('missionPopImage');
 const m22PickPanel = document.getElementById('m22PickPanel');
 
 const seatPop = document.getElementById('seatPop');
@@ -3248,6 +3267,23 @@ function growForCardTokens(box, basePx = 96, padPx = 6){
   
 /* mission panels */
 function renderMissionPanels(v){
+  const missionId = Number(v?.mission?.id || 0);
+  const missionsWithPopImage = new Set([19, 30, 42, 54, 66]);
+
+  if (missionPopImage) {
+    if (missionsWithPopImage.has(missionId)) {
+      missionPopImage.src = `./P${missionId}.png`;
+      missionPopImage.classList.remove('hidden');
+      missionPopImage.onerror = ()=>{
+        missionPopImage.classList.add('hidden');
+      };
+    } else {
+      missionPopImage.classList.add('hidden');
+      missionPopImage.removeAttribute('src');
+      missionPopImage.onerror = null;
+    }
+  }
+
   if(!v?.mission){
     // 右サイドの missionBox を廃止したので未選択表示は出さない
     missionDetailTitle.textContent = '';
