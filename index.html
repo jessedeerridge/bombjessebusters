@@ -3466,11 +3466,11 @@ function renderItemsAndDi(v){
     let baseRaised = false;
     if(itemNo>=1 && itemNo<=12) baseRaised = (openNormalCountByNum[itemNo]||0) >= 2;
     else if(itemNo===13) baseRaised = openYellowCount >= 2;
-    else if(itemNo===14) baseRaised = (openNormalCountByNum[2]||0) >= 2;
-    else if(itemNo===15) baseRaised = (openNormalCountByNum[3]||0) >= 2;
-    else if(itemNo===16) baseRaised = (openNormalCountByNum[10]||0) >= 2;
-    else if(itemNo===17) baseRaised = (openNormalCountByNum[9]||0) >= 2;
-    else if(itemNo===18) baseRaised = (openNormalCountByNum[11]||0) >= 2;
+    else if(itemNo===14) baseRaised = (openNormalCountByNum[2]||0) >= 4;
+    else if(itemNo===15) baseRaised = (openNormalCountByNum[3]||0) >= 4;
+    else if(itemNo===16) baseRaised = (openNormalCountByNum[10]||0) >= 4;
+    else if(itemNo===17) baseRaised = (openNormalCountByNum[9]||0) >= 4;
+    else if(itemNo===18) baseRaised = (openNormalCountByNum[11]||0) >= 4;
 
     if (!baseRaised) return false;
 
