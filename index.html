@@ -3261,11 +3261,18 @@ function renderMissionPanels(v){
     .map(line=>`<div class="line">${line}</div>`).join('');
 
   /* ここから追加：#50 専用 OKタブ＆赤/黄のみ [?] マスク（全員に同期） */
-  if ((v?.mission?.id|0) === 50) {
-  document.querySelectorAll('.check-mark').forEach(el=>{
-    el.style.background = 'none';
-  });
-    
+  const missionId = (v?.mission?.id|0);
+  const clearM50OkTimer = ()=>{
+    if (state._m50OkTimer){
+      clearTimeout(state._m50OkTimer);
+      state._m50OkTimer = null;
+    }
+  };
+  if (missionId === 50) {
+    document.querySelectorAll('.check-mark').forEach(el=>{
+      el.style.background = 'none';
+    });
+
     const hidden = v?.meta?.m50_hidden === true;
 
     // 赤/黄の数値だけ [ ? ] にする関数（"●" or "▧" を含む行の [ ... ] だけ置換）
@@ -3277,30 +3284,33 @@ function renderMissionPanels(v){
         }
       });
     };
+    const ensureM50OkTab = ()=>{
+      if (((state?.watching?.mission?.id|0) !== 50)) return;
+      if (document.getElementById('m50OkTab')) return;
+      const okBtn = document.createElement('button');
+      okBtn.id = 'm50OkTab';
+      okBtn.className = 'tab';
+      okBtn.textContent = 'OK';
+      okBtn.onclick = async (e)=>{
+        e.stopPropagation();
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m50_hidden: true });
+      };
+      missionDetailBody.appendChild(okBtn);
+    };
 
-    // 既に隠すフラグが立っていたら即マスク
     if (hidden) {
+      clearM50OkTimer();
+      document.getElementById('m50OkTab')?.remove();
       maskRedYellowInDetails(missionDetailBody);
-    } else {
-      // まだなら「OK」タブを1回だけ出す（詳細をクリックしたタイミングで表示）
-      if (!missionDetailBody.dataset.m50Hooked) {
-        missionDetailBody.dataset.m50Hooked = '1';
-        missionDetailBody.addEventListener('click', (ev)=>{
-         if (((state?.watching?.mission?.id|0) !== 50)) return;
-          if (document.getElementById('m50OkTab')) return;
-          const okBtn = document.createElement('button');
-          okBtn.id = 'm50OkTab';
-          okBtn.className = 'tab';
-          okBtn.textContent = 'OK';
-          okBtn.onclick = async (e)=>{
-            e.stopPropagation();
-            // 全員に反映：DBにフラグを書き込む
-            await update(ref(db, `rooms/${state.roomCode}/meta`), { m50_hidden: true });
-          };
-          missionDetailBody.appendChild(okBtn);
-        }, { once:false });
-      }
+    } else if (!document.getElementById('m50OkTab') && !state._m50OkTimer) {
+      state._m50OkTimer = setTimeout(()=>{
+        state._m50OkTimer = null;
+        ensureM50OkTab();
+      }, 2000);
     }
+  } else {
+    clearM50OkTimer();
+    document.getElementById('m50OkTab')?.remove();
   }
   
   H(missionFooter, !v.started);
@@ -3854,7 +3864,7 @@ if ((v.mission?.id|0) === 23) {
 
   
   const checklistHints = deriveChecklistCodeHints(v?.mission?.display || []);
-  const hideM50ChecklistHints = ((v?.mission?.id|0) === 50) && v?.meta?.m50_hidden === true;
+  const hideM50ChecklistHints = ((v?.mission?.id|0) === 50);
 
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
