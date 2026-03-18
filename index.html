@@ -3261,11 +3261,18 @@ function renderMissionPanels(v){
     .map(line=>`<div class="line">${line}</div>`).join('');
 
   /* ここから追加：#50 専用 OKタブ＆赤/黄のみ [?] マスク（全員に同期） */
-  if ((v?.mission?.id|0) === 50) {
-  document.querySelectorAll('.check-mark').forEach(el=>{
-    el.style.background = 'none';
-  });
-    
+  const missionId = (v?.mission?.id|0);
+  const clearM50OkTimer = ()=>{
+    if (state._m50OkTimer){
+      clearTimeout(state._m50OkTimer);
+      state._m50OkTimer = null;
+    }
+  };
+  if (missionId === 50) {
+    document.querySelectorAll('.check-mark').forEach(el=>{
+      el.style.background = 'none';
+    });
+
     const hidden = v?.meta?.m50_hidden === true;
 
     // 赤/黄の数値だけ [ ? ] にする関数（"●" or "▧" を含む行の [ ... ] だけ置換）
@@ -3277,30 +3284,33 @@ function renderMissionPanels(v){
         }
       });
     };
+    const ensureM50OkTab = ()=>{
+      if (((state?.watching?.mission?.id|0) !== 50)) return;
+      if (document.getElementById('m50OkTab')) return;
+      const okBtn = document.createElement('button');
+      okBtn.id = 'm50OkTab';
+      okBtn.className = 'tab';
+      okBtn.textContent = 'OK';
+      okBtn.onclick = async (e)=>{
+        e.stopPropagation();
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m50_hidden: true });
+      };
+      missionDetailBody.appendChild(okBtn);
+    };
 
-    // 既に隠すフラグが立っていたら即マスク
     if (hidden) {
+      clearM50OkTimer();
+      document.getElementById('m50OkTab')?.remove();
       maskRedYellowInDetails(missionDetailBody);
-    } else {
-      // まだなら「OK」タブを1回だけ出す（詳細をクリックしたタイミングで表示）
-      if (!missionDetailBody.dataset.m50Hooked) {
-        missionDetailBody.dataset.m50Hooked = '1';
-        missionDetailBody.addEventListener('click', (ev)=>{
-         if (((state?.watching?.mission?.id|0) !== 50)) return;
-          if (document.getElementById('m50OkTab')) return;
-          const okBtn = document.createElement('button');
-          okBtn.id = 'm50OkTab';
-          okBtn.className = 'tab';
-          okBtn.textContent = 'OK';
-          okBtn.onclick = async (e)=>{
-            e.stopPropagation();
-            // 全員に反映：DBにフラグを書き込む
-            await update(ref(db, `rooms/${state.roomCode}/meta`), { m50_hidden: true });
-          };
-          missionDetailBody.appendChild(okBtn);
-        }, { once:false });
-      }
+    } else if (!document.getElementById('m50OkTab') && !state._m50OkTimer) {
+      state._m50OkTimer = setTimeout(()=>{
+        state._m50OkTimer = null;
+        ensureM50OkTab();
+      }, 2000);
     }
+  } else {
+    clearM50OkTimer();
+    document.getElementById('m50OkTab')?.remove();
   }
   
   H(missionFooter, !v.started);
@@ -3490,9 +3500,10 @@ function renderItemsAndDi(v){
   {
     const flags = v?.mission?.flags || {};
     const isM42 = ((v?.mission?.id|0) === 42);
+    const isM53 = ((v?.mission?.id|0) === 53);
     const m23OnlyHideItems = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
     hideItems = m23OnlyHideItems || (isM42 && !!v?.meta?.m42_on);
-    hideDi    = (isM42 && !!v?.meta?.m42_on);
+    hideDi    = isM53;
 
     // バー自体は常に表示（m42の箱を置くため）、必要に応じて中身だけ隠す
     H(itemsBar, false);
@@ -3853,6 +3864,7 @@ if ((v.mission?.id|0) === 23) {
 
   
   const checklistHints = deriveChecklistCodeHints(v?.mission?.display || []);
+  const hideM50ChecklistHints = ((v?.mission?.id|0) === 50);
 
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
   if((v.tables||[]).length>0){
@@ -3860,7 +3872,7 @@ if ((v.mission?.id|0) === 23) {
     for(let n=1; n<=12; n++){
       const cell = document.createElement('div'); cell.className='check-item';
       cell.textContent = String(n);
-      if(n < 12){
+      if(n < 12 && !hideM50ChecklistHints){
         const topDot = document.createElement('span');
         topDot.className = 'check-dot top';
         if (checklistHints.yellowCertain.has(n)) topDot.classList.add('is-certain-yellow');
@@ -11054,6 +11066,23 @@ function renderNumberFaceUpStack(pile, nums, opts={}){
   return spread;
 }
 
+function getFullyOpenNumberSet(v){
+  const openCountByNum = {};
+  (v?.tables || []).forEach(T=>{
+    (T.hand || []).forEach(c=>{
+      if (c?.kind === 'normal' && c.open === true){
+        const n = c.num | 0;
+        openCountByNum[n] = (openCountByNum[n] || 0) + 1;
+      }
+    });
+  });
+  return new Set(
+    Object.entries(openCountByNum)
+      .filter(([, cnt]) => (cnt|0) >= 4)
+      .map(([n]) => Number(n))
+  );
+}
+
 
 /* パターン1：山札→めくる */
 function buildDeckLaneP1(){
@@ -11873,9 +11902,11 @@ function renderM15(v){
   const refresh = ()=>{
     const d = (v?.meta?.m15_deck||[]);
     const x = (v?.meta?.m15_discards||[]);
-    const remain = d.filter(n=>!x.includes(n)).length;
+    const blocked = (mid === 51) ? getFullyOpenNumberSet(v) : new Set();
+    const remain = d.filter(n=>!x.includes(n) && !blocked.has(n)).length;
     renderDeckBackStack(deckBtn, remain, { kind:'number', backImage:'./numberdeck.png', maxLayers:6, emptyBorderRadius:'6px' });
     lane.style.marginBottom = renderNumberFaceUpStack(pile, x, { maxLayers:6, offset:2 }) + 'px';
+    deckBtn.title = remain > 0 ? 'めくる' : '山札を作り直す';
   };
   refresh();
 
@@ -11888,8 +11919,9 @@ deckBtn.onclick = async (ev)=>{
     const meta  = mSnap.val()||{};
     const D = Array.isArray(meta.m15_deck) ? meta.m15_deck.slice() : [];
     const Xs = Array.isArray(meta.m15_discards) ? meta.m15_discards.slice() : [];
+    const blocked = (mid === 51) ? getFullyOpenNumberSet(state.watching) : new Set();
 
-    const next = D.find(n=> !Xs.includes(n)); // 山札順で次
+    const next = D.find(n=> !Xs.includes(n) && !blocked.has(n)); // 山札順で次
     if (next==null){
       // 山札切れ → 作り直しメニュー
       openOneMini(ev.clientX, ev.clientY, '山札を作り直す', async ()=>{
