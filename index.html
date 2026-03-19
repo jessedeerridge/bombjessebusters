@@ -6216,10 +6216,10 @@ const onRotate = ()=>{
       const box = document.createElement('div');
       box.id = 'm42Box';
       Object.assign(box.style, {
-        width:'140px', height:'var(--di-h)', marginLeft:'6px',
-        background:`url('./box.jpg') center/cover no-repeat`,
+        width:'140px', height:'90px', marginLeft:'6px',
+        background:`url('./box.jpg') center/contain no-repeat`,
         border:'2px dashed #38bdf8', borderRadius:'10px',
-        flex:'0 0 auto'
+        flex:'0 0 auto', alignSelf:'flex-start'
       });
       const di = document.getElementById('di');
       if (di && di.parentElement === bar) di.insertAdjacentElement('beforebegin', box);
