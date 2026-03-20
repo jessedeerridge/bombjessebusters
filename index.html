@@ -1847,7 +1847,7 @@ const audioVolumeRange = document.getElementById('audioVolumeRange');
 const audioVolDown = document.getElementById('audioVolDown');
 const audioVolUp = document.getElementById('audioVolUp');
 const audioVolumeValue = document.getElementById('audioVolumeValue');
-const audioVolumes = { m19:1, m30:1, m42:1 };
+const audioVolumes = { m19:1, m30:1, m42:1, m54:1 };
 let audioVolumeDockOpen = false;
 const AUDIO_VOL_STEP = 0.01;
 const AUDIO_VOL_HOLD_DELAY_MS = 260;
@@ -2038,6 +2038,7 @@ function getMissionAudio(mid){
   if ((mid|0) === 19) return document.getElementById('m19Audio');
   if ((mid|0) === 30) return document.getElementById('m30Audio');
   if ((mid|0) === 42) return document.getElementById('m42Audio');
+  if ((mid|0) === 54) return document.getElementById('m54Audio');
   return null;
 }
 
@@ -2098,7 +2099,7 @@ function updateMissionAudioVolume(mid){
 }
 
 function isAudioMissionId(mid){
-  return mid === 19 || mid === 30 || mid === 42;
+  return mid === 19 || mid === 30 || mid === 42 || mid === 54;
 }
 
 function applyAudioVolumeDockVisibility(v){
@@ -3069,6 +3070,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
 renderM31(v);
    renderM30Audio(v);
    renderM42Audio(v);
+   renderM54Audio(v);
    renderMissionAudioVolume(v);
     renderM32(v);
     renderM36(v);
@@ -11742,6 +11744,124 @@ const elapsed = Math.max(0, (serverNow() - (data.at||0)) / 1000); // ←置換
      }
    }
   
+function renderM54Audio(v){
+  const isM54 = ((v?.mission?.id|0) === 54);
+  const barId = 'm54AudioBar';
+  const audioId = 'm54Audio';
+  const oldBar = document.getElementById(barId);
+  if (!isM54){ if (oldBar) oldBar.remove(); return; }
+
+  let audio = document.getElementById(audioId);
+  if (!audio){
+    audio = document.createElement('audio');
+    audio.id = audioId;
+    audio.preload = 'auto';
+    audio.src = './mi54.mp3';
+    audio.crossOrigin = 'anonymous';
+    audio.style.display = 'none';
+    audio.setAttribute('playsinline', '');
+    audio.setAttribute('webkit-playsinline', '');
+    audio.playsInline = true;
+    document.body.appendChild(audio);
+  }
+
+  if (state.isHost){
+    if (oldBar) oldBar.remove();
+    const bar = document.createElement('div');
+    bar.id = barId;
+    bar.className = 'line';
+    bar.innerHTML = `
+      <button class="btn small" id="m54Back10">⏪ 10秒</button>
+      <button class="btn small" id="m54Play">▶</button>
+      <button class="btn small" id="m54Pause">⏸</button>
+      <input id="m54Seek" type="range" min="0" max="0" value="0" step="0.1" style="vertical-align:middle; width:240px; margin:0 8px;">
+      <span id="m54Time">0:00</span>
+    `;
+    const footer = document.getElementById('missionFooter');
+    if (footer && !footer.classList.contains('hidden')) {
+      footer.appendChild(bar);
+    }
+
+    const btnBack = document.getElementById('m54Back10');
+    const btnPlay = document.getElementById('m54Play');
+    const btnPause= document.getElementById('m54Pause');
+    const seek    = document.getElementById('m54Seek');
+    const timeLbl = document.getElementById('m54Time');
+
+    const fmt = (t)=> {
+      const s = Math.max(0, Math.floor(t|0));
+      const m = (s/60)|0; const r = s%60;
+      return `${m}:${String(r).padStart(2,'0')}`;
+    };
+
+    const writeMeta = async (playing)=>{
+      const payload = {
+        m54_audio: {
+          playing: !!playing,
+          t: audio.currentTime||0,
+          at: serverNow()
+        }
+      };
+      await update(ref(db, `rooms/${state.roomCode}/meta`), payload);
+    };
+
+    const refreshDur = ()=>{
+      const dur = isFinite(audio.duration) ? Math.max(0, audio.duration) : 0;
+      seek.max = String(dur || 0);
+    };
+    if (isNaN(audio.duration) || !isFinite(audio.duration)){
+      audio.addEventListener('loadedmetadata', refreshDur, { once:true });
+    } else {
+      refreshDur();
+    }
+
+    const refreshLocal = ()=>{
+      timeLbl.textContent = fmt(audio.currentTime||0);
+      if (!document.activeElement || document.activeElement !== seek){
+        seek.value = String(audio.currentTime||0);
+      }
+    };
+    refreshLocal();
+    audio.addEventListener('timeupdate', refreshLocal);
+
+    btnPlay.onclick = async ()=>{
+      await forcePlayAudio(audio);
+      await writeMeta(true);
+    };
+    btnPause.onclick = async ()=>{
+      try{ audio.pause(); }catch(_e){}
+      await writeMeta(false);
+    };
+    btnBack.onclick = async ()=>{
+      audio.currentTime = Math.max(0, (audio.currentTime||0) - 10);
+      await writeMeta(!audio.paused);
+    };
+    seek.oninput = ()=>{ timeLbl.textContent = fmt(Number(seek.value||'0')); };
+    seek.onchange = async ()=>{
+      audio.currentTime = Number(seek.value||'0');
+      await writeMeta(!audio.paused);
+    };
+  } else {
+    if (oldBar) oldBar.remove();
+  }
+
+  const data = v?.meta?.m54_audio || null;
+  if (data){
+    const elapsed = Math.max(0, (serverNow() - (data.at||0)) / 1000);
+    const target = Math.max(0, (data.t||0) + (data.playing ? elapsed : 0));
+    if (Math.abs((audio.currentTime||0) - target) > 0.5){
+      audio.currentTime = target;
+    }
+    if (data.playing && audio.paused){
+      forcePlayAudio(audio);
+    }
+    if (!data.playing && !audio.paused){
+      audio.pause();
+    }
+  }
+}
+
+
 function renderM42Audio(v){
   const isM42 = ((v?.mission?.id|0) === 42);
   const barId = 'm42AudioBar';
