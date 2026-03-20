@@ -8281,8 +8281,7 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
     wrap.appendChild(t);
   }
 
-  // ④ リザーブクリック → 「補給」ポップ（1枚獲得）
-// ④ リザーブクリック → OX表示の 1/2/3 ボタン（実行値は 1/2/3）
+  // ④ リザーブクリック → 「1」ボタンで 1 個だけ取得
 poolRow.onclick = (ev)=>{
   const poolCnt = Math.max(0, v?.meta?.m54_pool|0);
   if (poolCnt <= 0) return;
@@ -8290,34 +8289,18 @@ poolRow.onclick = (ev)=>{
   const idx = (state?.seatedTable==null)? null : Number(state.seatedTable);
   if (idx==null){ alert('席に座ってから取得してください'); return; }
 
-  const x = ev.clientX, y = ev.clientY;
-  const oxHtml = (n)=> `<span style="display:flex;gap:2px">${'<div class="token ox"></div>'.repeat(n)}</span>`;
-
-const rangeLabel = {1:"1~4", 2:"5~8", 3:"9~12"};
-
-const entries = [1,2,3]
-  .filter(k => poolCnt >= k)
-  .map(k => ({
-    label: '',
-    // ★範囲ラベルを上、OXを下に並べる
-    html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-             <div class="range-label">${rangeLabel[k]}</div>
-             <div style="display:flex;gap:2px">
-               ${'<div class="token ox"></div>'.repeat(k)}
-             </div>
-           </div>`,
-    ariaLabel: rangeLabel[k],      action: async ()=>{
-        const mine = (v?.meta?.m54_byTable?.[idx]|0) + k;
-        const left = (v?.meta?.m54_pool|0) - k;
-        if (left < 0) return;
-        await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          m54_pool: left,
-          [`m54_byTable/${idx}`]: mine
-        });
-      }
-    }));
-
-  openMenu(x, y, entries);
+  openMenu(ev.clientX, ev.clientY, [{
+    label: '1',
+    action: async ()=>{
+      const mine = (v?.meta?.m54_byTable?.[idx]|0) + 1;
+      const left = (v?.meta?.m54_pool|0) - 1;
+      if (left < 0) return;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), {
+        m54_pool: left,
+        [`m54_byTable/${idx}`]: mine
+      });
+    }
+  }]);
 };
 
 
@@ -8372,8 +8355,16 @@ const entries = [1,2,3]
     if (myIdx !== null && myIdx === ti){
       row.onclick = (ev)=>{
         const maxCan = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
+        const rangeLabel = {1:'1~4', 2:'5~8', 3:'9~12'};
         const choices = [1,2,3].filter(k=> k<=maxCan).map(k=>({
-          label:String(k),
+          label: '',
+          html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                   <div class="range-label">${rangeLabel[k]}</div>
+                   <div style="display:flex;gap:2px">
+                     ${'<div class="token ox"></div>'.repeat(k)}
+                   </div>
+                 </div>`,
+          ariaLabel: rangeLabel[k],
           action: async ()=>{
             const mine = (v?.meta?.m54_byTable?.[ti]||0) - k;
             const pool = (v?.meta?.m54_pool||0) + k;
