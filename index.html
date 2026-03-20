@@ -8294,18 +8294,20 @@ poolRow.onclick = (ev)=>{
   const oxHtml = (n)=> `<span style="display:flex;gap:2px">${'<div class="token ox"></div>'.repeat(n)}</span>`;
 
 const rangeLabel = {1:"1~4", 2:"5~8", 3:"9~12"};
+const rangeChoiceHtml = (k)=> `
+  <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+    <div class="range-label">${rangeLabel[k]}</div>
+    <div style="display:flex;gap:2px">
+      ${'<div class="token ox"></div>'.repeat(k)}
+    </div>
+  </div>`;
 
 const entries = [1,2,3]
   .filter(k => poolCnt >= k)
   .map(k => ({
     label: '',
     // ★範囲ラベルを上、OXを下に並べる
-    html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-             <div class="range-label">${rangeLabel[k]}</div>
-             <div style="display:flex;gap:2px">
-               ${'<div class="token ox"></div>'.repeat(k)}
-             </div>
-           </div>`,
+    html: rangeChoiceHtml(k),
     ariaLabel: rangeLabel[k],      action: async ()=>{
         const mine = (v?.meta?.m54_byTable?.[idx]|0) + k;
         const left = (v?.meta?.m54_pool|0) - k;
@@ -8373,7 +8375,9 @@ const entries = [1,2,3]
       row.onclick = (ev)=>{
         const maxCan = Math.max(0, v?.meta?.m54_byTable?.[ti]||0);
         const choices = [1,2,3].filter(k=> k<=maxCan).map(k=>({
-          label:String(k),
+          label:'',
+          html: rangeChoiceHtml(k),
+          ariaLabel: rangeLabel[k],
           action: async ()=>{
             const mine = (v?.meta?.m54_byTable?.[ti]||0) - k;
             const pool = (v?.meta?.m54_pool||0) + k;
