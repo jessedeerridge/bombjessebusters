@@ -6242,11 +6242,14 @@ const onRotate = ()=>{
       const box = document.createElement('div');
       box.id = 'm42Box';
       Object.assign(box.style, {
-        width:'140px', height:'90px', marginTop:'6px', marginLeft:'4px',
-        background:`url('./box.jpg') center/cover no-repeat`,
-        border:'2px dashed #38bdf8', borderRadius:'10px'
+        width:'140px', height:'90px', marginLeft:'6px',
+        background:`url('./box.jpg') center/contain no-repeat`,
+        border:'2px dashed #38bdf8', borderRadius:'10px',
+        flex:'0 0 auto', alignSelf:'flex-start'
       });
-      bar.insertAdjacentElement('afterend', box);
+      const di = document.getElementById('di');
+      if (di && di.parentElement === bar) di.insertAdjacentElement('beforebegin', box);
+      else bar.appendChild(box);
     }
     document.body.setAttribute('data-m42box','on');
   } else {
