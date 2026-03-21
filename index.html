@@ -2243,6 +2243,7 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function cssNum(name){const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return parseFloat(v.replace('px',''))||0;}
 const now=()=>Date.now();
+const HAND_OPEN_CLICK_LOCK_MS = 2000;
 
 let revealArmState = null;
 function clearRevealArm(){
@@ -2268,6 +2269,11 @@ function isRevealArmed(table, cardKey){
     && revealArmState.table === table
     && revealArmState.cardKey === cardKey
     && (now() - revealArmState.at) <= 900;
+}
+function isHandCardClickLocked(card){
+  if (!card?.open) return false;
+  const openedAt = Number(card.openedAt || 0);
+  return openedAt > 0 && (now() - openedAt) < HAND_OPEN_CLICK_LOCK_MS;
 }
 
 document.addEventListener('click', (ev)=>{
@@ -4338,14 +4344,15 @@ if (c.markUntil && now() < c.markUntil) {
             const blockingI2 = i2All && i2All.usingBy===state.userId && (i2All.phase==='pickSelf' || i2All.phase==='pickOther' || i2All.phase==='pickViewerSelf');
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
             if(blockingI2 || blockingI18) return;
+            if (isHandCardClickLocked(c)) return;
             if (c.open){
               clearRevealArm();
-              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: false});
+              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: false, openedAt: null});
               return;
             }
             if (isRevealArmed(idx, cardKey)){
               clearRevealArm();
-              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: true});
+              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: true, openedAt: Date.now()});
               return;
             }
             armReveal(idx, cardKey);
