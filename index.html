@@ -785,6 +785,7 @@
   .card.back{background:#fff url('./codeback.jpg') center/cover no-repeat;border-color:#ccc}
     .card.back .num{display:none;}   /* ← 裏状態では数字を隠す */
   .card.open{background:#000}
+  .card.click-locked{pointer-events:none; cursor:default; opacity:0.92;}
   .card.reveal-armed{outline:1.5px solid #000;outline-offset:-1.5px;}
   /* ★ アイテム2：選択可能カードの青枠 */
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
@@ -4261,6 +4262,8 @@ const ownerBlindSpecial = (m38Special || m56Special || m64Special);
       }
 
       if (c.open) card.classList.add('open');
+      const isOpenClickLocked = !!(c.open && Number(c.openLockedUntil||0) > now());
+      if (isOpenClickLocked) card.classList.add('click-locked');
 
       if (i2All?.selA && i2All.selA.cardId===c.id && i2All.selA.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
       if (i2All?.selB && i2All.selB.cardId===c.id && i2All.selB.table===idx){ const m = document.createElement('div'); m.className='marker'; m.textContent='▼'; wrap.appendChild(m); }
@@ -4339,13 +4342,14 @@ if (c.markUntil && now() < c.markUntil) {
             const blockingI18= i18All && i18All.usingBy===state.userId && (i18All.phase==='pickOther');
             if(blockingI2 || blockingI18) return;
             if (c.open){
+              if (Number(c.openLockedUntil||0) > now()) return;
               clearRevealArm();
-              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: false});
+              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: false, openLockedUntil: null});
               return;
             }
             if (isRevealArmed(idx, cardKey)){
               clearRevealArm();
-              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: true});
+              await update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${ci}`), {open: true, openLockedUntil: Date.now() + 2000});
               return;
             }
             armReveal(idx, cardKey);
