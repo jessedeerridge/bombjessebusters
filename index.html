@@ -2042,6 +2042,20 @@ function getMissionAudio(mid){
   return null;
 }
 
+function resetAudioElement(audio){
+  if (!audio) return;
+  pendingAudioAutoplay.delete(audio);
+  try{ audio.pause(); }catch(_e){}
+  try{ audio.currentTime = 0; }catch(_e){}
+}
+
+function resetMissionAudioPlayback(){
+  [19, 30, 42, 54].forEach((mid)=>{
+    resetAudioElement(getMissionAudio(mid));
+  });
+  resetAudioElement(getSpTimerAudio());
+}
+
 function ensureMissionAudioContext(){
   if (missionAudioGraph.ctx) return missionAudioGraph.ctx;
   const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -2987,7 +3001,8 @@ function listenRoom(code){
   if (state._prevMissionId !== curId) {
     window.m22_alreadyShown = false;   // ← 自動ポップを再許可
     state.m22GaveOnce = false;         // ← 念のためローカルの渡し済みもクリア
-    state._spTimerOn = false;   
+    state._spTimerOn = false;
+    resetMissionAudioPlayback();
     state._prevMissionId = curId;
   state._mcShownMissionId = 0;
 
