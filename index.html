@@ -204,7 +204,8 @@
     z-index:3;
   }
   .item.alt-rule.item-raised{ transform:translateY(-8px); }
-  .item.alt-rule.item-raised.used{ transform:translateY(-35px); }
+  .item.alt-rule.item-raised.used{ transform:translateY(-8px); }
+  .item.alt-rule.item-raised.item16-used-lift{ transform:translateY(-35px); }
   .item.alt-rule.item-raised::after{ display:none; }
   .item.used{background:#fff url('./itemback.jpg') center/cover no-repeat}
   .m12-overlay-num{
@@ -3574,6 +3575,7 @@ function renderItemsAndDi(v){
     if(useAltItemRule){
       div.classList.add('alt-rule');
       if(isAltRuleItemRaised(it.no, idx)) div.classList.add('item-raised');
+      if(it.no===16 && it.used) div.classList.add('item16-used-lift');
     }
     if(!it.used){
       // #15: 最初は裏向き表示（使用可だが faceUp===false の間は裏面アートを表示）
