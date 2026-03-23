@@ -820,7 +820,15 @@
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
-  .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px;position:relative}
+  .tok-col{
+    display:grid;
+    grid-auto-rows:20px;
+    row-gap:2px;
+    margin-top:2px;
+    position:relative;
+    align-content:start;
+    justify-items:start;
+  }
   .tok-col.has-link-gap{margin-left:6px;}
 .token{
     font-size:11px; line-height:1;
@@ -2270,11 +2278,86 @@ function getTokenDisplayText(tk){
   }
 }
 function sortCardTokens(tokens){
-  const rank = { equal:0, noteq:0, num:1 };
+  const rank = { equal:0, noteq:1, num:2 };
   return (Array.isArray(tokens) ? tokens : []).slice().sort((a,b)=>{
-    const ar = rank[a?.type] ?? 2;
-    const br = rank[b?.type] ?? 2;
+    const ar = rank[a?.type] ?? 3;
+    const br = rank[b?.type] ?? 3;
     return ar - br;
+  });
+}
+function computeHandTokenLayouts(cards){
+  const priorityTypes = ['equal','noteq','num'];
+  const linkTargets = new Map();
+  const cardMetas = (Array.isArray(cards) ? cards : []).map((card)=>{
+    const orderedTokens = sortCardTokens(card?.tokens || []);
+    const firstIndexByType = new Map();
+    orderedTokens.forEach((tk, idx)=>{
+      const type = String(tk?.type || '');
+      if (!firstIndexByType.has(type)) firstIndexByType.set(type, idx);
+    });
+    const hasType = new Set(orderedTokens.map(tk => String(tk?.type || '')));
+    const baseRows = new Map();
+    let nextRow = 0;
+    priorityTypes.forEach((type)=>{
+      if (hasType.has(type)) {
+        baseRows.set(type, nextRow);
+        nextRow += 1;
+      }
+    });
+    return { orderedTokens, firstIndexByType, hasType, baseRows };
+  });
+
+  LINKABLE_TOKEN_TYPES.forEach((type)=>{
+    let run = [];
+    const flush = ()=>{
+      if (!run.length) return;
+      const maxRow = run.reduce((max, cardIndex)=>{
+        const row = cardMetas[cardIndex]?.baseRows.get(type);
+        return Math.max(max, row ?? 0);
+      }, 0);
+      run.forEach((cardIndex)=> linkTargets.set(`${cardIndex}:${type}`, maxRow));
+      run = [];
+    };
+    cardMetas.forEach((meta, cardIndex)=>{
+      const batch = meta.orderedTokens.find(tk => String(tk?.type || '') === type)?.batch;
+      if (!meta.hasType.has(type)) {
+        flush();
+        return;
+      }
+      if (!run.length) {
+        run = [cardIndex];
+        run.batch = batch ?? 0;
+        return;
+      }
+      const prevIndex = run[run.length - 1];
+      if (cardIndex === prevIndex + 1 && (batch ?? 0) === (run.batch ?? 0)) {
+        run.push(cardIndex);
+      } else {
+        flush();
+        run = [cardIndex];
+        run.batch = batch ?? 0;
+      }
+    });
+    flush();
+  });
+
+  return cardMetas.map((meta, cardIndex)=>{
+    const rowByIndex = new Map();
+    let nextRow = 0;
+    priorityTypes.forEach((type)=>{
+      const tokenIndex = meta.firstIndexByType.get(type);
+      if (tokenIndex == null) return;
+      const desiredRow = linkTargets.get(`${cardIndex}:${type}`) ?? meta.baseRows.get(type) ?? nextRow;
+      const row = Math.max(nextRow, desiredRow);
+      rowByIndex.set(tokenIndex, row);
+      nextRow = row + 1;
+    });
+    meta.orderedTokens.forEach((_tk, tokenIndex)=>{
+      if (rowByIndex.has(tokenIndex)) return;
+      rowByIndex.set(tokenIndex, nextRow);
+      nextRow += 1;
+    });
+    return { orderedTokens: meta.orderedTokens, rowByIndex };
   });
 }
 function getLinkableTokenGroup(token){
@@ -3354,24 +3437,23 @@ function growForCardTokens(box, basePx = 96, padPx = 6){
   const cols = box.querySelectorAll('.badge-fixed .tok-col');
   if (!cols.length) return;
 
-  let needs = false;
   let maxBottom = 0;
   const rBox = box.getBoundingClientRect();
 
   cols.forEach(col=>{
-    const cnt = col.querySelectorAll('.token').length | 0;
-    // ――― 1行（=1個）以下なら一切スライドしない
-    if (cnt >= 2){
-      needs = true;
-      const r = col.getBoundingClientRect();
+    const tokens = Array.from(col.querySelectorAll('.token'));
+    if (!tokens.length) return;
+    tokens.forEach((tokenEl)=>{
+      const r = tokenEl.getBoundingClientRect();
       maxBottom = Math.max(maxBottom, r.bottom);
-    }
+    });
   });
 
-  if (!needs) return; // 2個以上の列が無ければ何もしない（アニメも発生しない）
+  if (!maxBottom) return;
 
   // テーブル上端から“最も下に出たトークン列の下端”までの高さに少しパディングを足す
   const needPx = Math.max(basePx, Math.ceil(maxBottom - rBox.top + padPx));
+  if (needPx <= basePx) return;
   applyTableHeight(box, needPx);
 }
 // ▲▲ カード下トークンでの自動伸長 ▲▲
@@ -4286,6 +4368,7 @@ content.appendChild(charCol);
 
     const hand=document.createElement('div'); hand.className='hand';
     const handTokenLinkEntries = [];
+    const tokenLayouts = computeHandTokenLayouts(t.hand || []);
     (t.hand||[]).forEach((c,ci)=>{
             /* 無効カードは描画しない（"undefined"表示の根絶） */
       if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
@@ -4499,14 +4582,17 @@ const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.c
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
-const displayTokens = sortCardTokens(c.tokens || []);
+const tokenLayout = tokenLayouts[ci] || { orderedTokens: sortCardTokens(c.tokens || []), rowByIndex:new Map() };
+const displayTokens = tokenLayout.orderedTokens;
 /* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
 if (!isM50 || (isM50 && c.open === true)) {
-  displayTokens.forEach(tk=>{
+  displayTokens.forEach((tk, tokenIndex)=>{
     if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
     const el = document.createElement('div');
     el.className = 'token ' + (tk.style || tk.type || '');
     el.textContent = getTokenDisplayText(tk);
+    const rowIndex = tokenLayout.rowByIndex.get(tokenIndex);
+    if (rowIndex != null) el.style.gridRow = `${rowIndex + 1}`;
     const groupKey = getLinkableTokenGroup(tk);
     if (groupKey) {
       el.dataset.linkGroup = groupKey;
