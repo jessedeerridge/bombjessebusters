@@ -820,7 +820,32 @@
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
-  .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+  .tok-col{display:flex;flex-direction:column;justify-content:flex-end;gap:2px;margin-top:2px}
+  .token.equal.merge-hide{ visibility:hidden; }
+  .equal-run-layer{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:4;
+    overflow:visible;
+  }
+  .equal-run-segment{
+    position:absolute;
+    background:#cfe8ff;
+    border-radius:4px;
+  }
+  .equal-run-glyph{
+    position:absolute;
+    width:20px;
+    height:20px;
+    display:grid;
+    place-items:center;
+    transform:translate(-50%, -50%);
+    color:#000;
+    font-size:11px;
+    line-height:1;
+    white-space:nowrap;
+  }
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
@@ -829,7 +854,7 @@
     width:20px; height:20px;   /* ← 統一サイズ（2桁OK） */
     padding:0;                 /* 中央ぴったりに */
   }  /* ▼▼ 変更1：＝ と ≠ の色を入れ替え ▼▼ */
-  .token.equal{background:#cfe8ff;color:#000}
+  .token.equal{background:transparent;color:#000;border:1px dashed #9ca3af}
   body[data-seated="no"] .token { display: none !important; }
 
   .token.black{background:#000;color:#fff}
@@ -3243,6 +3268,92 @@ function applyTableHeight(box, needPx){
 
   // ▼▼ カード下トークン（.tok-col）の“実測下端”に合わせて、必要時のみテーブルを伸ばす ▼▼
 // 対象：数字 / x1・x2・x3 / 偶数 / 奇数 / ＝ / ≠ （= .tok-col に並ぶ .token）
+function layoutJoinedEqualTokens(hand){
+  if (!hand) return;
+  const wraps = Array.from(hand.querySelectorAll('.card-wrap'));
+  if (!wraps.length) return;
+
+  hand.querySelectorAll('.equal-run-layer').forEach(node=> node.remove());
+
+  let maxHeight = 0;
+  wraps.forEach(wrap=>{
+    const col = wrap.querySelector('.tok-col');
+    if (!col) return;
+    col.style.height = '';
+    const tokens = Array.from(col.querySelectorAll('.token'));
+    const count = tokens.length;
+    const height = count > 0 ? (count * 20) + ((count - 1) * 2) : 0;
+    maxHeight = Math.max(maxHeight, height);
+    tokens.forEach(tok=> tok.classList.remove('merge-hide'));
+  });
+
+  wraps.forEach(wrap=>{
+    const col = wrap.querySelector('.tok-col');
+    if (col) col.style.height = maxHeight > 0 ? `${maxHeight}px` : '';
+  });
+
+  const equalByWrap = wraps.map(wrap=>{
+    const col = wrap.querySelector('.tok-col');
+    const tokens = col ? Array.from(col.querySelectorAll('.token')) : [];
+    const equalMap = new Map();
+    tokens.forEach((tok, idx)=>{
+      if (!tok.classList.contains('equal')) return;
+      const rowFromBottom = tokens.length - 1 - idx;
+      equalMap.set(rowFromBottom, tok);
+    });
+    return equalMap;
+  });
+
+  const rowSet = new Set();
+  equalByWrap.forEach(map=> map.forEach((_tok,row)=> rowSet.add(row)));
+  const layer = document.createElement('div');
+  layer.className = 'equal-run-layer';
+  const handRect = hand.getBoundingClientRect();
+  let hasJoinedRun = false;
+
+  [...rowSet].sort((a,b)=>a-b).forEach(row=>{
+    let start = null;
+    for (let i = 0; i <= wraps.length; i++){
+      const present = i < wraps.length && equalByWrap[i].has(row);
+      if (present && start == null) { start = i; continue; }
+      if ((!present || i === wraps.length) && start != null){
+        const end = i - 1;
+        if (end > start){
+          const runTokens = [];
+          for (let j = start; j <= end; j++){
+            const tok = equalByWrap[j].get(row);
+            if (!tok) continue;
+            tok.classList.add('merge-hide');
+            runTokens.push(tok);
+          }
+          if (runTokens.length >= 2){
+            const firstRect = runTokens[0].getBoundingClientRect();
+            const lastRect = runTokens[runTokens.length - 1].getBoundingClientRect();
+            const segment = document.createElement('div');
+            segment.className = 'equal-run-segment';
+            segment.style.left = `${firstRect.left - handRect.left}px`;
+            segment.style.top = `${firstRect.top - handRect.top}px`;
+            segment.style.width = `${lastRect.right - firstRect.left}px`;
+            segment.style.height = `${firstRect.height}px`;
+            layer.appendChild(segment);
+
+            const glyph = document.createElement('span');
+            glyph.className = 'equal-run-glyph';
+            glyph.textContent = '＝';
+            glyph.style.left = `${((firstRect.left + lastRect.right) / 2) - handRect.left}px`;
+            glyph.style.top = `${(firstRect.top + (firstRect.height / 2)) - handRect.top}px`;
+            layer.appendChild(glyph);
+            hasJoinedRun = true;
+          }
+        }
+        start = null;
+      }
+    }
+  });
+
+  if (hasJoinedRun) hand.appendChild(layer);
+}
+
 function growForCardTokens(box, basePx = 96, padPx = 6){
   // テーブル内の各カードバッジ直下にあるトークン列を全部見る
   const cols = box.querySelectorAll('.badge-fixed .tok-col');
@@ -4394,8 +4505,15 @@ const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
 /* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
 if (!isM50 || (isM50 && c.open === true)) {
-  (c.tokens||[]).forEach(tk=>{
-    if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
+  const displayTokens = (c.tokens||[])
+    .filter(tk=> !(isM50 && tk?.type !== 'num'))
+    .slice()
+    .sort((a,b)=>{
+      const pa = a?.type === 'equal' ? 0 : 1;
+      const pb = b?.type === 'equal' ? 0 : 1;
+      return pa - pb;
+    });
+  displayTokens.forEach(tk=>{
     const el = document.createElement('div');
     el.className = 'token ' + (tk.style || '');
     col.appendChild(el);
@@ -4667,6 +4785,7 @@ tokens.forEach((tk,ti)=>{
       wrap.appendChild(badge);
       hand.appendChild(wrap);
     });
+    layoutJoinedEqualTokens(hand);
     content.appendChild(hand);
     box.appendChild(content);
 
