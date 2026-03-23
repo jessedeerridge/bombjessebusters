@@ -841,6 +841,16 @@
   .token.relation.connected-right{border-radius:0;}
   .token.relation.connected-left{border-radius:4px 0 0 4px;}
   .token.relation.connected-right{border-radius:0 4px 4px 0;}
+  .token.relation .token-label{display:block;line-height:1;}
+  .token.relation.pair-anchor .token-label{
+    position:absolute;
+    top:50%;
+    left:50%;
+    width:calc(200% + var(--card-gap) + 4px);
+    text-align:center;
+    transform:translate(calc(-50% + ((20px + var(--card-gap) + 4px) / 2)), -50%);
+    pointer-events:none;
+  }
   .token.relation.connected-left::after,
   .token.relation.connected-right::before,
   .token.relation.connected-mid::before,
@@ -4255,17 +4265,23 @@ content.appendChild(charCol);
       const maxRelationRow = relationRowIndexes.length ? Math.max(...relationRowIndexes) : -1;
       info.other.forEach((tk, order) => { info.rows[maxRelationRow + 1 + order] = tk; });
     });
-    const connectionMetaByCard = relationLayoutByCard.map((info, ci) => {
-      const meta = {};
-      ['equal','noteq'].forEach(type => {
-        const row = info.relationRows[type];
-        if (row == null) return;
-        meta[type] = {
-          connectedPrev: ci > 0 && relationLayoutByCard[ci - 1].relationRows[type] === row,
-          connectedNext: ci + 1 < relationLayoutByCard.length && relationLayoutByCard[ci + 1].relationRows[type] === row,
-        };
-      });
-      return meta;
+    const pairMetaByCard = relationLayoutByCard.map(() => ({}));
+    ['equal','noteq'].forEach(type => {
+      let runStart = -1;
+      for (let i = 0; i <= relationLayoutByCard.length; i++) {
+        const row = i < relationLayoutByCard.length ? relationLayoutByCard[i].relationRows[type] : null;
+        if (row != null && runStart < 0) runStart = i;
+        if ((row == null || i === relationLayoutByCard.length) && runStart >= 0) {
+          const runEnd = i - 1;
+          for (let left = runStart; left < runEnd; left += 2) {
+            const right = left + 1;
+            if (right > runEnd) break;
+            pairMetaByCard[left][type] = { pairRole:'left', partner:right };
+            pairMetaByCard[right][type] = { pairRole:'right', partner:left };
+          }
+          runStart = -1;
+        }
+      }
     });
     (t.hand||[]).forEach((c,ci)=>{
             /* 無効カードは描画しない（"undefined"表示の根絶） */
@@ -4490,25 +4506,20 @@ layoutRows.forEach((tk)=>{
   const el = document.createElement('div');
   el.className = 'token ' + (tk.style || '');
   if (RELATION_TYPES.has(tk?.type)) {
-    const meta = connectionMetaByCard[ci]?.[tk.type] || { connectedPrev:false, connectedNext:false };
+    const meta = pairMetaByCard[ci]?.[tk.type] || null;
     el.classList.add('relation');
-    if (meta.connectedPrev && meta.connectedNext) el.classList.add('connected-mid');
-    else if (meta.connectedPrev) el.classList.add('connected-right');
-    else if (meta.connectedNext) el.classList.add('connected-left');
+    if (meta?.pairRole === 'left') el.classList.add('connected-left', 'pair-anchor');
+    else if (meta?.pairRole === 'right') el.classList.add('connected-right');
     else el.classList.add('disconnected');
   }
-  el.textContent = tokenText(tk);
+  const label = document.createElement('span');
+  label.className = 'token-label';
+  label.textContent = tokenText(tk);
   if (RELATION_TYPES.has(tk?.type)) {
-    const meta = connectionMetaByCard[ci]?.[tk.type] || { connectedPrev:false, connectedNext:false };
-    if (meta.connectedPrev || meta.connectedNext) {
-      let start = ci;
-      let end = ci;
-      while (start > 0 && relationLayoutByCard[start - 1].relationRows[tk.type] === relationLayoutByCard[ci].relationRows[tk.type]) start--;
-      while (end + 1 < relationLayoutByCard.length && relationLayoutByCard[end + 1].relationRows[tk.type] === relationLayoutByCard[ci].relationRows[tk.type]) end++;
-      const center = Math.floor((start + end) / 2);
-      if (ci !== center) el.textContent = '';
-    }
+    const meta = pairMetaByCard[ci]?.[tk.type] || null;
+    if (meta?.pairRole === 'right') label.textContent = '';
   }
+  el.appendChild(label);
   col.appendChild(el);
 });
 
