@@ -3366,16 +3366,18 @@ function growForCardTokens(box, basePx = 96, padPx = 6){
   const rBox = box.getBoundingClientRect();
 
   cols.forEach(col=>{
-    const cnt = col.querySelectorAll('.token').length | 0;
-    // ――― 1行（=1個）以下なら一切スライドしない
-    if (cnt >= 2){
+    const tokens = Array.from(col.querySelectorAll('.token'));
+    const cnt = tokens.length | 0;
+    const lowered = tokens.some(token => token.offsetTop > 0);
+    // 通常の2段以上に加え、1個でも下段へ押し下げられていれば伸長対象にする
+    if (cnt >= 2 || lowered){
       needs = true;
       const r = col.getBoundingClientRect();
       maxBottom = Math.max(maxBottom, r.bottom);
     }
   });
 
-  if (!needs) return; // 2個以上の列が無ければ何もしない（アニメも発生しない）
+  if (!needs) return; // 下段にかかる列が無ければ何もしない（アニメも発生しない）
 
   // テーブル上端から“最も下に出たトークン列の下端”までの高さに少しパディングを足す
   const needPx = Math.max(basePx, Math.ceil(maxBottom - rBox.top + padPx));
