@@ -821,6 +821,8 @@
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.equal-join-overlay{position:absolute;height:20px;display:flex;align-items:center;justify-content:center;background:#cfe8ff;color:#000;border-radius:4px;font-size:11px;line-height:1;pointer-events:none;z-index:3;}
+.equal-join-overlay .equal-join-label{display:flex;align-items:center;justify-content:center;width:20px;height:20px;}
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
@@ -3243,6 +3245,57 @@ function applyTableHeight(box, needPx){
 
   // ▼▼ カード下トークン（.tok-col）の“実測下端”に合わせて、必要時のみテーブルを伸ばす ▼▼
 // 対象：数字 / x1・x2・x3 / 偶数 / 奇数 / ＝ / ≠ （= .tok-col に並ぶ .token）
+function layoutJoinedEqualTokens(hand, box){
+  if(!hand || !box) return;
+  hand.querySelectorAll('.equal-join-overlay').forEach(el=>el.remove());
+
+  const wraps = Array.from(hand.querySelectorAll('.card-wrap'));
+  const groups = [];
+  let current = [];
+
+  const flush = ()=>{
+    if(current.length >= 2) groups.push(current);
+    current = [];
+  };
+
+  wraps.forEach((wrap)=>{
+    const eq = wrap.querySelector('.tok-col .token.equal');
+    if(eq){
+      current.push({ wrap, token:eq });
+    }else{
+      flush();
+    }
+  });
+  flush();
+
+  if(!groups.length) return;
+
+  const handRect = hand.getBoundingClientRect();
+  groups.forEach(group=>{
+    const rects = group.map(item=>item.token.getBoundingClientRect());
+    const top = Math.max(...rects.map(r=>r.top)) - handRect.top;
+    const left = rects[0].left - handRect.left;
+    const right = rects[rects.length - 1].right - handRect.left;
+    const width = Math.max(20, right - left);
+
+    group.forEach(({ token })=>{
+      token.style.visibility = 'hidden';
+    });
+
+    const overlay = document.createElement('div');
+    overlay.className = 'equal-join-overlay';
+    overlay.style.left = `${left}px`;
+    overlay.style.top = `${top}px`;
+    overlay.style.width = `${width}px`;
+
+    const label = document.createElement('div');
+    label.className = 'equal-join-label';
+    label.textContent = '＝';
+    overlay.appendChild(label);
+    hand.appendChild(overlay);
+  });
+}
+
 function growForCardTokens(box, basePx = 96, padPx = 6){
   // テーブル内の各カードバッジ直下にあるトークン列を全部見る
   const cols = box.querySelectorAll('.badge-fixed .tok-col');
@@ -4669,6 +4722,8 @@ tokens.forEach((tk,ti)=>{
     });
     content.appendChild(hand);
     box.appendChild(content);
+
+    layoutJoinedEqualTokens(hand, box);
 
     const hasToken = (t.hand||[]).some(c=> (c.tokens||[]).length>0);
     box.classList.toggle('elevated', hasToken);
