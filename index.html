@@ -820,16 +820,34 @@
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
-  .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+  .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px;position:relative}
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
+    border:1px solid transparent;
     /* 正方形・中央揃え */
     display:inline-grid; place-items:center;
     width:20px; height:20px;   /* ← 統一サイズ（2桁OK） */
     padding:0;                 /* 中央ぴったりに */
   }  /* ▼▼ 変更1：＝ と ≠ の色を入れ替え ▼▼ */
   .token.equal{background:#cfe8ff;color:#000}
+  .token.bridge{position:relative;display:grid;place-items:center;min-width:20px;padding:0 4px;font-weight:700}
+  .token.bridge.connected{justify-items:center}
+  .token.bridge.unlinked{background:transparent !important;border-style:dashed}
+  .token.bridge.equal{border-color:#7db2e8}
+  .token.bridge.noteq{border-color:#f0a872}
+  .token.bridge.connected.equal{background:#cfe8ff !important}
+  .token.bridge.connected.noteq{background:#ffedd5 !important}
+  .token.bridge.has-divider::after{
+    content:'';
+    position:absolute;
+    top:-2px;
+    right:-5px;
+    width:0;
+    height:24px;
+    border-right:2px solid rgba(17,17,17,.4);
+    pointer-events:none;
+  }
   body[data-seated="no"] .token { display: none !important; }
 
   .token.black{background:#000;color:#fff}
@@ -3953,6 +3971,52 @@ if ((v.mission?.id|0) === 23) {
     x1:    uses.i14>=2 ? 2 : (uses.i14>=1 ? 1 : 0)
   };
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
+  const BRIDGE_TOKEN_TYPES = new Set(['equal','noteq']);
+  const tokenPlacedOrder = (tk, fallbackIndex=0)=> {
+    const raw = Number(tk?.placedAt ?? tk?.createdAt ?? tk?.ts ?? fallbackIndex ?? 0);
+    return Number.isFinite(raw) ? raw : (fallbackIndex|0);
+  };
+  const buildBridgeDescriptors = (hand)=>{
+    const descriptors = new Map();
+    const orderMap = new Map();
+    ['equal','noteq'].forEach(type=>{
+      let i = 0;
+      while (i < hand.length){
+        const card = hand[i] || {};
+        const token = (card.tokens||[]).find(tk=>tk?.type===type);
+        if (!token){ i += 1; continue; }
+        const phase = Number(token?.bridgePhase ?? token?.phase ?? 0);
+        const start = i;
+        let end = i;
+        let hasDivider = false;
+        while (end + 1 < hand.length){
+          const nextCard = hand[end + 1] || {};
+          const nextToken = (nextCard.tokens||[]).find(tk=>tk?.type===type);
+          if (!nextToken) break;
+          const nextPhase = Number(nextToken?.bridgePhase ?? nextToken?.phase ?? 0);
+          if (nextPhase !== phase){
+            hasDivider = true;
+            break;
+          }
+          end += 1;
+        }
+        descriptors.set(`${type}:${start}`, {
+          type,
+          start,
+          end,
+          phase,
+          label: type === 'equal' ? '＝' : '≠',
+          connected: end > start,
+          hasDivider
+        });
+        for (let idx2 = start; idx2 <= end; idx2 += 1){
+          orderMap.set(`${type}:${idx2}`, tokenPlacedOrder((hand[idx2]?.tokens||[]).find(tk=>tk?.type===type), idx2));
+        }
+        i = end + 1;
+      }
+    });
+    return { descriptors, orderMap };
+  };
   const i2All=v.meta?.i2Flow;
   const i18All=v.meta?.i18Flow;
   const myTableIndex = (v.tables||[]).findIndex(T => T.playerId===state.userId);
@@ -4179,6 +4243,7 @@ content.appendChild(charCol);
 
 
     const hand=document.createElement('div'); hand.className='hand';
+    const bridgeInfo = buildBridgeDescriptors(t.hand||[]);
     (t.hand||[]).forEach((c,ci)=>{
             /* 無効カードは描画しない（"undefined"表示の根絶） */
       if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
@@ -4392,29 +4457,46 @@ const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.c
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
+const tokenText = (t)=>{
+  switch(t.type){
+    case 'equal':  return '＝';
+    case 'noteq':  return '≠';
+    case 'x1':     return 'x1';
+    case 'x2':     return 'x2';
+    case 'x3':     return 'x3';
+    case 'yellow': return '▧';
+    case 'even':   return '2/4';
+    case 'odd':    return '1/3';
+    case 'xmark':  return '✕';
+    case 'num':    return String(t.value);
+    default:       return String(t.value ?? '');
+  }
+};
+const bridgeDescriptors = [];
+['equal','noteq'].forEach(type=>{
+  const descriptor = bridgeInfo.descriptors.get(`${type}:${ci}`);
+  if (descriptor) bridgeDescriptors.push({ ...descriptor, order: bridgeInfo.orderMap.get(`${type}:${ci}`) ?? ci });
+});
+bridgeDescriptors.sort((a,b)=> (a.order - b.order) || (a.start - b.start));
+bridgeDescriptors.forEach(desc=>{
+  const bridge = document.createElement('div');
+  bridge.className = `token bridge ${desc.type} ${desc.connected ? 'connected' : 'unlinked'}${desc.hasDivider ? ' has-divider' : ''}`;
+  bridge.textContent = desc.label;
+  bridge.style.width = `${((desc.end - desc.start + 1) * W) + ((desc.end - desc.start) * G)}px`;
+  bridge.style.zIndex = '2';
+  col.appendChild(bridge);
+});
 /* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
 if (!isM50 || (isM50 && c.open === true)) {
-  (c.tokens||[]).forEach(tk=>{
-    if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
+  const normalTokens = (c.tokens||[])
+    .filter(tk => !(BRIDGE_TOKEN_TYPES.has(tk?.type) && bridgeInfo.orderMap.has(`${tk.type}:${ci}`)))
+    .filter(tk => !(isM50 && tk?.type !== 'num'))
+    .sort((a,b)=> tokenPlacedOrder(a, 0) - tokenPlacedOrder(b, 0));
+
+  normalTokens.forEach(tk=>{
     const el = document.createElement('div');
     el.className = 'token ' + (tk.style || '');
     col.appendChild(el);
-
-    const tokenText = (t)=>{
-      switch(t.type){
-        case 'equal':  return '＝';
-        case 'noteq':  return '≠';
-        case 'x1':     return 'x1';
-        case 'x2':     return 'x2';
-        case 'x3':     return 'x3';
-        case 'yellow': return '▧';
-        case 'even':   return '2/4';
-        case 'odd':    return '1/3';
-        case 'xmark':  return '✕';
-        case 'num':    return String(t.value);
-        default:       return String(t.value ?? '');
-      }
-    };
     el.textContent = tokenText(tk);
   });
 }
@@ -4438,6 +4520,8 @@ if (!isM50 || (isM50 && c.open === true)) {
   const hasGroup = tokens.some(tk => INCOMP_GROUP.has(tk.type));
           const canEqual = !has('equal') && (counts.equal < caps.equal);
           const canNoteq = !has('noteq') && (counts.noteq < caps.noteq);
+          const equalPhase = Number(state.watching?.meta?.itemUses?.i12 || 0);
+          const noteqPhase = Number(state.watching?.meta?.itemUses?.i1 || 0);
           const canNum   = !has('num');
           const canX1    = !has('x1') && (counts.x1 < caps.x1);
 
@@ -4463,7 +4547,7 @@ if(!hasGroup && (flags.useYellowToken || c.kind === 'yellow')){
    entries.push({label:'▧', action: async ()=>{
     // 既にグループが付いていたら何もしない（多重防止の最終ガード）
     if (hasGroup || has('yellow')) return;
-    const updated = [...tokens, {type:'yellow', value:'▧', style:'yellow'}];
+    const updated = [...tokens, {type:'yellow', value:'▧', style:'yellow', placedAt: Date.now()}];
      await update(ref(db, cardPath), { tokens: updated });
      box.classList.add('elevated');
    }});
@@ -4473,19 +4557,19 @@ if(!hasGroup && (flags.useYellowToken || c.kind === 'yellow')){
 if (!hasGroup && USE_X && !isColorCode){
    if(countSame===1) entries.push({label:'x1', action: async ()=>{
     if (hasGroup || has('x1')) return;
-    const updated=[...tokens, {type:'x1', value:'x1', style:'x1'}];
+    const updated=[...tokens, {type:'x1', value:'x1', style:'x1', placedAt: Date.now()}];
      await update(ref(db, cardPath), { tokens: updated });
      box.classList.add('elevated');
    }});
    if(countSame===2) entries.push({label:'x2', action: async ()=>{
     if (hasGroup || has('x2')) return;
-    const updated=[...tokens, {type:'x2', value:'x2', style:'x2'}];
+    const updated=[...tokens, {type:'x2', value:'x2', style:'x2', placedAt: Date.now()}];
      await update(ref(db, cardPath), { tokens: updated });
      box.classList.add('elevated');
    }});
    if(countSame===3) entries.push({label:'x3', action: async ()=>{
     if (hasGroup || has('x3')) return;
-    const updated=[...tokens, {type:'x3', value:'x3', style:'x3'}];
+    const updated=[...tokens, {type:'x3', value:'x3', style:'x3', placedAt: Date.now()}];
      await update(ref(db, cardPath), { tokens: updated });
      box.classList.add('elevated');
    }});
@@ -4497,14 +4581,14 @@ if (!hasGroup && USE_PARITY && !isColorCode){
    if(isEven){
      entries.push({label:'2/4', action: async ()=>{
      if (hasGroup || has('even')) return;
-      const updated=[...tokens, {type:'even', value:'2/4', style:'even'}];
+      const updated=[...tokens, {type:'even', value:'2/4', style:'even', placedAt: Date.now()}];
        await update(ref(db, cardPath), { tokens: updated });
        box.classList.add('elevated');
      }});
    }else{
      entries.push({label:'1/3', action: async ()=>{
       if (hasGroup || has('odd')) return;
-      const updated=[...tokens, {type:'odd', value:'1/3', style:'odd'}];
+      const updated=[...tokens, {type:'odd', value:'1/3', style:'odd', placedAt: Date.now()}];
        await update(ref(db, cardPath), { tokens: updated });
        box.classList.add('elevated');
      }});
@@ -4520,7 +4604,7 @@ if (_m52 && canNum && (c.kind==='normal' || c.kind==='red')) {
     entries.push({
       label: String(nn),
       action: async ()=>{
-        const updated = [ ...(tokens), { type:'num', value: nn, style:'black' } ];
+        const updated = [ ...(tokens), { type:'num', value: nn, style:'black', placedAt: Date.now() } ];
         await update(ref(db, cardPath), { tokens: updated });
         box.classList.add('elevated');
       }
@@ -4538,7 +4622,7 @@ if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captain
     for(let nn=1; nn<=12; nn++){
       if(nn===c.num) continue;
       entries.push({label:String(nn), action: async ()=>{
-        const updated=[...(tokens), {type:'num', value:nn, style:'black'}];
+        const updated=[...(tokens), {type:'num', value:nn, style:'black', placedAt: Date.now()}];
         await update(ref(db, cardPath), { tokens: updated });
         box.classList.add('elevated');
       }});
@@ -4546,7 +4630,7 @@ if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captain
   }else{
     // 通常：そのカードの数字
     entries.push({label:String(c.num), action: async ()=>{
-      const updated=[...(tokens), {type:'num', value:c.num, style:'black'}];
+      const updated=[...(tokens), {type:'num', value:c.num, style:'black', placedAt: Date.now()}];
       await update(ref(db, cardPath), { tokens: updated });
       await consumeM22IfMatches(idx, c.num);   // ← 追加
       box.classList.add('elevated');
@@ -4569,7 +4653,7 @@ if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captain
                     }},
                   { label:String(c.num), action: async ()=>{
                       if(!has('num')){
-                        const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
+                        const next=[...(tokens), {type:'num', value:c.num, style:'black', placedAt: Date.now()}];
                         await update(ref(db, cardPath), { tokens: next });
                         box.classList.add('elevated');
                       }
@@ -4579,7 +4663,7 @@ if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captain
             });
           } else if (canEqual){
             entries.push({label:'＝', action: async ()=>{
-              const updated=[...(tokens), {type:'equal', value:c.num, style:'equal'}];
+              const updated=[...(tokens), {type:'equal', value:c.num, style:'equal', bridgePhase: equalPhase, placedAt: Date.now()}];
               await update(ref(db, cardPath), { tokens: updated });
               await incToken('equal', +1);
               box.classList.add('elevated');
@@ -4601,7 +4685,7 @@ if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captain
                     }},
                   { label:String(c.num), action: async ()=>{
                       if(!has('num')){
-                        const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
+                        const next=[...(tokens), {type:'num', value:c.num, style:'black', placedAt: Date.now()}];
                         await update(ref(db, cardPath), { tokens: next });
                         box.classList.add('elevated');
                       }
@@ -4613,7 +4697,7 @@ if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captain
             entries.push({
               label:'≠',
               action: async ()=>{
-                const updated=[...(tokens), {type:'noteq', value:c.num, style:'noteq'}];
+                const updated=[...(tokens), {type:'noteq', value:c.num, style:'noteq', bridgePhase: noteqPhase, placedAt: Date.now()}];
                 await update(ref(db, cardPath), { tokens: updated });
                 await incToken('noteq', +1);
                 box.classList.add('elevated');
