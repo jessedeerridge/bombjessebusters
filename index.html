@@ -2270,10 +2270,10 @@ function getTokenDisplayText(tk){
   }
 }
 function sortCardTokens(tokens){
-  const rank = { equal:0, noteq:0, num:1 };
+  const rank = { equal:0, noteq:1, num:2 };
   return (Array.isArray(tokens) ? tokens : []).slice().sort((a,b)=>{
-    const ar = rank[a?.type] ?? 2;
-    const br = rank[b?.type] ?? 2;
+    const ar = rank[a?.type] ?? 3;
+    const br = rank[b?.type] ?? 3;
     return ar - br;
   });
 }
@@ -2301,6 +2301,10 @@ function decorateHandTokenGroups(handEl, entries){
     }
   });
 
+  entries.forEach((entry)=>{
+    entry.el.style.marginTop = '0px';
+  });
+
   const grouped = new Map();
   entries.forEach((entry)=>{
     const key = getLinkableTokenGroup(entry.token);
@@ -2316,7 +2320,10 @@ function decorateHandTokenGroups(handEl, entries){
         run = [];
         return;
       }
+      const maxOffsetTop = run.reduce((max, entry)=> Math.max(max, entry.el.offsetTop), 0);
       run.forEach((entry, idx)=>{
+        const delta = maxOffsetTop - entry.el.offsetTop;
+        entry.el.style.marginTop = `${Math.max(0, delta)}px`;
         entry.el.classList.add('link-member');
         entry.el.classList.remove('link-single');
         if (idx === 0) entry.el.classList.add('link-start');
@@ -3359,16 +3366,18 @@ function growForCardTokens(box, basePx = 96, padPx = 6){
   const rBox = box.getBoundingClientRect();
 
   cols.forEach(col=>{
-    const cnt = col.querySelectorAll('.token').length | 0;
-    // ――― 1行（=1個）以下なら一切スライドしない
-    if (cnt >= 2){
+    const tokens = Array.from(col.querySelectorAll('.token'));
+    const cnt = tokens.length | 0;
+    const colRect = col.getBoundingClientRect();
+    const lowered = tokens.some(token => (token.getBoundingClientRect().top - colRect.top) > 0.5);
+    // 通常の2段以上に加え、1個でも見た目上で下段へ押し下げられていれば伸長対象にする
+    if (cnt >= 2 || lowered){
       needs = true;
-      const r = col.getBoundingClientRect();
-      maxBottom = Math.max(maxBottom, r.bottom);
+      maxBottom = Math.max(maxBottom, colRect.bottom);
     }
   });
 
-  if (!needs) return; // 2個以上の列が無ければ何もしない（アニメも発生しない）
+  if (!needs) return; // 下段にかかる列が無ければ何もしない（アニメも発生しない）
 
   // テーブル上端から“最も下に出たトークン列の下端”までの高さに少しパディングを足す
   const needPx = Math.max(basePx, Math.ceil(maxBottom - rBox.top + padPx));
