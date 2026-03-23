@@ -831,13 +831,17 @@
   }
   .equal-run-segment{
     position:absolute;
-    display:grid;
-    place-items:center;
     background:#cfe8ff;
+    border-radius:4px;
+  }
+  .equal-run-glyph{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%, -50%);
     color:#000;
     font-size:11px;
     line-height:1;
-    border-radius:4px;
     white-space:nowrap;
   }
 .token{
@@ -3325,11 +3329,14 @@ function layoutJoinedEqualTokens(hand){
             const lastRect = runTokens[runTokens.length - 1].getBoundingClientRect();
             const segment = document.createElement('div');
             segment.className = 'equal-run-segment';
-            segment.textContent = '＝';
             segment.style.left = `${firstRect.left - handRect.left}px`;
             segment.style.top = `${firstRect.top - handRect.top}px`;
             segment.style.width = `${lastRect.right - firstRect.left}px`;
             segment.style.height = `${firstRect.height}px`;
+            const glyph = document.createElement('span');
+            glyph.className = 'equal-run-glyph';
+            glyph.textContent = '＝';
+            segment.appendChild(glyph);
             layer.appendChild(segment);
             hasJoinedRun = true;
           }
