@@ -2270,10 +2270,10 @@ function getTokenDisplayText(tk){
   }
 }
 function sortCardTokens(tokens){
-  const rank = { equal:0, noteq:0, num:1 };
+  const rank = { equal:0, noteq:1, num:2 };
   return (Array.isArray(tokens) ? tokens : []).slice().sort((a,b)=>{
-    const ar = rank[a?.type] ?? 2;
-    const br = rank[b?.type] ?? 2;
+    const ar = rank[a?.type] ?? 3;
+    const br = rank[b?.type] ?? 3;
     return ar - br;
   });
 }
@@ -2301,6 +2301,10 @@ function decorateHandTokenGroups(handEl, entries){
     }
   });
 
+  entries.forEach((entry)=>{
+    entry.el.style.marginTop = '0px';
+  });
+
   const grouped = new Map();
   entries.forEach((entry)=>{
     const key = getLinkableTokenGroup(entry.token);
@@ -2316,7 +2320,10 @@ function decorateHandTokenGroups(handEl, entries){
         run = [];
         return;
       }
+      const maxOffsetTop = run.reduce((max, entry)=> Math.max(max, entry.el.offsetTop), 0);
       run.forEach((entry, idx)=>{
+        const delta = maxOffsetTop - entry.el.offsetTop;
+        entry.el.style.marginTop = `${Math.max(0, delta)}px`;
         entry.el.classList.add('link-member');
         entry.el.classList.remove('link-single');
         if (idx === 0) entry.el.classList.add('link-start');
