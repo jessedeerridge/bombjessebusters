@@ -821,33 +821,25 @@
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;justify-content:flex-end;gap:2px;margin-top:2px}
-  .token.equal.merge-left,
-  .token.equal.merge-mid,
-  .token.equal.merge-right,
-  .token.equal.merge-both{
-    position:relative;
-    z-index:0;
-  }
-  .token.equal.merge-left::before,
-  .token.equal.merge-mid::before,
-  .token.equal.merge-right::before,
-  .token.equal.merge-both::before{
-    content:'';
+  .token.equal.merge-hide{ visibility:hidden; }
+  .equal-run-layer{
     position:absolute;
-    top:0;
-    bottom:0;
-    background:#cfe8ff;
-    z-index:-1;
+    inset:0;
+    pointer-events:none;
+    z-index:1;
+    overflow:visible;
   }
-  .token.equal.merge-left::before{ left:50%; right:calc(-1 * var(--card-gap)); }
-  .token.equal.merge-right::before{ left:calc(-1 * var(--card-gap)); right:50%; }
-  .token.equal.merge-mid::before,
-  .token.equal.merge-both::before{ left:calc(-1 * var(--card-gap)); right:calc(-1 * var(--card-gap)); }
-  .token.equal.merge-left{ border-radius:4px 0 0 4px; }
-  .token.equal.merge-right{ border-radius:0 4px 4px 0; }
-  .token.equal.merge-mid,
-  .token.equal.merge-both{ border-radius:0; }
-  .token.equal.merge-hide{ color:transparent; }
+  .equal-run-segment{
+    position:absolute;
+    display:grid;
+    place-items:center;
+    background:#cfe8ff;
+    color:#000;
+    font-size:11px;
+    line-height:1;
+    border-radius:4px;
+    white-space:nowrap;
+  }
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
@@ -3275,6 +3267,8 @@ function layoutJoinedEqualTokens(hand){
   const wraps = Array.from(hand.querySelectorAll('.card-wrap'));
   if (!wraps.length) return;
 
+  hand.querySelectorAll('.equal-run-layer').forEach(node=> node.remove());
+
   let maxHeight = 0;
   wraps.forEach(wrap=>{
     const col = wrap.querySelector('.tok-col');
@@ -3284,10 +3278,7 @@ function layoutJoinedEqualTokens(hand){
     const count = tokens.length;
     const height = count > 0 ? (count * 20) + ((count - 1) * 2) : 0;
     maxHeight = Math.max(maxHeight, height);
-    tokens.forEach(tok=>{
-      tok.classList.remove('merge-left','merge-mid','merge-right','merge-both','merge-hide');
-      if (tok.dataset.equalOriginalText != null) tok.textContent = tok.dataset.equalOriginalText;
-    });
+    tokens.forEach(tok=> tok.classList.remove('merge-hide'));
   });
 
   wraps.forEach(wrap=>{
@@ -3302,7 +3293,6 @@ function layoutJoinedEqualTokens(hand){
     tokens.forEach((tok, idx)=>{
       if (!tok.classList.contains('equal')) return;
       const rowFromBottom = tokens.length - 1 - idx;
-      if (tok.dataset.equalOriginalText == null) tok.dataset.equalOriginalText = tok.textContent || '＝';
       equalMap.set(rowFromBottom, tok);
     });
     return equalMap;
@@ -3310,6 +3300,11 @@ function layoutJoinedEqualTokens(hand){
 
   const rowSet = new Set();
   equalByWrap.forEach(map=> map.forEach((_tok,row)=> rowSet.add(row)));
+  const layer = document.createElement('div');
+  layer.className = 'equal-run-layer';
+  const handRect = hand.getBoundingClientRect();
+  let hasJoinedRun = false;
+
   [...rowSet].sort((a,b)=>a-b).forEach(row=>{
     let start = null;
     for (let i = 0; i <= wraps.length; i++){
@@ -3318,23 +3313,33 @@ function layoutJoinedEqualTokens(hand){
       if ((!present || i === wraps.length) && start != null){
         const end = i - 1;
         if (end > start){
-          const center = Math.floor((start + end) / 2);
+          const runTokens = [];
           for (let j = start; j <= end; j++){
             const tok = equalByWrap[j].get(row);
             if (!tok) continue;
-            const hasLeft = j > start;
-            const hasRight = j < end;
-            const mergeClass = hasLeft && hasRight ? 'merge-both' :
-              hasLeft ? 'merge-right' :
-              hasRight ? 'merge-left' : null;
-            if (mergeClass) tok.classList.add(mergeClass);
-            if (j !== center) tok.classList.add('merge-hide');
+            tok.classList.add('merge-hide');
+            runTokens.push(tok);
+          }
+          if (runTokens.length >= 2){
+            const firstRect = runTokens[0].getBoundingClientRect();
+            const lastRect = runTokens[runTokens.length - 1].getBoundingClientRect();
+            const segment = document.createElement('div');
+            segment.className = 'equal-run-segment';
+            segment.textContent = '＝';
+            segment.style.left = `${firstRect.left - handRect.left}px`;
+            segment.style.top = `${firstRect.top - handRect.top}px`;
+            segment.style.width = `${lastRect.right - firstRect.left}px`;
+            segment.style.height = `${firstRect.height}px`;
+            layer.appendChild(segment);
+            hasJoinedRun = true;
           }
         }
         start = null;
       }
     }
   });
+
+  if (hasJoinedRun) hand.appendChild(layer);
 }
 
 function growForCardTokens(box, basePx = 96, padPx = 6){
