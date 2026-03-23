@@ -820,8 +820,9 @@
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
-  .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px;position:relative}
+  .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px;position:relative;min-height:var(--token-col-min-h, 0px);justify-content:flex-end}
   .tok-col.has-link-gap{margin-left:6px;}
+  .tok-row{display:flex;justify-content:center;min-height:20px;}
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
@@ -2270,12 +2271,32 @@ function getTokenDisplayText(tk){
   }
 }
 function sortCardTokens(tokens){
-  const rank = { equal:0, noteq:0, num:1 };
+  const rank = { equal:0, noteq:1, num:2 };
   return (Array.isArray(tokens) ? tokens : []).slice().sort((a,b)=>{
-    const ar = rank[a?.type] ?? 2;
-    const br = rank[b?.type] ?? 2;
+    const ar = rank[a?.type] ?? 3;
+    const br = rank[b?.type] ?? 3;
     return ar - br;
   });
+}
+function buildTokenRows(tokens){
+  const sorted = sortCardTokens(tokens);
+  const others = [];
+  const equal = [];
+  const noteq = [];
+  const nums = [];
+  sorted.forEach((tk)=>{
+    const type = String(tk?.type || '');
+    if (type === 'equal') equal.push(tk);
+    else if (type === 'noteq') noteq.push(tk);
+    else if (type === 'num') nums.push(tk);
+    else others.push(tk);
+  });
+  const rows = [];
+  if (others.length) rows.push(others);
+  if (equal.length) rows.push(equal);
+  if (noteq.length) rows.push(noteq);
+  if (nums.length) rows.push(nums);
+  return rows;
 }
 function getLinkableTokenGroup(token){
   if (!token || !LINKABLE_TOKEN_TYPES.has(String(token.type||''))) return null;
@@ -2283,6 +2304,8 @@ function getLinkableTokenGroup(token){
 }
 function decorateHandTokenGroups(handEl, entries){
   if (!handEl || !Array.isArray(entries) || entries.length === 0) return;
+  const maxRows = entries.reduce((acc, entry)=> Math.max(acc, Number(entry.totalRows) || 0), 0);
+  handEl.style.setProperty('--token-col-min-h', `${Math.max(0, maxRows) * 22}px`);
   const handRect = handEl.getBoundingClientRect();
   const byType = new Map();
   entries.forEach((entry)=>{
@@ -4286,6 +4309,7 @@ content.appendChild(charCol);
 
     const hand=document.createElement('div'); hand.className='hand';
     const handTokenLinkEntries = [];
+    let handMaxTokenRows = 0;
     (t.hand||[]).forEach((c,ci)=>{
             /* 無効カードは描画しない（"undefined"表示の根絶） */
       if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
@@ -4499,21 +4523,27 @@ const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.c
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
-const displayTokens = sortCardTokens(c.tokens || []);
+const tokenRows = buildTokenRows(c.tokens || []);
+handMaxTokenRows = Math.max(handMaxTokenRows, tokenRows.length);
 /* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
 if (!isM50 || (isM50 && c.open === true)) {
-  displayTokens.forEach(tk=>{
-    if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
-    const el = document.createElement('div');
-    el.className = 'token ' + (tk.style || tk.type || '');
-    el.textContent = getTokenDisplayText(tk);
-    const groupKey = getLinkableTokenGroup(tk);
-    if (groupKey) {
-      el.dataset.linkGroup = groupKey;
-      el.classList.add('link-single');
-      handTokenLinkEntries.push({ cardIndex: ci, token: tk, el, col });
-    }
-    col.appendChild(el);
+  tokenRows.forEach((rowTokens, rowIndex)=>{
+    const row = document.createElement('div');
+    row.className = 'tok-row';
+    rowTokens.forEach(tk=>{
+      if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
+      const el = document.createElement('div');
+      el.className = 'token ' + (tk.style || tk.type || '');
+      el.textContent = getTokenDisplayText(tk);
+      const groupKey = getLinkableTokenGroup(tk);
+      if (groupKey) {
+        el.dataset.linkGroup = groupKey;
+        el.classList.add('link-single');
+        handTokenLinkEntries.push({ cardIndex: ci, token: tk, el, col, rowIndex, totalRows: tokenRows.length });
+      }
+      row.appendChild(el);
+    });
+    if (row.childElementCount > 0) col.appendChild(row);
   });
 }
 
@@ -4765,6 +4795,7 @@ tokens.forEach((tk,ti)=>{
       wrap.appendChild(badge);
       hand.appendChild(wrap);
     });
+    hand.style.setProperty('--token-col-min-h', `${handMaxTokenRows * 22}px`);
     requestAnimationFrame(()=>{
       decorateHandTokenGroups(hand, handTokenLinkEntries);
     });
