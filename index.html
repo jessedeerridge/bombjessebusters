@@ -822,6 +822,8 @@
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px;position:relative}
   .tok-col.has-link-gap{margin-left:6px;}
+  .tok-slot{width:20px;height:20px;display:grid;place-items:center;}
+  .tok-slot.spacer{visibility:hidden;pointer-events:none;}
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
@@ -2270,12 +2272,33 @@ function getTokenDisplayText(tk){
   }
 }
 function sortCardTokens(tokens){
-  const rank = { equal:0, noteq:0, num:1 };
+  const rank = { equal:0, noteq:1, num:2 };
   return (Array.isArray(tokens) ? tokens : []).slice().sort((a,b)=>{
-    const ar = rank[a?.type] ?? 2;
-    const br = rank[b?.type] ?? 2;
-    return ar - br;
+    const ar = rank[a?.type] ?? 3;
+    const br = rank[b?.type] ?? 3;
+    if (ar !== br) return ar - br;
+    return String(a?.value ?? '').localeCompare(String(b?.value ?? ''));
   });
+}
+function buildCardTokenRows(tokens){
+  const ordered = sortCardTokens(tokens);
+  const specialOrder = ['equal','noteq','num'];
+  const specials = new Map();
+  const extras = [];
+  ordered.forEach((tk)=>{
+    const type = String(tk?.type || '');
+    if (specialOrder.includes(type) && !specials.has(type)) {
+      specials.set(type, tk);
+    } else {
+      extras.push(tk);
+    }
+  });
+  if (specials.size === 0) return ordered.map((token)=>({ token, spacer:false }));
+  const rows = specialOrder.map((type)=>{
+    const token = specials.get(type) || null;
+    return { token, spacer: !token };
+  });
+  return rows.concat(extras.map((token)=>({ token, spacer:false })));
 }
 function getLinkableTokenGroup(token){
   if (!token || !LINKABLE_TOKEN_TYPES.has(String(token.type||''))) return null;
@@ -4499,10 +4522,16 @@ const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.c
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
-const displayTokens = sortCardTokens(c.tokens || []);
+const displayRows = buildCardTokenRows(c.tokens || []);
 /* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
 if (!isM50 || (isM50 && c.open === true)) {
-  displayTokens.forEach(tk=>{
+  displayRows.forEach(({ token:tk, spacer })=>{
+    if (spacer) {
+      const slot = document.createElement('div');
+      slot.className = 'tok-slot spacer';
+      col.appendChild(slot);
+      return;
+    }
     if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
     const el = document.createElement('div');
     el.className = 'token ' + (tk.style || tk.type || '');
