@@ -820,21 +820,40 @@
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
-  .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+  .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px;align-items:center;position:relative;z-index:1;}
+  .tok-row{display:flex;justify-content:center;align-items:center;min-height:20px;width:100%;}
+  .tok-row:empty{display:none;}
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
+    border:1px solid transparent;
     /* 正方形・中央揃え */
     display:inline-grid; place-items:center;
     width:20px; height:20px;   /* ← 統一サイズ（2桁OK） */
     padding:0;                 /* 中央ぴったりに */
-  }  /* ▼▼ 変更1：＝ と ≠ の色を入れ替え ▼▼ */
-  .token.equal{background:#cfe8ff;color:#000}
+    background:#fff;
+  }
+  .token.relation-token{
+    background:transparent;
+    border-style:dashed;
+    border-width:1px;
+  }
+  .token.relation-token.connected{
+    width:100%;
+    border-style:solid;
+    justify-items:center;
+    background:#fff;
+  }
+  .token.equal{background:#cfe8ff;color:#000;border-color:#7fb3ea}
+  .token.noteq{background:#ffedd5;color:#000;border-color:#f0b489}
+  .token.equal.relation-token:not(.connected),
+  .token.noteq.relation-token:not(.connected){background:transparent;}
   body[data-seated="no"] .token { display: none !important; }
 
   .token.black{background:#000;color:#fff}
   .token.x1{background:#e5e7eb;color:#000}
-  .token.noteq{background:#ffedd5;color:#000}
+  .hand-relation-layer{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:visible;}
+  .hand-relation-layer .token{position:absolute;}
 
 /* ▼ ミッション専用トークン */
   .token.yellow { background:#000; color:#ffd400; }  /* 黄コード「▧」 */
@@ -4179,6 +4198,7 @@ content.appendChild(charCol);
 
 
     const hand=document.createElement('div'); hand.className='hand';
+    const pendingRelationGroups = [];
     (t.hand||[]).forEach((c,ci)=>{
             /* 無効カードは描画しない（"undefined"表示の根絶） */
       if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
@@ -4391,31 +4411,46 @@ const badge=document.createElement('div'); badge.className='badge-fixed';
 const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.classList.add('m43-added'); if (c?.hookGray) a.classList.add('hook-gray'); a.textContent=c.alpha||'';
 
 const col=document.createElement('div'); col.className='tok-col';
+const relationRow = document.createElement('div'); relationRow.className='tok-row tok-row-relation';
+const infoRow = document.createElement('div'); infoRow.className='tok-row tok-row-info';
+col.appendChild(relationRow);
+col.appendChild(infoRow);
 const isM50 = ((state.watching?.mission?.id|0) === 50);
+const tokenText = (t)=>{
+  switch(t.type){
+    case 'equal':  return '＝';
+    case 'noteq':  return '≠';
+    case 'x1':     return 'x1';
+    case 'x2':     return 'x2';
+    case 'x3':     return 'x3';
+    case 'yellow': return '▧';
+    case 'even':   return '2/4';
+    case 'odd':    return '1/3';
+    case 'xmark':  return '✕';
+    case 'num':    return String(t.value);
+    default:       return String(t.value ?? '');
+  }
+};
 /* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
 if (!isM50 || (isM50 && c.open === true)) {
-  (c.tokens||[]).forEach(tk=>{
-    if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
+  const visibleTokens = (c.tokens||[]).filter(tk => !(isM50 && tk?.type !== 'num'));
+  const relationToken = visibleTokens.find(tk => tk?.type === 'equal' || tk?.type === 'noteq');
+  const infoTokens = visibleTokens.filter(tk => tk !== relationToken);
+
+  if (relationToken) {
+    const relEl = document.createElement('div');
+    relEl.className = 'token relation-token ' + (relationToken.style || '');
+    relEl.textContent = tokenText(relationToken);
+    relationRow.appendChild(relEl);
+    wrap.dataset.relationType = relationToken.type;
+    pendingRelationGroups.push({ wrap, row: relationRow, token: relationToken, cardIndex: ci });
+  }
+
+  infoTokens.forEach(tk=>{
     const el = document.createElement('div');
     el.className = 'token ' + (tk.style || '');
-    col.appendChild(el);
-
-    const tokenText = (t)=>{
-      switch(t.type){
-        case 'equal':  return '＝';
-        case 'noteq':  return '≠';
-        case 'x1':     return 'x1';
-        case 'x2':     return 'x2';
-        case 'x3':     return 'x3';
-        case 'yellow': return '▧';
-        case 'even':   return '2/4';
-        case 'odd':    return '1/3';
-        case 'xmark':  return '✕';
-        case 'num':    return String(t.value);
-        default:       return String(t.value ?? '');
-      }
-    };
     el.textContent = tokenText(tk);
+    infoRow.appendChild(el);
   });
 }
 
@@ -4674,6 +4709,41 @@ tokens.forEach((tk,ti)=>{
     box.classList.toggle('elevated', hasToken);
 
     tablesEl.appendChild(box);
+
+    const relationLayer = document.createElement('div');
+    relationLayer.className = 'hand-relation-layer';
+    hand.appendChild(relationLayer);
+    let group = [];
+    const flushRelationGroup = ()=>{
+      if (!group.length) return;
+      if (group.length > 1) {
+        const first = group[0];
+        const last = group[group.length - 1];
+        const left = first.wrap.offsetLeft + (first.wrap.offsetWidth - 20) / 2;
+        const right = last.wrap.offsetLeft + (last.wrap.offsetWidth + 20) / 2;
+        const rowTop = first.wrap.offsetTop + first.row.parentElement.offsetTop + first.row.offsetTop;
+        const overlay = document.createElement('div');
+        overlay.className = `token relation-token connected ${first.token.style || ''}`;
+        overlay.textContent = tokenText(first.token);
+        overlay.style.left = `${left}px`;
+        overlay.style.top = `${rowTop}px`;
+        overlay.style.width = `${Math.max(20, right - left)}px`;
+        relationLayer.appendChild(overlay);
+        group.forEach(item => { item.row.innerHTML = '<div class="token relation-token placeholder" style="visibility:hidden"></div>'; });
+      }
+      group = [];
+    };
+    pendingRelationGroups.forEach(item=>{
+      if (!group.length) { group = [item]; return; }
+      const prev = group[group.length - 1];
+      if (item.token.type === prev.token.type && item.cardIndex === prev.cardIndex + 1) {
+        group.push(item);
+      } else {
+        flushRelationGroup();
+        group = [item];
+      }
+    });
+    flushRelationGroup();
       growForCardTokens(box);
 
   });
