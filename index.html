@@ -820,7 +820,34 @@
   .card-wrap.hook-anim-origin .marker,
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
-  .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+  .tok-col{display:flex;flex-direction:column;justify-content:flex-end;gap:2px;margin-top:2px}
+  .token.equal.merge-left,
+  .token.equal.merge-mid,
+  .token.equal.merge-right,
+  .token.equal.merge-both{
+    position:relative;
+    z-index:0;
+  }
+  .token.equal.merge-left::before,
+  .token.equal.merge-mid::before,
+  .token.equal.merge-right::before,
+  .token.equal.merge-both::before{
+    content:'';
+    position:absolute;
+    top:0;
+    bottom:0;
+    background:#cfe8ff;
+    z-index:-1;
+  }
+  .token.equal.merge-left::before{ left:50%; right:calc(-1 * var(--card-gap)); }
+  .token.equal.merge-right::before{ left:calc(-1 * var(--card-gap)); right:50%; }
+  .token.equal.merge-mid::before,
+  .token.equal.merge-both::before{ left:calc(-1 * var(--card-gap)); right:calc(-1 * var(--card-gap)); }
+  .token.equal.merge-left{ border-radius:4px 0 0 4px; }
+  .token.equal.merge-right{ border-radius:0 4px 4px 0; }
+  .token.equal.merge-mid,
+  .token.equal.merge-both{ border-radius:0; }
+  .token.equal.merge-hide{ color:transparent; }
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
@@ -3243,6 +3270,73 @@ function applyTableHeight(box, needPx){
 
   // ▼▼ カード下トークン（.tok-col）の“実測下端”に合わせて、必要時のみテーブルを伸ばす ▼▼
 // 対象：数字 / x1・x2・x3 / 偶数 / 奇数 / ＝ / ≠ （= .tok-col に並ぶ .token）
+function layoutJoinedEqualTokens(hand){
+  if (!hand) return;
+  const wraps = Array.from(hand.querySelectorAll('.card-wrap'));
+  if (!wraps.length) return;
+
+  let maxHeight = 0;
+  wraps.forEach(wrap=>{
+    const col = wrap.querySelector('.tok-col');
+    if (!col) return;
+    col.style.height = '';
+    const tokens = Array.from(col.querySelectorAll('.token'));
+    const count = tokens.length;
+    const height = count > 0 ? (count * 20) + ((count - 1) * 2) : 0;
+    maxHeight = Math.max(maxHeight, height);
+    tokens.forEach(tok=>{
+      tok.classList.remove('merge-left','merge-mid','merge-right','merge-both','merge-hide');
+      if (tok.dataset.equalOriginalText != null) tok.textContent = tok.dataset.equalOriginalText;
+    });
+  });
+
+  wraps.forEach(wrap=>{
+    const col = wrap.querySelector('.tok-col');
+    if (col) col.style.height = maxHeight > 0 ? `${maxHeight}px` : '';
+  });
+
+  const equalByWrap = wraps.map(wrap=>{
+    const col = wrap.querySelector('.tok-col');
+    const tokens = col ? Array.from(col.querySelectorAll('.token')) : [];
+    const equalMap = new Map();
+    tokens.forEach((tok, idx)=>{
+      if (!tok.classList.contains('equal')) return;
+      const rowFromBottom = tokens.length - 1 - idx;
+      if (tok.dataset.equalOriginalText == null) tok.dataset.equalOriginalText = tok.textContent || '＝';
+      equalMap.set(rowFromBottom, tok);
+    });
+    return equalMap;
+  });
+
+  const rowSet = new Set();
+  equalByWrap.forEach(map=> map.forEach((_tok,row)=> rowSet.add(row)));
+  [...rowSet].sort((a,b)=>a-b).forEach(row=>{
+    let start = null;
+    for (let i = 0; i <= wraps.length; i++){
+      const present = i < wraps.length && equalByWrap[i].has(row);
+      if (present && start == null) { start = i; continue; }
+      if ((!present || i === wraps.length) && start != null){
+        const end = i - 1;
+        if (end > start){
+          const center = Math.floor((start + end) / 2);
+          for (let j = start; j <= end; j++){
+            const tok = equalByWrap[j].get(row);
+            if (!tok) continue;
+            const hasLeft = j > start;
+            const hasRight = j < end;
+            const mergeClass = hasLeft && hasRight ? 'merge-both' :
+              hasLeft ? 'merge-right' :
+              hasRight ? 'merge-left' : null;
+            if (mergeClass) tok.classList.add(mergeClass);
+            if (j !== center) tok.classList.add('merge-hide');
+          }
+        }
+        start = null;
+      }
+    }
+  });
+}
+
 function growForCardTokens(box, basePx = 96, padPx = 6){
   // テーブル内の各カードバッジ直下にあるトークン列を全部見る
   const cols = box.querySelectorAll('.badge-fixed .tok-col');
@@ -4667,6 +4761,7 @@ tokens.forEach((tk,ti)=>{
       wrap.appendChild(badge);
       hand.appendChild(wrap);
     });
+    layoutJoinedEqualTokens(hand);
     content.appendChild(hand);
     box.appendChild(content);
 
