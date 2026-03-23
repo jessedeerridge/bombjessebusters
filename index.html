@@ -821,6 +821,7 @@
   .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.tok-slot{width:20px;height:20px;}
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
@@ -830,11 +831,40 @@
     padding:0;                 /* 中央ぴったりに */
   }  /* ▼▼ 変更1：＝ と ≠ の色を入れ替え ▼▼ */
   .token.equal{background:#cfe8ff;color:#000}
+  .token.noteq{background:#ffedd5;color:#000}
+  .token.relation{position:relative;overflow:visible;}
+  .token.relation.disconnected{background:transparent;}
+  .token.equal.disconnected{border:1px dashed #60a5fa;color:#2563eb;}
+  .token.noteq.disconnected{border:1px dashed #fb923c;color:#c2410c;}
+  .token.relation.connected-center{z-index:2;}
+  .token.relation.connected-center::before,
+  .token.relation.connected-center::after{content:"";position:absolute;top:50%;height:0;border-top:2px solid currentColor;transform:translateY(-50%);pointer-events:none;}
+  .token.equal.connected-center::before,
+  .token.equal.connected-center::after{border-top-color:#60a5fa;}
+  .token.noteq.connected-center::before,
+  .token.noteq.connected-center::after{border-top-color:#fb923c;}
+  .token.relation.connected-center::before{right:calc(100% + 2px);width:calc(var(--card-gap) + var(--card-w));}
+  .token.relation.connected-center::after{left:calc(100% + 2px);width:calc(var(--card-gap) + var(--card-w));}
+  .token.relation.connected-left::after,
+  .token.relation.connected-right::before,
+  .token.relation.connected-mid::before,
+  .token.relation.connected-mid::after{content:"";position:absolute;top:50%;height:0;border-top:2px solid currentColor;transform:translateY(-50%);pointer-events:none;}
+  .token.equal.connected-left::after,
+  .token.equal.connected-right::before,
+  .token.equal.connected-mid::before,
+  .token.equal.connected-mid::after{border-top-color:#60a5fa;}
+  .token.noteq.connected-left::after,
+  .token.noteq.connected-right::before,
+  .token.noteq.connected-mid::before,
+  .token.noteq.connected-mid::after{border-top-color:#fb923c;}
+  .token.relation.connected-left::after,
+  .token.relation.connected-mid::after{left:calc(100% + 2px);width:calc(var(--card-gap) + 2px);}
+  .token.relation.connected-right::before,
+  .token.relation.connected-mid::before{right:calc(100% + 2px);width:calc(var(--card-gap) + 2px);}
   body[data-seated="no"] .token { display: none !important; }
 
   .token.black{background:#000;color:#fff}
   .token.x1{background:#e5e7eb;color:#000}
-  .token.noteq{background:#ffedd5;color:#000}
 
 /* ▼ ミッション専用トークン */
   .token.yellow { background:#000; color:#ffd400; }  /* 黄コード「▧」 */
@@ -4179,6 +4209,68 @@ content.appendChild(charCol);
 
 
     const hand=document.createElement('div'); hand.className='hand';
+    const isM50 = ((state.watching?.mission?.id|0) === 50);
+    const RELATION_TYPES = new Set(['equal','noteq']);
+    const tokenText = (tk)=>{
+      switch(tk?.type){
+        case 'equal': return '＝';
+        case 'noteq': return '≠';
+        case 'x1': return 'x1';
+        case 'x2': return 'x2';
+        case 'x3': return 'x3';
+        case 'yellow': return '▧';
+        case 'even': return '2/4';
+        case 'odd': return '1/3';
+        case 'xmark': return '✕';
+        case 'num': return String(tk.value);
+        default: return String(tk?.value ?? '');
+      }
+    };
+    const visibleTokensByCard = (t.hand||[]).map(c => {
+      if (!Array.isArray(c?.tokens)) return [];
+      if (isM50 && c.open !== true) return [];
+      return c.tokens.filter(tk => !(isM50 && tk?.type !== 'num'));
+    });
+    const relationLayoutByCard = visibleTokensByCard.map(tokens => {
+      const rel = tokens.filter(tk => RELATION_TYPES.has(tk?.type));
+      const other = tokens.filter(tk => !RELATION_TYPES.has(tk?.type));
+      const relationRows = {};
+      rel.forEach((tk, order) => { relationRows[tk.type] = order; });
+      return { rel, other, relationRows, rows: [] };
+    });
+    ['equal','noteq'].forEach(type => {
+      let start = -1;
+      for (let i = 0; i <= relationLayoutByCard.length; i++) {
+        const row = i < relationLayoutByCard.length ? relationLayoutByCard[i].relationRows[type] : null;
+        if (row != null && start < 0) start = i;
+        if ((row == null || i === relationLayoutByCard.length) && start >= 0) {
+          const end = i - 1;
+          if (end > start) {
+            const targetRow = Math.max(...relationLayoutByCard.slice(start, end + 1).map(info => info.relationRows[type] ?? 0));
+            for (let j = start; j <= end; j++) relationLayoutByCard[j].relationRows[type] = targetRow;
+          }
+          start = -1;
+        }
+      }
+    });
+    relationLayoutByCard.forEach(info => {
+      info.rel.forEach(tk => { info.rows[info.relationRows[tk.type]] = tk; });
+      const relationRowIndexes = Object.values(info.relationRows);
+      const maxRelationRow = relationRowIndexes.length ? Math.max(...relationRowIndexes) : -1;
+      info.other.forEach((tk, order) => { info.rows[maxRelationRow + 1 + order] = tk; });
+    });
+    const connectionMetaByCard = relationLayoutByCard.map((info, ci) => {
+      const meta = {};
+      ['equal','noteq'].forEach(type => {
+        const row = info.relationRows[type];
+        if (row == null) return;
+        meta[type] = {
+          connectedPrev: ci > 0 && relationLayoutByCard[ci - 1].relationRows[type] === row,
+          connectedNext: ci + 1 < relationLayoutByCard.length && relationLayoutByCard[ci + 1].relationRows[type] === row,
+        };
+      });
+      return meta;
+    });
     (t.hand||[]).forEach((c,ci)=>{
             /* 無効カードは描画しない（"undefined"表示の根絶） */
       if (!c || (c.num == null && c?.kind!=='red' && c?.kind!=='yellow')) {
@@ -4391,33 +4483,38 @@ const badge=document.createElement('div'); badge.className='badge-fixed';
 const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.classList.add('m43-added'); if (c?.hookGray) a.classList.add('hook-gray'); a.textContent=c.alpha||'';
 
 const col=document.createElement('div'); col.className='tok-col';
-const isM50 = ((state.watching?.mission?.id|0) === 50);
-/* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
-if (!isM50 || (isM50 && c.open === true)) {
-  (c.tokens||[]).forEach(tk=>{
-    if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
-    const el = document.createElement('div');
-    el.className = 'token ' + (tk.style || '');
-    col.appendChild(el);
-
-    const tokenText = (t)=>{
-      switch(t.type){
-        case 'equal':  return '＝';
-        case 'noteq':  return '≠';
-        case 'x1':     return 'x1';
-        case 'x2':     return 'x2';
-        case 'x3':     return 'x3';
-        case 'yellow': return '▧';
-        case 'even':   return '2/4';
-        case 'odd':    return '1/3';
-        case 'xmark':  return '✕';
-        case 'num':    return String(t.value);
-        default:       return String(t.value ?? '');
-      }
-    };
-    el.textContent = tokenText(tk);
-  });
-}
+const layoutRows = relationLayoutByCard[ci]?.rows || [];
+layoutRows.forEach((tk)=>{
+  if (!tk) {
+    const spacer = document.createElement('div');
+    spacer.className = 'tok-slot';
+    col.appendChild(spacer);
+    return;
+  }
+  const el = document.createElement('div');
+  el.className = 'token ' + (tk.style || '');
+  if (RELATION_TYPES.has(tk?.type)) {
+    const meta = connectionMetaByCard[ci]?.[tk.type] || { connectedPrev:false, connectedNext:false };
+    el.classList.add('relation');
+    if (meta.connectedPrev && meta.connectedNext) el.classList.add('connected-mid');
+    else if (meta.connectedPrev) el.classList.add('connected-right');
+    else if (meta.connectedNext) el.classList.add('connected-left');
+    else el.classList.add('disconnected');
+  }
+  el.textContent = tokenText(tk);
+  if (RELATION_TYPES.has(tk?.type)) {
+    const meta = connectionMetaByCard[ci]?.[tk.type] || { connectedPrev:false, connectedNext:false };
+    if (meta.connectedPrev || meta.connectedNext) {
+      let start = ci;
+      let end = ci;
+      while (start > 0 && relationLayoutByCard[start - 1].relationRows[tk.type] === relationLayoutByCard[ci].relationRows[tk.type]) start--;
+      while (end + 1 < relationLayoutByCard.length && relationLayoutByCard[end + 1].relationRows[tk.type] === relationLayoutByCard[ci].relationRows[tk.type]) end++;
+      const center = Math.floor((start + end) / 2);
+      if (ci !== center) el.textContent = '';
+    }
+  }
+  col.appendChild(el);
+});
 
 
 
