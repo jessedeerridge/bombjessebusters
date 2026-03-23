@@ -822,6 +822,7 @@
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{display:flex;flex-direction:column;gap:2px;margin-top:2px;position:relative}
   .tok-col.has-link-gap{margin-left:6px;}
+  .token-slot{width:20px;height:20px;pointer-events:none;visibility:hidden;}
 .token{
     font-size:11px; line-height:1;
     border-radius:4px;
@@ -2269,20 +2270,32 @@ function getTokenDisplayText(tk){
     default:       return String(tk?.value ?? '');
   }
 }
-function sortCardTokens(tokens){
-  return (Array.isArray(tokens) ? tokens : []).slice().sort((a,b)=>{
-    const at = String(a?.type || '');
-    const bt = String(b?.type || '');
-    const aSpecial = (at === 'equal' || at === 'noteq' || at === 'num');
-    const bSpecial = (bt === 'equal' || bt === 'noteq' || bt === 'num');
-    if (aSpecial || bSpecial){
-      const rank = { equal:0, noteq:1, num:2 };
-      const ar = rank[at] ?? -1;
-      const br = rank[bt] ?? -1;
-      if (ar !== br) return ar - br;
+function buildCardTokenLayout(tokens){
+  const src = Array.isArray(tokens) ? tokens : [];
+  const normal = [];
+  const specialMap = new Map();
+  src.forEach((tk)=>{
+    const type = String(tk?.type || '');
+    if (type === 'equal' || type === 'noteq' || type === 'num') {
+      if (!specialMap.has(type)) specialMap.set(type, []);
+      specialMap.get(type).push(tk);
+      return;
     }
-    return 0;
+    normal.push({ kind:'token', token: tk });
   });
+
+  if (!specialMap.size) return normal;
+
+  const layout = normal.slice();
+  ['equal', 'noteq', 'num'].forEach((type)=>{
+    const items = specialMap.get(type) || [];
+    if (items.length){
+      items.forEach((tk)=> layout.push({ kind:'token', token: tk }));
+    } else {
+      layout.push({ kind:'slot', type });
+    }
+  });
+  return layout;
 }
 function getLinkableTokenGroup(token){
   if (!token || !LINKABLE_TOKEN_TYPES.has(String(token.type||''))) return null;
@@ -2329,15 +2342,13 @@ function decorateHandTokenGroups(handEl, entries){
         if (idx === 0) entry.el.classList.add('link-start');
         if (idx === run.length - 1) entry.el.classList.add('link-end');
       });
-      const rects = run.map(entry => entry.el.getBoundingClientRect());
-      const firstRect = rects[0];
-      const lastRect = rects[rects.length - 1];
-      const targetTop = Math.max(...rects.map(rect => rect.top));
+      const firstRect = run[0].el.getBoundingClientRect();
+      const lastRect = run[run.length - 1].el.getBoundingClientRect();
       const link = document.createElement('div');
       link.className = `token-link ${run[0].token.style || run[0].token.type}`;
       link.textContent = getTokenDisplayText(run[0].token);
       link.style.left = `${firstRect.left - handRect.left}px`;
-      link.style.top = `${targetTop - handRect.top}px`;
+      link.style.top = `${firstRect.top - handRect.top}px`;
       link.style.width = `${lastRect.right - firstRect.left}px`;
       handEl.appendChild(link);
       run = [];
@@ -4508,10 +4519,19 @@ const a=document.createElement('div'); a.className='alpha'; if (c?.m43Added) a.c
 
 const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
-const displayTokens = sortCardTokens(c.tokens || []);
+const tokenLayout = buildCardTokenLayout(c.tokens || []);
 /* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
 if (!isM50 || (isM50 && c.open === true)) {
-  displayTokens.forEach(tk=>{
+  tokenLayout.forEach(entry=>{
+    if (entry?.kind === 'slot') {
+      if (isM50) return;
+      const slot = document.createElement('div');
+      slot.className = 'token-slot';
+      slot.dataset.slotType = entry.type || '';
+      col.appendChild(slot);
+      return;
+    }
+    const tk = entry?.token;
     if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
     const el = document.createElement('div');
     el.className = 'token ' + (tk.style || tk.type || '');
