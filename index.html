@@ -836,8 +836,10 @@
   }
   .equal-run-glyph{
     position:absolute;
-    left:50%;
-    top:50%;
+    width:20px;
+    height:20px;
+    display:grid;
+    place-items:center;
     transform:translate(-50%, -50%);
     color:#000;
     font-size:11px;
@@ -3333,11 +3335,14 @@ function layoutJoinedEqualTokens(hand){
             segment.style.top = `${firstRect.top - handRect.top}px`;
             segment.style.width = `${lastRect.right - firstRect.left}px`;
             segment.style.height = `${firstRect.height}px`;
+            layer.appendChild(segment);
+
             const glyph = document.createElement('span');
             glyph.className = 'equal-run-glyph';
             glyph.textContent = '＝';
-            segment.appendChild(glyph);
-            layer.appendChild(segment);
+            glyph.style.left = `${((firstRect.left + lastRect.right) / 2) - handRect.left}px`;
+            glyph.style.top = `${(firstRect.top + (firstRect.height / 2)) - handRect.top}px`;
+            layer.appendChild(glyph);
             hasJoinedRun = true;
           }
         }
