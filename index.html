@@ -831,17 +831,15 @@
     width:20px; height:20px;   /* ← 統一サイズ（2桁OK） */
     padding:0;                 /* 中央ぴったりに */
   }  /* ▼▼ 変更1：＝ と ≠ の色を入れ替え ▼▼ */
-  .token.equal{background:#cfe8ff;color:#000}
-  .token.noteq{background:#ffedd5;color:#000}
-  .token.link-member{position:relative;z-index:1;color:transparent;border-radius:0;}
-  .token.link-member.link-start{border-top-left-radius:10px;border-bottom-left-radius:10px;}
-  .token.link-member.link-end{border-top-right-radius:10px;border-bottom-right-radius:10px;}
+  .token.equal,
+  .token.noteq{background:transparent;color:#000;border-style:dashed;}
+  .token.equal{border-color:#60a5fa;}
+  .token.noteq{border-color:#fb923c;}
+  .token.link-member{position:relative;z-index:1;color:transparent;border:none !important;background:transparent !important;border-radius:0;}
   .token.link-member.link-single{color:inherit;border-style:dashed;background:transparent !important;}
-  .token.equal.link-single{border-color:#60a5fa;}
-  .token.noteq.link-single{border-color:#fb923c;}
-  .token-link{position:absolute;height:20px;border-radius:10px;display:grid;place-items:center;font-size:11px;font-weight:700;z-index:0;pointer-events:none;}
-  .token-link.equal{background:#cfe8ff;color:#000;border:1px solid #93c5fd;}
-  .token-link.noteq{background:#ffedd5;color:#000;border:1px solid #fdba74;}
+  .token-link{position:absolute;height:20px;border-radius:4px;display:grid;place-items:center;font-size:11px;font-weight:700;z-index:0;pointer-events:none;border:none !important;box-shadow:none !important;}
+  .token-link.equal{background:#cfe8ff;color:#000;}
+  .token-link.noteq{background:#ffedd5;color:#000;}
   body[data-seated="no"] .token { display: none !important; }
 
   .token.black{background:#000;color:#fff}
