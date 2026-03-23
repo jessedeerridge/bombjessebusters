@@ -8401,8 +8401,37 @@ poolRow.onclick = (ev)=>{
         }));
         if (choices.length>0) openMenu(ev.clientX, ev.clientY, choices);
       };
+      box.onclick = null;
     }else{
       row.onclick = null;
+      box.onclick = async (ev)=>{
+        if (ev.target.closest('.ox-row, .card, .char-card, .concard, .numcard, .numdeck, .token, button, input, select, textarea, a')) return;
+        const sourceIdx = (()=>{
+          const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
+          if (Number.isInteger(sNum) && sNum>=0 && sNum<n) return sNum;
+          const alt = (v.tables||[]).findIndex(t=> t?.playerId===state.userId);
+          return (alt>=0? alt : null);
+        })();
+        if (sourceIdx == null || sourceIdx === ti) return;
+        const mine = Math.max(0, v?.meta?.m54_byTable?.[sourceIdx]||0);
+        if (mine <= 0) return;
+        const entries = Array.from({length: mine}, (_,i)=>({
+          label: String(i+1),
+          action: async ()=>{
+            const snap = await get(ref(db, `rooms/${state.roomCode}/meta`));
+            const meta = snap.val() || {};
+            const curMine = Math.max(0, meta?.m54_byTable?.[sourceIdx]||0);
+            const curTarget = Math.max(0, meta?.m54_byTable?.[ti]||0);
+            const amount = i + 1;
+            if (amount > curMine) return;
+            await update(ref(db, `rooms/${state.roomCode}/meta`), {
+              [`m54_byTable/${sourceIdx}`]: curMine - amount,
+              [`m54_byTable/${ti}`]: curTarget + amount
+            });
+          }
+        }));
+        if (entries.length>0) openMenu(ev.clientX, ev.clientY, entries);
+      };
     }
   });
 
