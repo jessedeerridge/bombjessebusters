@@ -2270,11 +2270,18 @@ function getTokenDisplayText(tk){
   }
 }
 function sortCardTokens(tokens){
-  const rank = { equal:0, noteq:0, num:1 };
   return (Array.isArray(tokens) ? tokens : []).slice().sort((a,b)=>{
-    const ar = rank[a?.type] ?? 2;
-    const br = rank[b?.type] ?? 2;
-    return ar - br;
+    const at = String(a?.type || '');
+    const bt = String(b?.type || '');
+    const aSpecial = (at === 'equal' || at === 'noteq' || at === 'num');
+    const bSpecial = (bt === 'equal' || bt === 'noteq' || bt === 'num');
+    if (aSpecial || bSpecial){
+      const rank = { equal:0, noteq:1, num:2 };
+      const ar = rank[at] ?? -1;
+      const br = rank[bt] ?? -1;
+      if (ar !== br) return ar - br;
+    }
+    return 0;
   });
 }
 function getLinkableTokenGroup(token){
@@ -2322,13 +2329,15 @@ function decorateHandTokenGroups(handEl, entries){
         if (idx === 0) entry.el.classList.add('link-start');
         if (idx === run.length - 1) entry.el.classList.add('link-end');
       });
-      const firstRect = run[0].el.getBoundingClientRect();
-      const lastRect = run[run.length - 1].el.getBoundingClientRect();
+      const rects = run.map(entry => entry.el.getBoundingClientRect());
+      const firstRect = rects[0];
+      const lastRect = rects[rects.length - 1];
+      const targetTop = Math.max(...rects.map(rect => rect.top));
       const link = document.createElement('div');
       link.className = `token-link ${run[0].token.style || run[0].token.type}`;
       link.textContent = getTokenDisplayText(run[0].token);
       link.style.left = `${firstRect.left - handRect.left}px`;
-      link.style.top = `${firstRect.top - handRect.top}px`;
+      link.style.top = `${targetTop - handRect.top}px`;
       link.style.width = `${lastRect.right - firstRect.left}px`;
       handEl.appendChild(link);
       run = [];
