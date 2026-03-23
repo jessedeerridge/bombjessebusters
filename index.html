@@ -848,7 +848,7 @@
     width:20px; height:20px;   /* ← 統一サイズ（2桁OK） */
     padding:0;                 /* 中央ぴったりに */
   }  /* ▼▼ 変更1：＝ と ≠ の色を入れ替え ▼▼ */
-  .token.equal{background:#cfe8ff;color:#000}
+  .token.equal{background:transparent;color:#000;border:1px dashed #9ca3af}
   body[data-seated="no"] .token { display: none !important; }
 
   .token.black{background:#000;color:#fff}
@@ -4493,8 +4493,15 @@ const col=document.createElement('div'); col.className='tok-col';
 const isM50 = ((state.watching?.mission?.id|0) === 50);
 /* #50：公開カードだけ数字トークンをカード下へ。それ以外は従来どおり */
 if (!isM50 || (isM50 && c.open === true)) {
-  (c.tokens||[]).forEach(tk=>{
-    if (isM50 && tk?.type !== 'num') return; // #50 は num のみ
+  const displayTokens = (c.tokens||[])
+    .filter(tk=> !(isM50 && tk?.type !== 'num'))
+    .slice()
+    .sort((a,b)=>{
+      const pa = a?.type === 'equal' ? 0 : 1;
+      const pb = b?.type === 'equal' ? 0 : 1;
+      return pa - pb;
+    });
+  displayTokens.forEach(tk=>{
     const el = document.createElement('div');
     el.className = 'token ' + (tk.style || '');
     col.appendChild(el);
