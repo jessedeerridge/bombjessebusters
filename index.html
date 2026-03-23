@@ -3368,12 +3368,12 @@ function growForCardTokens(box, basePx = 96, padPx = 6){
   cols.forEach(col=>{
     const tokens = Array.from(col.querySelectorAll('.token'));
     const cnt = tokens.length | 0;
-    const lowered = tokens.some(token => token.offsetTop > 0);
-    // 通常の2段以上に加え、1個でも下段へ押し下げられていれば伸長対象にする
+    const colRect = col.getBoundingClientRect();
+    const lowered = tokens.some(token => (token.getBoundingClientRect().top - colRect.top) > 0.5);
+    // 通常の2段以上に加え、1個でも見た目上で下段へ押し下げられていれば伸長対象にする
     if (cnt >= 2 || lowered){
       needs = true;
-      const r = col.getBoundingClientRect();
-      maxBottom = Math.max(maxBottom, r.bottom);
+      maxBottom = Math.max(maxBottom, colRect.bottom);
     }
   });
 
