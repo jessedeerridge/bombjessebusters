@@ -816,9 +816,10 @@
   .card-wrap.m54-pending-arrival .tok-col{opacity:0;}
   .card-wrap.m54-pending-arrival .card{pointer-events:none;}
   /* 入れ替えフックの移動中：アルファベット帯は固定表示のまま、カード本体＋下トークンのみ隠す */
-  .card-wrap.hook-anim-origin .card,
-  .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+.card-wrap.hook-anim-origin .card,
+.card-wrap.hook-anim-origin .marker,
+.card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+.card-wrap.hook-anim-origin.hook-anim-hide-alpha .badge-fixed{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{
     display:grid;
@@ -10022,6 +10023,32 @@ async function waitForHookArrival(tableIdx, cardId, timeoutMs=2000){
   return false;
 }
 
+function clearHookAnimOriginState(){
+  const wraps = document.querySelectorAll('.card-wrap.hook-anim-origin');
+  wraps.forEach((w)=>{
+    w.classList.remove('hook-anim-origin');
+    w.classList.remove('hook-anim-hide-alpha');
+    w.style.removeProperty('visibility');
+    const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
+    bodyNodes.forEach((node)=>{
+      node.style.removeProperty('transition');
+      node.style.removeProperty('transform');
+      node.style.removeProperty('opacity');
+      node.style.removeProperty('pointer-events');
+    });
+    const marker = w.querySelector('.marker');
+    if (marker){
+      marker.style.removeProperty('opacity');
+      marker.style.removeProperty('pointer-events');
+    }
+    const badge = w.querySelector('.badge-fixed');
+    if (badge){
+      badge.style.removeProperty('opacity');
+      badge.style.removeProperty('pointer-events');
+    }
+  });
+}
+
 function queueSharedHookAnimations(v){
   const i2Anim = v?.meta?.i2Anim;
   if (i2Anim?.id && i2Anim.id !== state._lastI2AnimId && i2Anim.A && i2Anim.B){
@@ -10071,8 +10098,8 @@ async function playHookSwapAnimation(A, B, tables){
     };
     setupFly(ca, ra); setupFly(cb, rb);
 
-    wa.classList.add('hook-anim-origin');
-    wb.classList.add('hook-anim-origin');
+    wa.classList.add('hook-anim-origin','hook-anim-hide-alpha');
+    wb.classList.add('hook-anim-origin','hook-anim-hide-alpha');
 
     // 1) 抜き取りカードを上に飛び出し
     requestAnimationFrame(()=>{
@@ -10163,6 +10190,8 @@ async function playHookSwapAnimation(A, B, tables){
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
     return null;
+  }finally{
+    clearHookAnimOriginState();
   }
 }
 
@@ -10202,7 +10231,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     fly.style.transition=`transform ${HOOK_STEP_MS}ms ease, left ${HOOK_STEP_MS}ms ease, top ${HOOK_STEP_MS}ms ease`;
     document.body.appendChild(fly);
 
-    ws.classList.add('hook-anim-origin');
+    ws.classList.add('hook-anim-origin','hook-anim-hide-alpha');
     requestAnimationFrame(()=>{ fly.style.transform=`translateY(-${cardH}px)`; });
     await sleep(HOOK_STEP_MS);
 
@@ -10248,6 +10277,8 @@ async function playHookTakeAnimation(sel, myTable, tables){
     fly.remove();
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
+  }finally{
+    clearHookAnimOriginState();
   }
 }
 
