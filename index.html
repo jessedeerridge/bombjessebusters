@@ -818,7 +818,10 @@
   /* 入れ替えフックの移動中：アルファベット帯は固定表示のまま、カード本体＋下トークンのみ隠す */
   .card-wrap.hook-anim-origin .card,
   .card-wrap.hook-anim-origin .marker,
-  .card-wrap.hook-anim-origin .tok-col{opacity:0;pointer-events:none;}
+  .card-wrap.hook-anim-origin .badge-fixed{opacity:0;pointer-events:none;}
+  .card-wrap.hook-pending-arrival .card,
+  .card-wrap.hook-pending-arrival .marker,
+  .card-wrap.hook-pending-arrival .badge-fixed{opacity:0;pointer-events:none;}
   .card-wrap.m43-pending-arrival .card{pointer-events:none;}
   .tok-col{
     display:grid;
@@ -4400,6 +4403,17 @@ wrap.dataset.cardKey = cardKey;
         && (state._m54AnimFinishedId !== m54Anim.id);
       if (isM54PendingCard){
         wrap.classList.add('m54-pending-arrival');
+      }
+
+      const i2Anim = v?.meta?.i2Anim;
+      const isI2PendingCard = !!i2Anim?.id && (
+        String(c.id||'') === String(i2Anim?.A?.cardId||'') ||
+        String(c.id||'') === String(i2Anim?.B?.cardId||'')
+      );
+      const i18Anim = v?.meta?.i18Anim;
+      const isI18PendingCard = !!i18Anim?.id && String(c.id||'') === String(i18Anim?.sel?.cardId||'');
+      if (isI2PendingCard || isI18PendingCard){
+        wrap.classList.add('hook-pending-arrival');
       }
       
       if (c.gone === true){
@@ -10030,6 +10044,9 @@ function queueSharedHookAnimations(v){
       playHookSwapAnimation(i2Anim.A, i2Anim.B, state.watching?.tables || v?.tables || []).catch(()=>{});
     }, 0);
   }
+  if (!i2Anim?.id){
+    document.querySelectorAll('.card-wrap.hook-pending-arrival').forEach(w=>w.classList.remove('hook-pending-arrival'));
+  }
 
   const i18Anim = v?.meta?.i18Anim;
   if (i18Anim?.id && i18Anim.id !== state._lastI18AnimId && i18Anim.sel && Number.isInteger(i18Anim.myTable)){
@@ -10037,6 +10054,9 @@ function queueSharedHookAnimations(v){
     setTimeout(()=>{
       playHookTakeAnimation(i18Anim.sel, i18Anim.myTable, state.watching?.tables || v?.tables || []).catch(()=>{});
     }, 0);
+  }
+  if (!i18Anim?.id){
+    document.querySelectorAll('.card-wrap.hook-pending-arrival').forEach(w=>w.classList.remove('hook-pending-arrival'));
   }
 }
 
@@ -10154,6 +10174,8 @@ async function playHookSwapAnimation(A, B, tables){
     await sleep(HOOK_STEP_MS);
 
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
+    wa.classList.add('hook-pending-arrival');
+    wb.classList.add('hook-pending-arrival');
     await Promise.all([
       waitForHookArrival(B.table, A.cardId),
       waitForHookArrival(A.table, B.cardId)
@@ -10244,6 +10266,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(HOOK_STEP_MS);
 
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
+    ws.classList.add('hook-pending-arrival');
     await waitForHookArrival(myTable, sel.cardId);
     fly.remove();
   }catch(e){
