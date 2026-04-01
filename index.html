@@ -3589,6 +3589,12 @@ function appendItemTextBox(el, itemNo){
     if(descLineCount >= 5){
       box.classList.add('desc-five-lines');
     }
+
+    const lineHeight = parseFloat(getComputedStyle(desc).lineHeight) || 0;
+    const descLineCount = lineHeight > 0 ? Math.round(desc.scrollHeight / lineHeight) : 0;
+    if(descLineCount >= 5){
+      box.classList.add('desc-five-lines');
+    }
   });
 }
 
