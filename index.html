@@ -4383,6 +4383,11 @@ wrap.dataset.cardIndex = String(ci);
 const cardKey = String(c.id || `ci-${ci}`);
 wrap.dataset.cardKey = cardKey;
 
+      if (isHookAnimatingCard(c.id)){
+        // i2 / i18 のアニメ中は、着地前後の再描画でも旧レイヤの黒トークンを再表示しない
+        wrap.classList.add('hook-anim-origin');
+      }
+
       // #43: 挿入アニメ対象カードは、nanoから飛ぶ前に見えないよう先に隠す
       const m43Anim = v?.meta?.m43_insertAnim;
       const isM43PendingCard = ((v?.mission?.id|0) === 43)
@@ -10008,6 +10013,20 @@ const HOOK_ANIM_TOTAL_MS = 5200;
 const HOOK_STEP_MS = 1500;
 const HOOK_STAGE_COUNT = 3;
 const HOOK_LAND_HOLD_MS = Math.max(0, HOOK_ANIM_TOTAL_MS - (HOOK_STEP_MS * HOOK_STAGE_COUNT));
+const HOOK_ARRIVAL_SETTLE_MS = 120;
+
+function markHookAnimatingCard(cardId, isAnimating){
+  if (!cardId) return;
+  if (!state._hookAnimatingCards) state._hookAnimatingCards = new Set();
+  const key = String(cardId);
+  if (isAnimating) state._hookAnimatingCards.add(key);
+  else state._hookAnimatingCards.delete(key);
+}
+
+function isHookAnimatingCard(cardId){
+  if (!cardId || !state._hookAnimatingCards) return false;
+  return state._hookAnimatingCards.has(String(cardId));
+}
 
 
 
@@ -10026,6 +10045,8 @@ function queueSharedHookAnimations(v){
   const i2Anim = v?.meta?.i2Anim;
   if (i2Anim?.id && i2Anim.id !== state._lastI2AnimId && i2Anim.A && i2Anim.B){
     state._lastI2AnimId = i2Anim.id;
+    markHookAnimatingCard(i2Anim.A?.cardId, true);
+    markHookAnimatingCard(i2Anim.B?.cardId, true);
     setTimeout(()=>{
       playHookSwapAnimation(i2Anim.A, i2Anim.B, state.watching?.tables || v?.tables || []).catch(()=>{});
     }, 0);
@@ -10034,6 +10055,7 @@ function queueSharedHookAnimations(v){
   const i18Anim = v?.meta?.i18Anim;
   if (i18Anim?.id && i18Anim.id !== state._lastI18AnimId && i18Anim.sel && Number.isInteger(i18Anim.myTable)){
     state._lastI18AnimId = i18Anim.id;
+    markHookAnimatingCard(i18Anim.sel?.cardId, true);
     setTimeout(()=>{
       playHookTakeAnimation(i18Anim.sel, i18Anim.myTable, state.watching?.tables || v?.tables || []).catch(()=>{});
     }, 0);
@@ -10106,7 +10128,7 @@ async function playHookSwapAnimation(A, B, tables){
     const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
 
     const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col'), w.querySelector('.badge-fixed')].filter(Boolean);
       bodyNodes.forEach((node)=>{
         node.style.transition = `transform ${HOOK_STEP_MS}ms ease`;
         node.style.transform = `translateX(${dx}px)`;
@@ -10158,11 +10180,15 @@ async function playHookSwapAnimation(A, B, tables){
       waitForHookArrival(B.table, A.cardId),
       waitForHookArrival(A.table, B.cardId)
     ]);
+    await sleep(HOOK_ARRIVAL_SETTLE_MS);
     ca.remove(); cb.remove();
     return null;
   }catch(e){
     console.warn('playHookSwapAnimation failed', e);
     return null;
+  }finally{
+    markHookAnimatingCard(A?.cardId, false);
+    markHookAnimatingCard(B?.cardId, false);
   }
 }
 
@@ -10207,7 +10233,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     await sleep(HOOK_STEP_MS);
 
     const slideCardBody = (w, dx)=>{
-      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
+      const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col'), w.querySelector('.badge-fixed')].filter(Boolean);
       bodyNodes.forEach((node)=>{
         node.style.transition = `transform ${HOOK_STEP_MS}ms ease`;
         node.style.transform = `translateX(${dx}px)`;
@@ -10245,9 +10271,12 @@ async function playHookTakeAnimation(sel, myTable, tables){
 
     if (HOOK_LAND_HOLD_MS > 0) await sleep(HOOK_LAND_HOLD_MS);
     await waitForHookArrival(myTable, sel.cardId);
+    await sleep(HOOK_ARRIVAL_SETTLE_MS);
     fly.remove();
   }catch(e){
     console.warn('playHookTakeAnimation failed', e);
+  }finally{
+    markHookAnimatingCard(sel?.cardId, false);
   }
 }
 
@@ -10268,6 +10297,8 @@ async function doItem2Swap(A, B, usingByUserId=null){
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
 
   const animId = `i2-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  markHookAnimatingCard(A.cardId, true);
+  markHookAnimatingCard(B.cardId, true);
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Anim:{ id:animId, A, B, at: Date.now() } });
   await sleep(HOOK_ANIM_TOTAL_MS);
 
@@ -10332,6 +10363,7 @@ async function doItem18Take(sel){
   if(si<0){ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
 
   const animId = `i18-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  markHookAnimatingCard(sel.cardId, true);
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Anim:{ id:animId, sel, myTable, at: Date.now() } });
   await sleep(HOOK_ANIM_TOTAL_MS);
 
