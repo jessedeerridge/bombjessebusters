@@ -3177,6 +3177,7 @@ function updateHeaderInfo(){
 /* room base */
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
+    seatLimit: null,
     players:{}, spectators:{},
     meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
       /* ▼▼ ：ミッション44用 状態 ▼▼ */
@@ -10606,11 +10607,15 @@ async function setupAutoLeaveOnDisconnect(tableIdx){
 function renderSeatTabs(v){
   if(!v?.started) return;
   seatTabs.innerHTML='';
+  const seatLimit = Math.max(1, (v?.seatLimit|0) || (v?.tableCount|0) || ((v?.tables?.length|0) || 1));
+  const occupiedCount = (v?.tables || []).filter(t => !!t?.playerId).length;
   (v.tables||[]).forEach((t,i)=>{
     const tab=document.createElement('div'); 
     tab.className='tab';
-tab.textContent = String(i + 1);
-    if(t.playerId) tab.classList.add('disabled');
+    tab.textContent = String(i + 1);
+    const isOccupied = !!t.playerId;
+    const limitReached = occupiedCount >= seatLimit;
+    if (isOccupied || (!isOccupied && limitReached)) tab.classList.add('disabled');
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
       await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {
@@ -10735,6 +10740,8 @@ function closeMissionPicker(){ H(mp, true); }
 
 async function startGame(playerCount, missionId){
   if(!state.isHost) return;
+  const tableCount = (playerCount === 2) ? 4 : playerCount;
+  const seatLimit = (playerCount === 2) ? 2 : tableCount;
 
   // ★ 前のゲーム由来のDOM＆レジスタを完全クリア
   clearMissionOverlays();
@@ -10759,9 +10766,9 @@ async function startGame(playerCount, missionId){
   const code = state.roomCode;
 
 
-  const captainIndex = Math.floor(Math.random()*playerCount);
+  const captainIndex = Math.floor(Math.random()*tableCount);
   const faces=[1,2,3,4]; shuffle(faces);
-  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false, picked:false}, hand:[] }); }
+  const tables=[]; for(let i=0;i<tableCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false, picked:false}, hand:[] }); }
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
@@ -10788,7 +10795,7 @@ let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
     const nums = MATERIALS.numbers.slice(); shuffle(nums); // 1..12 をシャッフル
     // 全員に2枚、隊長の前（cap-1）のテーブルに +1
     const cap = captainIndex|0;
-    const x   = (cap - 1 + playerCount) % playerCount;
+    const x   = (cap - 1 + tableCount) % tableCount;
     let pi = 0;
     tables.forEach((T, i) => {
       const take = (i===x) ? 3 : 2;
@@ -10805,7 +10812,7 @@ m29Rest = nums.slice(pi);
   let m43A = [];
   if (missionId === 43) {
     // 5,6人→3枚 / 3,4人→4枚（2人は想定外だが 4 に寄せる）
-    const need = (playerCount >= 5) ? 3 : 4;
+    const need = (tableCount >= 5) ? 3 : 4;
     // 「このミッションで配布する予定のカード」＝現在の deck から通常数値カードだけを候補に
     const normalIdx = deck.map((c,i)=> c?.kind==='normal' ? i : -1).filter(i=> i>=0);
     shuffle(normalIdx);
@@ -10823,7 +10830,7 @@ m29Rest = nums.slice(pi);
   
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
-  let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
+  let p=0; while(p<deck.length){ for(let t=0; t<tableCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
   tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
 
 // アイテム（人数ぶん） — ミッション規則に合わせて山札を作る
@@ -10846,7 +10853,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
  const items = (missionMeta?.id === 23)
    ? []
    : pool
-       .slice(0, Math.min(playerCount, pool.length))
+       .slice(0, Math.min(tableCount, pool.length))
        .map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: faceUpStart }));
 
   // ★ 開始エッジを作るために一瞬だけ false を書く（ミッションは未選択状態へ）
@@ -10855,8 +10862,8 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
-    started:true, tableCount:playerCount, tables, items,
-  di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : playerCount), max:6 },
+    started:true, tableCount, seatLimit, tables, items,
+  di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : tableCount), max:6 },
   captainTable: captainIndex, mission: missionMeta,     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
     m29_stock: (missionMeta?.id===29 ? [] : null),
@@ -10866,7 +10873,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
   });
   /* ここから追加：#43 A群と nano 初期値を meta に保存 */
   if (missionId === 43) {
-    const initNano = (playerCount >= 5) ? 3 : 4; // スタート時の表示（仕様どおり）
+    const initNano = (tableCount >= 5) ? 3 : 4; // スタート時の表示（仕様どおり）
     try{
       await update(ref(db, `rooms/${code}/meta`), {
         m43_A: Array.isArray(m43A) ? m43A : [],
