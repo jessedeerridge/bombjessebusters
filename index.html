@@ -10606,10 +10606,12 @@ async function setupAutoLeaveOnDisconnect(tableIdx){
 function renderSeatTabs(v){
   if(!v?.started) return;
   seatTabs.innerHTML='';
-  (v.tables||[]).forEach((t,i)=>{
+  const playerCountInRoom = Object.keys(v.players || {}).length;
+  const seatLimit = (playerCountInRoom === 2) ? 2 : (v.tables||[]).length;
+  (v.tables||[]).slice(0, seatLimit).forEach((t,i)=>{
     const tab=document.createElement('div'); 
     tab.className='tab';
-tab.textContent = String(i + 1);
+    tab.textContent = String(i + 1);
     if(t.playerId) tab.classList.add('disabled');
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
@@ -10637,7 +10639,9 @@ btnSit.onclick = async ()=>{
   if(!v?.started){ return; }
 
   // ★ 自動着席：同じ名前の席を探す
-  const sameNameIdx = (v.tables || []).findIndex(t => t.playerName === state.userName);
+  const playerCountInRoom = Object.keys(v.players || {}).length;
+  const seatLimit = (playerCountInRoom === 2) ? 2 : (v.tables || []).length;
+  const sameNameIdx = (v.tables || []).findIndex((t, idx) => idx < seatLimit && t.playerName === state.userName);
   if (sameNameIdx >= 0) {
     // 名前が一致する席があれば自動着席
     await update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}`), {
