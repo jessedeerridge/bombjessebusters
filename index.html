@@ -10552,16 +10552,29 @@ gear.onclick=()=> {
 /* ★ 共通の離席処理 */
 async function leaveSeatNow(){
   if(state.seatedTable==null || !state.watching?.tables) return;
-  const idx=state.seatedTable; const hand=(state.watching.tables[idx].hand||[]);
+  const idx=state.seatedTable;
+  const tLen = Array.isArray(state.watching?.tables) ? state.watching.tables.length : 0;
+  const tc = Number(state.watching?.tableCount || tLen);
+  let targets = [idx];
+  if (tc === 2 && tLen >= 4){
+    if (idx === 0 || idx === 1) targets = [0,1];
+    if (idx === 2 || idx === 3) targets = [2,3];
+  }
   try{
-    await onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}`)).cancel();
-    await Promise.all(hand.map((_,i)=>
-      onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`)).cancel()
-    ));
+    await Promise.all(targets.map(async (ti)=>{
+      const hand = (state.watching.tables[ti]?.hand||[]);
+      await onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${ti}`)).cancel();
+      await Promise.all(hand.map((_,i)=>
+        onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${ti}/hand/${i}`)).cancel()
+      ));
+    }));
   }catch(_e){}
 
-  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
-  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
+  await Promise.all(targets.map(async (ti)=>{
+    const hand = (state.watching.tables[ti]?.hand||[]);
+    await update(ref(db, `rooms/${state.roomCode}/tables/${ti}`), {playerId:null, playerName:null});
+    await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${ti}/hand/${i}`), {ownerId:null})));
+  }));
   state.seatedTable=null; updateMenuButtons();
 }
 
@@ -10605,25 +10618,45 @@ async function setupAutoLeaveOnDisconnect(tableIdx){
  // ▼ 席選択タブの描画を関数化：開いている間も再描画で同期
 function renderSeatTabs(v){
   if(!v?.started) return;
+  const getSeatPair = (room, idx)=>{
+    const tLen = Array.isArray(room?.tables) ? room.tables.length : 0;
+    const tc = Number(room?.tableCount || tLen);
+    if (tc === 2 && tLen >= 4){
+      if (idx === 0 || idx === 1) return [0,1];
+      if (idx === 2 || idx === 3) return [2,3];
+    }
+    return [idx];
+  };
+  const seatPlayerToPair = async (room, idx)=>{
+    const pair = getSeatPair(room, idx);
+    await Promise.all(pair.map(pi=>
+      update(ref(db, `rooms/${state.roomCode}/tables/${pi}`), {
+        playerId:state.userId, playerName:state.userName
+      })
+    ));
+    await Promise.all(pair.map(async (pi)=>{
+      const hRef = ref(db, `rooms/${state.roomCode}/tables/${pi}/hand`);
+      const hSnap = await get(hRef);
+      const hand = hSnap.val() || [];
+      await Promise.all(hand.map((_,hidx)=>
+        update(ref(db, `rooms/${state.roomCode}/tables/${pi}/hand/${hidx}`), { ownerId: state.userId })
+      ));
+    }));
+    return pair[0];
+  };
   seatTabs.innerHTML='';
   (v.tables||[]).forEach((t,i)=>{
     const tab=document.createElement('div'); 
     tab.className='tab';
 tab.textContent = String(i + 1);
-    if(t.playerId) tab.classList.add('disabled');
+    const pair = getSeatPair(v, i);
+    const isOccupied = pair.some(pi => (v.tables?.[pi]?.playerId));
+    if(isOccupied) tab.classList.add('disabled');
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
-      await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {
-        playerId:state.userId, playerName:state.userName
-      });
-      const hRef = ref(db, `rooms/${state.roomCode}/tables/${i}/hand`);
-      const hSnap = await get(hRef);
-      const hand = hSnap.val() || [];
-      await Promise.all(hand.map((_,idx)=> 
-        update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), { ownerId: state.userId })
-      ));
+      const seatedIdx = await seatPlayerToPair(v, i);
 // await setupAutoLeaveOnDisconnect(i);   // ★自動退席を無効化
-      state.seatedTable=i; H(seatPop,true); H(stageStoryPop, true); updateMenuButtons();
+      state.seatedTable=seatedIdx; H(seatPop,true); H(stageStoryPop, true); updateMenuButtons();
 maybeOpenRolePickerAfterSeat();
 
     };
@@ -10640,17 +10673,28 @@ btnSit.onclick = async ()=>{
   const sameNameIdx = (v.tables || []).findIndex(t => t.playerName === state.userName);
   if (sameNameIdx >= 0) {
     // 名前が一致する席があれば自動着席
-    await update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}`), {
-      playerId: state.userId,
-      playerName: state.userName
-    });
-    const hRef = ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand`);
-    const hSnap = await get(hRef);
-    const hand = hSnap.val() || [];
-    await Promise.all(hand.map((_, idx) => 
-      update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand/${idx}`), { ownerId: state.userId })
+    const tLen = Array.isArray(v?.tables) ? v.tables.length : 0;
+    const tc = Number(v?.tableCount || tLen);
+    let pair = [sameNameIdx];
+    if (tc === 2 && tLen >= 4){
+      if (sameNameIdx === 0 || sameNameIdx === 1) pair = [0,1];
+      if (sameNameIdx === 2 || sameNameIdx === 3) pair = [2,3];
+    }
+    await Promise.all(pair.map(pi=>
+      update(ref(db, `rooms/${state.roomCode}/tables/${pi}`), {
+        playerId: state.userId,
+        playerName: state.userName
+      })
     ));
-    state.seatedTable = sameNameIdx;
+    await Promise.all(pair.map(async (pi)=>{
+      const hRef = ref(db, `rooms/${state.roomCode}/tables/${pi}/hand`);
+      const hSnap = await get(hRef);
+      const hand = hSnap.val() || [];
+      await Promise.all(hand.map((_, idx) => 
+        update(ref(db, `rooms/${state.roomCode}/tables/${pi}/hand/${idx}`), { ownerId: state.userId })
+      ));
+    }));
+    state.seatedTable = pair[0];
     H(seatPop, true); 
     H(stageStoryPop, true);
     updateMenuButtons();
