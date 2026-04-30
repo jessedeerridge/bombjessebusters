@@ -1702,6 +1702,16 @@ function getMySeatedTableIndex(v){
   const idx = tables.findIndex(t => t?.playerId === state.userId);
   return (idx >= 0 ? idx : null);
 }
+
+function getSeatGroupIndices(v, idx){
+  const i = Number(idx);
+  const tcount = (v?.tableCount|0) || (v?.tables?.length|0) || 0;
+  if (tcount === 4){
+    if (i === 0 || i === 1) return [0,1];
+    if (i === 2 || i === 3) return [2,3];
+  }
+  return Number.isInteger(i) && i >= 0 ? [i] : [];
+}
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -10552,16 +10562,23 @@ gear.onclick=()=> {
 /* ★ 共通の離席処理 */
 async function leaveSeatNow(){
   if(state.seatedTable==null || !state.watching?.tables) return;
-  const idx=state.seatedTable; const hand=(state.watching.tables[idx].hand||[]);
+  const idx=state.seatedTable;
+  const seatGroup = getSeatGroupIndices(state.watching, idx);
   try{
-    await onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}`)).cancel();
-    await Promise.all(hand.map((_,i)=>
-      onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`)).cancel()
-    ));
+    for (const gIdx of seatGroup){
+      const hand=(state.watching.tables[gIdx]?.hand||[]);
+      await onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${gIdx}`)).cancel();
+      await Promise.all(hand.map((_,i)=>
+        onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${gIdx}/hand/${i}`)).cancel()
+      ));
+    }
   }catch(_e){}
 
-  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
-  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
+  for (const gIdx of seatGroup){
+    const hand=(state.watching.tables[gIdx]?.hand||[]);
+    await update(ref(db, `rooms/${state.roomCode}/tables/${gIdx}`), {playerId:null, playerName:null});
+    await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${gIdx}/hand/${i}`), {ownerId:null})));
+  }
   state.seatedTable=null; updateMenuButtons();
 }
 
@@ -10610,18 +10627,22 @@ function renderSeatTabs(v){
     const tab=document.createElement('div'); 
     tab.className='tab';
 tab.textContent = String(i + 1);
-    if(t.playerId) tab.classList.add('disabled');
+    const seatGroup = getSeatGroupIndices(v, i);
+    const isOccupied = seatGroup.some(si => (v.tables?.[si]?.playerId));
+    if(isOccupied) tab.classList.add('disabled');
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
-      await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {
-        playerId:state.userId, playerName:state.userName
-      });
-      const hRef = ref(db, `rooms/${state.roomCode}/tables/${i}/hand`);
-      const hSnap = await get(hRef);
-      const hand = hSnap.val() || [];
-      await Promise.all(hand.map((_,idx)=> 
-        update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), { ownerId: state.userId })
-      ));
+      for (const si of seatGroup){
+        await update(ref(db, `rooms/${state.roomCode}/tables/${si}`), {
+          playerId:state.userId, playerName:state.userName
+        });
+        const hRef = ref(db, `rooms/${state.roomCode}/tables/${si}/hand`);
+        const hSnap = await get(hRef);
+        const hand = hSnap.val() || [];
+        await Promise.all(hand.map((_,idx)=> 
+          update(ref(db, `rooms/${state.roomCode}/tables/${si}/hand/${idx}`), { ownerId: state.userId })
+        ));
+      }
 // await setupAutoLeaveOnDisconnect(i);   // ★自動退席を無効化
       state.seatedTable=i; H(seatPop,true); H(stageStoryPop, true); updateMenuButtons();
 maybeOpenRolePickerAfterSeat();
@@ -10640,16 +10661,19 @@ btnSit.onclick = async ()=>{
   const sameNameIdx = (v.tables || []).findIndex(t => t.playerName === state.userName);
   if (sameNameIdx >= 0) {
     // 名前が一致する席があれば自動着席
-    await update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}`), {
-      playerId: state.userId,
-      playerName: state.userName
-    });
-    const hRef = ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand`);
-    const hSnap = await get(hRef);
-    const hand = hSnap.val() || [];
-    await Promise.all(hand.map((_, idx) => 
-      update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand/${idx}`), { ownerId: state.userId })
-    ));
+    const seatGroup = getSeatGroupIndices(v, sameNameIdx);
+    for (const si of seatGroup){
+      await update(ref(db, `rooms/${state.roomCode}/tables/${si}`), {
+        playerId: state.userId,
+        playerName: state.userName
+      });
+      const hRef = ref(db, `rooms/${state.roomCode}/tables/${si}/hand`);
+      const hSnap = await get(hRef);
+      const hand = hSnap.val() || [];
+      await Promise.all(hand.map((_, idx) => 
+        update(ref(db, `rooms/${state.roomCode}/tables/${si}/hand/${idx}`), { ownerId: state.userId })
+      ));
+    }
     state.seatedTable = sameNameIdx;
     H(seatPop, true); 
     H(stageStoryPop, true);
@@ -10759,9 +10783,10 @@ async function startGame(playerCount, missionId){
   const code = state.roomCode;
 
 
-  const captainIndex = Math.floor(Math.random()*playerCount);
+  const actualTableCount = (playerCount === 2) ? 4 : playerCount;
+  const captainIndex = Math.floor(Math.random()*actualTableCount);
   const faces=[1,2,3,4]; shuffle(faces);
-  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false, picked:false}, hand:[] }); }
+  const tables=[]; for(let i=0;i<actualTableCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false, picked:false}, hand:[] }); }
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
@@ -10823,7 +10848,7 @@ m29Rest = nums.slice(pi);
   
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
-  let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
+  let p=0; while(p<deck.length){ for(let t=0; t<actualTableCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
   tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
 
 // アイテム（人数ぶん） — ミッション規則に合わせて山札を作る
@@ -10846,7 +10871,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
  const items = (missionMeta?.id === 23)
    ? []
    : pool
-       .slice(0, Math.min(playerCount, pool.length))
+       .slice(0, Math.min(actualTableCount, pool.length))
        .map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: faceUpStart }));
 
   // ★ 開始エッジを作るために一瞬だけ false を書く（ミッションは未選択状態へ）
@@ -10855,8 +10880,8 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
-    started:true, tableCount:playerCount, tables, items,
-  di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : playerCount), max:6 },
+    started:true, tableCount:actualTableCount, tables, items,
+  di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : actualTableCount), max:6 },
   captainTable: captainIndex, mission: missionMeta,     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
     m29_stock: (missionMeta?.id===29 ? [] : null),
