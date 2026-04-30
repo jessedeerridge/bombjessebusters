@@ -1705,7 +1705,7 @@ function getMySeatedTableIndex(v){
 
 function getSeatGroupIndices(v, idx){
   const i = Number(idx);
-  const tcount = (v?.tableCount|0) || (v?.tables?.length|0) || 0;
+  const tcount = (v?.tables?.length|0) || (v?.tableCount|0) || 0;
   if (tcount === 4){
     if (i === 0 || i === 1) return [0,1];
     if (i === 2 || i === 3) return [2,3];
@@ -10871,7 +10871,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
  const items = (missionMeta?.id === 23)
    ? []
    : pool
-       .slice(0, Math.min(actualTableCount, pool.length))
+       .slice(0, Math.min(playerCount, pool.length))
        .map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: faceUpStart }));
 
   // ★ 開始エッジを作るために一瞬だけ false を書く（ミッションは未選択状態へ）
@@ -10880,8 +10880,8 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
-    started:true, tableCount:actualTableCount, tables, items,
-  di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : actualTableCount), max:6 },
+    started:true, tableCount:playerCount, tables, items,
+  di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : playerCount), max:6 },
   captainTable: captainIndex, mission: missionMeta,     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
     m29_stock: (missionMeta?.id===29 ? [] : null),
