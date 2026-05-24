@@ -1351,6 +1351,13 @@ main:has(#lobby.hidden){
   color: #b91c1c;      /* 落ち着いた赤。好みで変更可 */
   pointer-events: none; /* クリックを妨げない */
 }
+.tab.readonly-disabled{ opacity:.55; pointer-events:none; }
+.tab.readonly-disabled::after{ content:none; }
+.host-picking-badge{
+  position:fixed; left:50%; bottom:10px; transform:translateX(-50%);
+  background:#111; color:#fff; border:1px solid #111; border-radius:999px;
+  padding:7px 12px; font-size:12px; z-index:230;
+}
 
 /* PC幅では .di をカード群のすぐ右に寄せる */
 @media (min-width: 861px){
@@ -3330,9 +3337,20 @@ enforceM31to66(v);
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
     const hostMissionPickerOpen = !!v?.meta?.missionPickerOpen;
+    let hostPickingBadge = document.getElementById('hostPickingBadge');
+    if (!hostPickingBadge){
+      hostPickingBadge = document.createElement('div');
+      hostPickingBadge.id = 'hostPickingBadge';
+      hostPickingBadge.className = 'host-picking-badge hidden';
+      hostPickingBadge.textContent = 'ホストがミッションを選択中';
+      document.body.appendChild(hostPickingBadge);
+    }
     if (!state.isHost){
       if (hostMissionPickerOpen && mp.classList.contains('hidden')) openMissionPicker({ readOnly:true });
       if (!hostMissionPickerOpen && !mp.classList.contains('hidden')) H(mp, true);
+      H(hostPickingBadge, !hostMissionPickerOpen);
+    } else {
+      H(hostPickingBadge, true);
     }
 // 条件：ホスト && 未開始 && まだミッション未選択 && まだ未実行
     // v.started は false、v.mission は null で入ってくる
@@ -5067,12 +5085,17 @@ function renderM29(v){
           openMenu(ev.clientX, ev.clientY, [{
             label: '場に出す',
             action: async ()=>{
+              let locked = false;
               try{
                 const tRef = ref(db, `rooms/${state.roomCode}/tables/${myIdx}`);
                 const mRef = ref(db, `rooms/${state.roomCode}`);
+                const busyRef = ref(db, `rooms/${state.roomCode}/meta/m29_busy`);
                 const [tSnap, rSnap] = await Promise.all([get(tRef), get(mRef)]);
                 const T = tSnap.val()||{};
                 const R = rSnap.val()||{};
+                if (R?.meta?.m29_busy) return;
+                await set(busyRef, true);
+                locked = true;
 
                 const hand0 = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
                 const pos = hand0.indexOf(n);
@@ -5128,6 +5151,11 @@ function renderM29(v){
                   }
                 }
               }catch(e){ console.error(e); }
+              finally{
+                if (locked){
+                  try{ await set(ref(db, `rooms/${state.roomCode}/meta/m29_busy`), false); }catch(_e){}
+                }
+              }
             }
           }]);
         };
@@ -10721,7 +10749,7 @@ function openMissionPicker(opts = {}){
       [...mpCounts.children].forEach(c=>c.classList.remove('active'));
       tab.classList.add('active');
     };
-    if (readOnly) tab.classList.add('disabled');
+    if (readOnly) tab.classList.add('readonly-disabled');
     mpCounts.appendChild(tab);
   });
 
