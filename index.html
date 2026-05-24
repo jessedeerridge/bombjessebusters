@@ -5056,9 +5056,11 @@ function renderM29(v){
   const isM29 = (v?.mission?.id|0) === 29;
   const oldHand = document.getElementById('m29HandRow');
   const oldCenter = document.getElementById('m29CenterRow');
+  let waitPop = document.getElementById('m29WaitPop');
   if (!isM29) {
     if (oldHand) oldHand.remove();
     if (oldCenter) oldCenter.remove();
+    if (waitPop) waitPop.remove();
     return;
   }
 
@@ -5066,6 +5068,14 @@ function renderM29(v){
   const myHand = (myIdx>=0) ? (v.tables[myIdx]?.m29Hand||[]) : [];
   const centerNow = Array.isArray(v.m29_center) ? v.m29_center : [];
   const centerLocked = centerNow.length > 0;
+  if (!waitPop){
+    waitPop = document.createElement('div');
+    waitPop.id = 'm29WaitPop';
+    waitPop.className = 'host-picking-badge hidden';
+    waitPop.textContent = '手番プレイヤーがカードを出すのを待ってください。';
+    document.body.appendChild(waitPop);
+  }
+  H(waitPop, centerNow.length > 0);
 
   // ---- 自分の手札（画面下部：ミッション詳細の上） ----
   const footer = document.getElementById('missionFooter');
