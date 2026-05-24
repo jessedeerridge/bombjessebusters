@@ -7241,17 +7241,33 @@ async function renderM59(v){
       cell.style.display  = 'grid';
       cell.style.placeItems = 'center';
 
+      const pos = idx + 1;
+      const flipKey = `${rowIdx}:${pos}`;
+      const isFaceDown = !!(v?.meta?.m59Flips?.[flipKey]);
+
       const card = document.createElement('div');
       card.className = 'numcard m59num';
       card.style.width  = '30px'; // #59 は少し小さく
       card.style.height = '46px';
-      card.style.backgroundImage = `url('${imgNumber(n)}')`;
+      card.style.backgroundImage = isFaceDown
+        ? `url('./numbercardback.jpg')`
+        : `url('${imgNumber(n)}')`;
       card.title = String(n);
 
+      // クリックで表/裏を切替
       card.onclick = async () => {
+        const cur = !!(state.watching?.meta?.m59Flips?.[flipKey]);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          [`m59Flips/${flipKey}`]: !cur,
+          m59_updatedAt: Date.now()
+        });
+      };
+
+      // ダブルクリックで nano の位置を指定
+      card.ondblclick = async () => {
         await update(ref(db, `rooms/${state.roomCode}/meta`), {
           m59_row: rowIdx,        // 0-based
-          m59_pos: (idx + 1),     // 1..12
+          m59_pos: pos,           // 1..12
           m59_updatedAt: Date.now()
         });
       };
