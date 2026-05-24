@@ -40,6 +40,7 @@
   .join-box input{padding:8px;border:1px solid #ddd;border-radius:6px; font-size:16px;}
   .btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#f8f8f8;cursor:pointer}
   .btn.primary{background:#111;color:#fff;border-color:#111}
+  .btn.loading{opacity:.55;cursor:progress}
   .btn.menu-ink{background:#111;color:#fff;border-color:#111}
   .btn.small{padding:6px 10px;font-size:12px}
   .btn.big{padding:12px 14px;font-size:16px}
@@ -1349,6 +1350,18 @@ main:has(#lobby.hidden){
   font-weight: 700;
   color: #b91c1c;      /* 落ち着いた赤。好みで変更可 */
   pointer-events: none; /* クリックを妨げない */
+}
+.tab.readonly-disabled{ opacity:.55; pointer-events:none; }
+.tab.readonly-disabled::after{ content:none; }
+.tab.readonly-disabled.active{ opacity:1; }
+.host-picking-badge{
+  position:fixed; left:50%; bottom:calc(10px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+  background:#111; color:#fff; border:1px solid #111; border-radius:8px;
+  padding:6px 10px;
+  font:inherit;
+  font-size:inherit;
+  z-index:2147483601;
+  pointer-events:none;
 }
 
 /* PC幅では .di をカード群のすぐ右に寄せる */
@@ -3083,7 +3096,11 @@ function openBottomMenu(entries){
 
 
 /* enter */
-btnJoin.onclick   = ()=>{
+btnJoin.onclick   = async ()=>{
+  if (btnJoin.dataset.loading === '1') return;
+  btnJoin.dataset.loading = '1';
+  btnJoin.classList.add('loading');
+  btnJoin.disabled = true;
   const nm = (inputName?.value || '').trim();
   // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
   state.userName = nm ? nm.slice(0,4) : hiragana(4);
@@ -3096,7 +3113,13 @@ btnJoin.onclick   = ()=>{
     inputCode.value = randomRoomCode(5);
   }
 
-  enter('player');
+  try{
+    await enter('player');
+  } finally {
+    btnJoin.dataset.loading = '0';
+    btnJoin.classList.remove('loading');
+    btnJoin.disabled = false;
+  }
 };
 
 
@@ -3318,6 +3341,23 @@ enforceM31to66(v);
 
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
+    const hostMissionPickerOpen = !!v?.meta?.missionPickerOpen;
+    let hostPickingBadge = document.getElementById('hostPickingBadge');
+    if (!hostPickingBadge){
+      hostPickingBadge = document.createElement('div');
+      hostPickingBadge.id = 'hostPickingBadge';
+      hostPickingBadge.className = 'host-picking-badge hidden';
+      hostPickingBadge.textContent = 'ホストがミッションを選択中';
+      document.body.appendChild(hostPickingBadge);
+    }
+    if (!state.isHost){
+      if (hostMissionPickerOpen && mp.classList.contains('hidden')) openMissionPicker({ readOnly:true });
+      if (!hostMissionPickerOpen && !mp.classList.contains('hidden')) H(mp, true);
+      H(hostPickingBadge, !hostMissionPickerOpen);
+    } else {
+      H(hostPickingBadge, true);
+    }
+    syncMissionPickerCountTabs(v);
 // 条件：ホスト && 未開始 && まだミッション未選択 && まだ未実行
     // v.started は false、v.mission は null で入ってくる
     /* ここから追加 */
@@ -5051,12 +5091,17 @@ function renderM29(v){
           openMenu(ev.clientX, ev.clientY, [{
             label: '場に出す',
             action: async ()=>{
+              let locked = false;
               try{
                 const tRef = ref(db, `rooms/${state.roomCode}/tables/${myIdx}`);
                 const mRef = ref(db, `rooms/${state.roomCode}`);
+                const busyRef = ref(db, `rooms/${state.roomCode}/meta/m29_busy`);
                 const [tSnap, rSnap] = await Promise.all([get(tRef), get(mRef)]);
                 const T = tSnap.val()||{};
                 const R = rSnap.val()||{};
+                if (R?.meta?.m29_busy) return;
+                await set(busyRef, true);
+                locked = true;
 
                 const hand0 = Array.isArray(T.m29Hand) ? T.m29Hand.slice() : [];
                 const pos = hand0.indexOf(n);
@@ -5112,6 +5157,11 @@ function renderM29(v){
                   }
                 }
               }catch(e){ console.error(e); }
+              finally{
+                if (locked){
+                  try{ await set(ref(db, `rooms/${state.roomCode}/meta/m29_busy`), false); }catch(_e){}
+                }
+              }
             }
           }]);
         };
@@ -10360,7 +10410,7 @@ dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark, markSrc:'
 function missionUsesYellow(missionId){
   const plan = buildMixPlan(missionId) || [];
   // yellowPick / yellowChoose を含むか、#2（黄コード）なら true
-  return missionId===2 || plan.some(p => p.type==='yellowPick' || p.type==='yellowChoose');
+  return missionId===2 || plan.some(p => p.type==='yellowPick' || p.type==='yellowChoose' || p.type==='yellowFixed');
 }
 
 function missionNumberRange(missionId){
@@ -10687,10 +10737,12 @@ btnStartOk.onclick = async ()=>{ const count=clamp(parseInt(selCount.value,10),1
 /* ▼▼ ミッションピッカー実装 ▼▼ */
 let mpSelectedCount = 4;
 
-function openMissionPicker(){
+function openMissionPicker(opts = {}){
+  const readOnly = !!opts.readOnly;
   // 初期人数は現在のテーブル数 or 4
   const v = state.watching;
-  mpSelectedCount = clamp(parseInt(v?.tableCount||4,10), 1, 6);
+  const syncedCount = parseInt(v?.meta?.missionPickerCount ?? v?.tableCount ?? 4, 10);
+  mpSelectedCount = clamp(syncedCount, 1, 6);
 
   // 人数タブ生成
   mpCounts.innerHTML = '';
@@ -10699,10 +10751,13 @@ function openMissionPicker(){
     tab.className = 'tab' + (n===mpSelectedCount?' active':'');
     tab.textContent = String(n);
     tab.onclick = ()=>{
+      if (readOnly) return;
       mpSelectedCount = n;
       [...mpCounts.children].forEach(c=>c.classList.remove('active'));
       tab.classList.add('active');
+      update(ref(db, `rooms/${state.roomCode}/meta`), { missionPickerCount: mpSelectedCount }).catch(()=>{});
     };
+    if (readOnly) tab.classList.add('readonly-disabled');
     mpCounts.appendChild(tab);
   });
 
@@ -10715,23 +10770,63 @@ missionIds.forEach(id=>{
   b.className = 'btn small';
   b.textContent = `#${id}`; // ★ #付き
   b.onclick = async ()=>{
+    if (readOnly) return;
     await leaveSeatNow();
     closeMissionPicker();
     await startGame(mpSelectedCount, id);
   };
+  if (readOnly) b.disabled = true;
   mpMissions.appendChild(b);
 });
 
 
 
   btnMpBack.onclick = ()=> closeMissionPicker();
+  H(btnMpBack, readOnly);
+  const mpActions = btnMpBack.closest('.mp-actions');
+  if (mpActions) H(mpActions, readOnly);
   H(mp, false);
+  if (state.isHost && !readOnly){
+    update(ref(db, `rooms/${state.roomCode}/meta`), {
+      missionPickerOpen:true,
+      missionPickerCount: mpSelectedCount
+    }).catch(()=>{});
+  }
   // 他のポップは閉じる
   H(menuPop, true);
 }
 
-function closeMissionPicker(){ H(mp, true); }
+function closeMissionPicker(){
+  H(mp, true);
+  if (state.isHost){
+    update(ref(db, `rooms/${state.roomCode}/meta`), { missionPickerOpen:false }).catch(()=>{});
+  }
+}
 /* ▲▲ ミッションピッカー実装 ▲▲ */
+
+function syncMissionPickerCountTabs(v){
+  if (!mp || mp.classList.contains('hidden')) return;
+  const syncedCount = clamp(parseInt(v?.meta?.missionPickerCount ?? v?.tableCount ?? 4, 10), 1, 6);
+  mpSelectedCount = syncedCount;
+  const tabs = Array.from(mpCounts?.children || []);
+  tabs.forEach((tab)=>{
+    const n = parseInt(tab.textContent || '', 10);
+    const isActive = (n === syncedCount);
+    tab.classList.toggle('active', isActive);
+    // 非ホスト(readOnly)でも、選択中はホスト同様に黒く見せる
+    if (tab.classList.contains('readonly-disabled')){
+      if (isActive){
+        tab.style.background = '#111';
+        tab.style.color = '#fff';
+        tab.style.borderColor = '#111';
+      }else{
+        tab.style.background = '';
+        tab.style.color = '';
+        tab.style.borderColor = '';
+      }
+    }
+  });
+}
 
 async function startGame(playerCount, missionId){
   if(!state.isHost) return;
@@ -10862,7 +10957,14 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
     m29_stock: (missionMeta?.id===29 ? [] : null),
  m29_deck:   (missionMeta?.id===29 ? (m29Rest||[]) : null),
     /* ▲▲ ここまで追加 ▼▼ */
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null }
+    meta:{
+      itemUses:{i1:0,i2:0,i12:0,i14:0},
+      tokenCounts:{equal:0,noteq:0,x1:0},
+      i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
+      missionPickerOpen:false,
+      missionPickerCount: playerCount,
+      m55_deck:null, m55_shown:null, m55_c8Sides:null, m55_backByIndex:null
+    }
   });
   /* ここから追加：#43 A群と nano 初期値を meta に保存 */
   if (missionId === 43) {
