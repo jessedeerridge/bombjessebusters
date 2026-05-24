@@ -5124,7 +5124,7 @@ function renderM29(v){
 
                 const already4 = ((openCountByNum[n] | 0) >= 4);
                 if (already4) stock.push({ n, by: myIdx, from: 'play' });
-                else center.push({ cid: crypto.randomUUID(), n, by: myIdx, faceUp:true });
+                else center.push({ cid: crypto.randomUUID(), n, by: myIdx, faceUp:false });
 
                 let drew = false;
                 let nextHand = hand0.slice();
@@ -5255,14 +5255,35 @@ function renderM29(v){
       cell.style.display = 'grid';
       cell.style.placeItems = 'center';
       cell.style.fontWeight = 'bold';
-      cell.style.backgroundImage = `url('${imgNumber(obj.n)}')`;
+      const isFaceUp = (obj?.faceUp !== false);
+      cell.style.backgroundImage = isFaceUp
+        ? `url('${imgNumber(obj.n)}')`
+        : `url('./numbercardback.jpg')`;
       cell.style.backgroundSize = 'cover';
       cell.style.backgroundPosition = 'center';
-      cell.title = 'クリックしたプレイヤーが獲得';
+      cell.title = isFaceUp ? 'クリックしたプレイヤーが獲得' : 'クリックで表にする';
 
       cell.onclick = async (ev) => {
         try {
           if (myIdx < 0) return;
+          if (!isFaceUp){
+            const rRef = ref(db, `rooms/${state.roomCode}`);
+            const rSnap = await get(rRef);
+            const R = rSnap.val() || {};
+            const cur = Array.isArray(R.m29_center) ? R.m29_center.slice() : [];
+            let pickIdx = -1;
+            if (cardId) pickIdx = cur.findIndex(x => x?.cid === cardId);
+            if (pickIdx < 0 && idx >= 0 && idx < cur.length) {
+              const cand = cur[idx];
+              if (cand && cand.n === obj.n && (cand.by|0) === (obj.by|0)) pickIdx = idx;
+            }
+            if (pickIdx < 0) return;
+            const target = { ...(cur[pickIdx] || {}) };
+            target.faceUp = true;
+            cur[pickIdx] = target;
+            await update(rRef, { m29_center: cur });
+            return;
+          }
           openMenu(ev.clientX, ev.clientY, [{
             label: '獲得する',
             action: async ()=>{
