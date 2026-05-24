@@ -40,6 +40,7 @@
   .join-box input{padding:8px;border:1px solid #ddd;border-radius:6px; font-size:16px;}
   .btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#f8f8f8;cursor:pointer}
   .btn.primary{background:#111;color:#fff;border-color:#111}
+  .btn.loading{opacity:.55;cursor:progress}
   .btn.menu-ink{background:#111;color:#fff;border-color:#111}
   .btn.small{padding:6px 10px;font-size:12px}
   .btn.big{padding:12px 14px;font-size:16px}
@@ -3083,7 +3084,11 @@ function openBottomMenu(entries){
 
 
 /* enter */
-btnJoin.onclick   = ()=>{
+btnJoin.onclick   = async ()=>{
+  if (btnJoin.dataset.loading === '1') return;
+  btnJoin.dataset.loading = '1';
+  btnJoin.classList.add('loading');
+  btnJoin.disabled = true;
   const nm = (inputName?.value || '').trim();
   // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
   state.userName = nm ? nm.slice(0,4) : hiragana(4);
@@ -3096,7 +3101,13 @@ btnJoin.onclick   = ()=>{
     inputCode.value = randomRoomCode(5);
   }
 
-  enter('player');
+  try{
+    await enter('player');
+  } finally {
+    btnJoin.dataset.loading = '0';
+    btnJoin.classList.remove('loading');
+    btnJoin.disabled = false;
+  }
 };
 
 
@@ -3318,6 +3329,11 @@ enforceM31to66(v);
 
     // ▼ ホスト以外には「ミッションを選ぶ」ボタン自体を非表示
     H(btnPickMission, !state.isHost);
+    const hostMissionPickerOpen = !!v?.meta?.missionPickerOpen;
+    if (!state.isHost){
+      if (hostMissionPickerOpen && mp.classList.contains('hidden')) openMissionPicker({ readOnly:true });
+      if (!hostMissionPickerOpen && !mp.classList.contains('hidden')) H(mp, true);
+    }
 // 条件：ホスト && 未開始 && まだミッション未選択 && まだ未実行
     // v.started は false、v.mission は null で入ってくる
     /* ここから追加 */
@@ -10360,7 +10376,7 @@ dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark, markSrc:'
 function missionUsesYellow(missionId){
   const plan = buildMixPlan(missionId) || [];
   // yellowPick / yellowChoose を含むか、#2（黄コード）なら true
-  return missionId===2 || plan.some(p => p.type==='yellowPick' || p.type==='yellowChoose');
+  return missionId===2 || plan.some(p => p.type==='yellowPick' || p.type==='yellowChoose' || p.type==='yellowFixed');
 }
 
 function missionNumberRange(missionId){
@@ -10687,7 +10703,8 @@ btnStartOk.onclick = async ()=>{ const count=clamp(parseInt(selCount.value,10),1
 /* ▼▼ ミッションピッカー実装 ▼▼ */
 let mpSelectedCount = 4;
 
-function openMissionPicker(){
+function openMissionPicker(opts = {}){
+  const readOnly = !!opts.readOnly;
   // 初期人数は現在のテーブル数 or 4
   const v = state.watching;
   mpSelectedCount = clamp(parseInt(v?.tableCount||4,10), 1, 6);
@@ -10699,10 +10716,12 @@ function openMissionPicker(){
     tab.className = 'tab' + (n===mpSelectedCount?' active':'');
     tab.textContent = String(n);
     tab.onclick = ()=>{
+      if (readOnly) return;
       mpSelectedCount = n;
       [...mpCounts.children].forEach(c=>c.classList.remove('active'));
       tab.classList.add('active');
     };
+    if (readOnly) tab.classList.add('disabled');
     mpCounts.appendChild(tab);
   });
 
@@ -10715,10 +10734,12 @@ missionIds.forEach(id=>{
   b.className = 'btn small';
   b.textContent = `#${id}`; // ★ #付き
   b.onclick = async ()=>{
+    if (readOnly) return;
     await leaveSeatNow();
     closeMissionPicker();
     await startGame(mpSelectedCount, id);
   };
+  if (readOnly) b.disabled = true;
   mpMissions.appendChild(b);
 });
 
@@ -10726,11 +10747,19 @@ missionIds.forEach(id=>{
 
   btnMpBack.onclick = ()=> closeMissionPicker();
   H(mp, false);
+  if (state.isHost && !readOnly){
+    update(ref(db, `rooms/${state.roomCode}/meta`), { missionPickerOpen:true }).catch(()=>{});
+  }
   // 他のポップは閉じる
   H(menuPop, true);
 }
 
-function closeMissionPicker(){ H(mp, true); }
+function closeMissionPicker(){
+  H(mp, true);
+  if (state.isHost){
+    update(ref(db, `rooms/${state.roomCode}/meta`), { missionPickerOpen:false }).catch(()=>{});
+  }
+}
 /* ▲▲ ミッションピッカー実装 ▲▲ */
 
 async function startGame(playerCount, missionId){
@@ -10862,7 +10891,13 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
     m29_stock: (missionMeta?.id===29 ? [] : null),
  m29_deck:   (missionMeta?.id===29 ? (m29Rest||[]) : null),
     /* ▲▲ ここまで追加 ▼▼ */
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null }
+    meta:{
+      itemUses:{i1:0,i2:0,i12:0,i14:0},
+      tokenCounts:{equal:0,noteq:0,x1:0},
+      i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
+      missionPickerOpen:false,
+      m55_deck:null, m55_shown:null, m55_c8Sides:null, m55_backByIndex:null
+    }
   });
   /* ここから追加：#43 A群と nano 初期値を meta に保存 */
   if (missionId === 43) {
