@@ -5075,7 +5075,8 @@ function renderM29(v){
     waitPop.textContent = '手番プレイヤーがカードを出すのを待ってください。';
     document.body.appendChild(waitPop);
   }
-  H(waitPop, centerNow.length > 0);
+  const isSeated = (myIdx >= 0);
+  H(waitPop, (centerNow.length > 0) || !isSeated);
 
   // ---- 自分の手札（画面下部：ミッション詳細の上） ----
   const footer = document.getElementById('missionFooter');
