@@ -10811,7 +10811,20 @@ function syncMissionPickerCountTabs(v){
   const tabs = Array.from(mpCounts?.children || []);
   tabs.forEach((tab)=>{
     const n = parseInt(tab.textContent || '', 10);
-    tab.classList.toggle('active', n === syncedCount);
+    const isActive = (n === syncedCount);
+    tab.classList.toggle('active', isActive);
+    // 非ホスト(readOnly)でも、選択中はホスト同様に黒く見せる
+    if (tab.classList.contains('readonly-disabled')){
+      if (isActive){
+        tab.style.background = '#111';
+        tab.style.color = '#fff';
+        tab.style.borderColor = '#111';
+      }else{
+        tab.style.background = '';
+        tab.style.color = '';
+        tab.style.borderColor = '';
+      }
+    }
   });
 }
 
