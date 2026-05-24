@@ -3356,6 +3356,7 @@ enforceM31to66(v);
     } else {
       H(hostPickingBadge, true);
     }
+    syncMissionPickerCountTabs(v);
 // 条件：ホスト && 未開始 && まだミッション未選択 && まだ未実行
     // v.started は false、v.mission は null で入ってくる
     /* ここから追加 */
@@ -10801,6 +10802,17 @@ function closeMissionPicker(){
   }
 }
 /* ▲▲ ミッションピッカー実装 ▲▲ */
+
+function syncMissionPickerCountTabs(v){
+  if (!mp || mp.classList.contains('hidden')) return;
+  const syncedCount = clamp(parseInt(v?.meta?.missionPickerCount ?? v?.tableCount ?? 4, 10), 1, 6);
+  mpSelectedCount = syncedCount;
+  const tabs = Array.from(mpCounts?.children || []);
+  tabs.forEach((tab)=>{
+    const n = parseInt(tab.textContent || '', 10);
+    tab.classList.toggle('active', n === syncedCount);
+  });
+}
 
 async function startGame(playerCount, missionId){
   if(!state.isHost) return;
