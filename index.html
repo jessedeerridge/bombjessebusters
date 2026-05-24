@@ -1356,7 +1356,11 @@ main:has(#lobby.hidden){
 .host-picking-badge{
   position:fixed; left:50%; bottom:calc(10px + env(safe-area-inset-bottom)); transform:translateX(-50%);
   background:#111; color:#fff; border:1px solid #111; border-radius:999px;
-  padding:7px 12px; font-size:12px; z-index:2147483601; pointer-events:none;
+  padding:6px 10px;
+  font:inherit;
+  font-size:inherit;
+  z-index:2147483601;
+  pointer-events:none;
 }
 
 /* PC幅では .di をカード群のすぐ右に寄せる */
@@ -10775,6 +10779,8 @@ missionIds.forEach(id=>{
 
   btnMpBack.onclick = ()=> closeMissionPicker();
   H(btnMpBack, readOnly);
+  const mpActions = btnMpBack.closest('.mp-actions');
+  if (mpActions) H(mpActions, readOnly);
   H(mp, false);
   if (state.isHost && !readOnly){
     update(ref(db, `rooms/${state.roomCode}/meta`), { missionPickerOpen:true }).catch(()=>{});
