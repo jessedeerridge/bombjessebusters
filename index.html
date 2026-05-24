@@ -1355,7 +1355,7 @@ main:has(#lobby.hidden){
 .tab.readonly-disabled::after{ content:none; }
 .host-picking-badge{
   position:fixed; left:50%; bottom:calc(10px + env(safe-area-inset-bottom)); transform:translateX(-50%);
-  background:#111; color:#fff; border:1px solid #111; border-radius:999px;
+  background:#111; color:#fff; border:1px solid #111; border-radius:8px;
   padding:6px 10px;
   font:inherit;
   font-size:inherit;
@@ -10739,7 +10739,8 @@ function openMissionPicker(opts = {}){
   const readOnly = !!opts.readOnly;
   // 初期人数は現在のテーブル数 or 4
   const v = state.watching;
-  mpSelectedCount = clamp(parseInt(v?.tableCount||4,10), 1, 6);
+  const syncedCount = parseInt(v?.meta?.missionPickerCount ?? v?.tableCount ?? 4, 10);
+  mpSelectedCount = clamp(syncedCount, 1, 6);
 
   // 人数タブ生成
   mpCounts.innerHTML = '';
@@ -10752,6 +10753,7 @@ function openMissionPicker(opts = {}){
       mpSelectedCount = n;
       [...mpCounts.children].forEach(c=>c.classList.remove('active'));
       tab.classList.add('active');
+      update(ref(db, `rooms/${state.roomCode}/meta`), { missionPickerCount: mpSelectedCount }).catch(()=>{});
     };
     if (readOnly) tab.classList.add('readonly-disabled');
     mpCounts.appendChild(tab);
@@ -10783,7 +10785,10 @@ missionIds.forEach(id=>{
   if (mpActions) H(mpActions, readOnly);
   H(mp, false);
   if (state.isHost && !readOnly){
-    update(ref(db, `rooms/${state.roomCode}/meta`), { missionPickerOpen:true }).catch(()=>{});
+    update(ref(db, `rooms/${state.roomCode}/meta`), {
+      missionPickerOpen:true,
+      missionPickerCount: mpSelectedCount
+    }).catch(()=>{});
   }
   // 他のポップは閉じる
   H(menuPop, true);
@@ -10931,6 +10936,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
       tokenCounts:{equal:0,noteq:0,x1:0},
       i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
       missionPickerOpen:false,
+      missionPickerCount: playerCount,
       m55_deck:null, m55_shown:null, m55_c8Sides:null, m55_backByIndex:null
     }
   });
