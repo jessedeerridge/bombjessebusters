@@ -7254,14 +7254,38 @@ async function renderM59(v){
         : `url('${imgNumber(n)}')`;
       card.title = String(n);
 
-      // クリックで表/裏を切替
-      card.onclick = async () => {
-        const cur = !!(state.watching?.meta?.m59Flips?.[flipKey]);
-        await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          [`m59Flips/${flipKey}`]: !cur,
-          m59_updatedAt: Date.now()
-        });
+      // 長押しで表/裏を切替（nano移動クリックと誤爆しないよう区別）
+      let holdTimer = null;
+      let longPressed = false;
+      const clearHold = ()=>{
+        if (holdTimer){
+          clearTimeout(holdTimer);
+          holdTimer = null;
+        }
       };
+      card.addEventListener('pointerdown', (ev)=>{
+        if (ev.button !== 0) return;
+        longPressed = false;
+        clearHold();
+        holdTimer = setTimeout(async ()=>{
+          longPressed = true;
+          const cur = !!(state.watching?.meta?.m59Flips?.[flipKey]);
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            [`m59Flips/${flipKey}`]: !cur,
+            m59_updatedAt: Date.now()
+          });
+        }, LONG_PRESS_MS);
+      });
+      card.addEventListener('pointerup', clearHold);
+      card.addEventListener('pointercancel', clearHold);
+      card.addEventListener('pointerleave', clearHold);
+      card.addEventListener('click', (ev)=>{
+        if (longPressed){
+          longPressed = false;
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+      });
 
       // ダブルクリックで nano の位置を指定
       card.ondblclick = async () => {
