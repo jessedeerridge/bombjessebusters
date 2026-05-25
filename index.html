@@ -7254,17 +7254,42 @@ async function renderM59(v){
         : `url('${imgNumber(n)}')`;
       card.title = String(n);
 
-      // クリックで表/裏を切替
-      card.onclick = async () => {
-        const cur = !!(state.watching?.meta?.m59Flips?.[flipKey]);
-        await update(ref(db, `rooms/${state.roomCode}/meta`), {
-          [`m59Flips/${flipKey}`]: !cur,
-          m59_updatedAt: Date.now()
-        });
+      // ミッション59：
+      // - 数値カードの長押しで表/裏を切替
+      // - 数値カードのワンクリックで nano の位置を指定
+      const LONG_PRESS_MS = 450;
+      let m59LongPressTimer = null;
+      let m59LongPressed = false;
+
+      const clearM59LongPress = ()=>{
+        if (m59LongPressTimer){
+          clearTimeout(m59LongPressTimer);
+          m59LongPressTimer = null;
+        }
       };
 
-      // ダブルクリックで nano の位置を指定
-      card.ondblclick = async () => {
+      card.onpointerdown = ()=>{
+        m59LongPressed = false;
+        clearM59LongPress();
+        m59LongPressTimer = setTimeout(async ()=>{
+          m59LongPressTimer = null;
+          m59LongPressed = true;
+          const cur = !!(state.watching?.meta?.m59Flips?.[flipKey]);
+          await update(ref(db, `rooms/${state.roomCode}/meta`), {
+            [`m59Flips/${flipKey}`]: !cur,
+            m59_updatedAt: Date.now()
+          });
+        }, LONG_PRESS_MS);
+      };
+      card.onpointerup = clearM59LongPress;
+      card.onpointerleave = clearM59LongPress;
+      card.onpointercancel = clearM59LongPress;
+
+      card.onclick = async () => {
+        if (m59LongPressed){
+          m59LongPressed = false;
+          return;
+        }
         await update(ref(db, `rooms/${state.roomCode}/meta`), {
           m59_row: rowIdx,        // 0-based
           m59_pos: pos,           // 1..12
