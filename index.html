@@ -8061,8 +8061,8 @@ function renderM66(v){
     };
     const ga = mkGhost(a, ra);
     const gb = mkGhost(b, rb);
-    a.style.opacity = '0.35';
-    b.style.opacity = '0.35';
+    a.style.visibility = 'hidden';
+    b.style.visibility = 'hidden';
 
     await new Promise((resolve)=>{
       requestAnimationFrame(()=>{
@@ -8074,6 +8074,8 @@ function renderM66(v){
 
     ga.remove();
     gb.remove();
+    a.style.visibility = '';
+    b.style.visibility = '';
     a.style.opacity = '';
     b.style.opacity = '';
   }
