@@ -7699,14 +7699,20 @@ function renderM63(v){
       row.className = 'ox-row';
       row.dataset.owner = '1';
       row.dataset.m63 = '1';
-      // #44 と同じアンカー（アルファベット直下） :contentReference[oaicite:4]{index=4}
-      const anchor = box.querySelector('.badge-fixed');
-      if (anchor){
-        anchor.insertAdjacentElement('afterend', row);
-        const ah = anchor.querySelector('.alpha')?.getBoundingClientRect().height || 18;
-        row.style.marginTop = `${Math.round(ah * 5)}px`;
-      }else{
-        (box.querySelector('.hand') || box).appendChild(row);
+      // M63: 情報トークン表示と干渉しないよう、キャラ列の直後を優先して配置
+      const charCol = box.querySelector('.char-col');
+      if (charCol){
+        charCol.insertAdjacentElement('afterend', row);
+        row.style.marginTop = '6px';
+      } else {
+        const anchor = box.querySelector('.badge-fixed');
+        if (anchor && anchor.parentElement){
+          anchor.parentElement.appendChild(row);
+          row.style.marginTop = '6px';
+        } else {
+          (box.querySelector('.hand') || box).appendChild(row);
+          row.style.marginTop = '6px';
+        }
       }
     }
 
