@@ -7728,7 +7728,17 @@ function renderM63(v){
     const rowH = 24;        // 1行の高さ（20px + gap余白を考慮）
     const rows = Math.ceil(cnt / perRow);
     const extra = rows > 0 ? (4 + rowH * rows) : 0;
-    box.style.setProperty('--table-h', `${baseH + extra}px`);
+    let needH = baseH + extra;
+
+    // ★ M63修正:
+    // 情報トークン行がある席では OX 行の絶対位置が下がるため、
+    // 実際の OX 行の下端がテーブル内に収まる高さを最低値として確保する。
+    const rowTop = row.offsetTop || 0;
+    const rowBottomNeed = rowTop + row.offsetHeight + 8; // 下余白込み
+    needH = Math.max(needH, rowBottomNeed);
+
+    box.style.setProperty('--table-h', `${needH}px`);
+    box.style.height = `${needH}px`;
     // 自分の所持酸素クリック → 1..12 をリザーブへ返却（+Nフラッシュ）
     if (Number.isInteger(myIdx) && myIdx === ti){
       row.onclick = (ev)=>{
