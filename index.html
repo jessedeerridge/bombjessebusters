@@ -7958,7 +7958,8 @@ function renderM66(v){
     box.addEventListener('click', async (ev)=>{
       const r = box.getBoundingClientRect();
       const nx = (ev.clientX - r.left) / r.width;
-      const ny = (ev.clientY - r.top) / r.height;
+      const nyRaw = (ev.clientY - r.top) / r.height;
+      const ny = Math.max(0, Math.min(1, nyRaw - 0.06)); // クリック位置より少し上に表示
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m66_rabit: { x:nx, y:ny } });
     });
 
