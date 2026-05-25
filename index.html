@@ -8014,8 +8014,7 @@ function renderM66(v){
     if (!m66SwapFrom){
       m66SwapFrom = name;
       m66SwapFromNode = node;
-      node.style.outline = '2px solid #2563eb';
-      node.style.outlineOffset = '-2px';
+      node.style.opacity = '0.65';
       return;
     }
     const src = m66SwapFrom;
@@ -8036,8 +8035,7 @@ function renderM66(v){
 
   function clearM66SwapSelection(){
     if (m66SwapFromNode){
-      m66SwapFromNode.style.outline = '';
-      m66SwapFromNode.style.outlineOffset = '';
+      m66SwapFromNode.style.opacity = '';
     }
     m66SwapFrom = null;
     m66SwapFromNode = null;
