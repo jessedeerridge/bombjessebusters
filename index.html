@@ -7254,17 +7254,39 @@ async function renderM59(v){
         : `url('${imgNumber(n)}')`;
       card.title = String(n);
 
-      // クリックで表/裏を切替
-      card.onclick = async () => {
+      // 長押しで表/裏を切替（nano移動のクリック操作と分離）
+      const HOLD_MS = 450;
+      let holdTimer = null;
+      let holdTriggered = false;
+      const clearHoldTimer = () => {
+        if (holdTimer != null){
+          clearTimeout(holdTimer);
+          holdTimer = null;
+        }
+      };
+      const flipCard = async () => {
         const cur = !!(state.watching?.meta?.m59Flips?.[flipKey]);
         await update(ref(db, `rooms/${state.roomCode}/meta`), {
           [`m59Flips/${flipKey}`]: !cur,
           m59_updatedAt: Date.now()
         });
       };
+      card.onpointerdown = () => {
+        holdTriggered = false;
+        clearHoldTimer();
+        holdTimer = setTimeout(async () => {
+          holdTriggered = true;
+          await flipCard();
+        }, HOLD_MS);
+      };
+      card.onpointerup = () => clearHoldTimer();
+      card.onpointerleave = () => clearHoldTimer();
+      card.onpointercancel = () => clearHoldTimer();
 
       // ダブルクリックで nano の位置を指定
       card.ondblclick = async () => {
+        clearHoldTimer();
+        if (holdTriggered) return;
         await update(ref(db, `rooms/${state.roomCode}/meta`), {
           m59_row: rowIdx,        // 0-based
           m59_pos: pos,           // 1..12
