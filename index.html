@@ -1262,12 +1262,6 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
   user-select:none;
 }
 
-/* 右上ホットスポット（階切替） */
-.m66-hot{
-  position:absolute; right:2px; top:2px;
-  width:12px; height:12px; cursor:pointer; z-index:2;
-}
-
 /* ラビット（1匹のみ、クリック位置に出す） */
 .m66-rabit{
   position:absolute; left:50%; top:50%;
@@ -7893,13 +7887,10 @@ function renderM66(v){
       byDi.className = 'concard';
       // diの左に差し込み（itemsBar内）
       di.insertAdjacentElement('beforebegin', byDi);
-      // ドラッグ＆ドロップ入替
-      bindM66Drag(byDi, 'bydi');
       byDi.title = '拡大';
       byDi.addEventListener('click', (ev)=>{ 
         ev.stopPropagation();
-        const cur = Array.isArray(state?.watching?.meta?.m66_slots) ? state.watching.meta.m66_slots : slots;
-        openConstraintZoomView(cur[0]);
+        handleM66SwapTap('bydi', byDi);
       });
     }
     // 表示は今回の描画スナップショットでOK
@@ -7942,19 +7933,13 @@ function renderM66(v){
 
   function mkSlot(name){
     const slot = document.createElement('div'); slot.className = 'm66-slot';
-    const cc = document.createElement('div'); cc.className = 'concard'; cc.draggable = true;
+    const cc = document.createElement('div'); cc.className = 'concard';
 
-    // 拡大（常に最新metaから参照）
+
     cc.addEventListener('click', (ev)=>{
       ev.stopPropagation();
-      const map = { bydi:0, top:1, bottom:2, left:3, right:4 };
-      const idx = map[name];
-      const cur = Array.isArray(state?.watching?.meta?.m66_slots) ? state.watching.meta.m66_slots : slots;
-      const letter = cur?.[idx];
-      if (letter) openConstraintZoomView(letter);
+      handleM66SwapTap(name, cc);
     });
-
-    bindM66Drag(cc, name);
     slot.appendChild(cc);
     return slot;
   }
@@ -7969,26 +7954,20 @@ function renderM66(v){
     stage.className = 'm66-stage';
     box.appendChild(stage);
 
-    // 右上ホットスポット（階切替）
-    const hot = document.createElement('div');
-    hot.className = 'm66-hot';
-    hot.title = '階を切替';
-    hot.addEventListener('click', (ev)=>{
-      ev.stopPropagation();
-      const cur = (v?.meta?.m66_face|0)===2 ? 2 : 1;
-      const to2 = (cur===1);
-      openOneMini(ev.clientX, ev.clientY, to2 ? '2階へ' : '1階へ', async ()=>{
-        await update(ref(db, `rooms/${state.roomCode}/meta`), { m66_face: to2 ? 2 : 1 });
-      });
-    });
-    box.appendChild(hot);
-
     // ステージクリック：ラビットをその座標に移動（1匹だけ）
     box.addEventListener('click', async (ev)=>{
       const r = box.getBoundingClientRect();
       const nx = (ev.clientX - r.left) / r.width;
       const ny = (ev.clientY - r.top) / r.height;
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m66_rabit: { x:nx, y:ny } });
+    });
+
+    // ステージをダブルクリックで階切替（＋マーク廃止）
+    box.addEventListener('dblclick', async (ev)=>{
+      ev.stopPropagation();
+      const cur = (state?.watching?.meta?.m66_face|0)===2 ? 2 : 1;
+      const to2 = (cur===1);
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m66_face: to2 ? 2 : 1 });
     });
 
     return box;
@@ -8027,31 +8006,86 @@ function renderM66(v){
     }
   }
 
-  // D&D 交換（同一固定スロット間で中身を入替）
-  function bindM66Drag(node, name){
-    const map = { bydi:0, top:1, bottom:2, left:3, right:4 };
-    node.setAttribute('draggable','true');
+  let m66SwapFrom = null;
+  let m66SwapFromNode = null;
 
-    node.addEventListener('dragstart',(e)=>{
-      e.dataTransfer.setData('text/plain', name);
+  async function handleM66SwapTap(name, node){
+    const map = { bydi:0, top:1, bottom:2, left:3, right:4 };
+    if (!m66SwapFrom){
+      m66SwapFrom = name;
+      m66SwapFromNode = node;
+      node.style.opacity = '0.65';
+      return;
+    }
+    const src = m66SwapFrom;
+    const dst = name;
+    const srcNode = m66SwapFromNode;
+    if (!src || !dst || src === dst){
+      clearM66SwapSelection();
+      return;
+    }
+    try{
+      await animateM66Swap(srcNode, node);
+      const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+      const snap = await get(mRef);
+      const meta = snap.val()||{};
+      const cur  = Array.isArray(meta?.m66_slots) ? meta.m66_slots.slice() : slots.slice();
+      const si = map[src], di = map[dst];
+      if (si==null || di==null) return;
+      const tmp = cur[si]; cur[si]=cur[di]; cur[di]=tmp;
+      await update(mRef, { m66_slots: cur });
+    }catch(err){ console.error(err); }
+    finally{
+      clearM66SwapSelection();
+    }
+  }
+
+  async function animateM66Swap(a, b){
+    if (!a || !b || !a.isConnected || !b.isConnected) return;
+    const ra = a.getBoundingClientRect();
+    const rb = b.getBoundingClientRect();
+    const mkGhost = (src, r)=>{
+      const g = src.cloneNode(true);
+      g.style.position = 'fixed';
+      g.style.left = `${r.left}px`;
+      g.style.top = `${r.top}px`;
+      g.style.width = `${r.width}px`;
+      g.style.height = `${r.height}px`;
+      g.style.margin = '0';
+      g.style.zIndex = '2147483646';
+      g.style.pointerEvents = 'none';
+      g.style.transition = 'transform 340ms ease';
+      g.style.opacity = '0.95';
+      document.body.appendChild(g);
+      return g;
+    };
+    const ga = mkGhost(a, ra);
+    const gb = mkGhost(b, rb);
+    a.style.visibility = 'hidden';
+    b.style.visibility = 'hidden';
+
+    await new Promise((resolve)=>{
+      requestAnimationFrame(()=>{
+        ga.style.transform = `translate(${rb.left - ra.left}px, ${rb.top - ra.top}px)`;
+        gb.style.transform = `translate(${ra.left - rb.left}px, ${ra.top - rb.top}px)`;
+      });
+      setTimeout(resolve, 360);
     });
-    node.addEventListener('dragover',(e)=>{ e.preventDefault(); });
-    node.addEventListener('drop', async (e)=>{
-      e.preventDefault();
-      const src = e.dataTransfer.getData('text/plain');
-      const dst = name;
-      if (!src || !dst || src===dst) return;
-      try{
-        const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-        const snap = await get(mRef);
-        const meta = snap.val()||{};
-        const cur  = Array.isArray(meta?.m66_slots) ? meta.m66_slots.slice() : slots.slice();
-        const si = map[src], di = map[dst];
-        if (si==null || di==null) return;
-        const tmp = cur[si]; cur[si]=cur[di]; cur[di]=tmp;
-        await update(mRef, { m66_slots: cur });
-      }catch(err){ console.error(err); }
-    });
+
+    ga.remove();
+    gb.remove();
+    a.style.visibility = '';
+    b.style.visibility = '';
+    a.style.opacity = '';
+    b.style.opacity = '';
+  }
+
+  function clearM66SwapSelection(){
+    if (m66SwapFromNode){
+      m66SwapFromNode.style.opacity = '';
+    }
+    m66SwapFrom = null;
+    m66SwapFromNode = null;
   }
 }
 /* ===== ここまで追加：#66 ===== */
