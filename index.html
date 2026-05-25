@@ -7666,12 +7666,14 @@ function renderM63(v){
         const mRef = ref(db, `rooms/${state.roomCode}/meta`);
         const snap = await get(mRef);
         const meta = snap.val()||{};
-        const pool = Math.max(0, meta?.oxItem|0);
-        if (pool <= 0) return;
-        const curCap = Math.max(0, meta?.oxByTable?.[capIdx]||0);
-        const upd = {};
-        upd['oxItem'] = 0;
-        upd[`oxByTable/${capIdx}`] = curCap + pool;
+        const byTable = meta?.oxByTable || {};
+        let total = Math.max(0, meta?.oxItem|0);
+        Object.values(byTable).forEach(v=>{ total += Math.max(0, v|0); });
+        if (total <= 0) return;
+
+        const upd = { oxItem: 0 };
+        Object.keys(byTable).forEach((k)=>{ upd[`oxByTable/${k}`] = 0; });
+        upd[`oxByTable/${capIdx}`] = total;
         await update(mRef, upd);
       });
     };
