@@ -8054,7 +8054,7 @@ function renderM66(v){
       g.style.margin = '0';
       g.style.zIndex = '2147483646';
       g.style.pointerEvents = 'none';
-      g.style.transition = 'transform 220ms ease';
+      g.style.transition = 'transform 340ms ease';
       g.style.opacity = '0.95';
       document.body.appendChild(g);
       return g;
@@ -8069,11 +8069,13 @@ function renderM66(v){
         ga.style.transform = `translate(${rb.left - ra.left}px, ${rb.top - ra.top}px)`;
         gb.style.transform = `translate(${ra.left - rb.left}px, ${ra.top - rb.top}px)`;
       });
-      setTimeout(resolve, 240);
+      setTimeout(resolve, 360);
     });
 
     ga.remove();
     gb.remove();
+    a.style.opacity = '';
+    b.style.opacity = '';
   }
 
   function clearM66SwapSelection(){
