@@ -8019,9 +8019,13 @@ function renderM66(v){
     }
     const src = m66SwapFrom;
     const dst = name;
-    clearM66SwapSelection();
-    if (!src || !dst || src === dst) return;
+    const srcNode = m66SwapFromNode;
+    if (!src || !dst || src === dst){
+      clearM66SwapSelection();
+      return;
+    }
     try{
+      await animateM66Swap(srcNode, node);
       const mRef = ref(db, `rooms/${state.roomCode}/meta`);
       const snap = await get(mRef);
       const meta = snap.val()||{};
@@ -8031,6 +8035,45 @@ function renderM66(v){
       const tmp = cur[si]; cur[si]=cur[di]; cur[di]=tmp;
       await update(mRef, { m66_slots: cur });
     }catch(err){ console.error(err); }
+    finally{
+      clearM66SwapSelection();
+    }
+  }
+
+  async function animateM66Swap(a, b){
+    if (!a || !b || !a.isConnected || !b.isConnected) return;
+    const ra = a.getBoundingClientRect();
+    const rb = b.getBoundingClientRect();
+    const mkGhost = (src, r)=>{
+      const g = src.cloneNode(true);
+      g.style.position = 'fixed';
+      g.style.left = `${r.left}px`;
+      g.style.top = `${r.top}px`;
+      g.style.width = `${r.width}px`;
+      g.style.height = `${r.height}px`;
+      g.style.margin = '0';
+      g.style.zIndex = '2147483646';
+      g.style.pointerEvents = 'none';
+      g.style.transition = 'transform 220ms ease';
+      g.style.opacity = '0.95';
+      document.body.appendChild(g);
+      return g;
+    };
+    const ga = mkGhost(a, ra);
+    const gb = mkGhost(b, rb);
+    a.style.opacity = '0.35';
+    b.style.opacity = '0.35';
+
+    await new Promise((resolve)=>{
+      requestAnimationFrame(()=>{
+        ga.style.transform = `translate(${rb.left - ra.left}px, ${rb.top - ra.top}px)`;
+        gb.style.transform = `translate(${ra.left - rb.left}px, ${ra.top - rb.top}px)`;
+      });
+      setTimeout(resolve, 240);
+    });
+
+    ga.remove();
+    gb.remove();
   }
 
   function clearM66SwapSelection(){
