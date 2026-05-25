@@ -7666,12 +7666,14 @@ function renderM63(v){
         const mRef = ref(db, `rooms/${state.roomCode}/meta`);
         const snap = await get(mRef);
         const meta = snap.val()||{};
-        const pool = Math.max(0, meta?.oxItem|0);
-        if (pool <= 0) return;
-        const curCap = Math.max(0, meta?.oxByTable?.[capIdx]||0);
-        const upd = {};
-        upd['oxItem'] = 0;
-        upd[`oxByTable/${capIdx}`] = curCap + pool;
+        const byTable = meta?.oxByTable || {};
+        let total = Math.max(0, meta?.oxItem|0);
+        Object.values(byTable).forEach(v=>{ total += Math.max(0, v|0); });
+        if (total <= 0) return;
+
+        const upd = { oxItem: 0 };
+        Object.keys(byTable).forEach((k)=>{ upd[`oxByTable/${k}`] = 0; });
+        upd[`oxByTable/${capIdx}`] = total;
         await update(mRef, upd);
       });
     };
@@ -7753,6 +7755,38 @@ function renderM63(v){
             upd['oxItem'] = curPool + k;
             await update(mRef, upd);
             flashPlus(k);
+
+            // 2秒後に残り酸素を自動移動
+            setTimeout(async ()=>{
+              const s2 = await get(mRef);
+              const m2 = s2.val()||{};
+              const nTables = Math.max(0, v?.tables?.length|0);
+              if (nTables <= 0) return;
+              const cap = Math.max(0, v?.captainTable|0);
+              const me = ti;
+              const prevOfCap = (cap - 1 + nTables) % nTables;
+              const nowMine = Math.max(0, m2?.oxByTable?.[me]||0);
+              if (me === prevOfCap){
+                const poolNow = Math.max(0, m2?.oxItem|0);
+                const capNow = Math.max(0, m2?.oxByTable?.[cap]||0);
+                const moveAll = nowMine + poolNow;
+                if (moveAll <= 0) return;
+                const upd2 = {};
+                upd2[`oxByTable/${me}`] = 0;
+                upd2['oxItem'] = 0;
+                upd2[`oxByTable/${cap}`] = capNow + moveAll;
+                await update(mRef, upd2);
+                return;
+              }
+
+              if (nowMine <= 0) return;
+              const next = (me + 1) % nTables;
+              const nextNow = Math.max(0, m2?.oxByTable?.[next]||0);
+              const upd2 = {};
+              upd2[`oxByTable/${me}`] = 0;
+              upd2[`oxByTable/${next}`] = nextNow + nowMine;
+              await update(mRef, upd2);
+            }, 2000);
           }
         }));
 　　    entries.push({ label: `/ ${mine}` });
