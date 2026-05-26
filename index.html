@@ -10901,7 +10901,7 @@ btnRestartCancel.onclick = ()=>{ H(restartPop,true); };
 // ▼ 変更：爆弾を解除！ で下部ピッカーを開く
 
 btnStartCancel.onclick = ()=> H(startPop,true);
-btnStartOk.onclick = async ()=>{ const count=clamp(parseInt(selCount.value,10),1,6); const missionId=parseInt(selMission.value,10); H(startPop,true); await startGame(count, missionId); };
+btnStartOk.onclick = async ()=>{ const count=clamp(parseInt(selCount.value,10),1,6); const missionRaw=selMission.value; H(startPop,true); await startGame(count, missionRaw); };
 
 
 /* ▼▼ ミッションピッカー実装 ▼▼ */
@@ -10931,19 +10931,21 @@ function openMissionPicker(opts = {}){
     mpCounts.appendChild(tab);
   });
 
-// ミッション一覧生成（#付き数字）
+// ミッション一覧生成（# と @ は別経路）
 mpMissions.innerHTML = '';
-// 1〜66 全部
-const missionIds = Array.from({length:66}, (_,i) => i+1);
-missionIds.forEach(id=>{
+const missionRoutes = [
+  ...Array.from({length:66}, (_,i)=>({ code:`hash-${i+1}`, label:`#${i+1}` })),
+  ...Array.from({length:20}, (_,i)=>({ code:`at-${i+1}`, label:`@${i+1}` }))
+];
+missionRoutes.forEach(m=>{
   const b = document.createElement('button');
   b.className = 'btn small';
-  b.textContent = `#${id}`; // ★ #付き
+  b.textContent = m.label;
   b.onclick = async ()=>{
     if (readOnly) return;
     await leaveSeatNow();
     closeMissionPicker();
-    await startGame(mpSelectedCount, id);
+    await startGame(mpSelectedCount, m.code);
   };
   if (readOnly) b.disabled = true;
   mpMissions.appendChild(b);
@@ -10998,7 +11000,21 @@ function syncMissionPickerCountTabs(v){
   });
 }
 
-async function startGame(playerCount, missionId){
+function normalizeMissionCode(input){
+  if (typeof input === 'string'){
+    if (/^hash-\d+$/.test(input) || /^at-\d+$/.test(input)) return input;
+    const n = parseInt(input,10);
+    if (!Number.isNaN(n)) return `hash-${n}`;
+  }
+  if (typeof input === 'number' && Number.isFinite(input)) return `hash-${input|0}`;
+  return 'hash-1';
+}
+
+async function startGame(playerCount, missionInput){
+  const missionCode = normalizeMissionCode(missionInput);
+  const [missionRoute, missionNumRaw] = missionCode.split('-');
+  const missionId = parseInt(missionNumRaw,10)|0;
+
   if(!state.isHost) return;
 
   // ★ 前のゲーム由来のDOM＆レジスタを完全クリア
@@ -11036,8 +11052,15 @@ let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
   shuffle(base);
 
   // ▼ ミッション別：赤/黄の混入プランを取得＆実行
-  const planList = buildMixPlan(missionId);
-  const { toAdd, mixLines, chooseLines } = executeMixPlan(planList);
+  let toAdd = []; let mixLines = []; let chooseLines = [];
+  if (missionRoute === 'hash') {
+    const planList = buildMixPlan(missionId);
+    const mixed = executeMixPlan(planList);
+    toAdd = mixed.toAdd; mixLines = mixed.mixLines; chooseLines = mixed.chooseLines;
+  } else {
+    const atMixMap = { 1:[{kind:'red',num:0}], 2:[{kind:'yellow',num:0},{kind:'yellow',num:0}], 3:[{kind:'red',num:0}] };
+    toAdd = (atMixMap[missionId]||[]).map(c=>({ ...c, num: Math.floor(Math.random()*12)+1 }));
+  }
 
 
   // デッキ合成
@@ -11047,7 +11070,7 @@ let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
   shuffle(deck);
 
   // ミッション表示メタ生成（赤/黄の結果行を先頭に差し込む）
-  missionMeta = missionInfo(missionId, { mixLines, chooseLines });
+  missionMeta = missionInfo(missionId, { mixLines, chooseLines, route: missionRoute });
   /* ▼▼ ここから追加：#29 数値カードの配布とセンター初期化 ▼▼ */
   if (missionId === 29) {
     const nums = MATERIALS.numbers.slice(); shuffle(nums); // 1..12 をシャッフル
@@ -13369,11 +13392,39 @@ function mountM26GridUnderItems(){
 }
   
 function missionInfo(id, opts={}){
+  const route = opts.route || "hash";
   const mixLines = opts.mixLines || [];     // 例: ['赤[1.5]', '黄[2.1][5.1]']
   const chooseLines = opts.chooseLines || [];// 例: ['赤コード[1.5] [3.5] のうち1つ']
   const linesForMix = [...mixLines, ...chooseLines]; // 表示の先頭に差し込む
 
-  switch(id){
+  
+  if (route === 'at') {
+    switch(id){
+      case 1:
+        return { id:1, route:'at', name:'@1', desc:'', display:[
+          '@1','新開発！','新たな道具を発明したぞ。これがあればなんでも切れるはずだ。','説明',
+          '人数分のコードを除外する。人数分だけスーパーニッパーを用意する。',
+          '除外されているコードが自分のコードと対になっている場合、スーパーニッパーを使って切断しなければならない。スーパーニッパーは使い切りだ。つまり間違えれば爆発を待つしかないだろう。'
+        ], flags:{ at1_superNipper:true, at_addCodes:[{kind:'red',count:1}], limitItemsTo:[13], at1_itemImage:'item19.png', at1_itemText:'プレイヤーのスタンドにないコードを切断できる。', at1_onlySuperNipper:true } };
+      case 2:
+        return { id:2, route:'at', name:'@2', desc:'', display:[
+          '@2','他力本願','自分ではどうにもできないこともある。仲間を信じたまえ。',
+          'このミッションではいずれのコードも自力解体ができない。',
+          'ただし、自分のコードを含めず、他プレイヤーのコード同士を宣言して切断ができる。',
+          '自分以外の二人のスタンドから切断を試みて失敗した場合、どちらかが正しくても、その2か所に情報トークンを置いて、起爆ダイヤルを2進める。'
+        ], flags:{ at2_noSelfCut:true, at2_crossCutOnly:true, at2_failAdds2TokensAndDi2:true, at_addCodes:[{kind:'yellow',count:2}] } };
+      case 3:
+        return { id:3, route:'at', name:'@3', desc:'', display:[
+          '@3','一本で終わり','最後の一本を見極めろ。',
+          '最初に情報トークンをランダムに1つ取る。その数値がなければ手元に置いて見せる。',
+          '数値カードの数値を宣言してコードの切断に失敗すれば、即爆発する。',
+          'または、別の数字を宣言して、数値カードの数値のコードの場所を間違って切断した時、即爆発する。'
+        ], flags:{ at3_showOneNumberCard:true, at3_randomInfoToAll:true, at3_failExplodes:true, at_addCodes:[{kind:'red',count:1}] } };
+      default:
+        return { id, route:'at', name:`@${id}`, desc:'', display:[`@${id}`], flags:{} };
+    }
+  }
+switch(id){
     case 1:{
       return {
         id:1, name:'#1', desc:'',
