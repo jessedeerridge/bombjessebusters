@@ -3723,6 +3723,7 @@ function renderItemsAndDi(v){
 
   const openNormalCountByNum = {};
   let openYellowCount = 0;
+  const m101OpenBonus = (((v?.mission?.id|0) === 101) ? (v?.meta?.m101_superNipperOpenBonus|0) : 0);
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       if(c?.open!==true) return;
@@ -3736,6 +3737,20 @@ function renderItemsAndDi(v){
       }
     });
   });
+
+  if (((v?.mission?.id|0) === 101)){
+    const badgeId = 'm101OpenCountBadge';
+    let badge = document.getElementById(badgeId);
+    if (!badge){
+      badge = document.createElement('div');
+      badge.id = badgeId;
+      badge.style.cssText = 'margin-left:8px;font-size:12px;color:#fff;background:#111a;padding:4px 8px;border-radius:999px;';
+      itemsBar.appendChild(badge);
+    }
+    badge.textContent = `公開枚数カウント +${m101OpenBonus}`;
+  } else {
+    document.getElementById('m101OpenCountBadge')?.remove();
+  }
 
   const isAltRuleItemRaised = (itemNo, idx)=>{
     let baseRaised = false;
@@ -9831,6 +9846,10 @@ function openItemZoom(itemNo, itemIdx, opt={}){
         if(itemNo===13){ await addTwoItemsFromDeck(); }
         if(itemNo===16){ await handleItem16(itemIdx); }
         if(itemNo===18){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i18Flow:{usingBy:state.userId, phase:'pickOther', sel:null} }); }
+        if(itemNo===50 && ((state.watching?.mission?.id|0) === 101)){
+          const used = (state.watching?.meta?.m101_superNipperOpenBonus|0);
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m101_superNipperOpenBonus: used + 1 });
+        }
 
         closeConstraintZoom();
       };
