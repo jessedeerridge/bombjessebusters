@@ -1785,7 +1785,8 @@ const STAGE_STORIES = {
   66: { title:'ビッグボス！', body:'君たちはヘリコプターに乗り込んで、ノーブ博士の隠れ家に向かっている。最終の対決が近づいている。' },
   101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' },
   102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
-  103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' }
+  103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' },
+  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。そのために予備のレシーバーと電池は用意しておいた。' }
 };
 
 function renderStageStory(v){
@@ -3005,6 +3006,9 @@ function buildMixPlan(missionId){
     ],
     103: [ // @3 赤1
       {type:'redPick', k:1},
+    ],
+    104: [ // @4 赤2
+      {type:'redPick', k:2},
     ],
 };
 return plans[missionId] || [];
@@ -11132,6 +11136,14 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
  // #23 は開始時は配らない（広げ条件を満たすまで非表示）
  const items = (missionMeta?.id === 23)
    ? []
+   : (missionMeta?.id === 104)
+     ? (() => {
+         const fixed = [7, 2];
+         const restPool = pool.filter(no => !fixed.includes(no));
+         shuffle(restPool);
+         const pick = [...fixed, restPool[0]].filter(n => Number.isFinite(n));
+         return pick.map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: faceUpStart }));
+       })()
    : (missionMeta?.id === 101)
      ? Array.from({length:playerCount}, ()=>({ id: crypto.randomUUID(), no:50, used:false, faceUp:faceUpStart }))
      : pool
@@ -11194,7 +11206,7 @@ async function setupMissionOnStart(code){
   }
 
     /* ★ #12：各アイテムの“真下”に置く数字を決定→metaへ保存（ホストのみ・一度だけ） */
-    if ((v.mission?.id|0) === 12) {
+  if ((v.mission?.id|0) === 12) {
     if (!Array.isArray(v?.meta?.m12_under)) {
         const itemCount = Array.isArray(v.items) ? v.items.length : 0;
        const pool = MATERIALS.numbers.slice(); shuffle(pool);
@@ -11202,6 +11214,16 @@ async function setupMissionOnStart(code){
         await update(ref(db, `rooms/${code}/meta`), { m12_under: picks });
       }
     }
+
+  if ((v.mission?.id|0) === 104) {
+    const picks = pickK(MATERIALS.numbers, 3);
+    await update(ref(db, `rooms/${code}/meta`), {
+      m104_numbers: picks,
+      m104_flipped: [],
+      m104_original: picks.slice(),
+      m104_forcedRightIndex: -1
+    });
+  }
 
   
   /* ここから追加：#41 黄コード4枚配布（4人＝全員 / 5人＝隊長以外） */
@@ -14310,6 +14332,19 @@ case 103: {
       '最初に情報トークンをランダムに1つ取る。その数値がなければ手元に置いて見せる。',
       '数値カードの数値を宣言してコードの切断に失敗すれば、即爆発する。',
       'または、別の数字を宣言して、数値カードの数値のコードの場所を間違って切断した時、即爆発する。',
+   ],
+    flags:{ needsNumberLane:true, pattern:'P1' }
+  };
+}
+case 104: {
+  return {
+    id:104, name:'@4', desc:'',
+    display:[
+      '@4',
+      ...linesForMix,
+      '数値カードを3枚ひいて、並べる。',
+      '数値カードのコードを切断したら、直後の手番プレイヤーはその右の数値カードのコードを切断しなければならない。切断できない場合は起爆ダイヤルを1進める。',
+      '数値カードのコードを4本切断したら、そのカードを取り除く。'
    ],
     flags:{ needsNumberLane:true, pattern:'P1' }
   };
