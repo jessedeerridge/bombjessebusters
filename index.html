@@ -1783,7 +1783,9 @@ const STAGE_STORIES = {
   64: { title:'おとりコードの帰還', body:'その上、奴らは倍増だ！' },
   65: { title:'数本のコードを引っ張る', body:'「数値を教えてもらえますか？」' },
   66: { title:'ビッグボス！', body:'君たちはヘリコプターに乗り込んで、ノーブ博士の隠れ家に向かっている。最終の対決が近づいている。' },
-  101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' }
+  101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' },
+  102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
+  103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' }
 };
 
 function renderStageStory(v){
@@ -2997,6 +2999,12 @@ function buildMixPlan(missionId){
     ],
     101: [ // @1 黄2
       {type:'yellowPick', k:2},
+    ],
+    102: [ // @2 黄2
+      {type:'yellowPick', k:2},
+    ],
+    103: [ // @3 赤1
+      {type:'redPick', k:1},
     ],
 };
 return plans[missionId] || [];
@@ -11488,6 +11496,19 @@ if ((v.mission?.id|0) === 39) {
   ]);
 }
 
+// #103：各プレイヤーにランダム情報トークンを1枚ずつ配布（キャラ下表示）
+if ((v.mission?.id|0) === 103) {
+  const tblRef = ref(db, `rooms/${code}/tables`);
+  const tblSnap = await get(tblRef);
+  const tbls = tblSnap.val() || [];
+  const allNums = MATERIALS.numbers.slice();
+  tbls.forEach(T=>{
+    const tok = allNums[(Math.random()*allNums.length)|0];
+    T.m22Tokens = [tok];
+  });
+  await set(tblRef, tbls);
+}
+
   // #26：1〜12を3×4で配置（裏表トグル）
   if (flags.m26_grid12) {
     mountM26GridUnderItems();
@@ -11804,8 +11825,10 @@ function buildFixedLane(list){
 /* ここから追加：#11 数値カード1枚（同期表示） */
 async function ensureM11MetaInit(vNow){
   const v = vNow || state.watching; if (!v) return;
+  const mid = (v?.mission?.id|0);
+  const key = (mid === 103) ? 'm103_number' : 'm11_number';
   // 既に用意済みなら何もしない／初期化はホストのみ
-  if ((v?.meta?.m11_number|0) > 0) return;
+  if ((v?.meta?.[key]|0) > 0) return;
   if (!state.isHost) return;
 
   // 配布済みアイテムカードの番号と一致しない数値を優先して選ぶ
@@ -11815,17 +11838,19 @@ async function ensureM11MetaInit(vNow){
   shuffle(candidates);
   const pick = candidates[0]|0;
 
-  await update(ref(db, `rooms/${state.roomCode}/meta`), { m11_number: pick });
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { [key]: pick });
 }
 
 function renderM11(v){
-  const isM11 = ((v?.mission?.id|0) === 11);
+  const mid = (v?.mission?.id|0);
+  const isM11 = (mid === 11 || mid === 103);
+  const key = (mid === 103) ? 'm103_number' : 'm11_number';
   const rowId = 'm11Row';
   const old   = document.getElementById(rowId);
   if (!isM11){ if (old) old.remove(); return; }
 
   // 初回：ホストが m11_number を用意（未用意なら用意して次のonValueで描画）
-  if ((v?.meta?.m11_number|0) === 0){ ensureM11MetaInit(v); if (old) old.remove(); return; }
+  if ((v?.meta?.[key]|0) === 0){ ensureM11MetaInit(v); if (old) old.remove(); return; }
 
   if (old) old.remove();
   const lane = document.createElement('div');
@@ -11833,7 +11858,7 @@ function renderM11(v){
   lane.className = 'numlane';
 
   // 数値カード1枚を配置（重複禁止の登録つき）
-  const N = v?.meta?.m11_number|0;
+  const N = v?.meta?.[key]|0;
   if (typeof placeNumberCard === 'function'){
     placeNumberCard(N, lane);     // 既存UI登録ユーティリティ
   }else{
@@ -14259,6 +14284,34 @@ case 101: {
       '（他プレイヤーがスーパーニッパーで切断したコードが、自分のスタンドにある場合は宣言して、全員に知らせる。）',
    ],
     flags:{ m101_superNipper:true }
+  };
+}
+case 102: {
+  return {
+    id:102, name:'@2', desc:'',
+    display:[
+      '@2',
+      ...linesForMix,
+      'このミッションでは、いずれのコードも自分1人だけで切断ができない。',
+      'このミッションでは、自分のコードを含めず、他プレイヤーのコード同士を宣言して切断することができる。',
+      'もし他のプレイヤー1人のスタンドから2本を選び、コードの切断に失敗した場合、どちらかが正しくても、任意の一か所に情報トークンを置いて、起爆ダイヤルを1進める。',
+'もし自分以外の二人のスタンドから切断を試みて失敗した場合、どちらかが正しくても、その2か所に情報トークンを置いて、起爆ダイヤルを2進める。',
+
+   ],
+    flags:{}
+  };
+}
+case 103: {
+  return {
+    id:103, name:'@3', desc:'',
+    display:[
+      '@3',
+      ...linesForMix,
+      '最初に情報トークンをランダムに1つ取る。その数値がなければ手元に置いて見せる。',
+      '数値カードの数値を宣言してコードの切断に失敗すれば、即爆発する。',
+      'または、別の数字を宣言して、数値カードの数値のコードの場所を間違って切断した時、即爆発する。',
+   ],
+    flags:{ needsNumberLane:true, pattern:'P1' }
   };
 }
 
