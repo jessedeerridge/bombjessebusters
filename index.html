@@ -11142,9 +11142,9 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
      ? Array.from({length:playerCount}, ()=>({ id: crypto.randomUUID(), no:50, used:false, faceUp:faceUpStart }))
      : (missionMeta?.id === 104)
        ? (()=>{
-           const randomPool = Array.from({length:18}, (_,i)=>i+1).filter(n=>n!==1 && n!==2);
+           const randomPool = Array.from({length:18}, (_,i)=>i+1).filter(n=>n!==7 && n!==2);
            shuffle(randomPool);
-           return [1,2,randomPool[0]].map(no => ({ id: crypto.randomUUID(), no, used:false, faceUp:faceUpStart }));
+           return [7,2,randomPool[0]].map(no => ({ id: crypto.randomUUID(), no, used:false, faceUp:faceUpStart }));
          })()
        : pool
          .slice(0, Math.min(playerCount, pool.length))
