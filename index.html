@@ -1780,7 +1780,8 @@ const STAGE_STORIES = {
   63: { title:'タイタニックII号', body:'この巨大な新造船には奇妙な名前がつけられている。船体に爆弾を仕掛けるなんて、ディカプリオのファンにとっては奇妙な思いつきだ！酸素を管理して世界の王になろう！' },
   64: { title:'おとりコードの帰還', body:'その上、奴らは倍増だ！' },
   65: { title:'数本のコードを引っ張る', body:'「数値を教えてもらえますか？」' },
-  66: { title:'ビッグボス！', body:'君たちはヘリコプターに乗り込んで、ノーブ博士の隠れ家に向かっている。最終の対決が近づいている。' }
+  66: { title:'ビッグボス！', body:'君たちはヘリコプターに乗り込んで、ノーブ博士の隠れ家に向かっている。最終の対決が近づいている。' },
+  101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' }
 };
 
 function renderStageStory(v){
@@ -1808,7 +1809,7 @@ const ITEM_USE_TIMINGS = {
   1:'いつでも使える', 2:'いつでも使える', 3:'手番中に使う', 4:'いつでも使える', 5:'手番中に使う',
   6:'いつでも使える', 7:'いつでも使える', 8:'いつでも使える', 9:'手番開始の前', 10:'手番中に使う',
   11:'相談せずに使う', 12:'いつでも使える', 13:'即時効果', 14:'いつでも使える', 15:'即時効果',
-  16:'即時効果', 17:'手番中に使う', 18:'いつでも使える'
+  16:'即時効果', 17:'手番中に使う', 18:'いつでも使える', 50:'いつでも使える'
 };
 
 const ITEM_TEXTS = {
@@ -1829,7 +1830,8 @@ const ITEM_TEXTS = {
   15:{name:'フタタビボックス',desc:'使用済みの装備カードを全てオモテ向きにする。'},
   16:{name:'分離銃',desc:'情報トークンをランダムに1枚ひき、その値のコードを全て切断できる。'},
   17:{name:'優先切断券',desc:'他の2本のコードが切断されていなくても、単独で自分の数値が同じ2本のコードを切断できる。'},
-  18:{name:'ヒッカケフック',desc:'他プレイヤーのコードを1枚選び、自分のスタンドに置く。'}
+  18:{name:'ヒッカケフック',desc:'他プレイヤーのコードを1枚選び、自分のスタンドに置く。'},
+  50:{name:'スーパーニッパー',desc:'スタンド上にないコードと一緒に切断することができる。'}
 };
 
 /* Elements */
@@ -2991,6 +2993,9 @@ function buildMixPlan(missionId){
       {type:'redPick', k:2},
       {type:'yellowPick', k:2},
     ],
+    101: [ // @1 黄2
+      {type:'yellowPick', k:2},
+    ],
 };
 return plans[missionId] || [];
 
@@ -3690,7 +3695,7 @@ function decorateItemFront(el, itemNo){
     img.alt = '';
     chip.appendChild(img);
 
-    if(itemNo===13){
+    if(itemNo===13 || itemNo===50){
       const sq = document.createElement('span');
       sq.className = 'yellow-square';
       chip.appendChild(sq);
@@ -10609,6 +10614,7 @@ function missionNumberRange(missionId){
    59: [10],
    63: [10],
   65: [10],
+  101: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
  };
 
     
@@ -10621,6 +10627,7 @@ function itemDeckNumbers(missionId){
   // 43以降は 1..18 を使用
   if(missionId >= 43){
     pool = Array.from({length:18}, (_,i)=> i+1);
+    if (missionId >= 101) pool.push(50);
   } else {
     // 〜42は 1..13（黄コードあり） / 1..12（黄コードなし）
     const maxNo = useYellow ? 13 : 12;
@@ -10934,11 +10941,11 @@ function openMissionPicker(opts = {}){
 // ミッション一覧生成（#付き数字）
 mpMissions.innerHTML = '';
 // 1〜66 全部
-const missionIds = Array.from({length:66}, (_,i) => i+1);
+const missionIds = [...Array.from({length:66}, (_,i) => i+1), ...Array.from({length:20}, (_,i)=>101+i)];
 missionIds.forEach(id=>{
   const b = document.createElement('button');
   b.className = 'btn small';
-  b.textContent = `#${id}`; // ★ #付き
+  b.textContent = (id >= 101) ? `@${id-100}` : `#${id}`;
   b.onclick = async ()=>{
     if (readOnly) return;
     await leaveSeatNow();
@@ -11048,6 +11055,13 @@ let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
 
   // ミッション表示メタ生成（赤/黄の結果行を先頭に差し込む）
   missionMeta = missionInfo(missionId, { mixLines, chooseLines });
+
+  if (missionId === 101){
+    const candidates = deck.filter(c => c.kind !== 'yellow');
+    shuffle(candidates);
+    const removeSet = new Set(candidates.slice(0, playerCount).map(c => c.id));
+    deck = deck.filter(c => !removeSet.has(c.id));
+  }
   /* ▼▼ ここから追加：#29 数値カードの配布とセンター初期化 ▼▼ */
   if (missionId === 29) {
     const nums = MATERIALS.numbers.slice(); shuffle(nums); // 1..12 をシャッフル
@@ -11110,7 +11124,9 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
  // #23 は開始時は配らない（広げ条件を満たすまで非表示）
  const items = (missionMeta?.id === 23)
    ? []
-   : pool
+   : (missionMeta?.id === 101)
+     ? Array.from({length:playerCount}, ()=>({ id: crypto.randomUUID(), no:50, used:false, faceUp:faceUpStart }))
+     : pool
        .slice(0, Math.min(playerCount, pool.length))
        .map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: faceUpStart }));
 
@@ -14231,6 +14247,21 @@ case 66: {
 }
         
       
+
+case 101: {
+  return {
+    id:101, name:'@1', desc:'',
+    display:[
+      '@1',
+      ...linesForMix,
+      '人数分のコードを除外する。人数分だけスーパーニッパーを用意する。',
+      '除外されているコードが自分のコードと対になっている場合、スーパーニッパーを使って切断しなければならない。スーパーニッパーは使い切りだ。つまり間違えれば爆発を待つしかないだろう。',
+      '（他プレイヤーがスーパーニッパーで切断したコードが、自分のスタンドにある場合は宣言して、全員に知らせる。）',
+   ],
+    flags:{ m101_superNipper:true }
+  };
+}
+
     default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
   }
 }
