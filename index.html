@@ -3971,7 +3971,7 @@ function renderHostTool(v){
 
   // ミッション101系のスーパーニッパーは、1枚使用ごとに「手札1枚公開相当」として扱う
   // （黒アイコンの奇数判定のみで加算。公開数カウントに +1 する）
-  const superNipperUsedCount = (v?.items || []).filter(it => (it?.itemNo|0) === 50 && it?.used === true).length;
+  const superNipperUsedCount = (v?.items || []).filter(it => (it?.no|0) === 50 && it?.used === true).length;
   if (superNipperUsedCount > 0) {
     openCountByNum.__superNipperVirtualOpen__ = (openCountByNum.__superNipperVirtualOpen__ || 0) + superNipperUsedCount;
   }
