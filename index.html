@@ -1672,6 +1672,20 @@ const state = {
   _lastI2AnimId:null,
   _lastI18AnimId:null};
 
+const MISSION_LABEL_CONFIG = {
+  hashMax: 99,
+  afterHashPrefix: '@',
+  atMissionIdStart: 101,
+};
+
+function missionLabelById(id){
+  const num = Number(id) | 0;
+  if (num >= MISSION_LABEL_CONFIG.atMissionIdStart){
+    return `${MISSION_LABEL_CONFIG.afterHashPrefix}${num - MISSION_LABEL_CONFIG.atMissionIdStart + 1}`;
+  }
+  return `#${num}`;
+}
+
 function needsRoleSelection(missionId){
   const mid = Number(missionId) | 0;
   return (mid >= 31 && mid <= 66 && mid !== 58);
@@ -1780,7 +1794,10 @@ const STAGE_STORIES = {
   63: { title:'タイタニックII号', body:'この巨大な新造船には奇妙な名前がつけられている。船体に爆弾を仕掛けるなんて、ディカプリオのファンにとっては奇妙な思いつきだ！酸素を管理して世界の王になろう！' },
   64: { title:'おとりコードの帰還', body:'その上、奴らは倍増だ！' },
   65: { title:'数本のコードを引っ張る', body:'「数値を教えてもらえますか？」' },
-  66: { title:'ビッグボス！', body:'君たちはヘリコプターに乗り込んで、ノーブ博士の隠れ家に向かっている。最終の対決が近づいている。' }
+  66: { title:'ビッグボス！', body:'君たちはヘリコプターに乗り込んで、ノーブ博士の隠れ家に向かっている。最終の対決が近づいている。' },
+  101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' },
+  102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
+  103: { title:'一本で終わり', body:'たった一本の判断が、すべてを決める。' }
 };
 
 function renderStageStory(v){
@@ -1790,7 +1807,7 @@ function renderStageStory(v){
   const mySeatIdx = getMySeatedTableIndex(v);
   if (mySeatIdx != null) { H(stageStoryPop, true); return; }
   stageStoryTitle.textContent = def.title;
-  stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
+  stageStoryNum.textContent = missionLabelById(missionId);
   stageStoryBody.textContent = def.body;
   if (stageStoryImageMissions.has(missionId)) {
     stageStoryImage.src = `./P${missionId}.png`;
@@ -10931,14 +10948,17 @@ function openMissionPicker(opts = {}){
     mpCounts.appendChild(tab);
   });
 
-// ミッション一覧生成（#付き数字）
+// ミッション一覧生成（表示ラベルは missionLabelById で管理）
 mpMissions.innerHTML = '';
-// 1〜66 全部
-const missionIds = Array.from({length:66}, (_,i) => i+1);
+// #1〜#66 + @1〜@20（内部IDは 101〜120）
+const missionIds = [
+  ...Array.from({length:66}, (_,i) => i+1),
+  ...Array.from({length:20}, (_,i) => MISSION_LABEL_CONFIG.atMissionIdStart + i),
+];
 missionIds.forEach(id=>{
   const b = document.createElement('button');
   b.className = 'btn small';
-  b.textContent = `#${id}`; // ★ #付き
+  b.textContent = missionLabelById(id);
   b.onclick = async ()=>{
     if (readOnly) return;
     await leaveSeatNow();
@@ -14229,9 +14249,59 @@ case 66: {
     flags:{}
   };
 }
+case 101: {
+  return {
+    id:101, name:missionLabelById(101), desc:'',
+    display:[
+      missionLabelById(101),
+      ...linesForMix,
+      '人数分のコードを除外する。人数分だけスーパーニッパーを用意する。',
+      '除外されているコードが自分のコードと対になっている場合、スーパーニッパーを使って切断しなければならない。スーパーニッパーは使い切りだ。',
+    ],
+    flags:{
+      forcedMix:{ red:1, yellow:0 },
+      limitItemsTo:[19],
+      forceItemDealCountById:{ 19:'perPlayer' },
+      itemBadgeModeById:{ 19:'square' }
+    }
+  };
+}
+case 102: {
+  return {
+    id:102, name:missionLabelById(102), desc:'',
+    display:[
+      missionLabelById(102),
+      ...linesForMix,
+      'このミッションではいずれのコードも自力解体ができない。',
+      'ただし、自分のコードを含めず、他プレイヤーのコード同士を宣言して切断ができる。',
+      '自分以外の二人のスタンドから切断を試みて失敗した場合、どちらかが正しくても、その2か所に情報トークンを置いて、起爆ダイヤルを2進める。',
+    ],
+    flags:{ forcedMix:{ red:0, yellow:2 } }
+  };
+}
+case 103: {
+  return {
+    id:103, name:missionLabelById(103), desc:'',
+    display:[
+      missionLabelById(103),
+      ...linesForMix,
+      '最初に情報トークンをランダムに1つ取る。その数値がなければ手元に置いて見せる。',
+      '数値カードの数値を宣言してコードの切断に失敗すれば、即爆発する。',
+      'または、別の数字を宣言して、数値カードの数値のコードの場所を間違って切断した時、即爆発する。',
+    ],
+    flags:{
+      forcedMix:{ red:1, yellow:0 },
+      m69ShowTopNumberCard:true,
+      m69RandomInfoTokenToAll:true,
+    }
+  };
+}
         
       
-    default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
+    default:  {
+      const label = missionLabelById(id);
+      return {id, name:label, desc:'', display:[label, ...linesForMix]};
+    }
   }
 }
 
