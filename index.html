@@ -1674,7 +1674,9 @@ const state = {
 
 function needsRoleSelection(missionId){
   const mid = Number(missionId) | 0;
-  return (mid >= 31 && mid <= 66 && mid !== 58);
+  const normalRange = (mid >= 31 && mid <= 66 && mid !== 58);
+  const atRange = (mid >= 101 && mid <= 120);
+  return normalRange || atRange;
 }
 
 function isRoleSelectionDone(table, missionId){
@@ -9401,8 +9403,7 @@ async function maybeOpenRolePickerAfterSeat(){
   try{
     const v = state?.watching;
     const mid = (v?.mission?.id|0);
-    const inPickerRange = (mid >= 31 && mid <= 66 && mid !== 58);
-    if (!inPickerRange) return;
+    if (!needsRoleSelection(mid)) return;
     const myIdx = (typeof state.seatedTable === 'number')
       ? state.seatedTable
       : (v?.tables||[]).findIndex(t=> t?.playerId===state.userId);
