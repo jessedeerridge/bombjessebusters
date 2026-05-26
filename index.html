@@ -3212,7 +3212,7 @@ function updateHeaderInfo(){
 function baseRoom(hostId){
   return { createdAt: Date.now(), hostId, started:false, tableCount:0, tables:[], items:[], di:{value:0,max:6}, captainTable:null, mission:null,
     players:{}, spectators:{},
-    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
+    meta:{ itemUses:{i1:0,i2:0,i12:0,i14:0,i50:0}, tokenCounts:{equal:0,noteq:0,x1:0}, i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
       /* ▼▼ ：ミッション44用 状態 ▼▼ */
       oxItem: 0,         // アイテム列の下（全体プール）の酸素トークン数
       oxByTable: {}      // 各テーブルごとの酸素トークン所持数 { [tableIndex]: number }
@@ -3968,6 +3968,8 @@ function renderHostTool(v){
       }
     });
   });
+  const superNipperUsed = (v?.meta?.itemUses?.i50 || 0);
+  if (superNipperUsed > 0) openCountByNum.__superNipper = (openCountByNum.__superNipper||0) + superNipperUsed;
   const hasOdd = Object.values(openCountByNum).some(cnt => (cnt % 2)===1);
   H(hostTool, !hasOdd);
 }
@@ -4186,7 +4188,7 @@ if ((v.mission?.id|0) === 23) {
   // ★ 変更：上限の対応
   //   ＝ の上限はアイテム12の使用回数
   //   ≠ の上限はアイテム1の使用回数
-  const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
+  const uses = v.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0,i50:0};
   const caps = { 
     equal: uses.i12>=2 ? 4 : (uses.i12>=1 ? 2 : 0),
     noteq: uses.i1>=2  ? 4 : (uses.i1>=1  ? 2 : 0),
@@ -9819,11 +9821,12 @@ function openItemZoom(itemNo, itemIdx, opt={}){
         ev.stopPropagation();
         await update(ref(db, `rooms/${state.roomCode}/items/${itemIdx}`), { used:true });
         const path=`rooms/${state.roomCode}/meta/itemUses`;
-        const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0};
+        const uses = state.watching?.meta?.itemUses || {i1:0,i2:0,i12:0,i14:0,i50:0};
         if(itemNo===1)  await update(ref(db, path), {i1:(uses.i1||0)+1});
         if(itemNo===2)  await update(ref(db, path), {i2:(uses.i2||0)+1});
         if(itemNo===12) await update(ref(db, path), {i12:(uses.i12||0)+1});
         if(itemNo===14) await update(ref(db, path), {i14:(uses.i14||0)+1});
+        if(itemNo===50) await update(ref(db, path), {i50:(uses.i50||0)+1});
 
         if(itemNo===2){
           await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:{usingBy:state.userId, phase:'pickSelf', selA:null, selB:null, viewerTable:null} });
@@ -11144,7 +11147,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
  m29_deck:   (missionMeta?.id===29 ? (m29Rest||[]) : null),
     /* ▲▲ ここまで追加 ▼▼ */
     meta:{
-      itemUses:{i1:0,i2:0,i12:0,i14:0},
+      itemUses:{i1:0,i2:0,i12:0,i14:0,i50:0},
       tokenCounts:{equal:0,noteq:0,x1:0},
       i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
       missionPickerOpen:false,
@@ -13384,6 +13387,12 @@ function mountM26GridUnderItems(){
   });
 }
   
+
+function formatMissionLabel(id){
+  const n = Number(id) | 0;
+  return (n >= 101) ? `@${n - 100}` : `#${n}`;
+}
+
 function missionInfo(id, opts={}){
   const mixLines = opts.mixLines || [];     // 例: ['赤[1.5]', '黄[2.1][5.1]']
   const chooseLines = opts.chooseLines || [];// 例: ['赤コード[1.5] [3.5] のうち1つ']
@@ -14262,7 +14271,7 @@ case 101: {
   };
 }
 
-    default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
+    default:  { const label = formatMissionLabel(id); return {id, name:label, desc:'', display:[label, ...linesForMix]}; }
   }
 }
 
