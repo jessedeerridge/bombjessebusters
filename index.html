@@ -1780,7 +1780,10 @@ const STAGE_STORIES = {
   63: { title:'タイタニックII号', body:'この巨大な新造船には奇妙な名前がつけられている。船体に爆弾を仕掛けるなんて、ディカプリオのファンにとっては奇妙な思いつきだ！酸素を管理して世界の王になろう！' },
   64: { title:'おとりコードの帰還', body:'その上、奴らは倍増だ！' },
   65: { title:'数本のコードを引っ張る', body:'「数値を教えてもらえますか？」' },
-  66: { title:'ビッグボス！', body:'君たちはヘリコプターに乗り込んで、ノーブ博士の隠れ家に向かっている。最終の対決が近づいている。' }
+  66: { title:'ビッグボス！', body:'君たちはヘリコプターに乗り込んで、ノーブ博士の隠れ家に向かっている。最終の対決が近づいている。' },
+  67: { title:'@1', body:'人数分のコードを除外する。人数分だけスーパーニッパーを用意する。\n除外されているコードが自分のコードと対になっている場合、スーパーニッパーを使って切断しなければならない。スーパーニッパーは使い切りだ。つまり間違えれば爆発を待つしかないだろう。' },
+  68: { title:'@2', body:'このミッションではいずれのコードも自力解体ができない。\nただし、自分のコードを含めず、他プレイヤーのコード同士を宣言して切断ができる。\n自分以外の二人のスタンドから切断を試みて失敗した場合、どちらかが正しくても、その2か所に情報トークンを置いて、起爆ダイヤルを2進める。' },
+  69: { title:'@3', body:'最初に情報トークンをランダムに1つ取る。その数値がなければ手元に置いて見せる。\n数値カードの数値を宣言してコードの切断に失敗すれば、即爆発する。\nまたは、別の数字を宣言して、数値カードの数値のコードの場所を間違って切断した時、即爆発する。' }
 };
 
 function renderStageStory(v){
@@ -1790,7 +1793,8 @@ function renderStageStory(v){
   const mySeatIdx = getMySeatedTableIndex(v);
   if (mySeatIdx != null) { H(stageStoryPop, true); return; }
   stageStoryTitle.textContent = def.title;
-  stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
+  const missionLabel = missionId >= 67 ? `@${missionId-66}` : `#${missionId}`;
+  stageStoryNum.textContent = missionLabel;
   stageStoryBody.textContent = def.body;
   if (stageStoryImageMissions.has(missionId)) {
     stageStoryImage.src = `./P${missionId}.png`;
@@ -10933,12 +10937,12 @@ function openMissionPicker(opts = {}){
 
 // ミッション一覧生成（#付き数字）
 mpMissions.innerHTML = '';
-// 1〜66 全部
-const missionIds = Array.from({length:66}, (_,i) => i+1);
+// 1〜66 + @1〜@20（=67〜86）
+const missionIds = Array.from({length:86}, (_,i) => i+1);
 missionIds.forEach(id=>{
   const b = document.createElement('button');
   b.className = 'btn small';
-  b.textContent = `#${id}`; // ★ #付き
+  b.textContent = (id >= 67) ? `@${id-66}` : `#${id}`;
   b.onclick = async ()=>{
     if (readOnly) return;
     await leaveSeatNow();
@@ -14231,7 +14235,52 @@ case 66: {
 }
         
       
-    default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
+case 67: {
+  return {
+    id:67, name:'@1', desc:'',
+    display:[
+      '@1',
+      ...linesForMix,
+      '人数分のコードを除外する。人数分だけスーパーニッパーを用意する。',
+      '除外されているコードが自分のコードと対になっている場合、スーパーニッパーを使って切断しなければならない。',
+      'スーパーニッパーは使い切りだ。つまり間違えれば爆発を待つしかないだろう。',
+      '（追加コード、赤コード1本。追加アイテム、スーパーニッパー、人数分アイテム欄の右に。他のアイテムは配らない。）',
+    ],
+    flags:{}
+  };
+}
+case 68: {
+  return {
+    id:68, name:'@2', desc:'',
+    display:[
+      '@2',
+      ...linesForMix,
+      'このミッションではいずれのコードも自力解体ができない。',
+      'ただし、自分のコードを含めず、他プレイヤーのコード同士を宣言して切断ができる。',
+      '自分以外の二人のスタンドから切断を試みて失敗した場合、どちらかが正しくても、その2か所に情報トークンを置いて、起爆ダイヤルを2進める。',
+      '（追加コード、黄コード2本）',
+    ],
+    flags:{}
+  };
+}
+case 69: {
+  return {
+    id:69, name:'@3', desc:'',
+    display:[
+      '@3',
+      ...linesForMix,
+      '最初に情報トークンをランダムに1つ取る。その数値がなければ手元に置いて見せる。',
+      '数値カードの数値を宣言してコードの切断に失敗すれば、即爆発する。',
+      'または、別の数字を宣言して、数値カードの数値のコードの場所を間違って切断した時、即爆発する。',
+      '（追加コード、赤コード1本。上に数値カード一枚表示。情報トークンは全プレイヤーにらんだむで一枚プレイヤーカードの下に配布。）',
+    ],
+    flags:{}
+  };
+}
+    default:  {
+      const tag = (id >= 67 && id <= 86) ? `@${id-66}` : `#${id}`;
+      return {id, name:tag, desc:'', display:[tag, ...linesForMix]};
+    }
   }
 }
 
