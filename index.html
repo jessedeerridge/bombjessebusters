@@ -3731,7 +3731,6 @@ function renderItemsAndDi(v){
         return;
       }
       if(c.kind === 'normal'){
-        const n = c.num|0;
         openNormalCountByNum[n] = (openNormalCountByNum[n]||0) + 1;
       }
     });
@@ -3959,21 +3958,16 @@ function renderGlobalReveal(v){
 /* ===== Host tool (odd-open normal codes) ===== */
 function renderHostTool(v){
   if(!v?.tables){ H(hostTool,true); return; }
-  const openCountByNum = {};
   let totalOpenNormal = 0;
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       if(c?.kind==='normal' && c.open===true){
-        const n = c.num|0;
-        openCountByNum[n] = (openCountByNum[n]||0) + 1;
         totalOpenNormal += 1;
       }
     });
   });
   const usedSuperNipperCount = (v.items||[]).filter(it => (it?.no|0)===50 && it?.used===true).length;
-  const hasOddByNumber = Object.values(openCountByNum).some(cnt => (cnt % 2)===1);
-  const hasOddByTotalWithSuperNipper = ((totalOpenNormal + usedSuperNipperCount) % 2) === 1;
-  const hasOdd = hasOddByNumber || hasOddByTotalWithSuperNipper;
+  const hasOdd = ((totalOpenNormal + usedSuperNipperCount) % 2) === 1;
   H(hostTool, !hasOdd);
 }
 hostTool.onclick = ()=> alert('全体公開されている通常コードの枚数に奇数が含まれています。');
@@ -4103,12 +4097,10 @@ function renderTables(v){
   }
   
   /* ★ 全体公開中の通常コードの「数字別枚数」を集計 */
-  const openCountByNum = {};
   (v.tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       if(c?.kind==='normal' && c.open===true){
         const n = c.num|0; // 1..12
-        openCountByNum[n] = (openCountByNum[n]||0) + 1;
       }
     });
   });
@@ -5140,8 +5132,7 @@ function renderM29(v){
                 hand0.splice(pos,1);
                 const stock = Array.isArray(R.m29_stock) ? R.m29_stock.slice() : [];
 
-                const openCountByNum = {};
-                (R.tables||[]).forEach(T2=>{
+                              (R.tables||[]).forEach(T2=>{
                   (T2.hand||[]).forEach(c2=>{
                     if (c2?.kind === 'normal' && c2.open === true){
                       const num = c2.num|0;
@@ -7405,8 +7396,7 @@ async function renderM57(v){
     }
 
     // 4枚公開が成立した数字の抽出
-    const openCountByNum = {};
-    (v.tables || []).forEach(T => {
+      (v.tables || []).forEach(T => {
       (T.hand || []).forEach(c => {
         if (c?.kind === 'normal' && c.open === true) {
           const n = c.num | 0;
@@ -8200,12 +8190,9 @@ function renderM65(v){
   mine.sort((a,b)=>a-b);
 
   // 全体公開の通常コード枚数を集計（各テーブル hand の open==true, kind:'normal'）→ 4枚以上で裏面
-  const openCountByNum = {};
   (tables||[]).forEach(T=>{
     (T.hand||[]).forEach(c=>{
       if (c?.kind==='normal' && c.open===true){
-        const n = c.num|0;
-        openCountByNum[n] = (openCountByNum[n]||0) + 1;
       }
     });
   });
@@ -10127,8 +10114,7 @@ async function ensureM29AutoDrop(roomVal){
     (roomVal.tables||[]).forEach(T=>{
       (T.hand||[]).forEach(c=>{
         if (c?.kind==='normal' && c.open===true){
-          const n = c.num|0;
-          openMap[n] = (openMap[n]||0) + 1;
+            openMap[n] = (openMap[n]||0) + 1;
         }
       });
     });
@@ -11596,7 +11582,6 @@ function renderNumberFaceUpStack(pile, nums, opts={}){
 }
 
 function getFullyOpenNumberSet(v){
-  const openCountByNum = {};
   (v?.tables || []).forEach(T=>{
     (T.hand || []).forEach(c=>{
       if (c?.kind === 'normal' && c.open === true){
@@ -13290,8 +13275,7 @@ function attachM23DeckUI(lane){
 
     // 「広げる」条件は従来通りポップで提示（指示は“めくる”のみポップ廃止）
     const drawn = new Set(meta.m23_drawnNumbers||[]);
-    const openCountByNum = {};
-    (v.tables||[]).forEach(T=> (T.hand||[]).forEach(c=>{
+      (v.tables||[]).forEach(T=> (T.hand||[]).forEach(c=>{
       if(c?.kind==='normal' && c.open===true){
         const nn=c.num|0; openCountByNum[nn]=(openCountByNum[nn]||0)+1;
       }
