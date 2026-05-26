@@ -1674,6 +1674,7 @@ const state = {
 
 function needsRoleSelection(missionId){
   const mid = Number(missionId) | 0;
+  if (mid >= 101) return true; // @系ミッション
   return (mid >= 31 && mid <= 66 && mid !== 58);
 }
 
