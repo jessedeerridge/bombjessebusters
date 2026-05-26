@@ -3968,7 +3968,9 @@ function renderHostTool(v){
       }
     });
   });
-  const hasOdd = Object.values(openCountByNum).some(cnt => (cnt % 2)===1);
+  const oddOpenCount = Object.values(openCountByNum).filter(cnt => (cnt % 2)===1).length;
+  const superNipperBonus = (v.items||[]).filter(it => (it?.no|0)===50 && it?.used===true).length;
+  const hasOdd = (oddOpenCount - superNipperBonus) > 0;
   H(hostTool, !hasOdd);
 }
 hostTool.onclick = ()=> alert('全体公開されている通常コードの枚数に奇数が含まれています。');
