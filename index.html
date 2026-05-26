@@ -3311,6 +3311,7 @@ renderM31(v);
    renderM30Audio(v);
    renderM42Audio(v);
    renderM54Audio(v);
+   renderM66Audio(v);
    renderMissionAudioVolume(v);
     renderM32(v);
     renderM36(v);
@@ -12364,6 +12365,123 @@ function renderM54Audio(v){
   }
 }
 
+
+function renderM66Audio(v){
+  const isM66 = ((v?.mission?.id|0) === 66);
+  const barId = 'm66AudioBar';
+  const audioId = 'm66Audio';
+  const oldBar = document.getElementById(barId);
+  if (!isM66){ if (oldBar) oldBar.remove(); return; }
+
+  let audio = document.getElementById(audioId);
+  if (!audio){
+    audio = document.createElement('audio');
+    audio.id = audioId;
+    audio.preload = 'auto';
+    audio.src = './mi66.mp3';
+    audio.crossOrigin = 'anonymous';
+    audio.style.display = 'none';
+    audio.setAttribute('playsinline', '');
+    audio.setAttribute('webkit-playsinline', '');
+    audio.playsInline = true;
+    document.body.appendChild(audio);
+  }
+
+  if (state.isHost){
+    if (oldBar) oldBar.remove();
+    const bar = document.createElement('div');
+    bar.id = barId;
+    bar.className = 'line';
+    bar.innerHTML = `
+      <button class="btn small" id="m66Back10">⏪ 10秒</button>
+      <button class="btn small" id="m66Play">▶</button>
+      <button class="btn small" id="m66Pause">⏸</button>
+      <input id="m66Seek" type="range" min="0" max="0" value="0" step="0.1" style="vertical-align:middle; width:240px; margin:0 8px;">
+      <span id="m66Time">0:00</span>
+    `;
+    const footer = document.getElementById('missionFooter');
+    if (footer && !footer.classList.contains('hidden')) {
+      footer.appendChild(bar);
+    }
+
+    const btnBack = document.getElementById('m66Back10');
+    const btnPlay = document.getElementById('m66Play');
+    const btnPause= document.getElementById('m66Pause');
+    const seek    = document.getElementById('m66Seek');
+    const timeLbl = document.getElementById('m66Time');
+
+    const fmt = (t)=> {
+      const sec = Math.max(0, Math.floor(t|0));
+      const m = (sec/60)|0; const r = sec%60;
+      return `${m}:${String(r).padStart(2,'0')}`;
+    };
+
+    const writeMeta = async (playing)=>{
+      const payload = {
+        m66_audio: {
+          playing: !!playing,
+          t: audio.currentTime||0,
+          at: serverNow()
+        }
+      };
+      await update(ref(db, `rooms/${state.roomCode}/meta`), payload);
+    };
+
+    const refreshDur = ()=>{
+      const dur = isFinite(audio.duration) ? Math.max(0, audio.duration) : 0;
+      seek.max = String(dur || 0);
+    };
+    if (isNaN(audio.duration) || !isFinite(audio.duration)){
+      audio.addEventListener('loadedmetadata', refreshDur, { once:true });
+    } else {
+      refreshDur();
+    }
+
+    const refreshLocal = ()=>{
+      timeLbl.textContent = fmt(audio.currentTime||0);
+      if (!document.activeElement || document.activeElement !== seek){
+        seek.value = String(audio.currentTime||0);
+      }
+    };
+    refreshLocal();
+    audio.addEventListener('timeupdate', refreshLocal);
+
+    btnPlay.onclick = async ()=>{
+      await forcePlayAudio(audio);
+      await writeMeta(true);
+    };
+    btnPause.onclick = async ()=>{
+      try{ audio.pause(); }catch(_e){}
+      await writeMeta(false);
+    };
+    btnBack.onclick = async ()=>{
+      audio.currentTime = Math.max(0, (audio.currentTime||0) - 10);
+      await writeMeta(!audio.paused);
+    };
+    seek.oninput = ()=>{ timeLbl.textContent = fmt(Number(seek.value||'0')); };
+    seek.onchange = async ()=>{
+      audio.currentTime = Number(seek.value||'0');
+      await writeMeta(!audio.paused);
+    };
+  } else {
+    if (oldBar) oldBar.remove();
+  }
+
+  const data = v?.meta?.m66_audio || null;
+  if (data){
+    const elapsed = Math.max(0, (serverNow() - (data.at||0)) / 1000);
+    const target = Math.max(0, (data.t||0) + (data.playing ? elapsed : 0));
+    if (Math.abs((audio.currentTime||0) - target) > 0.5){
+      audio.currentTime = target;
+    }
+    if (data.playing && audio.paused){
+      forcePlayAudio(audio);
+    }
+    if (!data.playing && !audio.paused){
+      audio.pause();
+    }
+  }
+}
 
 function renderM42Audio(v){
   const isM42 = ((v?.mission?.id|0) === 42);
