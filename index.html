@@ -1785,7 +1785,8 @@ const STAGE_STORIES = {
   66: { title:'ビッグボス！', body:'君たちはヘリコプターに乗り込んで、ノーブ博士の隠れ家に向かっている。最終の対決が近づいている。' },
   101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' },
   102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
-  103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' }
+  103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' },
+  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' }
 };
 
 function renderStageStory(v){
@@ -3006,6 +3007,9 @@ function buildMixPlan(missionId){
     103: [ // @3 赤1
       {type:'redPick', k:1},
     ],
+    104: [ // @4 赤2
+      {type:'redPick', k:2},
+    ],
 };
 return plans[missionId] || [];
 
@@ -3315,6 +3319,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     state._lastMissionId = midNow;    renderM18(v);
     renderM39(v);
     renderM9(v);
+    renderM104(v);
      renderM11(v);
     renderM12(v);
     renderM15(v);
@@ -10623,6 +10628,7 @@ function missionNumberRange(missionId){
    63: [10],
   65: [10],
   101: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
+  104: [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
  };
 
     
@@ -11134,9 +11140,15 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
    ? []
    : (missionMeta?.id === 101)
      ? Array.from({length:playerCount}, ()=>({ id: crypto.randomUUID(), no:50, used:false, faceUp:faceUpStart }))
-     : pool
-       .slice(0, Math.min(playerCount, pool.length))
-       .map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: faceUpStart }));
+     : (missionMeta?.id === 104)
+       ? (()=>{
+           const randomPool = Array.from({length:18}, (_,i)=>i+1).filter(n=>n!==7 && n!==2);
+           shuffle(randomPool);
+           return [7,2,randomPool[0]].map(no => ({ id: crypto.randomUUID(), no, used:false, faceUp:faceUpStart }));
+         })()
+       : pool
+         .slice(0, Math.min(playerCount, pool.length))
+         .map(no => ({ id: crypto.randomUUID(), no, used: false, faceUp: faceUpStart }));
 
   // ★ 開始エッジを作るために一瞬だけ false を書く（ミッションは未選択状態へ）
   await update(ref(db, `rooms/${code}`), { started:false, mission:null });
@@ -11190,6 +11202,15 @@ async function setupMissionOnStart(code){
       m9_numbers: picks,
       m9_faceDown: [],
      m9_rule: 'right2'
+    });
+  }
+
+  if ((v.mission?.id|0) === 104) {
+    const pool = MATERIALS.numbers.slice(); shuffle(pool);
+    await update(ref(db, `rooms/${code}/meta`), {
+      m104_numbers: pool.slice(0,3),
+      m104_faceDown: [],
+      m104_order: []
     });
   }
 
@@ -11820,6 +11841,50 @@ function buildFixedLane(list){
       lane.appendChild(node);
     });
     lane.id = 'm9Row';
+    mountLaneUnderItemsBar(lane);
+  }
+
+  function renderM104(v){
+    const isM104 = ((v?.mission?.id|0) === 104);
+    const old = document.getElementById('m104Row');
+    if (!isM104){ if(old) old.remove(); return; }
+    const nums = Array.isArray(v?.meta?.m104_numbers) ? v.meta.m104_numbers : null;
+    const faceDown = Array.isArray(v?.meta?.m104_faceDown) ? v.meta.m104_faceDown : [];
+    const order = Array.isArray(v?.meta?.m104_order) ? v.meta.m104_order : [];
+    if (!nums || nums.length < 3) return;
+    if (old) old.remove();
+
+    const lane = document.createElement('div');
+    lane.className = 'numlane';
+    const rightOrdered = nums.filter(n=>!order.includes(n)).sort((a,b)=>nums.indexOf(a)-nums.indexOf(b));
+    const display = order.concat(rightOrdered);
+
+    display.forEach(n=>{
+      const node = document.createElement('div');
+      node.className = 'numcard';
+      const isFaceDown = faceDown.includes(n|0);
+      node.style.backgroundImage = `url('${isFaceDown ? imgBack : imgNumber(n)}')`;
+      node.style.cursor = 'pointer';
+      node.onclick = async (ev)=>{
+        ev.stopPropagation();
+        const now = state.watching;
+        if (((now?.mission?.id|0) !== 104)) return;
+        const curDown = Array.isArray(now?.meta?.m104_faceDown) ? now.meta.m104_faceDown.slice() : [];
+        const curOrder = Array.isArray(now?.meta?.m104_order) ? now.meta.m104_order.slice() : [];
+        const has = curDown.includes(n|0);
+        let nextDown, nextOrder;
+        if (has){
+          nextDown = curDown.filter(x=>x!==(n|0));
+          nextOrder = curOrder.filter(x=>x!==(n|0));
+        } else {
+          nextDown = curDown.concat([n|0]);
+          nextOrder = [n|0, ...curOrder.filter(x=>x!==(n|0))];
+        }
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m104_faceDown: nextDown, m104_order: nextOrder });
+      };
+      lane.appendChild(node);
+    });
+    lane.id = 'm104Row';
     mountLaneUnderItemsBar(lane);
   }
 /* ここから追加：#11 数値カード1枚（同期表示） */
@@ -14312,6 +14377,21 @@ case 103: {
       'または、別の数字を宣言して、数値カードの数値のコードの場所を間違って切断した時、即爆発する。',
    ],
     flags:{ needsNumberLane:true, pattern:'P1' }
+  };
+}
+
+
+case 104: {
+  return {
+    id:104, name:'@4', desc:'',
+    display:[
+      '@4',
+      ...linesForMix,
+      '数値カードを3枚ひいて、並べる。',
+      '数値カードのコードを切断したら、直後の手番プレイヤーはその右の数値カードのコードを切断しなければならない。切断できない場合は起爆ダイヤルを1進める。',
+      '数値カードのコードを4本切断したら、そのカードを取り除く。'
+    ],
+    flags:{ m104:true }
   };
 }
 
