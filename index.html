@@ -1089,6 +1089,12 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
     .side{width:100%;max-width:none}
   }
 
+
+.m105-card{width:120px;height:76px;border:1px solid #cfcfcf;border-radius:10px;background:#e5e7eb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
+.m105-dots{display:flex;gap:8px;}
+.m105-dot{width:18px;height:18px;border-radius:50%;border:2px solid #666;background:#fff;}
+.m105-bomb{width:44px;height:44px;background:url('./chargablebomb.png') center/contain no-repeat;}
+
 /* ▼▼ 画面下部ミッションピッカー ▼▼ */
 .mp{
   position:fixed; left:0; right:0; bottom:0;
@@ -1786,7 +1792,8 @@ const STAGE_STORIES = {
   101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' },
   102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
   103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' },
-  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' }
+  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' },
+  105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' }
 };
 
 function renderStageStory(v){
@@ -3010,6 +3017,8 @@ function buildMixPlan(missionId){
     104: [ // @4 赤2
       {type:'redPick', k:2},
     ],
+    105: [ // @5（指定なし）
+    ],
 };
 return plans[missionId] || [];
 
@@ -3320,6 +3329,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM39(v);
     renderM9(v);
     renderM104(v);
+    renderM105(v);
      renderM11(v);
     renderM12(v);
     renderM15(v);
@@ -10955,7 +10965,7 @@ function openMissionPicker(opts = {}){
 // ミッション一覧生成（#付き数字）
 mpMissions.innerHTML = '';
 // 1〜66 全部
-const missionIds = [...Array.from({length:66}, (_,i) => i+1), ...Array.from({length:20}, (_,i)=>101+i)];
+const missionIds = [...Array.from({length:66}, (_,i) => i+1), ...Array.from({length:5}, (_,i)=>101+i)];
 missionIds.forEach(id=>{
   const b = document.createElement('button');
   b.className = 'btn small';
@@ -11885,6 +11895,21 @@ function buildFixedLane(list){
       lane.appendChild(node);
     });
     lane.id = 'm104Row';
+    mountLaneUnderItemsBar(lane);
+  }
+
+  function renderM105(v){
+    const isM105 = ((v?.mission?.id|0) === 105);
+    const old = document.getElementById('m105Row');
+    if (!isM105){ if(old) old.remove(); return; }
+    if (old) old.remove();
+    const lane = document.createElement('div');
+    lane.className = 'numlane';
+    lane.id = 'm105Row';
+    const card = document.createElement('div');
+    card.className = 'm105-card';
+    card.innerHTML = `<div class="m105-dots"><div class="m105-dot"></div><div class="m105-dot"></div><div class="m105-dot"></div></div><div class="m105-bomb"></div>`;
+    lane.appendChild(card);
     mountLaneUnderItemsBar(lane);
   }
 /* ここから追加：#11 数値カード1枚（同期表示） */
@@ -14392,6 +14417,21 @@ case 104: {
       '数値カードのコードを4本切断したら、そのカードを取り除く。'
     ],
     flags:{ m104:true }
+  };
+}
+
+
+case 105: {
+  return {
+    id:105, name:'@5', desc:'',
+    display:[
+      '@5',
+      ...linesForMix,
+      'ABNI4の上に1つだけ確定トークンを置く。',
+      '確定トークンを獲得するたびに、最大3つまでいつでもABNI4の上に確定トークンを置ける。',
+      '次の隊長の手番以降、隊長の手番の直前でABNI4から確定トークンを1つ取り除く。ABNI4から確定トークンが0になった時点で爆弾が爆発する。'
+    ],
+    flags:{}
   };
 }
 
