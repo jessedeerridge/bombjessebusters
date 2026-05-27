@@ -1203,7 +1203,41 @@ border:1px solid #eee;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.12);
 
 
   
- /* ▼▼ ミッション44（酸素トークン） ▼▼ */
+ 
+/* ▼▼ ミッション5：chargablebombカード ▼▼ */
+.chargablebomb-card{
+  width: var(--item-w, 50px);
+  height: var(--item-h, 75px);
+  border: 1px solid #cfcfcf;
+  border-radius: 6px;
+  background: #e8e8e8;
+  position: relative;
+  box-sizing: border-box;
+}
+.chargablebomb-card img{
+  position:absolute;
+  left:50%; top:50%;
+  transform:translate(-50%, -50%);
+  width:34px; height:34px;
+  object-fit:contain;
+}
+.chargablebomb-dots{
+  position:absolute;
+  left:50%; top:8px;
+  transform:translateX(-50%);
+  display:flex;
+  gap:4px;
+}
+.chargablebomb-dots span{
+  width:18px; height:18px;
+  border-radius:50%;
+  background:#f8f8f8;
+  border:1px solid #9f9f9f;
+  box-sizing:border-box;
+}
+/* ▲▲ ミッション5：chargablebombカード ▲▲ */
+
+/* ▼▼ ミッション44（酸素トークン） ▼▼ */
 .token.ox{
   background:none;   /* ← 背景色を消す */
   color:transparent; /* ← テキスト色も消す */
@@ -1721,7 +1755,6 @@ const STAGE_STORIES = {
   2: { title:'訓練 2日目', body:'レッスン2：黄コードを切断せよ' },
   3: { title:'訓練 3日目', body:'レッスン3：赤コードを回避せよ' },
   4: { title:'実地訓練 1日目', body:'理論を実践するときだ！' },
-  5: { title:'実地訓練 2日目', body:'それは黄色いレンガ道ではなく、地雷原だ……。' },
   6: { title:'実地訓練 3日目', body:'君たちを待ち受けている黄色いものはなんだ？ 時間内に切断すべき4本の黄色いコードだ！' },
   7: { title:'訓練課程の最終科目', body:'赤コードには良い赤コードと悪い赤コードがある……。' },
   8: { title:'最終試験', body:'今日は大切な日だ！ 爆弾処理試験に合格する心構えはできているか？' },
@@ -1731,6 +1764,7 @@ const STAGE_STORIES = {
   12: { title:'失われた装備', body:'「コードだ、コードが金槌で殴りかかってくる！」　ところで金槌と言えば、工具箱はどこに行った？' },
   13: { title:'非常警報！', body:'あのマッドサイエンティストが怒り狂っている。頭に血が上りすぎて、自作の爆弾に赤いコードを3本も仕込んでしまったらしい。' },
   14: { title:'ハイリスクな爆弾処理専門家', body:'新人から目を離すな！ほんの些細なミスが致命傷になるぞ！' },
+  5: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' },
   15: { title:'НОВОСИБИРСК（発音不能）でのミッション', body:'工具箱にはロシア語のラベルが貼られているが、君たちにはまるでチンプンカンプンだ。だから箱を開けるたびに何が出てくるかサプライズってことさ！' },
   16: { title:'つじつまは合っている', body:'惑わされないように、正しい行動を取ること！' },
   17: { title:'セルジオ・エル・ミトー', body:'本物と偽物の見分けはつくか？' },
@@ -3328,6 +3362,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM29(v);
     renderM30(v);
 renderM31(v);
+    renderM5Chargablebomb(v);
    renderM30Audio(v);
    renderM42Audio(v);
    renderM54Audio(v);
@@ -5753,6 +5788,34 @@ function renderM55(v){
 
   // 既存の「アイテム列の直下に挿入」ヘルパを使用（#15等と同じ）
   mountLaneUnderItemsBar(lane);
+}
+
+
+function renderM5Chargablebomb(v){
+  const id = 'm5Chargablebomb';
+  const old = document.getElementById(id);
+  if ((v?.mission?.id|0) !== 5){
+    if (old) old.remove();
+    return;
+  }
+  const itemsBar = document.getElementById('itemsBar');
+  if (!itemsBar) return;
+
+  const card = old || document.createElement('div');
+  card.id = id;
+  card.className = 'chargablebomb-card';
+
+  if (!old){
+    const dots = document.createElement('div');
+    dots.className = 'chargablebomb-dots';
+    for (let i=0;i<3;i++) dots.appendChild(document.createElement('span'));
+    const img = document.createElement('img');
+    img.src = './chargablebomb.png';
+    img.alt = 'chargablebomb';
+    card.appendChild(dots);
+    card.appendChild(img);
+  }
+  itemsBar.insertAdjacentElement('afterend', card);
 }
 
 /* ==== #31：アイテム列の下に A~E、キャラ列はブランク＋直下にミニ ==== */
@@ -13509,7 +13572,12 @@ function missionInfo(id, opts={}){
     case 5:{
       return {
         id:5, name:'#5', desc:'',
-        display:[ '#5', ...linesForMix, '' ],
+        display:[
+          '#5', ...linesForMix,
+          'ABNI4の上に1つだけ確定トークンを置く。',
+          '確定トークンを獲得するたびに、最大3つまでいつでもABNI4の上に確定トークンを置ける。',
+          '次の隊長の手番以降、隊長の手番の直前でABNI4から確定トークンを1つ取り除く。ABNI4から確定トークンが0になった時点で爆弾が爆発する。'
+        ],
       };
     }
     case 6:{
