@@ -237,6 +237,12 @@
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+
+  .m105-charge-card{ width:32px; height:48px; border-radius:6px; border:1px solid #cfcfcf; background:#e5e7eb; display:flex; align-items:center; justify-content:center; position:relative; flex:0 0 auto; }
+  .m105-charge-card .bomb{ width:24px; height:24px; object-fit:contain; opacity:.92; }
+  .m105-charge-dots{ position:absolute; top:4px; left:50%; transform:translateX(-50%); display:flex; gap:4px; }
+  .m105-charge-dots i{ width:18px; height:18px; border-radius:50%; border:1px solid #6b7280; background:#f9fafb; display:block; }
+
   .deck-stack{ position:relative; cursor:pointer; user-select:none; flex:0 0 auto; }
   .deck-stack.number{ width:32px; height:48px; }
   .deck-stack.constraint{ width:32px; height:48px; }
@@ -1786,7 +1792,8 @@ const STAGE_STORIES = {
   101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' },
   102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
   103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' },
-  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' }
+  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' },
+  105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' }
 };
 
 function renderStageStory(v){
@@ -1796,7 +1803,8 @@ function renderStageStory(v){
   const mySeatIdx = getMySeatedTableIndex(v);
   if (mySeatIdx != null) { H(stageStoryPop, true); return; }
   stageStoryTitle.textContent = def.title;
-  stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
+  const missionLabel = (missionId >= 101) ? `@${missionId - 100}` : `#${missionId}`;
+  stageStoryNum.textContent = missionLabel;
   stageStoryBody.textContent = def.body;
   if (stageStoryImageMissions.has(missionId)) {
     stageStoryImage.src = `./P${missionId}.png`;
@@ -3010,6 +3018,9 @@ function buildMixPlan(missionId){
     104: [ // @4 赤2
       {type:'redPick', k:2},
     ],
+    105: [ // @5 赤2
+      {type:'redPick', k:2},
+    ],
 };
 return plans[missionId] || [];
 
@@ -3320,6 +3331,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM39(v);
     renderM9(v);
     renderM104(v);
+    renderM105(v);
      renderM11(v);
     renderM12(v);
     renderM15(v);
@@ -10629,6 +10641,7 @@ function missionNumberRange(missionId){
   65: [10],
   101: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
   104: [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
+  105: [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
  };
 
     
@@ -11841,6 +11854,36 @@ function buildFixedLane(list){
       lane.appendChild(node);
     });
     lane.id = 'm9Row';
+    mountLaneUnderItemsBar(lane);
+  }
+
+
+  function renderM105(v){
+    const isM105 = ((v?.mission?.id|0) === 105);
+    const old = document.getElementById('m105Row');
+    if (!isM105){ if(old) old.remove(); return; }
+    if (old) old.remove();
+
+    const lane = document.createElement('div');
+    lane.className = 'numlane';
+    lane.id = 'm105Row';
+
+    const card = document.createElement('div');
+    card.className = 'm105-charge-card';
+
+    const dots = document.createElement('div');
+    dots.className = 'm105-charge-dots';
+    for(let i=0;i<3;i++) dots.appendChild(document.createElement('i'));
+    card.appendChild(dots);
+
+    const bomb = document.createElement('img');
+    bomb.className = 'bomb';
+    bomb.src = './chargablebomb.png';
+    bomb.alt = 'chargablebomb';
+    bomb.onerror = ()=>{ bomb.style.display='none'; };
+    card.appendChild(bomb);
+
+    lane.appendChild(card);
     mountLaneUnderItemsBar(lane);
   }
 
@@ -14392,6 +14435,20 @@ case 104: {
       '数値カードのコードを4本切断したら、そのカードを取り除く。'
     ],
     flags:{ m104:true }
+  };
+}
+
+case 105: {
+  return {
+    id:105, name:'@5', desc:'',
+    display:[
+      '@5',
+      ...linesForMix,
+      'ABNI4の上に1つだけ確定トークンを置く。',
+      '確定トークンを獲得するたびに、最大3つまでいつでもABNI4の上に確定トークンを置ける。',
+      '次の隊長の手番以降、隊長の手番の直前でABNI4から確定トークンを1つ取り除く。ABNI4から確定トークンが0になった時点で爆弾が爆発する。'
+    ],
+    flags:{ m105_chargeableBomb:true }
   };
 }
 
