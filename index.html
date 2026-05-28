@@ -1047,6 +1047,13 @@
   border-radius:50%;
   background:rgba(34,197,94,.35);
 }
+.m105-charge-slot.filled,
+.m105-pool-slot.filled,
+.m105-drag-source{
+  touch-action:none;
+  -webkit-user-select:none;
+  user-select:none;
+}
 .m105-pool-slot.filled::after{
   content:'✕';
   position:absolute;
@@ -1071,17 +1078,6 @@
   pointer-events:none;
   transform:translate(-50%, -50%);
 }
-.m105-dragging.crossed::after{
-  content:'✕';
-  position:absolute;
-  inset:0;
-  display:grid;
-  place-items:center;
-  color:#dc2626;
-  font-size:18px;
-  font-weight:900;
-}
-  
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
 .mini-pop{
   position:fixed;
@@ -12034,8 +12030,11 @@ function beginM105Drag(ev, from, sourceNum=null){
   const startPool = clampM105PoolCount(meta.m105_pool ?? 0);
   const startUsedNums = Array.isArray(meta.m105_usedNums) ? meta.m105_usedNums.slice() : [];
 
+  const dragSourceEl = ev.currentTarget;
+  try{ dragSourceEl?.setPointerCapture?.(ev.pointerId); }catch(_e){}
+
   const ghost = document.createElement('div');
-  ghost.className = 'm105-dragging' + (from === 'pool' ? ' crossed' : '');
+  ghost.className = 'm105-dragging';
   document.body.appendChild(ghost);
   const moveGhost = (clientX, clientY)=>{
     ghost.style.left = `${clientX}px`;
@@ -12048,6 +12047,7 @@ function beginM105Drag(ev, from, sourceNum=null){
     window.removeEventListener('pointermove', onMove, true);
     window.removeEventListener('pointerup', onUp, true);
     window.removeEventListener('pointercancel', onUp, true);
+    try{ dragSourceEl?.releasePointerCapture?.(e.pointerId); }catch(_e){}
     ghost.remove();
 
     const target = document.elementFromPoint(e.clientX, e.clientY);
