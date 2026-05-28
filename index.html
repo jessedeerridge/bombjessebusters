@@ -982,7 +982,7 @@
 }
 .m105-wrap{ display:flex; gap:8px; margin-top:6px; align-items:stretch; }
 .m105-card,.m105-pool{
-  width:var(--item-w); height:var(--item-h); border-radius:8px; border:1px solid #cbd5e1;
+  width:var(--item-h); height:var(--item-w); border-radius:8px; border:1px solid #cbd5e1;
   background:#e5e7eb; position:relative; flex:0 0 auto;
 }
 .m105-card{
@@ -12063,7 +12063,9 @@ function renderM105(v){
 
   const marks = Array.from(document.querySelectorAll('.check-mark'));
   marks.forEach(m=>{ m.classList.add('drag-enabled'); m.draggable = true; m.classList.remove('crossed'); });
-  const allSlots = [...dots.querySelectorAll('.m105-slot'), pool];
+  const dotSlots = [...dots.querySelectorAll('.m105-slot')];
+  const allSlots = [...dotSlots, pool];
+  const firstEmptyDotSlot = ()=> dotSlots.find(s => !s.querySelector('.check-mark')) || null;
   allSlots.forEach(s=>{
     s.ondragover = (e)=>e.preventDefault();
     s.ondrop = (e)=>{
@@ -12071,8 +12073,14 @@ function renderM105(v){
       const id = e.dataTransfer.getData('text/plain');
       const node = document.getElementById(id);
       if (!node) return;
-      s.appendChild(node);
-      node.classList.toggle('crossed', s===pool);
+      if (s === pool){
+        pool.appendChild(node);
+        node.classList.add('crossed');
+        return;
+      }
+      const targetSlot = firstEmptyDotSlot() || s;
+      targetSlot.appendChild(node);
+      node.classList.remove('crossed');
     };
   });
   marks.forEach((m,idx)=>{
