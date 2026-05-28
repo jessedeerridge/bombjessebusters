@@ -1001,6 +1001,10 @@
   background:rgba(34,197,94,.35);
   pointer-events:none;
 }
+.check-mark.m105-draggable{
+  pointer-events:auto;
+  cursor:grab;
+}
   
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
 .mini-pop{
@@ -4203,6 +4207,7 @@ if ((v.mission?.id|0) === 23) {
       if((openCountByNum[n]||0) === 4 && !((v?.mission?.id|0)===105 && m105Placed)){ // 同じ数字が4本全体公開
         const mk = document.createElement('div'); mk.className='check-mark';
         if ((v?.mission?.id|0)===105){
+          mk.classList.add('m105-draggable');
           mk.draggable = true;
           mk.dataset.m105Num = String(n);
           mk.addEventListener('dragstart', (ev)=>{
@@ -11904,8 +11909,7 @@ function buildFixedLane(list){
 
     const card = document.createElement('div');
     card.className = 'm105-charge-card';
-    const rawPlaces = (v?.meta?.m105_places && typeof v.meta.m105_places === 'object') ? v.meta.m105_places : {};
-    const places = { seed:'slot0', ...rawPlaces };
+    const places = (v?.meta?.m105_places && typeof v.meta.m105_places === 'object') ? v.meta.m105_places : {};
 
     const dots = document.createElement('div');
     dots.className = 'm105-charge-dots';
@@ -11942,7 +11946,7 @@ function buildFixedLane(list){
       const target = dots.children[idx];
       if (!target) return;
       const mark = document.createElement('div');
-      mark.className = 'check-mark m105-mark';
+      mark.className = 'check-mark m105-mark m105-draggable';
       mark.draggable = true;
       mark.dataset.m105Num = String(num);
       mark.addEventListener('dragstart', (ev)=>{
@@ -11968,7 +11972,7 @@ function buildFixedLane(list){
     Object.entries(places).forEach(([num, where])=>{
       if (String(where||'') !== 'pool') return;
       const mark = document.createElement('div');
-      mark.className = 'check-mark m105-mark cross';
+      mark.className = 'check-mark m105-mark m105-draggable cross';
       mark.draggable = true;
       mark.dataset.m105Num = String(num);
       mark.addEventListener('dragstart', (ev)=>{
@@ -11976,6 +11980,13 @@ function buildFixedLane(list){
       });
       pool.appendChild(mark);
     });
+
+    const hasLeftSlotMark = Object.values(places).some(w => String(w||'') === 'slot0');
+    if (!hasLeftSlotMark && dots.children[0]){
+      const seed = document.createElement('div');
+      seed.className = 'check-mark m105-mark';
+      dots.children[0].appendChild(seed);
+    }
 
     wrap.appendChild(card);
     wrap.appendChild(pool);
