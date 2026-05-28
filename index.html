@@ -4051,31 +4051,54 @@ if(it.no===16 && v?.meta?.i16Badge && v.meta.i16Badge.num!=null){
   
   const val = clamp(v.di?.value ?? v.tableCount, 0, 6);
   diEl.style.backgroundImage = `url("./di${val}.png")`;
+  diEl.title = 'クリックで進む / ダブルクリックで戻る';
+  diEl.setAttribute('aria-label', '起爆ダイヤル。クリックで進む、ダブルクリックで戻る');
+
+  const playDialAdvanceSfx = ()=>{
+    const a = getCountdownAudio();
+    const now = Date.now();
+    if (!state._sfxJustPlayedAt || now - state._sfxJustPlayedAt > 500) {
+      try {
+        a.currentTime = 0;
+        const p = a.play();        // ← awaitしない（同期のうちに開始）
+        state._sfxJustPlayedAt = now;
+        p.catch(()=>{});           // 必要ならここで「音声を有効化」ポップ表示に差し替え可
+      } catch(_e){}
+    }
+  };
+
+  const advanceDial = async ()=>{
+    const nowv = state.watching?.di?.value ?? val;
+    const next = clamp(nowv-1,0,6);
+    playDialAdvanceSfx();
+    await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      sfx: { name: 'countdown', at: serverNow(), nonce: Math.random().toString(36).slice(2) }
+    });
+  };
+
+  const retreatDial = async ()=>{
+    const nowv = state.watching?.di?.value ?? val;
+    const next = clamp(nowv+1,0,6);
+    await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
+  };
+
   diEl.onclick=(ev)=>{
-    openMenu(ev.clientX, ev.clientY, [
-{label:'進める', action: async ()=>{
-  const nowv = state.watching?.di?.value ?? val;
-  const next = clamp(nowv-1,0,6);
-
-  const a = getCountdownAudio();
-const now = Date.now();
-if (!state._sfxJustPlayedAt || now - state._sfxJustPlayedAt > 500) {
-  try {
-    a.currentTime = 0;
-    const p = a.play();        // ← awaitしない（同期のうちに開始）
-    state._sfxJustPlayedAt = now;
-    p.catch(()=>{});           // 必要ならここで「音声を有効化」ポップ表示に差し替え可
-  } catch(_e){}
-}
-
-
-  await update(ref(db, `rooms/${state.roomCode}/di`), { value: next });
-  await update(ref(db, `rooms/${state.roomCode}/meta`), {
-  sfx: { name: 'countdown', at: serverNow(), nonce: Math.random().toString(36).slice(2) }
-  });
-}},
-      {label:'戻す', action: async ()=>{ const nowv=state.watching?.di?.value ?? val; const next=clamp(nowv+1,0,6); await update(ref(db, `rooms/${state.roomCode}/di`), {value:next}); }},
-    ]);
+    if (ev.detail > 1) return;
+    if (state._diClickTimer) clearTimeout(state._diClickTimer);
+    state._diClickTimer = setTimeout(()=>{
+      state._diClickTimer = null;
+      advanceDial().catch(()=>{});
+    }, 220);
+  };
+  diEl.ondblclick=(ev)=>{
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (state._diClickTimer) {
+      clearTimeout(state._diClickTimer);
+      state._diClickTimer = null;
+    }
+    retreatDial().catch(()=>{});
   };
 }
 
