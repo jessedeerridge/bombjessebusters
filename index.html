@@ -973,6 +973,31 @@
   background:rgba(34,197,94,.35);
   pointer-events:none;
 }
+.check-mark.drag-enabled{ pointer-events:auto; cursor:grab; touch-action:none; }
+.check-mark.crossed::after{
+  content:'×';
+  position:absolute; inset:0;
+  display:grid; place-items:center;
+  color:#dc2626; font-size:16px; font-weight:900;
+}
+.m105-wrap{ display:flex; gap:8px; margin-top:6px; align-items:stretch; }
+.m105-card,.m105-pool{
+  width:var(--item-h); height:var(--item-w); border-radius:8px; border:1px solid #cbd5e1;
+  background:#e5e7eb; position:relative; flex:0 0 auto;
+}
+.m105-card{
+  display:flex; flex-direction:column; justify-content:space-between; padding:6px 4px;
+}
+.m105-dots{ display:flex; justify-content:center; gap:4px; }
+.m105-slot{
+  width:18px; height:18px; border-radius:50%; border:1px solid #64748b; background:#fff;
+  position:relative;
+}
+.m105-bomb{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  max-width:80%; max-height:54%; object-fit:contain; pointer-events:none;
+}
+.m105-pool{ display:flex; align-items:center; justify-content:center; }
   
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
 .mini-pop{
@@ -1786,7 +1811,8 @@ const STAGE_STORIES = {
   101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' },
   102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
   103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' },
-  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' }
+  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' },
+  105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' }
 };
 
 function renderStageStory(v){
@@ -1796,7 +1822,9 @@ function renderStageStory(v){
   const mySeatIdx = getMySeatedTableIndex(v);
   if (mySeatIdx != null) { H(stageStoryPop, true); return; }
   stageStoryTitle.textContent = def.title;
-  stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
+  stageStoryNum.innerHTML = (missionId >= 101)
+    ? `<span class="hash">@</span>${missionId-100}`
+    : `<span class="hash">#</span>${missionId}`;
   stageStoryBody.textContent = def.body;
   if (stageStoryImageMissions.has(missionId)) {
     stageStoryImage.src = `./P${missionId}.png`;
@@ -3354,6 +3382,7 @@ renderM55(state.watching);
     renderM63(v);
     renderM65(v);
     renderM66(v);
+    renderM105(v);
 enforceM31to66(v);
 
 
@@ -12013,6 +12042,62 @@ function renderM23(v){
   // アイテム列の直下に設置（#39等と同じユーティリティ）
  mountLaneUnderItemsBar(lane);
 }  
+
+function renderM105(v){
+  const rowId = 'm105Wrap';
+  const old = document.getElementById(rowId);
+  if ((v?.mission?.id|0) !== 105){ if (old) old.remove(); return; }
+  if (old) old.remove();
+  const itemsBar = document.getElementById('itemsBar');
+  if (!itemsBar) return;
+
+  const wrap = document.createElement('div'); wrap.id = rowId; wrap.className = 'm105-wrap';
+  const card = document.createElement('div'); card.className = 'm105-card';
+  const dots = document.createElement('div'); dots.className = 'm105-dots';
+  for(let i=0;i<3;i++){ const s=document.createElement('div'); s.className='m105-slot'; dots.appendChild(s); }
+  const img = document.createElement('img'); img.className='m105-bomb'; img.src='./chargablebomb.png'; img.alt='chargablebomb';
+  card.appendChild(dots); card.appendChild(img); wrap.appendChild(card);
+
+  const pool = document.createElement('div'); pool.className='m105-pool'; wrap.appendChild(pool);
+  itemsBar.insertAdjacentElement('afterend', wrap);
+
+  const marks = Array.from(document.querySelectorAll('.check-mark'));
+  marks.forEach(m=>{ m.classList.add('drag-enabled'); m.draggable = true; m.classList.remove('crossed'); });
+  const dotSlots = [...dots.querySelectorAll('.m105-slot')];
+  const allSlots = [...dotSlots, pool];
+  const firstEmptyDotSlot = ()=> dotSlots.find(s => !s.querySelector('.check-mark')) || null;
+  allSlots.forEach(s=>{
+    s.ondragover = (e)=>e.preventDefault();
+    s.ondrop = (e)=>{
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/plain');
+      const node = document.getElementById(id);
+      if (!node) return;
+      if (s === pool){
+        pool.appendChild(node);
+        node.classList.add('crossed');
+        return;
+      }
+      const targetSlot = firstEmptyDotSlot() || s;
+      targetSlot.appendChild(node);
+      node.classList.remove('crossed');
+    };
+  });
+  marks.forEach((m,idx)=>{
+    if (!m.id) m.id = `m105chk-${idx}-${Date.now()}`;
+    const origin = m.parentElement;
+    m.ondragstart = (e)=>{
+      e.dataTransfer.setData('text/plain', m.id);
+      m.dataset.originId = origin?.id || '';
+    };
+    m.ondragend = ()=>{
+      const p = m.parentElement;
+      if (allSlots.includes(p)) return;
+      if (origin) origin.appendChild(m);
+      m.classList.remove('crossed');
+    };
+  });
+}
  
 /* ===== ★ #23：アイテム山（7枚）を数値山レーンの右側に表示 ===== */
 async function ensureM23MetaInit(){
@@ -14392,6 +14477,20 @@ case 104: {
       '数値カードのコードを4本切断したら、そのカードを取り除く。'
     ],
     flags:{ m104:true }
+  };
+}
+case 105: {
+  return {
+    id:105, name:'@5', desc:'',
+    display:[
+      '@5',
+      ...linesForMix,
+      'ABNI4の上に1つだけ確定トークンを置く。',
+      '確定トークンを獲得するたびに、最大3つまでいつでもABNI4の上に確定トークンを置ける。',
+      '次の隊長の手番以降、隊長の手番の直前でABNI4から確定トークンを1つ取り除く。',
+      'ABNI4から確定トークンが0になった時点で爆弾が爆発する。'
+    ],
+    flags:{}
   };
 }
 
