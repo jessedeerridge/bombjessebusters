@@ -237,6 +237,40 @@
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+
+  .m105-charge-card{
+    width:75px; height:50px; border-radius:8px; border:1px solid #cfcfcf;
+    background:#e5e7eb; display:flex; align-items:center; justify-content:center;
+    position:relative; flex:0 0 auto;
+  }
+  .m105-charge-card .bomb{ width:40px; height:40px; object-fit:contain; opacity:.95; }
+  .m105-charge-dots{
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    display:flex; gap:4px;
+  }
+  .m105-charge-dots i{
+    width:18px; height:18px; border-radius:50%;
+    border:1px solid #6b7280; background:transparent; display:block;
+  }
+  .m105-wrap{ display:flex; align-items:stretch; gap:6px; }
+  .m105-pool{
+    width:75px; min-height:50px; border:1px solid #cfcfcf; border-radius:8px;
+    background:#f3f4f6; display:flex; flex-wrap:wrap; align-content:flex-start; gap:4px; padding:4px;
+  }
+  .m105-slot{
+    pointer-events:auto;
+    position:relative;
+    display:block;
+    overflow:visible;
+  }
+  .m105-charge-card.m105-droppable{ cursor:copy; }
+  .m105-mark{
+    position:static; inset:auto; margin:0;
+    pointer-events:auto; cursor:grab; user-select:none;
+    display:grid; place-items:center;
+  }
+  .m105-mark.cross::after{ content:'×'; color:#dc2626; line-height:1; font-size:12px; font-weight:700; }
+
   .deck-stack{ position:relative; cursor:pointer; user-select:none; flex:0 0 auto; }
   .deck-stack.number{ width:32px; height:48px; }
   .deck-stack.constraint{ width:32px; height:48px; }
@@ -972,6 +1006,10 @@
   width:18px; height:18px; border-radius:50%;
   background:rgba(34,197,94,.35);
   pointer-events:none;
+}
+.check-mark.m105-draggable{
+  pointer-events:auto;
+  cursor:grab;
 }
   
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
@@ -1786,7 +1824,8 @@ const STAGE_STORIES = {
   101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' },
   102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
   103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' },
-  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' }
+  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' },
+  105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' }
 };
 
 function renderStageStory(v){
@@ -1796,7 +1835,8 @@ function renderStageStory(v){
   const mySeatIdx = getMySeatedTableIndex(v);
   if (mySeatIdx != null) { H(stageStoryPop, true); return; }
   stageStoryTitle.textContent = def.title;
-  stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
+  const missionLabel = (missionId >= 101) ? `@${missionId - 100}` : `#${missionId}`;
+  stageStoryNum.textContent = missionLabel;
   stageStoryBody.textContent = def.body;
   if (stageStoryImageMissions.has(missionId)) {
     stageStoryImage.src = `./P${missionId}.png`;
@@ -3010,6 +3050,9 @@ function buildMixPlan(missionId){
     104: [ // @4 赤2
       {type:'redPick', k:2},
     ],
+    105: [ // @5 赤2
+      {type:'redPick', k:2},
+    ],
 };
 return plans[missionId] || [];
 
@@ -3320,6 +3363,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM39(v);
     renderM9(v);
     renderM104(v);
+    renderM105(v);
      renderM11(v);
     renderM12(v);
     renderM15(v);
@@ -4164,8 +4208,18 @@ if ((v.mission?.id|0) === 23) {
         else if (checklistHints.redMaybe.has(n)) { bottomDot.classList.add('is-maybe-red'); bottomDot.textContent = '?'; }
         cell.appendChild(bottomDot);
       }
-      if((openCountByNum[n]||0) === 4){ // 同じ数字が4本全体公開
+      const m105Places = (v?.meta?.m105_places && typeof v.meta.m105_places === 'object') ? v.meta.m105_places : {};
+      const m105Placed = String(m105Places[n] || '');
+      if((openCountByNum[n]||0) === 4 && !((v?.mission?.id|0)===105 && m105Placed)){ // 同じ数字が4本全体公開
         const mk = document.createElement('div'); mk.className='check-mark';
+        if ((v?.mission?.id|0)===105){
+          mk.classList.add('m105-draggable');
+          mk.draggable = true;
+          mk.dataset.m105Num = String(n);
+          mk.addEventListener('dragstart', (ev)=>{
+            ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'m105', num:n, from:'checklist' }));
+          });
+        }
         cell.appendChild(mk);
       }
       /* ここから追加：#43のときだけクリック可能（全員） */
@@ -4913,7 +4967,32 @@ tokens.forEach((tk,ti)=>{
       badge.appendChild(a);
       badge.appendChild(col);
 
-      wrap.appendChild(card);
+  
+
+    lane.querySelectorAll('.m105-draggable').forEach((el)=>{
+      el.addEventListener('pointerdown', (ev)=>{
+        if (ev.pointerType !== 'touch') return;
+        const payload = { type:'m105', num:String(el.dataset.m105Num||''), from:'touch' };
+        state._m105Payload = payload;
+        const onUp = async (upEv)=>{
+          window.removeEventListener('pointerup', onUp, true);
+          const hit = document.elementFromPoint(upEv.clientX, upEv.clientY);
+          if (!hit) return;
+          if (hit.closest('.m105-pool')){
+            const now = state.watching;
+            if (((now?.mission?.id|0) !== 105)) return;
+            const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+            next[String(payload.num)] = 'pool';
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+            return;
+          }
+          if (hit.closest('.m105-charge-card')) await commitToLeftmostSlot(payload);
+        };
+        window.addEventListener('pointerup', onUp, true);
+      }, { passive:true });
+    });
+
+    wrap.appendChild(card);
       wrap.appendChild(badge);
       hand.appendChild(wrap);
     });
@@ -10629,6 +10708,7 @@ function missionNumberRange(missionId){
   65: [10],
   101: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
   104: [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
+  105: [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
  };
 
     
@@ -11841,6 +11921,177 @@ function buildFixedLane(list){
       lane.appendChild(node);
     });
     lane.id = 'm9Row';
+    mountLaneUnderItemsBar(lane);
+  }
+
+
+  function renderM105(v){
+    const isM105 = ((v?.mission?.id|0) === 105);
+    const old = document.getElementById('m105Row');
+    if (!isM105){ if(old) old.remove(); return; }
+    if (old) old.remove();
+
+    const lane = document.createElement('div');
+    lane.className = 'numlane';
+    lane.id = 'm105Row';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'm105-wrap';
+
+    const card = document.createElement('div');
+    card.className = 'm105-charge-card m105-droppable';
+    const places = (v?.meta?.m105_places && typeof v.meta.m105_places === 'object') ? v.meta.m105_places : {};
+    const hasSlot0Real = Object.values(places).some(w => String(w||'') === 'slot0');
+    const placesForView = hasSlot0Real ? { ...places } : { __seed:'slot0', ...places };
+
+    const dots = document.createElement('div');
+    dots.className = 'm105-charge-dots';
+    const findLeftmostEmptySlot = (placesMap, movingNum)=>{
+      const occ = new Set();
+      Object.entries(placesMap||{}).forEach(([num, where])=>{
+        if (String(num) === String(movingNum)) return;
+        const m = String(where||'').match(/^slot([0-2])$/);
+        if (m) occ.add(Number(m[1]));
+      });
+      for (let i=0; i<3; i++){
+        if (!occ.has(i)) return i;
+      }
+      return 0;
+    };
+    for(let i=0;i<3;i++){
+      const slot = document.createElement('i');
+      slot.classList.add('m105-slot');
+      slot.dataset.slot = String(i);
+      slot.addEventListener('dragover', (ev)=> ev.preventDefault());
+      slot.addEventListener('drop', async (ev)=>{
+        ev.preventDefault();
+        let payload = null;
+        try{ payload = JSON.parse(ev.dataTransfer.getData('text/plain')||'{}'); }catch(_e){}
+        await commitToLeftmostSlot(payload);
+      });
+      dots.appendChild(slot);
+    }
+    if (!state._m105Drag) state._m105Drag = { dropped:false, origin:'' };
+    if (!state._m105Payload) state._m105Payload = null;
+
+    const commitToLeftmostSlot = async (payload)=>{
+      if (payload?.type !== 'm105') return;
+      const tokenId = String(payload?.num ?? '');
+      if (!tokenId) return;
+      const now = state.watching;
+      if (((now?.mission?.id|0) !== 105)) return;
+      const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+      const hasSlot0Now = Object.values(next).some(w => String(w||'') === 'slot0');
+      const occMap = hasSlot0Now ? { ...next } : { __seed:'slot0', ...next };
+      const dest = findLeftmostEmptySlot(occMap, tokenId);
+      next[tokenId] = `slot${dest}`;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+    };
+    card.addEventListener('dragover', (ev)=> ev.preventDefault());
+    card.addEventListener('drop', async (ev)=>{
+      ev.preventDefault();
+      let payload = null;
+      try{ payload = JSON.parse(ev.dataTransfer.getData('text/plain')||'{}'); }catch(_e){}
+      await commitToLeftmostSlot(payload);
+      state._m105Drag = { dropped:true, origin: String(payload?.from || '') };
+    });
+    card.appendChild(dots);
+
+    const bomb = document.createElement('img');
+    bomb.className = 'bomb';
+    bomb.src = './chargablebomb.png';
+    bomb.alt = 'chargablebomb';
+    bomb.onerror = ()=>{ bomb.style.display='none'; };
+    card.appendChild(bomb);
+
+    Object.entries(placesForView).forEach(([num, where])=>{
+      if (!/^slot[0-2]$/.test(String(where||''))) return;
+      const idx = Number(String(where).replace('slot',''));
+      const target = dots.children[idx];
+      if (!target) return;
+      const mark = document.createElement('div');
+      const isSeed = (num === '__seed');
+      mark.className = 'check-mark m105-mark m105-draggable';
+      mark.draggable = true;
+      mark.dataset.m105Num = String(num);
+      mark.addEventListener('dragstart', (ev)=>{
+        state._m105Drag = { dropped:false, origin:`slot${idx}` };
+        state._m105Payload = { type:'m105', num:String(num), from:`slot${idx}` };
+        ev.dataTransfer.setData('text/plain', JSON.stringify(state._m105Payload));
+      });
+      mark.addEventListener('dragend', async ()=>{
+        const drag = state._m105Drag || {};
+        if (drag.dropped) return;
+        const now = state.watching;
+        if (((now?.mission?.id|0) !== 105)) return;
+        const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+        next[String(num)] = 'pool';
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+      });
+      target.appendChild(mark);
+    });
+
+    const pool = document.createElement('div');
+    pool.className = 'm105-pool';
+    pool.addEventListener('dragover', (ev)=> ev.preventDefault());
+    pool.addEventListener('drop', async (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      let payload = null;
+      try{ payload = JSON.parse(ev.dataTransfer.getData('text/plain')||'{}'); }catch(_e){}
+      if (payload?.type !== 'm105') return;
+      const tokenId = String(payload?.num ?? '');
+      if (!tokenId) return;
+      const now = state.watching;
+      if (((now?.mission?.id|0) !== 105)) return;
+      const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+      next[tokenId] = 'pool';
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+      state._m105Drag = { dropped:true, origin: String(payload?.from || '') };
+    });
+    Object.entries(placesForView).forEach(([num, where])=>{
+      if (String(where||'') !== 'pool') return;
+      if (num === '__seed') return;
+      const mark = document.createElement('div');
+      mark.className = 'check-mark m105-mark m105-draggable cross';
+      mark.draggable = true;
+      mark.dataset.m105Num = String(num);
+      mark.addEventListener('dragstart', (ev)=>{
+        state._m105Drag = { dropped:false, origin:'pool' };
+        state._m105Payload = { type:'m105', num:String(num), from:'pool' };
+        ev.dataTransfer.setData('text/plain', JSON.stringify(state._m105Payload));
+      });
+      pool.appendChild(mark);
+    });
+
+
+
+    lane.querySelectorAll('.m105-draggable').forEach((el)=>{
+      el.addEventListener('pointerdown', (ev)=>{
+        if (ev.pointerType !== 'touch') return;
+        const payload = { type:'m105', num:String(el.dataset.m105Num||''), from:'touch' };
+        state._m105Payload = payload;
+        const onUp = async (upEv)=>{
+          window.removeEventListener('pointerup', onUp, true);
+          const hit = document.elementFromPoint(upEv.clientX, upEv.clientY);
+          if (!hit) return;
+          if (hit.closest('.m105-pool')){
+            const now = state.watching;
+            if (((now?.mission?.id|0) !== 105)) return;
+            const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+            next[String(payload.num)] = 'pool';
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+            return;
+          }
+          if (hit.closest('.m105-charge-card')) await commitToLeftmostSlot(payload);
+        };
+        window.addEventListener('pointerup', onUp, true);
+      }, { passive:true });
+    });
+
+    wrap.appendChild(card);
+    wrap.appendChild(pool);
+    lane.appendChild(wrap);
     mountLaneUnderItemsBar(lane);
   }
 
@@ -14392,6 +14643,20 @@ case 104: {
       '数値カードのコードを4本切断したら、そのカードを取り除く。'
     ],
     flags:{ m104:true }
+  };
+}
+
+case 105: {
+  return {
+    id:105, name:'@5', desc:'',
+    display:[
+      '@5',
+      ...linesForMix,
+      'ABNI4の上に1つだけ確定トークンを置く。',
+      '確定トークンを獲得するたびに、最大3つまでいつでもABNI4の上に確定トークンを置ける。',
+      '次の隊長の手番以降、隊長の手番の直前でABNI4から確定トークンを1つ取り除く。ABNI4から確定トークンが0になった時点で爆弾が爆発する。'
+    ],
+    flags:{ m105_chargeableBomb:true }
   };
 }
 
