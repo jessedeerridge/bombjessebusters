@@ -238,10 +238,20 @@
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
 
-  .m105-charge-card{ width:32px; height:48px; border-radius:6px; border:1px solid #cfcfcf; background:#e5e7eb; display:flex; align-items:center; justify-content:center; position:relative; flex:0 0 auto; }
-  .m105-charge-card .bomb{ width:24px; height:24px; object-fit:contain; opacity:.92; }
-  .m105-charge-dots{ position:absolute; top:4px; left:50%; transform:translateX(-50%); display:flex; gap:4px; }
-  .m105-charge-dots i{ width:18px; height:18px; border-radius:50%; border:1px solid #6b7280; background:#f9fafb; display:block; }
+  .m105-charge-card{
+    width:75px; height:50px; border-radius:8px; border:1px solid #cfcfcf;
+    background:#e5e7eb; display:flex; align-items:center; justify-content:center;
+    position:relative; flex:0 0 auto;
+  }
+  .m105-charge-card .bomb{ width:30px; height:30px; object-fit:contain; opacity:.92; }
+  .m105-charge-dots{
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    display:flex; gap:4px;
+  }
+  .m105-charge-dots i{
+    width:18px; height:18px; border-radius:50%;
+    border:1px solid #6b7280; background:transparent; display:block;
+  }
 
   .deck-stack{ position:relative; cursor:pointer; user-select:none; flex:0 0 auto; }
   .deck-stack.number{ width:32px; height:48px; }
