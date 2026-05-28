@@ -1044,19 +1044,8 @@
 .m105-pool-slot.filled{
   position:relative;
   border:none;
-  background:transparent;
-}
-.m105-pool-slot.filled::before{
-  content:'✓';
-  position:absolute;
-  inset:0;
-  display:grid;
-  place-items:center;
-  color:#16a34a;
-  font-size:18px;
-  font-weight:900;
-  line-height:1;
-  pointer-events:none;
+  border-radius:50%;
+  background:rgba(34,197,94,.35);
 }
 .m105-pool-slot.filled::after{
   content:'✕';
@@ -1065,7 +1054,7 @@
   display:grid;
   place-items:center;
   color:#dc2626;
-  font-size:18px;
+  font-size:12px;
   font-weight:900;
   line-height:1;
   pointer-events:none;
