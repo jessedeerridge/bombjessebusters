@@ -258,6 +258,7 @@
     background:#f3f4f6; display:flex; flex-wrap:wrap; align-content:flex-start; gap:4px; padding:4px;
   }
   .m105-slot{ pointer-events:auto; }
+  .m105-charge-card.m105-droppable{ cursor:copy; }
   .m105-mark{
     position:static; inset:auto; margin:0;
     pointer-events:auto; cursor:grab; user-select:none;
@@ -11908,7 +11909,7 @@ function buildFixedLane(list){
     wrap.className = 'm105-wrap';
 
     const card = document.createElement('div');
-    card.className = 'm105-charge-card';
+    card.className = 'm105-charge-card m105-droppable';
     const places = (v?.meta?.m105_places && typeof v.meta.m105_places === 'object') ? v.meta.m105_places : {};
     const hasSlot0Real = Object.values(places).some(w => String(w||'') === 'slot0');
     const placesForView = hasSlot0Real ? { ...places } : { __seed:'slot0', ...places };
@@ -11936,18 +11937,28 @@ function buildFixedLane(list){
         ev.preventDefault();
         let payload = null;
         try{ payload = JSON.parse(ev.dataTransfer.getData('text/plain')||'{}'); }catch(_e){}
-        if (payload?.type !== 'm105' || !(payload?.num>0)) return;
-        const now = state.watching;
-        if (((now?.mission?.id|0) !== 105)) return;
-        const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
-        const hasSlot0Now = Object.values(next).some(w => String(w||'') === 'slot0');
-        const occMap = hasSlot0Now ? { ...next } : { __seed:'slot0', ...next };
-        const dest = findLeftmostEmptySlot(occMap, payload.num);
-        next[String(payload.num)] = `slot${dest}`;
-        await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+        await commitToLeftmostSlot(payload);
       });
       dots.appendChild(slot);
     }
+    const commitToLeftmostSlot = async (payload)=>{
+      if (payload?.type !== 'm105' || !(payload?.num>0)) return;
+      const now = state.watching;
+      if (((now?.mission?.id|0) !== 105)) return;
+      const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+      const hasSlot0Now = Object.values(next).some(w => String(w||'') === 'slot0');
+      const occMap = hasSlot0Now ? { ...next } : { __seed:'slot0', ...next };
+      const dest = findLeftmostEmptySlot(occMap, payload.num);
+      next[String(payload.num)] = `slot${dest}`;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+    };
+    card.addEventListener('dragover', (ev)=> ev.preventDefault());
+    card.addEventListener('drop', async (ev)=>{
+      ev.preventDefault();
+      let payload = null;
+      try{ payload = JSON.parse(ev.dataTransfer.getData('text/plain')||'{}'); }catch(_e){}
+      await commitToLeftmostSlot(payload);
+    });
     card.appendChild(dots);
 
     const bomb = document.createElement('img');
