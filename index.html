@@ -11946,6 +11946,8 @@ function buildFixedLane(list){
       });
       dots.appendChild(slot);
     }
+    if (!state._m105Drag) state._m105Drag = { dropped:false, origin:'' };
+
     const commitToLeftmostSlot = async (payload)=>{
       if (payload?.type !== 'm105' || !(payload?.num>0)) return;
       const now = state.watching;
@@ -11963,6 +11965,7 @@ function buildFixedLane(list){
       let payload = null;
       try{ payload = JSON.parse(ev.dataTransfer.getData('text/plain')||'{}'); }catch(_e){}
       await commitToLeftmostSlot(payload);
+      state._m105Drag = { dropped:true, origin: String(payload?.from || '') };
     });
     card.appendChild(dots);
 
@@ -11985,7 +11988,17 @@ function buildFixedLane(list){
       mark.dataset.m105Num = String(num);
       if (!isSeed){
         mark.addEventListener('dragstart', (ev)=>{
+          state._m105Drag = { dropped:false, origin:`slot${idx}` };
           ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'m105', num:Number(num), from:`slot${idx}` }));
+        });
+        mark.addEventListener('dragend', async ()=>{
+          const drag = state._m105Drag || {};
+          if (drag.dropped) return;
+          const now = state.watching;
+          if (((now?.mission?.id|0) !== 105)) return;
+          const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+          next[String(num)] = 'pool';
+          await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
         });
       }
       target.appendChild(mark);
@@ -11996,6 +12009,7 @@ function buildFixedLane(list){
     pool.addEventListener('dragover', (ev)=> ev.preventDefault());
     pool.addEventListener('drop', async (ev)=>{
       ev.preventDefault();
+      ev.stopPropagation();
       let payload = null;
       try{ payload = JSON.parse(ev.dataTransfer.getData('text/plain')||'{}'); }catch(_e){}
       if (payload?.type !== 'm105' || !(payload?.num>0)) return;
@@ -12004,6 +12018,7 @@ function buildFixedLane(list){
       const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
       next[String(payload.num)] = 'pool';
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+      state._m105Drag = { dropped:true, origin: String(payload?.from || '') };
     });
     Object.entries(placesForView).forEach(([num, where])=>{
       if (String(where||'') !== 'pool') return;
@@ -12013,6 +12028,7 @@ function buildFixedLane(list){
       mark.draggable = true;
       mark.dataset.m105Num = String(num);
       mark.addEventListener('dragstart', (ev)=>{
+        state._m105Drag = { dropped:false, origin:'pool' };
         ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'m105', num:Number(num), from:'pool' }));
       });
       pool.appendChild(mark);
