@@ -1067,6 +1067,7 @@
   pointer-events:none;
 }
 .m105-drag-source{ cursor:grab; }
+.m105-drag-origin{ opacity:0; }
 .m105-dragging{
   position:fixed;
   width:18px;
@@ -12032,25 +12033,46 @@ function beginM105Drag(ev, from, sourceNum=null){
 
   const dragSourceEl = ev.currentTarget;
   try{ dragSourceEl?.setPointerCapture?.(ev.pointerId); }catch(_e){}
+  dragSourceEl?.classList?.add('m105-drag-origin');
 
   const ghost = document.createElement('div');
   ghost.className = 'm105-dragging';
   document.body.appendChild(ghost);
+  let lastPoint = { x:ev.clientX, y:ev.clientY };
+  const pointFromEvent = (e)=>{
+    const t = e?.touches?.[0] || e?.changedTouches?.[0];
+    return {
+      x: Number.isFinite(e?.clientX) ? e.clientX : (t?.clientX ?? lastPoint.x),
+      y: Number.isFinite(e?.clientY) ? e.clientY : (t?.clientY ?? lastPoint.y)
+    };
+  };
   const moveGhost = (clientX, clientY)=>{
+    lastPoint = { x:clientX, y:clientY };
     ghost.style.left = `${clientX}px`;
     ghost.style.top = `${clientY}px`;
   };
-  moveGhost(ev.clientX, ev.clientY);
+  moveGhost(lastPoint.x, lastPoint.y);
 
-  const onMove = (e)=> moveGhost(e.clientX, e.clientY);
-  const onUp = async (e)=>{
+  let finished = false;
+  const cleanupDrag = (e)=>{
     window.removeEventListener('pointermove', onMove, true);
     window.removeEventListener('pointerup', onUp, true);
     window.removeEventListener('pointercancel', onUp, true);
-    try{ dragSourceEl?.releasePointerCapture?.(e.pointerId); }catch(_e){}
+    window.removeEventListener('touchmove', onTouchMove, true);
+    window.removeEventListener('touchend', onTouchEnd, true);
+    window.removeEventListener('touchcancel', onTouchEnd, true);
+    try{ dragSourceEl?.releasePointerCapture?.(e?.pointerId); }catch(_e){}
+    dragSourceEl?.classList?.remove('m105-drag-origin');
     ghost.remove();
+  };
+  const finishDrag = async (e)=>{
+    if (finished) return;
+    finished = true;
+    const pt = pointFromEvent(e);
+    moveGhost(pt.x, pt.y);
+    cleanupDrag(e);
 
-    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const target = document.elementFromPoint(pt.x, pt.y);
     const overCard = !!target?.closest?.('#m105ChargeCard');
     const overPool = !!target?.closest?.('#m105ChargePool');
 
@@ -12069,10 +12091,25 @@ function beginM105Drag(ev, from, sourceNum=null){
       if (overCard && startPool > 0 && startSlots < 3) await setM105State({ slots:startSlots + 1, pool:startPool - 1 });
     }
   };
+  const onMove = (e)=>{
+    e.preventDefault?.();
+    const pt = pointFromEvent(e);
+    moveGhost(pt.x, pt.y);
+  };
+  const onUp = (e)=>{ finishDrag(e); };
+  const onTouchMove = (e)=>{
+    e.preventDefault?.();
+    const pt = pointFromEvent(e);
+    moveGhost(pt.x, pt.y);
+  };
+  const onTouchEnd = (e)=>{ finishDrag(e); };
 
   window.addEventListener('pointermove', onMove, true);
   window.addEventListener('pointerup', onUp, true);
   window.addEventListener('pointercancel', onUp, true);
+  window.addEventListener('touchmove', onTouchMove, { capture:true, passive:false });
+  window.addEventListener('touchend', onTouchEnd, true);
+  window.addEventListener('touchcancel', onTouchEnd, true);
 }
 
 function renderM105(v){
