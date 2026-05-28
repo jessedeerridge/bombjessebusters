@@ -4967,7 +4967,32 @@ tokens.forEach((tk,ti)=>{
       badge.appendChild(a);
       badge.appendChild(col);
 
-      wrap.appendChild(card);
+  
+
+    lane.querySelectorAll('.m105-draggable').forEach((el)=>{
+      el.addEventListener('pointerdown', (ev)=>{
+        if (ev.pointerType !== 'touch') return;
+        const payload = { type:'m105', num:String(el.dataset.m105Num||''), from:'touch' };
+        state._m105Payload = payload;
+        const onUp = async (upEv)=>{
+          window.removeEventListener('pointerup', onUp, true);
+          const hit = document.elementFromPoint(upEv.clientX, upEv.clientY);
+          if (!hit) return;
+          if (hit.closest('.m105-pool')){
+            const now = state.watching;
+            if (((now?.mission?.id|0) !== 105)) return;
+            const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+            next[String(payload.num)] = 'pool';
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+            return;
+          }
+          if (hit.closest('.m105-charge-card')) await commitToLeftmostSlot(payload);
+        };
+        window.addEventListener('pointerup', onUp, true);
+      }, { passive:true });
+    });
+
+    wrap.appendChild(card);
       wrap.appendChild(badge);
       hand.appendChild(wrap);
     });
@@ -11947,16 +11972,19 @@ function buildFixedLane(list){
       dots.appendChild(slot);
     }
     if (!state._m105Drag) state._m105Drag = { dropped:false, origin:'' };
+    if (!state._m105Payload) state._m105Payload = null;
 
     const commitToLeftmostSlot = async (payload)=>{
-      if (payload?.type !== 'm105' || !(payload?.num>0)) return;
+      if (payload?.type !== 'm105') return;
+      const tokenId = String(payload?.num ?? '');
+      if (!tokenId) return;
       const now = state.watching;
       if (((now?.mission?.id|0) !== 105)) return;
       const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
       const hasSlot0Now = Object.values(next).some(w => String(w||'') === 'slot0');
       const occMap = hasSlot0Now ? { ...next } : { __seed:'slot0', ...next };
-      const dest = findLeftmostEmptySlot(occMap, payload.num);
-      next[String(payload.num)] = `slot${dest}`;
+      const dest = findLeftmostEmptySlot(occMap, tokenId);
+      next[tokenId] = `slot${dest}`;
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
     };
     card.addEventListener('dragover', (ev)=> ev.preventDefault());
@@ -11983,24 +12011,23 @@ function buildFixedLane(list){
       if (!target) return;
       const mark = document.createElement('div');
       const isSeed = (num === '__seed');
-      mark.className = `check-mark m105-mark${isSeed ? '' : ' m105-draggable'}`;
-      mark.draggable = !isSeed;
+      mark.className = 'check-mark m105-mark m105-draggable';
+      mark.draggable = true;
       mark.dataset.m105Num = String(num);
-      if (!isSeed){
-        mark.addEventListener('dragstart', (ev)=>{
-          state._m105Drag = { dropped:false, origin:`slot${idx}` };
-          ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'m105', num:Number(num), from:`slot${idx}` }));
-        });
-        mark.addEventListener('dragend', async ()=>{
-          const drag = state._m105Drag || {};
-          if (drag.dropped) return;
-          const now = state.watching;
-          if (((now?.mission?.id|0) !== 105)) return;
-          const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
-          next[String(num)] = 'pool';
-          await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
-        });
-      }
+      mark.addEventListener('dragstart', (ev)=>{
+        state._m105Drag = { dropped:false, origin:`slot${idx}` };
+        state._m105Payload = { type:'m105', num:String(num), from:`slot${idx}` };
+        ev.dataTransfer.setData('text/plain', JSON.stringify(state._m105Payload));
+      });
+      mark.addEventListener('dragend', async ()=>{
+        const drag = state._m105Drag || {};
+        if (drag.dropped) return;
+        const now = state.watching;
+        if (((now?.mission?.id|0) !== 105)) return;
+        const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+        next[String(num)] = 'pool';
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+      });
       target.appendChild(mark);
     });
 
@@ -12012,11 +12039,13 @@ function buildFixedLane(list){
       ev.stopPropagation();
       let payload = null;
       try{ payload = JSON.parse(ev.dataTransfer.getData('text/plain')||'{}'); }catch(_e){}
-      if (payload?.type !== 'm105' || !(payload?.num>0)) return;
+      if (payload?.type !== 'm105') return;
+      const tokenId = String(payload?.num ?? '');
+      if (!tokenId) return;
       const now = state.watching;
       if (((now?.mission?.id|0) !== 105)) return;
       const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
-      next[String(payload.num)] = 'pool';
+      next[tokenId] = 'pool';
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
       state._m105Drag = { dropped:true, origin: String(payload?.from || '') };
     });
@@ -12029,9 +12058,35 @@ function buildFixedLane(list){
       mark.dataset.m105Num = String(num);
       mark.addEventListener('dragstart', (ev)=>{
         state._m105Drag = { dropped:false, origin:'pool' };
-        ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'m105', num:Number(num), from:'pool' }));
+        state._m105Payload = { type:'m105', num:String(num), from:'pool' };
+        ev.dataTransfer.setData('text/plain', JSON.stringify(state._m105Payload));
       });
       pool.appendChild(mark);
+    });
+
+
+
+    lane.querySelectorAll('.m105-draggable').forEach((el)=>{
+      el.addEventListener('pointerdown', (ev)=>{
+        if (ev.pointerType !== 'touch') return;
+        const payload = { type:'m105', num:String(el.dataset.m105Num||''), from:'touch' };
+        state._m105Payload = payload;
+        const onUp = async (upEv)=>{
+          window.removeEventListener('pointerup', onUp, true);
+          const hit = document.elementFromPoint(upEv.clientX, upEv.clientY);
+          if (!hit) return;
+          if (hit.closest('.m105-pool')){
+            const now = state.watching;
+            if (((now?.mission?.id|0) !== 105)) return;
+            const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
+            next[String(payload.num)] = 'pool';
+            await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
+            return;
+          }
+          if (hit.closest('.m105-charge-card')) await commitToLeftmostSlot(payload);
+        };
+        window.addEventListener('pointerup', onUp, true);
+      }, { passive:true });
     });
 
     wrap.appendChild(card);
