@@ -973,7 +973,111 @@
   background:rgba(34,197,94,.35);
   pointer-events:none;
 }
-  
+
+
+/* ★ @5：チャージ式爆弾カード */
+.m105-charge-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:6px;
+  padding-left:0;
+}
+.m105-charge-card,
+.m105-charge-pool{
+  position:relative;
+  height:var(--item-w);
+  border:1px solid #d1d5db;
+  border-radius:8px;
+  background:#e5e7eb;
+  flex:0 0 auto;
+}
+.m105-charge-card{ width:var(--item-h); }
+.m105-charge-pool{
+  width:auto;
+  min-width:calc(12 * 18px + 11 * 5px + 12px);
+  border:none;
+  border-radius:0;
+  background:transparent;
+}
+.m105-charge-card{
+  background:#e5e7eb url('./chargablebomb.png') center/contain no-repeat;
+}
+.m105-charge-slots{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  z-index:2;
+}
+.m105-charge-slot,
+.m105-pool-slot{
+  width:18px;
+  height:18px;
+  border:none;
+  border-radius:50%;
+  background:transparent;
+  display:grid;
+  place-items:center;
+}
+.m105-charge-slot.filled,
+.m105-pool-slot.filled{
+  border:1px solid #16a34a;
+  background:rgba(34,197,94,.35);
+  cursor:grab;
+}
+.m105-charge-pool{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  background:transparent;
+}
+.m105-pool-slot{
+  border:none;
+  border-radius:0;
+  background:transparent;
+}
+.m105-pool-slot.filled{
+  position:relative;
+  border:none;
+  border-radius:50%;
+  background:rgba(34,197,94,.35);
+}
+.m105-charge-slot.filled,
+.m105-pool-slot.filled,
+.m105-drag-source{
+  touch-action:none;
+  -webkit-user-select:none;
+  user-select:none;
+}
+.m105-pool-slot.filled::after{
+  content:'✕';
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  color:#dc2626;
+  font-size:12px;
+  font-weight:900;
+  line-height:1;
+  pointer-events:none;
+}
+.m105-drag-source{ cursor:grab; }
+.m105-drag-origin{ opacity:0; }
+.m105-dragging{
+  position:fixed;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:rgba(34,197,94,.45);
+  border:1px solid #16a34a;
+  z-index:2147483647;
+  pointer-events:none;
+  transform:translate(-50%, -50%);
+}
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
 .mini-pop{
   position:fixed;
@@ -1786,8 +1890,14 @@ const STAGE_STORIES = {
   101: { title:'新開発！', body:'新たな道具を発明したぞ。これがあればなんでも切れるはずだ。' },
   102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
   103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' },
-  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' }
+  104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' },
+  105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' }
 };
+
+function missionLabel(missionId){
+  const id = Number(missionId) || 0;
+  return (id >= 101) ? `@${id - 100}` : `#${id}`;
+}
 
 function renderStageStory(v){
   const missionId = Number(v?.mission?.id || 0);
@@ -1796,7 +1906,8 @@ function renderStageStory(v){
   const mySeatIdx = getMySeatedTableIndex(v);
   if (mySeatIdx != null) { H(stageStoryPop, true); return; }
   stageStoryTitle.textContent = def.title;
-  stageStoryNum.innerHTML = `<span class="hash">#</span>${missionId}`;
+  const storyLabel = missionLabel(missionId);
+  stageStoryNum.innerHTML = `<span class="hash">${storyLabel.charAt(0)}</span>${storyLabel.slice(1)}`;
   stageStoryBody.textContent = def.body;
   if (stageStoryImageMissions.has(missionId)) {
     stageStoryImage.src = `./P${missionId}.png`;
@@ -3010,6 +3121,8 @@ function buildMixPlan(missionId){
     104: [ // @4 赤2
       {type:'redPick', k:2},
     ],
+    105: [ // @5
+    ],
 };
 return plans[missionId] || [];
 
@@ -3320,6 +3433,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM39(v);
     renderM9(v);
     renderM104(v);
+    renderM105(v);
      renderM11(v);
     renderM12(v);
     renderM15(v);
@@ -3780,9 +3894,10 @@ function renderItemsAndDi(v){
     const flags = v?.mission?.flags || {};
     const isM42 = ((v?.mission?.id|0) === 42);
     const isM53 = ((v?.mission?.id|0) === 53);
+    const isM105 = ((v?.mission?.id|0) === 105);
     const m23OnlyHideItems = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
     hideItems = m23OnlyHideItems || (isM42 && !!v?.meta?.m42_on);
-    hideDi    = isM53;
+    hideDi    = isM53 || isM105;
 
     // バー自体は常に表示（m42の箱を置くため）、必要に応じて中身だけ隠す
     H(itemsBar, false);
@@ -4146,10 +4261,12 @@ if ((v.mission?.id|0) === 23) {
   const hideM50ChecklistHints = ((v?.mission?.id|0) === 50);
 
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
+  const m105UsedNums = new Set(((v?.mission?.id|0) === 105 && Array.isArray(v?.meta?.m105_usedNums)) ? v.meta.m105_usedNums.map(x=>x|0) : []);
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
     for(let n=1; n<=12; n++){
       const cell = document.createElement('div'); cell.className='check-item';
+      cell.dataset.num = String(n);
       cell.textContent = String(n);
       if(n < 12 && !hideM50ChecklistHints){
         const topDot = document.createElement('span');
@@ -4164,7 +4281,7 @@ if ((v.mission?.id|0) === 23) {
         else if (checklistHints.redMaybe.has(n)) { bottomDot.classList.add('is-maybe-red'); bottomDot.textContent = '?'; }
         cell.appendChild(bottomDot);
       }
-      if((openCountByNum[n]||0) === 4){ // 同じ数字が4本全体公開
+      if((openCountByNum[n]||0) === 4 && !m105UsedNums.has(n)){ // 同じ数字が4本全体公開
         const mk = document.createElement('div'); mk.className='check-mark';
         cell.appendChild(mk);
       }
@@ -11169,6 +11286,8 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
       i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
       missionPickerOpen:false,
       missionPickerCount: playerCount,
+      m105_slots:(missionId===105 ? 1 : 0),
+      m105_pool:(missionId===105 ? 0 : 0),
       m55_deck:null, m55_shown:null, m55_c8Sides:null, m55_backByIndex:null
     }
   });
@@ -11887,10 +12006,171 @@ function buildFixedLane(list){
     lane.id = 'm104Row';
     mountLaneUnderItemsBar(lane);
   }
+
+/* ==== @5：チャージ式爆弾カード ==== */
+function clampM105SlotCount(n){ return Math.max(0, Math.min(3, Number(n)||0)); }
+function clampM105PoolCount(n){ return Math.max(0, Math.min(12, Number(n)||0)); }
+
+async function setM105State({ slots, pool, usedNums }){
+  if (!state.roomCode) return;
+  const patch = {};
+  if (slots != null) patch.m105_slots = clampM105SlotCount(slots);
+  if (pool != null) patch.m105_pool = clampM105PoolCount(pool);
+  if (Array.isArray(usedNums)) patch.m105_usedNums = Array.from(new Set(usedNums.map(n=>n|0).filter(n=>n>=1 && n<=12)));
+  await update(ref(db, `rooms/${state.roomCode}/meta`), patch);
+}
+
+function beginM105Drag(ev, from, sourceNum=null){
+  const v = state.watching;
+  if ((v?.mission?.id|0) !== 105) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+
+  const meta = v?.meta || {};
+  const startSlots = clampM105SlotCount(meta.m105_slots ?? 1);
+  const startPool = clampM105PoolCount(meta.m105_pool ?? 0);
+  const startUsedNums = Array.isArray(meta.m105_usedNums) ? meta.m105_usedNums.slice() : [];
+
+  const dragSourceEl = ev.currentTarget;
+  try{ dragSourceEl?.setPointerCapture?.(ev.pointerId); }catch(_e){}
+  dragSourceEl?.classList?.add('m105-drag-origin');
+
+  const ghost = document.createElement('div');
+  ghost.className = 'm105-dragging';
+  document.body.appendChild(ghost);
+  let lastPoint = { x:ev.clientX, y:ev.clientY };
+  const pointFromEvent = (e)=>{
+    const t = e?.touches?.[0] || e?.changedTouches?.[0];
+    return {
+      x: Number.isFinite(e?.clientX) ? e.clientX : (t?.clientX ?? lastPoint.x),
+      y: Number.isFinite(e?.clientY) ? e.clientY : (t?.clientY ?? lastPoint.y)
+    };
+  };
+  const moveGhost = (clientX, clientY)=>{
+    lastPoint = { x:clientX, y:clientY };
+    ghost.style.left = `${clientX}px`;
+    ghost.style.top = `${clientY}px`;
+  };
+  moveGhost(lastPoint.x, lastPoint.y);
+
+  let finished = false;
+  const cleanupDrag = (e)=>{
+    window.removeEventListener('pointermove', onMove, true);
+    window.removeEventListener('pointerup', onUp, true);
+    window.removeEventListener('pointercancel', onUp, true);
+    window.removeEventListener('touchmove', onTouchMove, true);
+    window.removeEventListener('touchend', onTouchEnd, true);
+    window.removeEventListener('touchcancel', onTouchEnd, true);
+    try{ dragSourceEl?.releasePointerCapture?.(e?.pointerId); }catch(_e){}
+    dragSourceEl?.classList?.remove('m105-drag-origin');
+    ghost.remove();
+  };
+  const finishDrag = async (e)=>{
+    if (finished) return;
+    finished = true;
+    const pt = pointFromEvent(e);
+    moveGhost(pt.x, pt.y);
+    cleanupDrag(e);
+
+    const target = document.elementFromPoint(pt.x, pt.y);
+    const overCard = !!target?.closest?.('#m105ChargeCard');
+    const overPool = !!target?.closest?.('#m105ChargePool');
+
+    if (from === 'checklist') {
+      if (overCard && startSlots < 3) {
+        const nextUsedNums = sourceNum ? startUsedNums.concat([sourceNum|0]) : startUsedNums;
+        await setM105State({ slots:startSlots + 1, pool:startPool, usedNums:nextUsedNums });
+      }
+      return;
+    }
+    if (from === 'card') {
+      if (overPool && startSlots > 0 && startPool < 12) await setM105State({ slots:startSlots - 1, pool:startPool + 1 });
+      return;
+    }
+    if (from === 'pool') {
+      if (overCard && startPool > 0 && startSlots < 3) await setM105State({ slots:startSlots + 1, pool:startPool - 1 });
+    }
+  };
+  const onMove = (e)=>{
+    e.preventDefault?.();
+    const pt = pointFromEvent(e);
+    moveGhost(pt.x, pt.y);
+  };
+  const onUp = (e)=>{ finishDrag(e); };
+  const onTouchMove = (e)=>{
+    e.preventDefault?.();
+    const pt = pointFromEvent(e);
+    moveGhost(pt.x, pt.y);
+  };
+  const onTouchEnd = (e)=>{ finishDrag(e); };
+
+  window.addEventListener('pointermove', onMove, true);
+  window.addEventListener('pointerup', onUp, true);
+  window.addEventListener('pointercancel', onUp, true);
+  window.addEventListener('touchmove', onTouchMove, { capture:true, passive:false });
+  window.addEventListener('touchend', onTouchEnd, true);
+  window.addEventListener('touchcancel', onTouchEnd, true);
+}
+
+function renderM105(v){
+  const old = document.getElementById('m105ChargeRow');
+  if ((v?.mission?.id|0) !== 105){
+    if (old) old.remove();
+    return;
+  }
+
+  let row = old;
+  if (!row){
+    row = document.createElement('div');
+    row.id = 'm105ChargeRow';
+    row.className = 'm105-charge-row';
+    const anchor = document.getElementById('itemsBar');
+    if (anchor) anchor.insertAdjacentElement('afterend', row);
+  }
+
+  const slots = clampM105SlotCount(v?.meta?.m105_slots ?? 1);
+  const pool = clampM105PoolCount(v?.meta?.m105_pool ?? 0);
+  row.innerHTML = '';
+
+  const card = document.createElement('div');
+  card.id = 'm105ChargeCard';
+  card.className = 'm105-charge-card';
+  const slotWrap = document.createElement('div');
+  slotWrap.className = 'm105-charge-slots';
+  for (let i=0; i<3; i++){
+    const slot = document.createElement('div');
+    slot.className = 'm105-charge-slot' + (i < slots ? ' filled' : '');
+    if (i < slots) slot.onpointerdown = (ev)=> beginM105Drag(ev, 'card');
+    slotWrap.appendChild(slot);
+  }
+  card.appendChild(slotWrap);
+
+  const poolEl = document.createElement('div');
+  poolEl.id = 'm105ChargePool';
+  poolEl.className = 'm105-charge-pool';
+  for (let i=0; i<12; i++){
+    const slot = document.createElement('div');
+    slot.className = 'm105-pool-slot' + (i < pool ? ' filled' : '');
+    if (i < pool) slot.onpointerdown = (ev)=> beginM105Drag(ev, 'pool');
+    poolEl.appendChild(slot);
+  }
+
+  row.appendChild(card);
+  row.appendChild(poolEl);
+
+  document.querySelectorAll('.checklist .check-mark').forEach(mark=>{
+    mark.classList.add('m105-drag-source');
+    mark.style.pointerEvents = 'auto';
+    const num = Number(mark.closest('.check-item')?.dataset?.num || 0);
+    mark.onpointerdown = (ev)=> beginM105Drag(ev, 'checklist', num);
+  });
+}
 /* ここから追加：#11 数値カード1枚（同期表示） */
 async function ensureM11MetaInit(vNow){
   const v = vNow || state.watching; if (!v) return;
   const mid = (v?.mission?.id|0);
+
+
   const key = (mid === 103) ? 'm103_number' : 'm11_number';
   // 既に用意済みなら何もしない／初期化はホストのみ
   if ((v?.meta?.[key]|0) > 0) return;
@@ -14395,7 +14675,21 @@ case 104: {
   };
 }
 
-    default:  { return {id, name:`#${id}`, desc:'', display:[`#${id}`, ...linesForMix]}; }
+case 105: {
+  return {
+    id:105, name:'@5', desc:'',
+    display:[
+      '@5',
+      ...linesForMix,
+      'ABNI4の上に1つだけ確定トークンを置く。',
+      '確定トークンを獲得するたびに、最大3つまでいつでもABNI4の上に確定トークンを置ける。',
+      '次の隊長の手番以降、隊長の手番の直前でABNI4から確定トークンを1つ取り除く。ABNI4から確定トークンが0になった時点で爆弾が爆発する。'
+    ],
+    flags:{ m105_chargeBomb:true }
+  };
+}
+
+    default:  { const label = missionLabel(id); return {id, name:label, desc:'', display:[label, ...linesForMix]}; }
   }
 }
 
