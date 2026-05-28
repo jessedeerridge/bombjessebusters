@@ -986,13 +986,14 @@
 .m105-charge-card,
 .m105-charge-pool{
   position:relative;
-  width:var(--item-h);
   height:var(--item-w);
   border:1px solid #d1d5db;
   border-radius:8px;
   background:#e5e7eb;
   flex:0 0 auto;
 }
+.m105-charge-card{ width:var(--item-h); }
+.m105-charge-pool{ width:auto; min-width:calc(12 * 18px + 11 * 5px + 12px); }
 .m105-charge-card{
   background:#e5e7eb url('./chargablebomb.png') center/contain no-repeat;
 }
@@ -4249,10 +4250,12 @@ if ((v.mission?.id|0) === 23) {
   const hideM50ChecklistHints = ((v?.mission?.id|0) === 50);
 
   /* ★ テーブル1の真上にチェック表（1..12）を設置 */
+  const m105UsedNums = new Set(((v?.mission?.id|0) === 105 && Array.isArray(v?.meta?.m105_usedNums)) ? v.meta.m105_usedNums.map(x=>x|0) : []);
   if((v.tables||[]).length>0){
     const cl = document.createElement('div'); cl.className='checklist';
     for(let n=1; n<=12; n++){
       const cell = document.createElement('div'); cell.className='check-item';
+      cell.dataset.num = String(n);
       cell.textContent = String(n);
       if(n < 12 && !hideM50ChecklistHints){
         const topDot = document.createElement('span');
@@ -4267,7 +4270,7 @@ if ((v.mission?.id|0) === 23) {
         else if (checklistHints.redMaybe.has(n)) { bottomDot.classList.add('is-maybe-red'); bottomDot.textContent = '?'; }
         cell.appendChild(bottomDot);
       }
-      if((openCountByNum[n]||0) === 4){ // 同じ数字が4本全体公開
+      if((openCountByNum[n]||0) === 4 && !m105UsedNums.has(n)){ // 同じ数字が4本全体公開
         const mk = document.createElement('div'); mk.className='check-mark';
         cell.appendChild(mk);
       }
@@ -11994,25 +11997,28 @@ function buildFixedLane(list){
   }
 
 /* ==== @5：チャージ式爆弾カード ==== */
-function clampM105Count(n){ return Math.max(0, Math.min(3, Number(n)||0)); }
+function clampM105SlotCount(n){ return Math.max(0, Math.min(3, Number(n)||0)); }
+function clampM105PoolCount(n){ return Math.max(0, Math.min(12, Number(n)||0)); }
 
-async function setM105Counts(slots, pool){
+async function setM105State({ slots, pool, usedNums }){
   if (!state.roomCode) return;
-  await update(ref(db, `rooms/${state.roomCode}/meta`), {
-    m105_slots: clampM105Count(slots),
-    m105_pool: clampM105Count(pool)
-  });
+  const patch = {};
+  if (slots != null) patch.m105_slots = clampM105SlotCount(slots);
+  if (pool != null) patch.m105_pool = clampM105PoolCount(pool);
+  if (Array.isArray(usedNums)) patch.m105_usedNums = Array.from(new Set(usedNums.map(n=>n|0).filter(n=>n>=1 && n<=12)));
+  await update(ref(db, `rooms/${state.roomCode}/meta`), patch);
 }
 
-function beginM105Drag(ev, from){
+function beginM105Drag(ev, from, sourceNum=null){
   const v = state.watching;
   if ((v?.mission?.id|0) !== 105) return;
   ev.preventDefault();
   ev.stopPropagation();
 
   const meta = v?.meta || {};
-  const startSlots = clampM105Count(meta.m105_slots ?? 1);
-  const startPool = clampM105Count(meta.m105_pool ?? 0);
+  const startSlots = clampM105SlotCount(meta.m105_slots ?? 1);
+  const startPool = clampM105PoolCount(meta.m105_pool ?? 0);
+  const startUsedNums = Array.isArray(meta.m105_usedNums) ? meta.m105_usedNums.slice() : [];
 
   const ghost = document.createElement('div');
   ghost.className = 'm105-dragging' + (from === 'pool' ? ' crossed' : '');
@@ -12035,15 +12041,18 @@ function beginM105Drag(ev, from){
     const overPool = !!target?.closest?.('#m105ChargePool');
 
     if (from === 'checklist') {
-      if (overCard && startSlots < 3) await setM105Counts(startSlots + 1, startPool);
+      if (overCard && startSlots < 3) {
+        const nextUsedNums = sourceNum ? startUsedNums.concat([sourceNum|0]) : startUsedNums;
+        await setM105State({ slots:startSlots + 1, pool:startPool, usedNums:nextUsedNums });
+      }
       return;
     }
     if (from === 'card') {
-      if (overPool && startSlots > 0 && startPool < 3) await setM105Counts(startSlots - 1, startPool + 1);
+      if (overPool && startSlots > 0 && startPool < 12) await setM105State({ slots:startSlots - 1, pool:startPool + 1 });
       return;
     }
     if (from === 'pool') {
-      if (overCard && startPool > 0 && startSlots < 3) await setM105Counts(startSlots + 1, startPool - 1);
+      if (overCard && startPool > 0 && startSlots < 3) await setM105State({ slots:startSlots + 1, pool:startPool - 1 });
     }
   };
 
@@ -12068,8 +12077,8 @@ function renderM105(v){
     if (anchor) anchor.insertAdjacentElement('afterend', row);
   }
 
-  const slots = clampM105Count(v?.meta?.m105_slots ?? 1);
-  const pool = clampM105Count(v?.meta?.m105_pool ?? 0);
+  const slots = clampM105SlotCount(v?.meta?.m105_slots ?? 1);
+  const pool = clampM105PoolCount(v?.meta?.m105_pool ?? 0);
   row.innerHTML = '';
 
   const card = document.createElement('div');
@@ -12088,7 +12097,7 @@ function renderM105(v){
   const poolEl = document.createElement('div');
   poolEl.id = 'm105ChargePool';
   poolEl.className = 'm105-charge-pool';
-  for (let i=0; i<3; i++){
+  for (let i=0; i<12; i++){
     const slot = document.createElement('div');
     slot.className = 'm105-pool-slot' + (i < pool ? ' filled' : '');
     if (i < pool) slot.onpointerdown = (ev)=> beginM105Drag(ev, 'pool');
@@ -12101,7 +12110,8 @@ function renderM105(v){
   document.querySelectorAll('.checklist .check-mark').forEach(mark=>{
     mark.classList.add('m105-drag-source');
     mark.style.pointerEvents = 'auto';
-    mark.onpointerdown = (ev)=> beginM105Drag(ev, 'checklist');
+    const num = Number(mark.closest('.check-item')?.dataset?.num || 0);
+    mark.onpointerdown = (ev)=> beginM105Drag(ev, 'checklist', num);
   });
 }
 /* ここから追加：#11 数値カード1枚（同期表示） */
