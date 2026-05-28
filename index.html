@@ -11913,6 +11913,18 @@ function buildFixedLane(list){
 
     const dots = document.createElement('div');
     dots.className = 'm105-charge-dots';
+    const findLeftmostEmptySlot = (placesMap, movingNum)=>{
+      const occ = new Set();
+      Object.entries(placesMap||{}).forEach(([num, where])=>{
+        if (String(num) === String(movingNum)) return;
+        const m = String(where||'').match(/^slot([0-2])$/);
+        if (m) occ.add(Number(m[1]));
+      });
+      for (let i=0; i<3; i++){
+        if (!occ.has(i)) return i;
+      }
+      return 0;
+    };
     for(let i=0;i<3;i++){
       const slot = document.createElement('i');
       slot.classList.add('m105-slot');
@@ -11926,7 +11938,8 @@ function buildFixedLane(list){
         const now = state.watching;
         if (((now?.mission?.id|0) !== 105)) return;
         const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
-        next[String(payload.num)] = `slot${i}`;
+        const dest = findLeftmostEmptySlot(next, payload.num);
+        next[String(payload.num)] = `slot${dest}`;
         await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
       });
       dots.appendChild(slot);
