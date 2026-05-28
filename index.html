@@ -993,7 +993,13 @@
   flex:0 0 auto;
 }
 .m105-charge-card{ width:var(--item-h); }
-.m105-charge-pool{ width:auto; min-width:calc(12 * 18px + 11 * 5px + 12px); }
+.m105-charge-pool{
+  width:auto;
+  min-width:calc(12 * 18px + 11 * 5px + 12px);
+  border:none;
+  border-radius:0;
+  background:transparent;
+}
 .m105-charge-card{
   background:#e5e7eb url('./chargablebomb.png') center/contain no-repeat;
 }
@@ -1028,10 +1034,29 @@
   align-items:center;
   justify-content:center;
   gap:5px;
-  background:#f3f4f6;
+  background:transparent;
+}
+.m105-pool-slot{
+  border:none;
+  border-radius:0;
+  background:transparent;
 }
 .m105-pool-slot.filled{
   position:relative;
+  border:none;
+  background:transparent;
+}
+.m105-pool-slot.filled::before{
+  content:'✓';
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  color:#16a34a;
+  font-size:18px;
+  font-weight:900;
+  line-height:1;
+  pointer-events:none;
 }
 .m105-pool-slot.filled::after{
   content:'✕';
