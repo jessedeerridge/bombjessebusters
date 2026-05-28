@@ -243,7 +243,7 @@
     background:#e5e7eb; display:flex; align-items:center; justify-content:center;
     position:relative; flex:0 0 auto;
   }
-  .m105-charge-card .bomb{ width:30px; height:30px; object-fit:contain; opacity:.92; }
+  .m105-charge-card .bomb{ width:40px; height:40px; object-fit:contain; opacity:.95; }
   .m105-charge-dots{
     position:absolute; top:16px; left:50%; transform:translateX(-50%);
     display:flex; gap:4px;
@@ -262,6 +262,7 @@
     width:18px; height:18px; border-radius:50%; border:1px solid #111; background:#fff;
     display:grid; place-items:center; font-size:12px; font-weight:700; cursor:grab; user-select:none;
   }
+  .m105-mark::after{ content:'✓'; color:#111; line-height:1; font-size:12px; }
   .m105-mark.cross::after{ content:'×'; color:#dc2626; line-height:1; }
 
   .deck-stack{ position:relative; cursor:pointer; user-select:none; flex:0 0 auto; }
@@ -4201,8 +4202,8 @@ if ((v.mission?.id|0) === 23) {
       const m105Placed = String(m105Places[n] || '');
       if((openCountByNum[n]||0) === 4 && !((v?.mission?.id|0)===105 && m105Placed)){ // 同じ数字が4本全体公開
         const mk = document.createElement('div'); mk.className='check-mark';
+        mk.draggable = true;
         if ((v?.mission?.id|0)===105){
-          mk.draggable = true;
           mk.dataset.m105Num = String(n);
           mk.addEventListener('dragstart', (ev)=>{
             ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'m105', num:n, from:'checklist' }));
@@ -11903,7 +11904,8 @@ function buildFixedLane(list){
 
     const card = document.createElement('div');
     card.className = 'm105-charge-card';
-    const places = (v?.meta?.m105_places && typeof v.meta.m105_places === 'object') ? v.meta.m105_places : {};
+    const rawPlaces = (v?.meta?.m105_places && typeof v.meta.m105_places === 'object') ? v.meta.m105_places : {};
+    const places = { seed:'slot0', ...rawPlaces };
 
     const dots = document.createElement('div');
     dots.className = 'm105-charge-dots';
