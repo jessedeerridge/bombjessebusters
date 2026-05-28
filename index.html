@@ -259,11 +259,11 @@
   }
   .m105-slot{ pointer-events:auto; }
   .m105-mark{
-    width:18px; height:18px; border-radius:50%; border:1px solid #111; background:#fff;
-    display:grid; place-items:center; font-size:12px; font-weight:700; cursor:grab; user-select:none;
+    position:static; inset:auto; margin:0;
+    pointer-events:auto; cursor:grab; user-select:none;
+    display:grid; place-items:center;
   }
-  .m105-mark::after{ content:'✓'; color:#111; line-height:1; font-size:12px; }
-  .m105-mark.cross::after{ content:'×'; color:#dc2626; line-height:1; }
+  .m105-mark.cross::after{ content:'×'; color:#dc2626; line-height:1; font-size:12px; font-weight:700; }
 
   .deck-stack{ position:relative; cursor:pointer; user-select:none; flex:0 0 auto; }
   .deck-stack.number{ width:32px; height:48px; }
@@ -4202,8 +4202,8 @@ if ((v.mission?.id|0) === 23) {
       const m105Placed = String(m105Places[n] || '');
       if((openCountByNum[n]||0) === 4 && !((v?.mission?.id|0)===105 && m105Placed)){ // 同じ数字が4本全体公開
         const mk = document.createElement('div'); mk.className='check-mark';
-        mk.draggable = true;
         if ((v?.mission?.id|0)===105){
+          mk.draggable = true;
           mk.dataset.m105Num = String(n);
           mk.addEventListener('dragstart', (ev)=>{
             ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'m105', num:n, from:'checklist' }));
@@ -11941,8 +11941,8 @@ function buildFixedLane(list){
       const idx = Number(String(where).replace('slot',''));
       const target = dots.children[idx];
       if (!target) return;
-      const mark = document.createElement('span');
-      mark.className = 'm105-mark';
+      const mark = document.createElement('div');
+      mark.className = 'check-mark m105-mark';
       mark.draggable = true;
       mark.dataset.m105Num = String(num);
       mark.addEventListener('dragstart', (ev)=>{
@@ -11967,8 +11967,8 @@ function buildFixedLane(list){
     });
     Object.entries(places).forEach(([num, where])=>{
       if (String(where||'') !== 'pool') return;
-      const mark = document.createElement('span');
-      mark.className = 'm105-mark cross';
+      const mark = document.createElement('div');
+      mark.className = 'check-mark m105-mark cross';
       mark.draggable = true;
       mark.dataset.m105Num = String(num);
       mark.addEventListener('dragstart', (ev)=>{
