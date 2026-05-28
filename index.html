@@ -11910,6 +11910,8 @@ function buildFixedLane(list){
     const card = document.createElement('div');
     card.className = 'm105-charge-card';
     const places = (v?.meta?.m105_places && typeof v.meta.m105_places === 'object') ? v.meta.m105_places : {};
+    const hasSlot0Real = Object.values(places).some(w => String(w||'') === 'slot0');
+    const placesForView = hasSlot0Real ? { ...places } : { __seed:'slot0', ...places };
 
     const dots = document.createElement('div');
     dots.className = 'm105-charge-dots';
@@ -11938,7 +11940,9 @@ function buildFixedLane(list){
         const now = state.watching;
         if (((now?.mission?.id|0) !== 105)) return;
         const next = { ...((now?.meta?.m105_places && typeof now.meta.m105_places==='object') ? now.meta.m105_places : {}) };
-        const dest = findLeftmostEmptySlot(next, payload.num);
+        const hasSlot0Now = Object.values(next).some(w => String(w||'') === 'slot0');
+        const occMap = hasSlot0Now ? { ...next } : { __seed:'slot0', ...next };
+        const dest = findLeftmostEmptySlot(occMap, payload.num);
         next[String(payload.num)] = `slot${dest}`;
         await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
       });
@@ -11953,18 +11957,21 @@ function buildFixedLane(list){
     bomb.onerror = ()=>{ bomb.style.display='none'; };
     card.appendChild(bomb);
 
-    Object.entries(places).forEach(([num, where])=>{
+    Object.entries(placesForView).forEach(([num, where])=>{
       if (!/^slot[0-2]$/.test(String(where||''))) return;
       const idx = Number(String(where).replace('slot',''));
       const target = dots.children[idx];
       if (!target) return;
       const mark = document.createElement('div');
-      mark.className = 'check-mark m105-mark m105-draggable';
-      mark.draggable = true;
+      const isSeed = (num === '__seed');
+      mark.className = `check-mark m105-mark${isSeed ? '' : ' m105-draggable'}`;
+      mark.draggable = !isSeed;
       mark.dataset.m105Num = String(num);
-      mark.addEventListener('dragstart', (ev)=>{
-        ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'m105', num:Number(num), from:`slot${idx}` }));
-      });
+      if (!isSeed){
+        mark.addEventListener('dragstart', (ev)=>{
+          ev.dataTransfer.setData('text/plain', JSON.stringify({ type:'m105', num:Number(num), from:`slot${idx}` }));
+        });
+      }
       target.appendChild(mark);
     });
 
@@ -11982,8 +11989,9 @@ function buildFixedLane(list){
       next[String(payload.num)] = 'pool';
       await update(ref(db, `rooms/${state.roomCode}/meta`), { m105_places: next });
     });
-    Object.entries(places).forEach(([num, where])=>{
+    Object.entries(placesForView).forEach(([num, where])=>{
       if (String(where||'') !== 'pool') return;
+      if (num === '__seed') return;
       const mark = document.createElement('div');
       mark.className = 'check-mark m105-mark m105-draggable cross';
       mark.draggable = true;
@@ -11993,13 +12001,6 @@ function buildFixedLane(list){
       });
       pool.appendChild(mark);
     });
-
-    const hasLeftSlotMark = Object.values(places).some(w => String(w||'') === 'slot0');
-    if (!hasLeftSlotMark && dots.children[0]){
-      const seed = document.createElement('div');
-      seed.className = 'check-mark m105-mark';
-      dots.children[0].appendChild(seed);
-    }
 
     wrap.appendChild(card);
     wrap.appendChild(pool);
