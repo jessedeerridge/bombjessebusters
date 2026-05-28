@@ -3894,9 +3894,10 @@ function renderItemsAndDi(v){
     const flags = v?.mission?.flags || {};
     const isM42 = ((v?.mission?.id|0) === 42);
     const isM53 = ((v?.mission?.id|0) === 53);
+    const isM105 = ((v?.mission?.id|0) === 105);
     const m23OnlyHideItems = !!(flags.m23_hideItemsUntilSpread && !v?.meta?.m23_spread);
     hideItems = m23OnlyHideItems || (isM42 && !!v?.meta?.m42_on);
-    hideDi    = isM53;
+    hideDi    = isM53 || isM105;
 
     // バー自体は常に表示（m42の箱を置くため）、必要に応じて中身だけ隠す
     H(itemsBar, false);
