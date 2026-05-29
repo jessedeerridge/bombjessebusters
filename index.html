@@ -832,6 +832,7 @@
   .card.reveal-armed{outline:1.5px solid #000;outline-offset:-1.5px;}
   /* ★ アイテム2：選択可能カードの青枠 */
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
+  .card.m109-transfer-range{outline:2px dashed #38bdf8; outline-offset:-1px;}
 
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .num.tight-code{font-size:calc(var(--font-card) - 3px);}
@@ -1124,7 +1125,7 @@
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
 .mini-pop{
   position:fixed;
-  z-index:100;
+  z-index:2147483647;
   background:#fff;
   border:1px solid #eee;
   border-radius:8px;
@@ -1750,6 +1751,7 @@ main:not(:has(#lobby.hidden)) > * {
   <option value="49">#49</option>
   <option value="107">@7 信じるべき仲間</option>
   <option value="108">@8 近ければ近いほどいい</option>
+  <option value="109">@9 瞑想中</option>
 </select>
   </div>
   <div class="row" style="justify-content:flex-end">
@@ -1819,7 +1821,8 @@ const state = {
   m22GaveOnce:false, // ★ #22：自分が渡した一回ガード（即時連打対策）
   _lastMissionId:null,
   _lastI2AnimId:null,
-  _lastI18AnimId:null};
+  _lastI18AnimId:null,
+  m109PromptTable:null};
 
 function needsRoleSelection(missionId){
   const mid = Number(missionId) | 0;
@@ -1939,7 +1942,8 @@ const STAGE_STORIES = {
   105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' },
   106: { title:'CODE IN ORDER', body:'コードは静かに順番待ちをしている。自分の仕事が片付くまで、次のコードには触れないことだ。' },
   107: { title:'信じるべき仲間', body:'爆弾処理班に必要なのは、鋼のニッパーだけではない。君たちは、命を仲間に託せるか。' },
-  108: { title:'近ければ近いほどいい', body:'気をつけろ。離れすぎると爆発するぞ。声を掛け合って、仲間との距離を見失うな。' }
+  108: { title:'近ければ近いほどいい', body:'気をつけろ。離れすぎると爆発するぞ。声を掛け合って、仲間との距離を見失うな。' },
+  109: { title:'瞑想中', body:'なにがなんだかめちゃくちゃだ。' }
 };
 
 function missionLabel(missionId){
@@ -3179,6 +3183,9 @@ function buildMixPlan(missionId){
     108: [ // @8 赤2
       {type:'redPick', k:2},
     ],
+    109: [ // @9 黄2
+      {type:'yellowPick', k:2},
+    ],
 };
 return plans[missionId] || [];
 
@@ -3254,7 +3261,10 @@ function openMenu(x,y, entries){
     const b=document.createElement('button');
     b.className='btn small';
     const labelText = (ent?.label ?? '');
-    if (labelText === 'カードを渡す' || labelText.endsWith('に見せる')) {
+    if (ent?.className) {
+      String(ent.className).split(/\s+/).filter(Boolean).forEach(cls => b.classList.add(cls));
+    }
+    if (labelText === '準備OK' || labelText === 'カードを渡す' || labelText.endsWith('に見せる')) {
       b.classList.add('menu-ink');
     }
     if (ent && ent.html){ 
@@ -3415,6 +3425,7 @@ function listenRoom(code){
     window.m22_alreadyShown = false;   // ← 自動ポップを再許可
     state.m22GaveOnce = false;         // ← 念のためローカルの渡し済みもクリア
     state._spTimerOn = false;
+    state.m109PromptTable = null;
     resetMissionAudioPlayback();
     state._prevMissionId = curId;
   state._mcShownMissionId = 0;
@@ -3477,6 +3488,7 @@ if (v) {
       renderStageStory(v);
 
     });
+    handleM109ReadyTransfer(v).catch(console.error);
     queueSharedHookAnimations(v);
     // ★ 追加：ミッション再選択でも未着席者に席ポップを出す（ホスト以外も）
    const midNow  = (v?.mission?.id|0);
@@ -4293,6 +4305,91 @@ function deriveChecklistCodeHints(displayLines){
   return out;
 }
 
+
+function getM109TransferCount(v){
+  const count = Number(v?.tableCount || (v?.tables || []).length) || 0;
+  const byPlayerCount = { 3:7, 4:6, 5:5, 6:4 };
+  return byPlayerCount[count] || Math.max(0, 10 - count);
+}
+
+function getM109SplitIndex(v, tableIdx){
+  const hand = Array.isArray(v?.tables?.[tableIdx]?.hand) ? v.tables[tableIdx].hand : [];
+  return Math.max(0, hand.length - getM109TransferCount(v));
+}
+
+function isM109Ready(v, tableIdx){
+  if ((v?.mission?.id|0) !== 109) return false;
+  const uid = v?.tables?.[tableIdx]?.playerId;
+  if (!uid) return false;
+  const ready = v?.meta?.m109_ready || {};
+  return !!ready[uid];
+}
+
+function shouldInterceptM109TableClick(v, tableIdx){
+  if ((v?.mission?.id|0) !== 109) return false;
+  if (v?.meta?.m109_done === true) return false;
+  if (tableIdx !== (state.seatedTable|0)) return false;
+  const table = v?.tables?.[tableIdx];
+  if (!table || table.playerId !== state.userId) return false;
+  return !isM109Ready(v, tableIdx);
+}
+
+function showM109ReadyPrompt(tableIdx, x, y){
+  state.m109PromptTable = tableIdx;
+  openMenu(x, y, [
+    {
+      label:'準備OK',
+      className:'menu-ink',
+      action: async ()=>{ await markM109Ready(tableIdx); }
+    }
+  ]);
+}
+
+async function markM109Ready(tableIdx){
+  if (!state.roomCode || !state.userId) return;
+  const patch = {};
+  patch[`meta/m109_ready/${state.userId}`] = { table: tableIdx, at: Date.now() };
+  await update(ref(db, `rooms/${state.roomCode}`), patch);
+  state.m109PromptTable = null;
+}
+
+function realphaHand(hand){
+  const alpha = 'abcdefghijklmnopqrstuvwxyz';
+  (hand || []).forEach((c, i) => { if (c) c.alpha = alpha[i % alpha.length]; });
+}
+
+async function handleM109ReadyTransfer(v){
+  if (!state.isHost || !state.roomCode) return;
+  if ((v?.mission?.id|0) !== 109) return;
+  if (v?.meta?.m109_done === true) return;
+  const tables = Array.isArray(v.tables) ? v.tables : [];
+  const ready = v?.meta?.m109_ready || {};
+  const occupied = tables
+    .map((T, i) => ({ T, i }))
+    .filter(({ T }) => !!T?.playerId);
+  if (!occupied.length || occupied.length !== (v.tableCount|0)) return;
+  if (!occupied.every(({ T }) => !!ready[T.playerId])) return;
+
+  const transferCount = getM109TransferCount(v);
+  const splitByTable = tables.map((_, i) => getM109SplitIndex(v, i));
+  const outgoing = tables.map((T, i) => (Array.isArray(T?.hand) ? T.hand.slice(splitByTable[i]) : []));
+  const nextTables = tables.map((T, i) => {
+    const prev = (i - 1 + tables.length) % tables.length;
+    const left = Array.isArray(T?.hand) ? T.hand.slice(0, splitByTable[i]) : [];
+    const received = (outgoing[prev] || []).map(c => ({ ...c, ownerId: T?.playerId || null }));
+    const hand = left.concat(received);
+    realphaHand(hand);
+    return { ...T, hand };
+  });
+  await update(ref(db, `rooms/${state.roomCode}`), {
+    tables: nextTables,
+    'meta/m109_done': true,
+    'meta/m109_transferCount': transferCount,
+    'meta/m109_splitByTable': splitByTable,
+    'meta/m109_movedAt': Date.now()
+  });
+}
+
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
     const seatedNow = (v?.tables||[]).some(T => T.playerId === state.userId);
@@ -4412,6 +4509,13 @@ if ((v.mission?.id|0) === 23) {
       const hasTokenLater = (t.hand||[]).some(c=> (c.tokens||[]).length>0);
       if(!hasTokenLater) box.classList.remove('elevated');
     });
+    box.addEventListener('click', (ev)=>{
+      if (!shouldInterceptM109TableClick(v, idx)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      ev.stopImmediatePropagation?.();
+      showM109ReadyPrompt(idx, ev.clientX, ev.clientY);
+    }, true);
 
     const n = (t.hand||[]).length;
     const handInner = n>0 ? (n*W + (n-1)*G) : 0;
@@ -4642,6 +4746,9 @@ wrap.dataset.cardId = String(c.id||'');
 wrap.dataset.cardIndex = String(ci);
 const cardKey = String(c.id || `ci-${ci}`);
 wrap.dataset.cardKey = cardKey;
+      if ((v.mission?.id|0) === 109 && isM109Ready(v, idx) && v?.meta?.m109_done !== true && ci >= getM109SplitIndex(v, idx)) {
+        card.classList.add('m109-transfer-range');
+      }
 
       // #43: 挿入アニメ対象カードは、nanoから飛ぶ前に見えないよう先に隠す
       const m43Anim = v?.meta?.m43_insertAnim;
@@ -11521,6 +11628,8 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
       missionPickerCount: playerCount,
       m105_slots:(missionId===105 ? 1 : 0),
       m105_pool:(missionId===105 ? 0 : 0),
+      m109_ready:null,
+      m109_done:false,
       m55_deck:null, m55_shown:null, m55_c8Sides:null, m55_backByIndex:null
     }
   });
@@ -14962,6 +15071,20 @@ case 108: {
       '手番にこの条件を満たして切断を行えない場合は、起爆ダイヤルを1つ進める。'
     ],
     flags:{}
+  };
+}
+
+case 109: {
+  return {
+    id:109, name:'@9', desc:'',
+    display:[
+      '@9 瞑想中',
+      ...linesForMix,
+      '全プレイヤーは、最初に自分のテーブル内を押したとき、押した場所のボタンは起動せず「準備OK」タブが出る。',
+      '準備OKを押したプレイヤーは、手札の移動対象範囲が点線青枠で表示される。',
+      '全員が準備OKしたら、3人プレイでは右7枚、4人プレイでは右6枚、5人プレイでは右5枚、6人プレイでは右4枚を次手番のプレイヤーへ同じ順で渡す。'
+    ],
+    flags:{ m109_meditation:true }
   };
 }
 
