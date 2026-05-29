@@ -237,6 +237,49 @@
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+
+  .m106-field-row{
+    gap:10px;
+    align-items:flex-start;
+    overflow-y:visible;
+    padding-top:8px;
+  }
+  .m106-hand-row .numcard{
+    background-size:cover;
+    background-position:center;
+  }
+  .m106-num-stack{
+    position:relative;
+    width:calc(32px + var(--m106-spread, 0px));
+    height:54px;
+    flex:0 0 auto;
+    overflow:visible;
+  }
+  .m106-num-stack .numcard{
+    position:absolute;
+    left:0;
+    top:0;
+    box-shadow:0 1px 4px rgba(0,0,0,.16);
+  }
+  .m106-name-tag{
+    position:absolute;
+    right:-6px;
+    top:-7px;
+    z-index:20;
+    max-width:36px;
+    padding:1px 4px;
+    border-radius:999px;
+    background:#111;
+    color:#fff;
+    font-size:9px;
+    line-height:1.2;
+    font-weight:700;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    pointer-events:none;
+    box-shadow:0 1px 3px rgba(0,0,0,.22);
+  }
   .deck-stack{ position:relative; cursor:pointer; user-select:none; flex:0 0 auto; }
   .deck-stack.number{ width:32px; height:48px; }
   .deck-stack.constraint{ width:32px; height:48px; }
@@ -1891,7 +1934,8 @@ const STAGE_STORIES = {
   102: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
   103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' },
   104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' },
-  105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' }
+  105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' },
+  106: { title:'CODE IN ORDER', body:'コードは静かに順番待ちをしている。自分の仕事が片付くまで、次のコードには触れないことだ。' }
 };
 
 function missionLabel(missionId){
@@ -3123,6 +3167,8 @@ function buildMixPlan(missionId){
     ],
     105: [ // @5
     ],
+    106: [ // @6
+    ],
 };
 return plans[missionId] || [];
 
@@ -3467,6 +3513,7 @@ renderM55(state.watching);
     renderM62(v);
     renderM63(v);
     renderM65(v);
+    renderM106(v);
     renderM66(v);
 enforceM31to66(v);
 
@@ -8430,6 +8477,162 @@ nc.onclick = async (ev)=>{
   });
 }
 /* ===== /#65 ===== */
+
+// ===== M106 初期配布：数値カードを均等配布し、余りは配らない =====
+async function ensureM106MetaInit(vNow){
+  const v = vNow || state.watching; if (!v) return;
+  if ((v?.mission?.id|0) !== 106) return;
+  const N = (v?.tables?.length|0); if (N <= 0) return;
+  if (Array.isArray(v?.meta?.m106_byTable)) return;
+  if (!state.isHost) return;
+
+  const cap = Math.max(0, v?.captainTable|0);
+  const order = [];
+  for (let off=0; off<N; off++) order.push((cap + off) % N);
+
+  const deck = MATERIALS.numbers.slice();
+  shuffle(deck);
+  const perPlayer = Math.floor(deck.length / N);
+  const dealCount = perPlayer * N;
+  const by = Array.from({length:N}, ()=> []);
+  for (let k=0; k<dealCount; k++){
+    const owner = order[k % order.length];
+    by[owner].push({ n: deck[k], faceUp: false });
+  }
+
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m106_byTable: by });
+}
+
+function normalizeM106Card(card){
+  if (typeof card === 'number') return { n: card|0, faceUp: false };
+  return { n: card?.n|0, faceUp: card?.faceUp === true };
+}
+
+function isM106CardReadyToReveal(table, n){
+  const hand = Array.isArray(table?.hand) ? table.hand : [];
+  return !hand.some(c => c?.kind === 'normal' && (c.num|0) === (n|0) && c.open !== true);
+}
+
+async function revealM106Cards(tableIdx, nums){
+  try{
+    const want = new Set((Array.isArray(nums) ? nums : [nums]).map(n => n|0));
+    if (!want.size) return;
+    const mRef = ref(db, `rooms/${state.roomCode}/meta`);
+    const snap = await get(mRef);
+    const meta = snap.val() || {};
+    const by = Array.isArray(meta.m106_byTable) ? meta.m106_byTable.map(arr => Array.isArray(arr) ? arr.map(normalizeM106Card) : []) : [];
+    const arr = Array.isArray(by[tableIdx]) ? by[tableIdx] : [];
+    let changed = false;
+    arr.forEach(c=>{
+      if (want.has(c.n|0) && c.faceUp !== true){
+        c.faceUp = true;
+        changed = true;
+      }
+    });
+    if (!changed) return;
+    by[tableIdx] = arr;
+    await update(mRef, { m106_byTable: by });
+  }catch(e){ console.error(e); }
+}
+
+async function revealM106Card(tableIdx, n){
+  await revealM106Cards(tableIdx, [n]);
+}
+
+function renderM106(v){
+  const isM106 = ((v?.mission?.id|0) === 106);
+  const fieldId = 'm106FieldRow';
+  const handId = 'm106HandRow';
+  const oldField = document.getElementById(fieldId);
+  const oldHand = document.getElementById(handId);
+  if (!isM106){
+    if (oldField) oldField.remove();
+    if (oldHand) oldHand.remove();
+    return;
+  }
+
+  if (!Array.isArray(v?.meta?.m106_byTable)){
+    ensureM106MetaInit(v);
+    if (oldField) oldField.remove();
+    if (oldHand) oldHand.remove();
+    return;
+  }
+
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  const by = v.meta.m106_byTable.map(arr => Array.isArray(arr) ? arr.map(normalizeM106Card) : []);
+
+  let field = oldField;
+  if (!field){
+    field = document.createElement('div');
+    field.id = fieldId;
+    mountLaneUnderItemsBar(field);
+  }
+  field.className = 'numlane m106-field-row';
+  field.innerHTML = '';
+  by.forEach((arr, tableIdx)=>{
+    const openCards = arr.filter(c => c.faceUp).sort((a,b)=>a.n-b.n);
+    if (!openCards.length) return;
+    const ownerName = tables[tableIdx]?.playerName || `#${tableIdx+1}`;
+    const stack = document.createElement('div');
+    stack.className = 'm106-num-stack';
+    stack.style.setProperty('--m106-spread', `${Math.max(0, openCards.length - 1) * 12}px`);
+    stack.title = `${ownerName}：${openCards.map(c=>c.n).join(', ')}`;
+    openCards.forEach((c, idx)=>{
+      const nc = document.createElement('div');
+      nc.className = 'numcard';
+      nc.style.backgroundImage = `url('${imgNumber(c.n)}')`;
+      nc.style.left = `${idx * 12}px`;
+      nc.style.zIndex = String(idx + 1);
+      stack.appendChild(nc);
+    });
+    const tag = document.createElement('div');
+    tag.className = 'm106-name-tag';
+    tag.textContent = ownerName;
+    stack.appendChild(tag);
+    field.appendChild(stack);
+  });
+
+  const footer = document.getElementById('missionFooter');
+  const myIdx = tables.findIndex(T => T?.playerId === state.userId);
+  if (!footer || myIdx < 0){ if (oldHand) oldHand.remove(); return; }
+
+  const mine = (Array.isArray(by[myIdx]) ? by[myIdx].slice() : []).filter(c => !c.faceUp).sort((a,b)=>a.n-b.n);
+  let handRow = oldHand;
+  if (!handRow){
+    handRow = document.createElement('div');
+    handRow.id = handId;
+    footer.insertAdjacentElement('beforebegin', handRow);
+  }
+  handRow.className = 'numlane m106-hand-row';
+  handRow.innerHTML = '';
+
+  const autoReveal = [];
+  mine.forEach(c=>{
+    const ready = isM106CardReadyToReveal(tables[myIdx], c.n);
+    if (ready) autoReveal.push(c.n);
+    const nc = document.createElement('div');
+    nc.className = 'numcard';
+    nc.style.backgroundImage = `url('${imgNumber(c.n)}')`;
+    nc.title = ready ? `${c.n}：場に出せます` : `${c.n}：自分のスタンド上の同じ数字を先に全て切断します`;
+    nc.onclick = (ev)=>{
+      if (!ready){
+        openOneMini(ev.clientX, ev.clientY, 'まだ出せません');
+        return;
+      }
+      openMenu(ev.clientX, ev.clientY, [{ label:`${c.n} を場に出す`, action: async ()=> revealM106Card(myIdx, c.n) }]);
+    };
+    handRow.appendChild(nc);
+  });
+
+  if (autoReveal.length){
+    setTimeout(()=>{
+      const latest = state.watching;
+      if ((latest?.mission?.id|0) !== 106) return;
+      revealM106Cards(myIdx, autoReveal);
+    }, 0);
+  }
+}
+/* ===== /@6 ===== */
 
 function shouldShowRoleCardTextDecorations(mid){
   const missionId = Number(mid || 0);
@@ -14706,6 +14909,20 @@ case 105: {
       '次の隊長の手番以降、隊長の手番の直前でABNI4から確定トークンを1つ取り除く。ABNI4から確定トークンが0になった時点で爆弾が爆発する。'
     ],
     flags:{ m105_chargeBomb:true }
+  };
+}
+
+case 106: {
+  return {
+    id:106, name:'@6', desc:'',
+    display:[
+      '@6',
+      ...linesForMix,
+      '数値カードを均等に配る。',
+      '自分の数値カードにある数値を先に全て切断しなければならない。',
+      '自分のスタンド上で切断が済んだ、またはスタンド上にない数字の数値カードは表向きにして全員に見せる。'
+    ],
+    flags:{}
   };
 }
 
