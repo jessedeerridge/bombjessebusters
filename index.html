@@ -833,24 +833,6 @@
   /* ★ アイテム2：選択可能カードの青枠 */
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
   .card.m109-transfer-range{outline:2px dashed #38bdf8; outline-offset:-1px;}
-  .m109-ready-tab{
-    margin-left:6px;
-    padding:2px 7px;
-    border:1px solid #38bdf8;
-    border-radius:999px;
-    background:#e0f2fe;
-    color:#075985;
-    font-size:11px;
-    font-weight:700;
-    line-height:1.2;
-    cursor:pointer;
-    white-space:nowrap;
-  }
-  .m109-ready-tab.done{
-    background:#dbeafe;
-    color:#1d4ed8;
-    cursor:default;
-  }
 
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .num.tight-code{font-size:calc(var(--font-card) - 3px);}
@@ -1143,7 +1125,7 @@
   .pop-layer{ position:fixed;inset:0;z-index:2147483647;pointer-events:none; }
 .mini-pop{
   position:fixed;
-  z-index:100;
+  z-index:2147483647;
   background:#fff;
   border:1px solid #eee;
   border-radius:8px;
@@ -3279,7 +3261,10 @@ function openMenu(x,y, entries){
     const b=document.createElement('button');
     b.className='btn small';
     const labelText = (ent?.label ?? '');
-    if (labelText === 'カードを渡す' || labelText.endsWith('に見せる')) {
+    if (ent?.className) {
+      String(ent.className).split(/\s+/).filter(Boolean).forEach(cls => b.classList.add(cls));
+    }
+    if (labelText === '準備OK' || labelText === 'カードを渡す' || labelText.endsWith('に見せる')) {
       b.classList.add('menu-ink');
     }
     if (ent && ent.html){ 
@@ -4346,9 +4331,15 @@ function shouldInterceptM109TableClick(v, tableIdx){
   return !isM109Ready(v, tableIdx);
 }
 
-function showM109ReadyPrompt(tableIdx){
+function showM109ReadyPrompt(tableIdx, x, y){
   state.m109PromptTable = tableIdx;
-  if (state.watching) renderTables(state.watching);
+  openMenu(x, y, [
+    {
+      label:'準備OK',
+      className:'menu-ink',
+      action: async ()=>{ await markM109Ready(tableIdx); }
+    }
+  ]);
 }
 
 async function markM109Ready(tableIdx){
@@ -4514,12 +4505,11 @@ if ((v.mission?.id|0) === 23) {
       if(!hasTokenLater) box.classList.remove('elevated');
     });
     box.addEventListener('click', (ev)=>{
-      if (ev.target?.closest?.('.m109-ready-tab')) return;
       if (!shouldInterceptM109TableClick(v, idx)) return;
       ev.preventDefault();
       ev.stopPropagation();
       ev.stopImmediatePropagation?.();
-      showM109ReadyPrompt(idx);
+      showM109ReadyPrompt(idx, ev.clientX, ev.clientY);
     }, true);
 
     const n = (t.hand||[]).length;
@@ -4568,22 +4558,6 @@ if ((v.mission?.id|0) === 29) {
 }
     
     header.appendChild(title);
-    if ((v.mission?.id|0) === 109 && t.playerId === state.userId && v?.meta?.m109_done !== true) {
-      const readyDone = isM109Ready(v, idx);
-      if (readyDone || state.m109PromptTable === idx) {
-        const readyTab = document.createElement('button');
-        readyTab.type = 'button';
-        readyTab.className = 'm109-ready-tab' + (readyDone ? ' done' : '');
-        readyTab.textContent = readyDone ? '準備OK済' : '準備OK';
-        readyTab.disabled = readyDone;
-        readyTab.onclick = async (ev)=>{
-          ev.preventDefault();
-          ev.stopPropagation();
-          if (!readyDone) await markM109Ready(idx);
-        };
-        header.appendChild(readyTab);
-      }
-    }
     /* ★ 追加：ホストだけ—テーブル名クリックで「キック」 */
     if (state.isHost){
       title.style.cursor = 'pointer';
