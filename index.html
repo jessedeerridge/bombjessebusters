@@ -238,8 +238,19 @@
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
 
+  .m106-field-row{
+    gap:10px;
+    align-items:flex-start;
+    overflow-y:visible;
+    padding-top:8px;
+  }
+  .m106-hand-row .numcard{
+    background-size:cover;
+    background-position:center;
+  }
   .m106-num-stack{
     position:relative;
+    width:calc(32px + var(--m106-spread, 0px));
     height:54px;
     flex:0 0 auto;
     overflow:visible;
@@ -8554,9 +8565,9 @@ function renderM106(v){
   if (!field){
     field = document.createElement('div');
     field.id = fieldId;
-    field.className = 'numlane';
     mountLaneUnderItemsBar(field);
   }
+  field.className = 'numlane m106-field-row';
   field.innerHTML = '';
   by.forEach((arr, tableIdx)=>{
     const openCards = arr.filter(c => c.faceUp).sort((a,b)=>a.n-b.n);
@@ -8564,7 +8575,7 @@ function renderM106(v){
     const ownerName = tables[tableIdx]?.playerName || `#${tableIdx+1}`;
     const stack = document.createElement('div');
     stack.className = 'm106-num-stack';
-    stack.style.width = `${32 + Math.max(0, openCards.length - 1) * 7}px`;
+    stack.style.setProperty('--m106-spread', `${Math.max(0, openCards.length - 1) * 7}px`);
     stack.title = `${ownerName}：${openCards.map(c=>c.n).join(', ')}`;
     openCards.forEach((c, idx)=>{
       const nc = document.createElement('div');
@@ -8590,9 +8601,9 @@ function renderM106(v){
   if (!handRow){
     handRow = document.createElement('div');
     handRow.id = handId;
-    handRow.className = 'numlane';
     footer.insertAdjacentElement('beforebegin', handRow);
   }
+  handRow.className = 'numlane m106-hand-row';
   handRow.innerHTML = '';
 
   const autoReveal = [];
