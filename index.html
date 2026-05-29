@@ -603,10 +603,6 @@
     outline:2px solid #38bdf8;
     outline-offset:-2px;
   }
-  .table.m109-table-armed{
-    outline:2px dashed #38bdf8;
-    outline-offset:-2px;
-  }
   .m109-ready-btn{
     padding:1px 6px;
     font-size:11px;
@@ -4329,6 +4325,25 @@ function isM109Ready(v, idx){
   return !!(v?.meta?.m109_ready && v.meta.m109_ready[String(idx)]);
 }
 
+function m109TransferCardIds(v, idx){
+  const saved = v?.meta?.m109_marked?.[String(idx)];
+  if (Array.isArray(saved) && saved.length > 0) return saved.map(String);
+  if (!isM109Ready(v, idx)) return [];
+  const split = m109SplitIndex(v);
+  const hand = Array.isArray(v?.tables?.[idx]?.hand) ? v.tables[idx].hand : [];
+  return hand.slice(split).map(c => String(c?.id || '')).filter(Boolean);
+}
+
+function m109TransferCardIdSet(v, idx){
+  return new Set(m109TransferCardIds(v, idx));
+}
+
+function m109ComputeTransferCardIdsForTable(v, idx){
+  const split = m109SplitIndex(v);
+  const hand = Array.isArray(v?.tables?.[idx]?.hand) ? v.tables[idx].hand : [];
+  return hand.slice(split).map(c => String(c?.id || '')).filter(Boolean);
+}
+
 function m109AllSeatedAndReady(v){
   if ((v?.mission?.id|0) !== 109 || v?.meta?.m109_done === true) return false;
   const tables = Array.isArray(v?.tables) ? v.tables : [];
@@ -4345,8 +4360,9 @@ async function performM109HandShift(){
     if (!m109AllSeatedAndReady(v)) return;
     const tables = (v.tables || []).map(T => ({ ...T, hand: Array.isArray(T?.hand) ? T.hand.slice() : [] }));
     const split = m109SplitIndex(v);
-    const outgoing = tables.map(T => T.hand.slice(split));
-    const left = tables.map(T => T.hand.slice(0, split));
+    const markedSets = tables.map((_, idx) => m109TransferCardIdSet(v, idx));
+    const outgoing = tables.map((T, idx) => T.hand.filter(c => markedSets[idx].has(String(c?.id || ''))));
+    const left = tables.map((T, idx) => T.hand.filter(c => !markedSets[idx].has(String(c?.id || ''))));
     const alpha = 'abcdefghijklmnopqrstuvwxyz';
 
     tables.forEach((T, idx)=>{
@@ -4361,6 +4377,7 @@ async function performM109HandShift(){
       tables,
       'meta/m109_done': true,
       'meta/m109_ready': null,
+      'meta/m109_marked': null,
       'meta/m109_split': split
     });
     state._m109ArmedTable = null;
@@ -4484,7 +4501,6 @@ if ((v.mission?.id|0) === 23) {
   const myTableIndex = (v.tables||[]).findIndex(T => T.playerId===state.userId);
   const isM109 = ((v?.mission?.id|0) === 109);
   const m109Done = !!v?.meta?.m109_done;
-  const m109Split = isM109 ? m109SplitIndex(v) : 0;
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table'; box.dataset.tableIdx = String(idx);
@@ -4525,14 +4541,16 @@ if ((v.mission?.id|0) === 23) {
 
     const m109Ready = isM109Ready(v, idx);
     const m109Armed = isM109 && !m109Done && t.playerId === state.userId && state._m109ArmedTable === idx;
-    const m109ShowTransfer = isM109 && !m109Done && (m109Ready || m109Armed);
-    if (m109ShowTransfer) box.classList.add('m109-table-armed');
-    if (isM109 && !m109Done && t.playerId === state.userId && !canPickOtherTable) {
-      box.onclick = (ev)=>{
-        if (ev?.target?.closest?.('.card, .char-card, button')) return;
-        state._m109ArmedTable = idx;
-        renderTables(state.watching);
-      };
+    const m109ShowTransfer = isM109 && !m109Done && m109Ready;
+    const m109TransferIds = m109ShowTransfer ? m109TransferCardIdSet(v, idx) : new Set();
+    if (isM109 && !m109Done && !m109Ready && t.playerId === state.userId && !canPickOtherTable) {
+      box.addEventListener('click', ()=>{
+        if (state._m109ArmedTable === idx) return;
+        setTimeout(()=>{
+          state._m109ArmedTable = idx;
+          renderTables(state.watching);
+        }, 0);
+      }, true);
     }
 
 const header=document.createElement('div'); header.className='t-header';
@@ -4559,7 +4577,10 @@ if ((v.mission?.id|0) === 29) {
       readyBtn.disabled = m109Ready;
       readyBtn.onclick = async (ev)=>{
         ev.stopPropagation();
-        await update(ref(db, `rooms/${state.roomCode}/meta/m109_ready`), { [idx]: state.userId });
+        await update(ref(db, `rooms/${state.roomCode}/meta`), {
+          [`m109_ready/${idx}`]: state.userId,
+          [`m109_marked/${idx}`]: m109ComputeTransferCardIdsForTable(state.watching || v, idx)
+        });
       };
       header.appendChild(readyBtn);
     } else if (isM109 && !m109Done && m109Ready) {
@@ -4751,7 +4772,7 @@ wrap.dataset.cardId = String(c.id||'');
 wrap.dataset.cardIndex = String(ci);
 const cardKey = String(c.id || `ci-${ci}`);
 wrap.dataset.cardKey = cardKey;
-if (m109ShowTransfer && ci >= m109Split) card.classList.add('m109-transfer');
+if (m109ShowTransfer && m109TransferIds.has(String(c.id || ''))) card.classList.add('m109-transfer');
 
       // #43: 挿入アニメ対象カードは、nanoから飛ぶ前に見えないよう先に隠す
       const m43Anim = v?.meta?.m43_insertAnim;
@@ -11634,6 +11655,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
       missionPickerOpen:false,
       missionPickerCount: playerCount,
       m109_ready:null,
+      m109_marked:null,
       m109_done:false,
       m109_split:null,
       m105_slots:(missionId===105 ? 1 : 0),
