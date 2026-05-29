@@ -237,6 +237,38 @@
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
+
+  .m106-num-stack{
+    position:relative;
+    height:54px;
+    flex:0 0 auto;
+    overflow:visible;
+  }
+  .m106-num-stack .numcard{
+    position:absolute;
+    left:0;
+    top:0;
+    box-shadow:0 1px 4px rgba(0,0,0,.16);
+  }
+  .m106-name-tag{
+    position:absolute;
+    right:-6px;
+    top:-7px;
+    z-index:20;
+    max-width:36px;
+    padding:1px 4px;
+    border-radius:999px;
+    background:#111;
+    color:#fff;
+    font-size:9px;
+    line-height:1.2;
+    font-weight:700;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    pointer-events:none;
+    box-shadow:0 1px 3px rgba(0,0,0,.22);
+  }
   .deck-stack{ position:relative; cursor:pointer; user-select:none; flex:0 0 auto; }
   .deck-stack.number{ width:32px; height:48px; }
   .deck-stack.constraint{ width:32px; height:48px; }
@@ -1892,7 +1924,7 @@ const STAGE_STORIES = {
   103: { title:'一本で終わり', body:'たった一つの判断がすべてを終わらせる。' },
   104: { title:'説明書通りに', body:'今回の爆弾は切断する順番を間違えないように気をつけろ。困ったら連絡してくれ。そのためにレシーバーと予備の電池は用意しておいた。' },
   105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' },
-  106: { title:'CODE IN ORDER', body:'番号札は静かに順番待ちをしている。自分の番号が片付くまで、次のコードには触れないことだ。' }
+  106: { title:'CODE IN ORDER', body:'コードは静かに順番待ちをしている。自分の仕事が片付くまで、次のコードには触れないことだ。' }
 };
 
 function missionLabel(missionId){
@@ -8527,13 +8559,26 @@ function renderM106(v){
   }
   field.innerHTML = '';
   by.forEach((arr, tableIdx)=>{
-    arr.filter(c => c.faceUp).sort((a,b)=>a.n-b.n).forEach(c=>{
+    const openCards = arr.filter(c => c.faceUp).sort((a,b)=>a.n-b.n);
+    if (!openCards.length) return;
+    const ownerName = tables[tableIdx]?.playerName || `#${tableIdx+1}`;
+    const stack = document.createElement('div');
+    stack.className = 'm106-num-stack';
+    stack.style.width = `${32 + Math.max(0, openCards.length - 1) * 7}px`;
+    stack.title = `${ownerName}：${openCards.map(c=>c.n).join(', ')}`;
+    openCards.forEach((c, idx)=>{
       const nc = document.createElement('div');
       nc.className = 'numcard';
       nc.style.backgroundImage = `url('${imgNumber(c.n)}')`;
-      nc.title = `${tables[tableIdx]?.playerName || `#${tableIdx+1}`}：${c.n}`;
-      field.appendChild(nc);
+      nc.style.left = `${idx * 7}px`;
+      nc.style.zIndex = String(idx + 1);
+      stack.appendChild(nc);
     });
+    const tag = document.createElement('div');
+    tag.className = 'm106-name-tag';
+    tag.textContent = ownerName;
+    stack.appendChild(tag);
+    field.appendChild(stack);
   });
 
   const footer = document.getElementById('missionFooter');
@@ -8556,7 +8601,7 @@ function renderM106(v){
     if (ready) autoReveal.push(c.n);
     const nc = document.createElement('div');
     nc.className = 'numcard';
-    nc.style.backgroundImage = `url('${ready ? imgNumber(c.n) : imgBack}')`;
+    nc.style.backgroundImage = `url('${imgNumber(c.n)}')`;
     nc.title = ready ? `${c.n}：場に出せます` : `${c.n}：自分のスタンド上の同じ数字を先に全て切断します`;
     nc.onclick = (ev)=>{
       if (!ready){
