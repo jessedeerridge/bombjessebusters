@@ -603,6 +603,20 @@
     outline:2px solid #38bdf8;
     outline-offset:-2px;
   }
+  .table.m109-table-armed{
+    outline:2px dashed #38bdf8;
+    outline-offset:-2px;
+  }
+  .m109-ready-btn{
+    padding:1px 6px;
+    font-size:11px;
+    line-height:1.35;
+  }
+  .m109-ready-label{
+    color:#0284c7;
+    font-size:11px;
+    font-weight:700;
+  }
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
   .title{text-decoration:underline;padding-right:4px}
@@ -832,6 +846,7 @@
   .card.reveal-armed{outline:1.5px solid #000;outline-offset:-1.5px;}
   /* ★ アイテム2：選択可能カードの青枠 */
   .card.i2-selectable{outline:2px dashed #38bdf8; outline-offset:-1px;}
+  .card.m109-transfer{outline:2px dashed #38bdf8; outline-offset:-1px;}
 
   .num{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:var(--font-card);font-weight:var(--font-weight);color:#fff;line-height:1;text-shadow:0 1px 0 rgba(0,0,0,.15)}
   .num.tight-code{font-size:calc(var(--font-card) - 3px);}
@@ -1750,6 +1765,7 @@ main:not(:has(#lobby.hidden)) > * {
   <option value="49">#49</option>
   <option value="107">@7 信じるべき仲間</option>
   <option value="108">@8 近ければ近いほどいい</option>
+  <option value="109">@9 瞑想中</option>
 </select>
   </div>
   <div class="row" style="justify-content:flex-end">
@@ -1819,7 +1835,9 @@ const state = {
   m22GaveOnce:false, // ★ #22：自分が渡した一回ガード（即時連打対策）
   _lastMissionId:null,
   _lastI2AnimId:null,
-  _lastI18AnimId:null};
+  _lastI18AnimId:null,
+  _m109ArmedTable:null,
+  _m109ShiftPending:false};
 
 function needsRoleSelection(missionId){
   const mid = Number(missionId) | 0;
@@ -1939,7 +1957,8 @@ const STAGE_STORIES = {
   105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' },
   106: { title:'CODE IN ORDER', body:'コードは静かに順番待ちをしている。自分の仕事が片付くまで、次のコードには触れないことだ。' },
   107: { title:'信じるべき仲間', body:'爆弾処理班に必要なのは、鋼のニッパーだけではない。君たちは、命を仲間に託せるか。' },
-  108: { title:'近ければ近いほどいい', body:'気をつけろ。離れすぎると爆発するぞ。声を掛け合って、仲間との距離を見失うな。' }
+  108: { title:'近ければ近いほどいい', body:'気をつけろ。離れすぎると爆発するぞ。声を掛け合って、仲間との距離を見失うな。' },
+  109: { title:'瞑想中', body:'なにがなんだかめちゃくちゃだ。' }
 };
 
 function missionLabel(missionId){
@@ -3179,6 +3198,9 @@ function buildMixPlan(missionId){
     108: [ // @8 赤2
       {type:'redPick', k:2},
     ],
+    109: [ // @9 黄2
+      {type:'yellowPick', k:2},
+    ],
 };
 return plans[missionId] || [];
 
@@ -3415,6 +3437,8 @@ function listenRoom(code){
     window.m22_alreadyShown = false;   // ← 自動ポップを再許可
     state.m22GaveOnce = false;         // ← 念のためローカルの渡し済みもクリア
     state._spTimerOn = false;
+    state._m109ArmedTable = null;
+    state._m109ShiftPending = false;
     resetMissionAudioPlayback();
     state._prevMissionId = curId;
   state._mcShownMissionId = 0;
@@ -4293,6 +4317,60 @@ function deriveChecklistCodeHints(displayLines){
   return out;
 }
 
+
+function m109SplitIndex(v){
+  const counts = (v?.tables || []).map(T => Array.isArray(T?.hand) ? T.hand.length : 0);
+  const positive = counts.filter(n => n > 0);
+  if (positive.length === 0) return 0;
+  return Math.ceil(Math.min(...positive) / 2);
+}
+
+function isM109Ready(v, idx){
+  return !!(v?.meta?.m109_ready && v.meta.m109_ready[String(idx)]);
+}
+
+function m109AllSeatedAndReady(v){
+  if ((v?.mission?.id|0) !== 109 || v?.meta?.m109_done === true) return false;
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  if (!tables.length) return false;
+  return tables.every((T, idx) => !!T?.playerId && isM109Ready(v, idx));
+}
+
+async function performM109HandShift(){
+  if (!state.roomCode || state._m109ShiftPending) return;
+  state._m109ShiftPending = true;
+  try{
+    const snap = await get(ref(db, `rooms/${state.roomCode}`));
+    const v = snap.val();
+    if (!m109AllSeatedAndReady(v)) return;
+    const tables = (v.tables || []).map(T => ({ ...T, hand: Array.isArray(T?.hand) ? T.hand.slice() : [] }));
+    const split = m109SplitIndex(v);
+    const outgoing = tables.map(T => T.hand.slice(split));
+    const left = tables.map(T => T.hand.slice(0, split));
+    const alpha = 'abcdefghijklmnopqrstuvwxyz';
+
+    tables.forEach((T, idx)=>{
+      const fromPrev = outgoing[(idx - 1 + tables.length) % tables.length]
+        .map(c => ({ ...c, ownerId: T.playerId || c.ownerId || null }));
+      const ownLeft = left[idx].map(c => ({ ...c, ownerId: T.playerId || c.ownerId || null }));
+      T.hand = ownLeft.concat(fromPrev);
+      T.hand.forEach((c, ci)=>{ c.alpha = alpha[ci % alpha.length]; });
+    });
+
+    await update(ref(db, `rooms/${state.roomCode}`), {
+      tables,
+      'meta/m109_done': true,
+      'meta/m109_ready': null,
+      'meta/m109_split': split
+    });
+    state._m109ArmedTable = null;
+  }catch(e){
+    console.error('performM109HandShift failed', e);
+  }finally{
+    state._m109ShiftPending = false;
+  }
+}
+
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
     const seatedNow = (v?.tables||[]).some(T => T.playerId === state.userId);
@@ -4404,6 +4482,9 @@ if ((v.mission?.id|0) === 23) {
   const i2All=v.meta?.i2Flow;
   const i18All=v.meta?.i18Flow;
   const myTableIndex = (v.tables||[]).findIndex(T => T.playerId===state.userId);
+  const isM109 = ((v?.mission?.id|0) === 109);
+  const m109Done = !!v?.meta?.m109_done;
+  const m109Split = isM109 ? m109SplitIndex(v) : 0;
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table'; box.dataset.tableIdx = String(idx);
@@ -4442,6 +4523,18 @@ if ((v.mission?.id|0) === 23) {
       };
     }
 
+    const m109Ready = isM109Ready(v, idx);
+    const m109Armed = isM109 && !m109Done && t.playerId === state.userId && state._m109ArmedTable === idx;
+    const m109ShowTransfer = isM109 && !m109Done && (m109Ready || m109Armed);
+    if (m109ShowTransfer) box.classList.add('m109-table-armed');
+    if (isM109 && !m109Done && t.playerId === state.userId && !canPickOtherTable) {
+      box.onclick = (ev)=>{
+        if (ev?.target?.closest?.('.card, .char-card, button')) return;
+        state._m109ArmedTable = idx;
+        renderTables(state.watching);
+      };
+    }
+
 const header=document.createElement('div'); header.className='t-header';
 const title=document.createElement('div');  title.className='title';
 title.textContent = t.playerName ? t.playerName : String(t.titleNumber ?? (idx+1));
@@ -4459,6 +4552,22 @@ if ((v.mission?.id|0) === 29) {
 }
     
     header.appendChild(title);
+    if (isM109 && !m109Done && t.playerId === state.userId && state._m109ArmedTable === idx) {
+      const readyBtn = document.createElement('button');
+      readyBtn.className = 'btn small m109-ready-btn';
+      readyBtn.textContent = m109Ready ? '準備OK済' : '準備OK';
+      readyBtn.disabled = m109Ready;
+      readyBtn.onclick = async (ev)=>{
+        ev.stopPropagation();
+        await update(ref(db, `rooms/${state.roomCode}/meta/m109_ready`), { [idx]: state.userId });
+      };
+      header.appendChild(readyBtn);
+    } else if (isM109 && !m109Done && m109Ready) {
+      const readyLabel = document.createElement('span');
+      readyLabel.className = 'm109-ready-label';
+      readyLabel.textContent = '準備OK';
+      header.appendChild(readyLabel);
+    }
     /* ★ 追加：ホストだけ—テーブル名クリックで「キック」 */
     if (state.isHost){
       title.style.cursor = 'pointer';
@@ -4642,6 +4751,7 @@ wrap.dataset.cardId = String(c.id||'');
 wrap.dataset.cardIndex = String(ci);
 const cardKey = String(c.id || `ci-${ci}`);
 wrap.dataset.cardKey = cardKey;
+if (m109ShowTransfer && ci >= m109Split) card.classList.add('m109-transfer');
 
       // #43: 挿入アニメ対象カードは、nanoから飛ぶ前に見えないよう先に隠す
       const m43Anim = v?.meta?.m43_insertAnim;
@@ -5124,6 +5234,10 @@ tokens.forEach((tk,ti)=>{
       growForCardTokens(box);
 
   });
+
+  if (isM109 && state.isHost && m109AllSeatedAndReady(v)) {
+    performM109HandShift();
+  }
 
   /* ★ #22：黄カードが「公開」された枚数が2枚以上になった瞬間に表を出す（種類ではなく枚数） */
   if (v.mission?.flags?.m22_showTableAfter2Yellows) {
@@ -11519,6 +11633,9 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
       i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
       missionPickerOpen:false,
       missionPickerCount: playerCount,
+      m109_ready:null,
+      m109_done:false,
+      m109_split:null,
       m105_slots:(missionId===105 ? 1 : 0),
       m105_pool:(missionId===105 ? 0 : 0),
       m55_deck:null, m55_shown:null, m55_c8Sides:null, m55_backByIndex:null
@@ -14965,6 +15082,20 @@ case 108: {
   };
 }
 
+    case 109: {
+      return {
+        id:109, name:'@9 瞑想中', desc:'なにがなんだかめちゃくちゃだ。',
+        display:[
+          '@9 瞑想中',
+          ...linesForMix,
+          'なにがなんだかめちゃくちゃだ。',
+          '全プレイヤーは、自分のテーブルを押して「準備OK」を押す。',
+          '準備OKしたプレイヤーは、移動する右半分のカードが点線青枠で表示される。',
+          '全員が準備OKしたら、手札が最も少ないプレイヤーの半分（奇数は繰り上げ）を左半分として残し、右半分すべてを次手番のプレイヤーへそのままの順で移す。'
+        ],
+        flags:{ m109_meditation:true }
+      };
+    }
     default:  { const label = missionLabel(id); return {id, name:label, desc:'', display:[label, ...linesForMix]}; }
   }
 }
