@@ -8575,13 +8575,13 @@ function renderM106(v){
     const ownerName = tables[tableIdx]?.playerName || `#${tableIdx+1}`;
     const stack = document.createElement('div');
     stack.className = 'm106-num-stack';
-    stack.style.setProperty('--m106-spread', `${Math.max(0, openCards.length - 1) * 7}px`);
+    stack.style.setProperty('--m106-spread', `${Math.max(0, openCards.length - 1) * 12}px`);
     stack.title = `${ownerName}：${openCards.map(c=>c.n).join(', ')}`;
     openCards.forEach((c, idx)=>{
       const nc = document.createElement('div');
       nc.className = 'numcard';
       nc.style.backgroundImage = `url('${imgNumber(c.n)}')`;
-      nc.style.left = `${idx * 7}px`;
+      nc.style.left = `${idx * 12}px`;
       nc.style.zIndex = String(idx + 1);
       stack.appendChild(nc);
     });
