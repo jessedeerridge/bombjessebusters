@@ -4306,12 +4306,15 @@ function deriveChecklistCodeHints(displayLines){
 }
 
 
-function getM109SplitIndex(v){
-  const hands = (v?.tables || [])
-    .map(T => Array.isArray(T?.hand) ? T.hand.length : 0)
-    .filter(n => n > 0);
-  if (!hands.length) return 0;
-  return Math.ceil(Math.min(...hands) / 2);
+function getM109TransferCount(v){
+  const count = Number(v?.tableCount || (v?.tables || []).length) || 0;
+  const byPlayerCount = { 3:7, 4:6, 5:5, 6:4 };
+  return byPlayerCount[count] || Math.max(0, 10 - count);
+}
+
+function getM109SplitIndex(v, tableIdx){
+  const hand = Array.isArray(v?.tables?.[tableIdx]?.hand) ? v.tables[tableIdx].hand : [];
+  return Math.max(0, hand.length - getM109TransferCount(v));
 }
 
 function isM109Ready(v, tableIdx){
@@ -4367,11 +4370,12 @@ async function handleM109ReadyTransfer(v){
   if (!occupied.length || occupied.length !== (v.tableCount|0)) return;
   if (!occupied.every(({ T }) => !!ready[T.playerId])) return;
 
-  const split = getM109SplitIndex(v);
-  const outgoing = tables.map(T => (Array.isArray(T?.hand) ? T.hand.slice(split) : []));
+  const transferCount = getM109TransferCount(v);
+  const splitByTable = tables.map((_, i) => getM109SplitIndex(v, i));
+  const outgoing = tables.map((T, i) => (Array.isArray(T?.hand) ? T.hand.slice(splitByTable[i]) : []));
   const nextTables = tables.map((T, i) => {
     const prev = (i - 1 + tables.length) % tables.length;
-    const left = Array.isArray(T?.hand) ? T.hand.slice(0, split) : [];
+    const left = Array.isArray(T?.hand) ? T.hand.slice(0, splitByTable[i]) : [];
     const received = (outgoing[prev] || []).map(c => ({ ...c, ownerId: T?.playerId || null }));
     const hand = left.concat(received);
     realphaHand(hand);
@@ -4380,7 +4384,8 @@ async function handleM109ReadyTransfer(v){
   await update(ref(db, `rooms/${state.roomCode}`), {
     tables: nextTables,
     'meta/m109_done': true,
-    'meta/m109_split': split,
+    'meta/m109_transferCount': transferCount,
+    'meta/m109_splitByTable': splitByTable,
     'meta/m109_movedAt': Date.now()
   });
 }
@@ -4741,7 +4746,7 @@ wrap.dataset.cardId = String(c.id||'');
 wrap.dataset.cardIndex = String(ci);
 const cardKey = String(c.id || `ci-${ci}`);
 wrap.dataset.cardKey = cardKey;
-      if ((v.mission?.id|0) === 109 && isM109Ready(v, idx) && v?.meta?.m109_done !== true && ci >= getM109SplitIndex(v)) {
+      if ((v.mission?.id|0) === 109 && isM109Ready(v, idx) && v?.meta?.m109_done !== true && ci >= getM109SplitIndex(v, idx)) {
         card.classList.add('m109-transfer-range');
       }
 
@@ -15077,7 +15082,7 @@ case 109: {
       ...linesForMix,
       '全プレイヤーは、最初に自分のテーブル内を押したとき、押した場所のボタンは起動せず「準備OK」タブが出る。',
       '準備OKを押したプレイヤーは、手札の移動対象範囲が点線青枠で表示される。',
-      '全員が準備OKしたら、最も少ない手札枚数の半分（奇数は繰り上げ）を基準に、各自の左側を残し、右側すべてを次手番のプレイヤーへ同じ順で渡す。'
+      '全員が準備OKしたら、3人プレイでは右7枚、4人プレイでは右6枚、5人プレイでは右5枚、6人プレイでは右4枚を次手番のプレイヤーへ同じ順で渡す。'
     ],
     flags:{ m109_meditation:true }
   };
