@@ -235,6 +235,8 @@
 /* ▼ 数値カードの表示帯（アイテム下など） */
   .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
+  .numcard.order-selected{ outline:3px solid #2563eb; outline-offset:2px; }
+  .arrowright-card{ width:34px; height:48px; flex:0 0 auto; display:grid; place-items:center; font-size:28px; font-weight:900; color:#111; user-select:none; }
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
 
@@ -1750,6 +1752,7 @@ main:not(:has(#lobby.hidden)) > * {
   <option value="49">#49</option>
   <option value="107">@7 信じるべき仲間</option>
   <option value="108">@8 近ければ近いほどいい</option>
+  <option value="109">@9 準備ができたら突っ走れ</option>
 </select>
   </div>
   <div class="row" style="justify-content:flex-end">
@@ -1939,7 +1942,8 @@ const STAGE_STORIES = {
   105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' },
   106: { title:'CODE IN ORDER', body:'コードは静かに順番待ちをしている。自分の仕事が片付くまで、次のコードには触れないことだ。' },
   107: { title:'信じるべき仲間', body:'爆弾処理班に必要なのは、鋼のニッパーだけではない。君たちは、命を仲間に託せるか。' },
-  108: { title:'近ければ近いほどいい', body:'気をつけろ。離れすぎると爆発するぞ。声を掛け合って、仲間との距離を見失うな。' }
+  108: { title:'近ければ近いほどいい', body:'気をつけろ。離れすぎると爆発するぞ。声を掛け合って、仲間との距離を見失うな。' },
+  109: { title:'準備ができたら突っ走れ', body:'リミッターは外された。ここから先は迷いが命取りになる。合図が出たら、決めた順番を信じて一気に駆け抜けろ。' }
 };
 
 function missionLabel(missionId){
@@ -3179,6 +3183,8 @@ function buildMixPlan(missionId){
     108: [ // @8 赤2
       {type:'redPick', k:2},
     ],
+    109: [ // @9
+    ],
 };
 return plans[missionId] || [];
 
@@ -3489,6 +3495,7 @@ if (state.seatedTable == null && midNow && midNow !== midPrev && seatPop.classLi
     renderM39(v);
     renderM9(v);
     renderM104(v);
+    renderM109(v);
     renderM105(v);
      renderM11(v);
     renderM12(v);
@@ -11566,6 +11573,14 @@ async function setupMissionOnStart(code){
     });
   }
 
+  if ((v.mission?.id|0) === 109) {
+    const pool = MATERIALS.numbers.slice(); shuffle(pool);
+    await update(ref(db, `rooms/${code}/meta`), {
+      m109_numbers: pool.slice(0,4),
+      m109_selected: null
+    });
+  }
+
     /* ★ #12：各アイテムの“真下”に置く数字を決定→metaへ保存（ホストのみ・一度だけ） */
     if ((v.mission?.id|0) === 12) {
     if (!Array.isArray(v?.meta?.m12_under)) {
@@ -12343,6 +12358,90 @@ function beginM105Drag(ev, from, sourceNum=null){
   window.addEventListener('touchmove', onTouchMove, { capture:true, passive:false });
   window.addEventListener('touchend', onTouchEnd, true);
   window.addEventListener('touchcancel', onTouchEnd, true);
+}
+
+
+function renderM109(v){
+  const isM109 = ((v?.mission?.id|0) === 109);
+  const old = document.getElementById('m109Row');
+  if (!isM109){ if(old) old.remove(); return; }
+  const nums = Array.isArray(v?.meta?.m109_numbers) ? v.meta.m109_numbers.slice(0,4) : null;
+  const selected = Number(v?.meta?.m109_selected || 0);
+  if (!nums || nums.length < 4) return;
+  if (old) old.remove();
+
+  const lane = document.createElement('div');
+  lane.className = 'numlane';
+  lane.id = 'm109Row';
+
+  const arrow = document.createElement('div');
+  arrow.className = 'arrowright-card';
+  arrow.textContent = '→';
+  arrow.title = '左から順番';
+  lane.appendChild(arrow);
+
+  const saveOrder = async (next, nextSelected=null)=>{
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m109_numbers: next,
+      m109_selected: nextSelected
+    });
+  };
+
+  nums.forEach((n, idx)=>{
+    const node = document.createElement('div');
+    node.className = 'numcard';
+    if ((n|0) === selected) node.classList.add('order-selected');
+    node.style.backgroundImage = `url('${imgNumber(n)}')`;
+    node.style.cursor = 'grab';
+    node.draggable = true;
+    node.title = 'クリックで2枚を選んで入れ替え。ドラッグ＆ドロップでも並び替えできます。';
+
+    node.onclick = async (ev)=>{
+      ev.stopPropagation();
+      const now = state.watching;
+      if (((now?.mission?.id|0) !== 109)) return;
+      const cur = Array.isArray(now?.meta?.m109_numbers) ? now.meta.m109_numbers.slice(0,4) : nums.slice();
+      const curSelected = Number(now?.meta?.m109_selected || 0);
+      const nVal = n|0;
+      if (!curSelected || curSelected === nVal){
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m109_selected: curSelected === nVal ? null : nVal });
+        return;
+      }
+      const a = cur.indexOf(curSelected);
+      const b = cur.indexOf(nVal);
+      if (a >= 0 && b >= 0){
+        [cur[a], cur[b]] = [cur[b], cur[a]];
+        await saveOrder(cur, null);
+      }
+    };
+
+    node.addEventListener('dragstart', (ev)=>{
+      node.style.cursor = 'grabbing';
+      ev.dataTransfer?.setData('text/plain', String(idx));
+      ev.dataTransfer.effectAllowed = 'move';
+    });
+    node.addEventListener('dragend', ()=>{ node.style.cursor = 'grab'; });
+    node.addEventListener('dragover', (ev)=>{
+      ev.preventDefault();
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+    });
+    node.addEventListener('drop', async (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      const from = Number(ev.dataTransfer?.getData('text/plain'));
+      if (!Number.isInteger(from) || from < 0 || from >= nums.length || from === idx) return;
+      const now = state.watching;
+      if (((now?.mission?.id|0) !== 109)) return;
+      const cur = Array.isArray(now?.meta?.m109_numbers) ? now.meta.m109_numbers.slice(0,4) : nums.slice();
+      const [moved] = cur.splice(from, 1);
+      cur.splice(idx, 0, moved);
+      await saveOrder(cur, null);
+    });
+
+    lane.appendChild(node);
+  });
+
+  mountLaneUnderItemsBar(lane);
 }
 
 function renderM105(v){
@@ -14962,6 +15061,19 @@ case 108: {
       '手番にこの条件を満たして切断を行えない場合は、起爆ダイヤルを1つ進める。'
     ],
     flags:{}
+  };
+}
+
+case 109: {
+  return {
+    id:109, name:'@9', desc:'',
+    display:[
+      '@9 準備ができたら突っ走れ',
+      ...linesForMix,
+      '最初に4枚の数値カードを任意の順で並べる。',
+      '左の数値カードの数字のコードが切断された時から、必ず左から順番に4本ずつ、数値カードの数字のコードのみを切断しなければならない。'
+    ],
+    flags:{ m109_orderableNumbers:true }
   };
 }
 
