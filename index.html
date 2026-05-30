@@ -307,6 +307,7 @@
   }
   .numcard.m109-insert-left::before{ left:-5px; }
   .numcard.m109-insert-right::after{ right:-5px; }
+  html.m109-drag-active, body.m109-drag-active{ overflow:hidden !important; }
   .m109-drag-ghost{
     position:fixed;
     left:0;
@@ -319,7 +320,9 @@
     box-shadow:0 8px 18px rgba(0,0,0,.28);
     pointer-events:none;
     z-index:10050;
-    transform:translate(-50%,-50%) scale(1.04);
+    will-change:transform;
+    contain:layout paint;
+    transform:translate(-9999px,-9999px) scale(1.04);
   }
 
   /* ★ 数値カードの「重ね」用ホルダー＆オーバーレイ */
@@ -13788,7 +13791,11 @@ function renderM109(v){
     return pos;
   };
   const setGhostPoint = (ghost, x, y)=>{
-    ghost.style.transform = `translate(${x - 16}px, ${y - 24}px) scale(1.04)`;
+    const maxX = Math.max(16, window.innerWidth - 16);
+    const maxY = Math.max(24, window.innerHeight - 24);
+    const clampedX = Math.max(16, Math.min(maxX, x));
+    const clampedY = Math.max(24, Math.min(maxY, y));
+    ghost.style.transform = `translate(${clampedX - 16}px, ${clampedY - 24}px) scale(1.04)`;
   };
   const reorderToIndex = (fromNum, rawIndex)=>{
     fromNum = fromNum|0;
@@ -13821,6 +13828,8 @@ function renderM109(v){
       try{ node.releasePointerCapture?.(ev?.pointerId); }catch(_e){}
       if (shouldApply) reorderToIndex(drag.n, drag.lastIndex);
       drag.ghost.remove();
+      document.documentElement.classList.remove('m109-drag-active');
+      document.body.classList.remove('m109-drag-active');
       node.classList.remove('dragging');
       clearInsertHelper();
       drag = null;
@@ -13846,6 +13855,8 @@ function renderM109(v){
       ghost.className = 'm109-drag-ghost';
       ghost.style.backgroundImage = node.style.backgroundImage;
       document.body.appendChild(ghost);
+      document.documentElement.classList.add('m109-drag-active');
+      document.body.classList.add('m109-drag-active');
       setGhostPoint(ghost, ev.clientX, ev.clientY);
       node.classList.add('dragging');
       try{ node.setPointerCapture?.(ev.pointerId); }catch(_e){}
@@ -15162,6 +15173,7 @@ case 109: {
       '@9 準備ができたら突っ走れ',
       ...linesForMix,
       '最初に4枚の数値カードを任意の順で並べる。',
+      '左の数値カードの数字のコードが全て切断される前に右側の数値のコードを切断した場合、爆弾が爆発する。',
       '左の数値カードの数字のコードが切断された時から、必ず左から順番に4本ずつ、数値カードの数字のコードのみを切断しなければならない。'
     ],
     flags:{ m109_orderedRight4:true }
