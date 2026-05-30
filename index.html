@@ -235,6 +235,10 @@
 /* ▼ 数値カードの表示帯（アイテム下など） */
   .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
+  .m9-sortable-card{ cursor:grab; touch-action:none; -webkit-user-select:none; user-select:none; }
+  .m9-sortable-card.m9-drag-origin{ opacity:0; }
+  .m9-drag-card{ position:fixed; width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; z-index:2147483647; pointer-events:none; transform:translate(-50%, -50%); box-shadow:0 10px 20px rgba(0,0,0,.18); }
+  .m9-drop-helper{ position:fixed; width:4px; height:52px; border-radius:999px; background:#38bdf8; box-shadow:0 0 0 2px rgba(56,189,248,.22); z-index:2147483646; pointer-events:none; transform:translate(-50%, -2px); }
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
 
@@ -11546,14 +11550,15 @@ async function setupMissionOnStart(code){
   const snap = await get(ref(db, `rooms/${code}`));
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
-  /* #9：右2 + 異なる数値2枚を決定して meta に保存（ホストのみ実行） */
+  /* #9：右4 + 異なる数値4枚を決定して meta に保存（ホストのみ実行） */
   if ((v.mission?.id|0) === 9) {
    const pool = MATERIALS.numbers.slice(); shuffle(pool);
-    const picks = pool.slice(0,3);            // 異なる3枚
+    const picks = pool.slice(0,4);            // 異なる4枚
    await update(ref(db, `rooms/${code}/meta`), {
       m9_numbers: picks,
+      m9_order: picks,
       m9_faceDown: [],
-     m9_rule: 'right2'
+     m9_rule: 'right4'
     });
   }
 
@@ -12155,18 +12160,160 @@ function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
 }
 
-  /* ===== #9：右2 + 異なる数値2枚（同期表示） ===== */
+  /* ===== #9：右4 + 異なる数値4枚（同期表示・並び替え） ===== */
+  function getM9DisplayOrder(meta){
+    const nums = Array.isArray(meta?.m9_numbers) ? meta.m9_numbers.map(n=>n|0).slice(0,4) : [];
+    const saved = Array.isArray(meta?.m9_order) ? meta.m9_order.map(n=>n|0) : [];
+    const seen = new Set();
+    const ordered = saved.filter(n=> nums.includes(n) && !seen.has(n) && seen.add(n));
+    nums.forEach(n=>{ if (!seen.has(n)) ordered.push(n); });
+    return ordered.slice(0,4);
+  }
+
+  function beginM9Sort(ev, n, display){
+    if ((state.watching?.mission?.id|0) !== 9) return;
+    if (ev.button != null && ev.button !== 0) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    const origin = ev.currentTarget;
+    const lane = origin.closest('#m9Row');
+    if (!lane) return;
+
+    const pointFromEvent = (e)=>{
+      const t = e?.touches?.[0] || e?.changedTouches?.[0];
+      return {
+        x: Number.isFinite(e?.clientX) ? e.clientX : (t?.clientX ?? ev.clientX),
+        y: Number.isFinite(e?.clientY) ? e.clientY : (t?.clientY ?? ev.clientY)
+      };
+    };
+
+    const startPt = pointFromEvent(ev);
+    const originIndex = display.indexOf(n|0);
+    let dragging = false;
+    let moved = false;
+    let insertIndex = originIndex;
+    let ghost = null;
+    let helper = null;
+    try{ origin.setPointerCapture?.(ev.pointerId); }catch(_e){}
+
+    const cleanup = (e)=>{
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
+      window.removeEventListener('touchmove', onTouchMove, true);
+      window.removeEventListener('touchend', onTouchEnd, true);
+      window.removeEventListener('touchcancel', onTouchEnd, true);
+      try{ origin.releasePointerCapture?.(e?.pointerId); }catch(_e){}
+      origin.classList.remove('m9-drag-origin');
+      ghost?.remove();
+      helper?.remove();
+    };
+
+    const ensureDrag = ()=>{
+      if (dragging) return;
+      dragging = true;
+      origin.classList.add('m9-drag-origin');
+      ghost = document.createElement('div');
+      ghost.className = 'm9-drag-card';
+      ghost.style.backgroundImage = origin.style.backgroundImage;
+      document.body.appendChild(ghost);
+      helper = document.createElement('div');
+      helper.className = 'm9-drop-helper';
+      document.body.appendChild(helper);
+    };
+
+    const moveGhost = (pt)=>{
+      if (ghost){
+        ghost.style.left = `${pt.x}px`;
+        ghost.style.top = `${pt.y}px`;
+      }
+    };
+
+    const updateHelper = (pt)=>{
+      if (!helper) return;
+      const cards = Array.from(lane.querySelectorAll('.m9-sortable-card'));
+      const others = cards.filter(el => el !== origin);
+      let idx = 0;
+      for (const el of others){
+        const r = el.getBoundingClientRect();
+        if (pt.x > r.left + r.width / 2) idx++;
+      }
+      insertIndex = idx;
+
+      let sideRect = null;
+      let x = null;
+      if (idx >= others.length){
+        sideRect = others[others.length - 1]?.getBoundingClientRect() || origin.getBoundingClientRect();
+        x = sideRect.right + 4;
+      } else {
+        sideRect = others[idx].getBoundingClientRect();
+        x = sideRect.left - 4;
+      }
+      helper.style.left = `${x}px`;
+      helper.style.top = `${sideRect.top}px`;
+    };
+
+    const currentInsertIndexForOriginalList = ()=>{
+      const without = display.filter(x=>x !== (n|0));
+      const next = without.slice();
+      next.splice(insertIndex, 0, n|0);
+      return next;
+    };
+
+    const maybeMove = (e)=>{
+      const pt = pointFromEvent(e);
+      const dist = Math.hypot(pt.x - startPt.x, pt.y - startPt.y);
+      if (!dragging && dist < 5) return;
+      moved = true;
+      ensureDrag();
+      moveGhost(pt);
+      updateHelper(pt);
+    };
+
+    const finish = async (e)=>{
+      maybeMove(e);
+      const didDrag = dragging && moved;
+      const nextOrder = didDrag ? currentInsertIndexForOriginalList() : null;
+      cleanup(e);
+      if (!didDrag) {
+        const now = state.watching;
+        if (((now?.mission?.id|0) !== 9)) return;
+        const cur = Array.isArray(now?.meta?.m9_faceDown) ? now.meta.m9_faceDown.slice() : [];
+        const has = cur.includes(n|0);
+        const next = has ? cur.filter(x=>x!==(n|0)) : cur.concat([n|0]);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m9_faceDown: next });
+        return;
+      }
+      if (!nextOrder || nextOrder.join(',') === display.join(',')) return;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m9_order: nextOrder });
+    };
+
+    const onMove = (e)=>{ e.preventDefault?.(); maybeMove(e); };
+    const onUp = (e)=>{ finish(e); };
+    const onTouchMove = (e)=>{ e.preventDefault?.(); maybeMove(e); };
+    const onTouchEnd = (e)=>{ finish(e); };
+
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onUp, true);
+    window.addEventListener('touchmove', onTouchMove, true);
+    window.addEventListener('touchend', onTouchEnd, true);
+    window.addEventListener('touchcancel', onTouchEnd, true);
+  }
+
   function renderM9(v){
     const isM9 = ((v?.mission?.id|0) === 9);
    const old = document.getElementById('m9Row');
     if (!isM9){ if(old) old.remove(); return; }
     // メタ（ホストが開始時に保存）
     const nums = Array.isArray(v?.meta?.m9_numbers) ? v.meta.m9_numbers : null;
-    const rule = v?.meta?.m9_rule || 'right2';
+    const rule = v?.meta?.m9_rule || 'right4';
     const faceDown = Array.isArray(v?.meta?.m9_faceDown) ? v.meta.m9_faceDown : [];
-    if (!nums || nums.length < 3) return; // 未準備なら何もしない（次のonValueで描画）
+    const display = getM9DisplayOrder(v?.meta || {});
+    if (!nums || nums.length < 4 || display.length < 4) return; // 未準備なら何もしない（次のonValueで描画）
    if (old) old.remove();
-    // [右2][数][数] をアイテム列の直下に表示
+    // [右4][数][数][数][数] をアイテム列の直下に表示
     const lane = document.createElement('div');
     lane.className = 'numlane';
 
@@ -12175,21 +12322,13 @@ function buildFixedLane(list){
     ruleCard.style.backgroundImage = `url('${imgRule(rule)}')`;
     lane.appendChild(ruleCard);
 
-    nums.slice(0,3).forEach(n=>{
+    display.forEach(n=>{
       const node = document.createElement('div');
-      node.className = 'numcard';
+      node.className = 'numcard m9-sortable-card';
       const isFaceDown = faceDown.includes(n|0);
       node.style.backgroundImage = `url('${isFaceDown ? imgBack : imgNumber(n)}')`;
-      node.style.cursor = 'pointer';
-      node.onclick = async (ev)=>{
-        ev.stopPropagation();
-        const now = state.watching;
-        if (((now?.mission?.id|0) !== 9)) return;
-        const cur = Array.isArray(now?.meta?.m9_faceDown) ? now.meta.m9_faceDown.slice() : [];
-        const has = cur.includes(n|0);
-        const next = has ? cur.filter(x=>x!==(n|0)) : cur.concat([n|0]);
-        await update(ref(db, `rooms/${state.roomCode}/meta`), { m9_faceDown: next });
-      };
+      node.title = 'ドラッグで並び替え / タップで表裏切替';
+      node.addEventListener('pointerdown', (ev)=> beginM9Sort(ev, n, display));
       lane.appendChild(node);
     });
     lane.id = 'm9Row';
@@ -14051,11 +14190,10 @@ function missionInfo(id, opts={}){
         display: [
           '#9',
           ...linesForMix, // ← 赤1・黄2の結果（赤[1.5] / 黄[2.1][…] など）
-          '一番目（左側）の数値のコードを2本切断するまでは二番目のカードを、二番目の数値のコードを2本切断するまでは三番目のカードを切断できない。',
-　　　　　'他の数値のコードは任意の順番で切断できる。',
-          '手番に切断できるコードがなければ爆弾が爆発する。'
+          '最初に4枚の数値カードを任意の順で並べる。',
+          '左の数値カードの数字のコードが切断された時から、必ず左から順番に4本ずつ、数値カードの数字のコードのみを切断しなければならない。'
         ],
-        flags: { needsRuleRow:true, rule: { type:'R2with2', rightCount:2 } }
+        flags: { needsRuleRow:true, rule: { type:'R4with4', rightCount:4 } }
       };
     }
     case 10: {
