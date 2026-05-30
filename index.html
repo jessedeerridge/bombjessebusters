@@ -290,6 +290,12 @@
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
+  .m9-lane{ align-items:center; }
+  .m9-arrow-right{ background-size:contain; }
+  .m9-numcard{ cursor:grab; touch-action:none; }
+  .m9-numcard:active{ cursor:grabbing; }
+  .m9-numcard.m9-selected{ outline:3px solid #2563eb; outline-offset:2px; }
+  .m9-numcard.m9-drag-over{ box-shadow:0 0 0 3px rgba(37,99,235,.35); transform:translateY(-2px); }
 
   /* ★ 数値カードの「重ね」用ホルダー＆オーバーレイ */
   .numcard-holder { position:relative; width:32px; height:48px; flex:0 0 auto; }
@@ -1742,7 +1748,7 @@ main:not(:has(#lobby.hidden)) > * {
   <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
   <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
   <option value="8">#8</option>
-  <option value="9">#9 aaa</option>
+  <option value="9">#9 準備ができたら突っ走れ</option>
   <option value="10">#10 bbb</option>
   <option value="11">#11 ccc</option>
   <option value="12">#12</option>
@@ -1874,7 +1880,7 @@ const STAGE_STORIES = {
   6: { title:'実地訓練 3日目', body:'君たちを待ち受けている黄色いものはなんだ？ 時間内に切断すべき4本の黄色いコードだ！' },
   7: { title:'訓練課程の最終科目', body:'赤コードには良い赤コードと悪い赤コードがある……。' },
   8: { title:'最終試験', body:'今日は大切な日だ！ 爆弾処理試験に合格する心構えはできているか？' },
-  9: { title:'優先順位の判断', body:'恐るべきマッドサイエンティストが爆弾を改造したようだ。この爆弾は特定のコードを順番に切断しなければ解除できない。焦ったり冷静さを失ったりしないように！' },
+  9: { title:'準備ができたら突っ走れ', body:'スタートの合図はもう目の前だ。4枚の数値カードを走順に並べ、ひとたび先頭のコードが切られたなら、迷わず左から順に駆け抜けろ。' },
   10: { title:'時間制限', body:'解きったコードを解くだけではなく、仲間との「すれ違い」も解く必要がありそうだ。チームの絆を信じること。コードはみんなで分け合えるほどたっぷりあるのだから！' },
   11: { title:'赤のような青、万策尽きたようだ', body:'「隊長、私は失読症で、色の見分けもつきません」' },
   12: { title:'失われた装備', body:'「コードだ、コードが金槌で殴りかかってくる！」　ところで金槌と言えば、工具箱はどこに行った？' },
@@ -2792,7 +2798,7 @@ const CARD_IMAGE_PRELOAD_LIST = [
   './numbercardback.jpg', './numberdeck.png', './codeback.jpg', './codeback.png',
   './itemback.jpg', './conback.jpg', './battery.jpg', './yellowcode.png', './redcode.png',
   './a.jpg', './b.jpg', './c.jpg', './d.jpg', './e.jpg', './f.jpg', './g.jpg', './h.jpg', './i.jpg', './j.jpg', './k.jpg', './l.jpg',
-  './left2.jpg', './right2.jpg', './left4.jpg', './right4.jpg',
+  './left2.jpg', './right2.jpg', './left4.jpg', './right4.jpg', './exright.jpg',
   './nano0.png', './nano1.png', './nano2.png', './nano3.png', './nano4.png',
   './nano0left.png', './nano1left.png', './nano2left.png', './nano3left.png', './nano4left.png'
 ];
@@ -11546,14 +11552,14 @@ async function setupMissionOnStart(code){
   const snap = await get(ref(db, `rooms/${code}`));
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
-  /* #9：右2 + 異なる数値2枚を決定して meta に保存（ホストのみ実行） */
+  /* #9：右矢印 + 異なる数値4枚を決定して meta に保存（ホストのみ実行） */
   if ((v.mission?.id|0) === 9) {
-   const pool = MATERIALS.numbers.slice(); shuffle(pool);
-    const picks = pool.slice(0,3);            // 異なる3枚
-   await update(ref(db, `rooms/${code}/meta`), {
+    const pool = MATERIALS.numbers.slice(); shuffle(pool);
+    const picks = pool.slice(0,4);            // 異なる4枚
+    await update(ref(db, `rooms/${code}/meta`), {
       m9_numbers: picks,
       m9_faceDown: [],
-     m9_rule: 'right2'
+      m9_rule: 'arrowright'
     });
   }
 
@@ -12155,44 +12161,109 @@ function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
 }
 
-  /* ===== #9：右2 + 異なる数値2枚（同期表示） ===== */
+  /* ===== #9：右矢印 + 数値4枚（同期表示・並び替え可） ===== */
   function renderM9(v){
     const isM9 = ((v?.mission?.id|0) === 9);
-   const old = document.getElementById('m9Row');
-    if (!isM9){ if(old) old.remove(); return; }
-    // メタ（ホストが開始時に保存）
-    const nums = Array.isArray(v?.meta?.m9_numbers) ? v.meta.m9_numbers : null;
-    const rule = v?.meta?.m9_rule || 'right2';
-    const faceDown = Array.isArray(v?.meta?.m9_faceDown) ? v.meta.m9_faceDown : [];
-    if (!nums || nums.length < 3) return; // 未準備なら何もしない（次のonValueで描画）
-   if (old) old.remove();
-    // [右2][数][数] をアイテム列の直下に表示
+    const old = document.getElementById('m9Row');
+    if (!isM9){ if(old) old.remove(); state._m9SelectedNum = null; return; }
+
+    const nums = Array.isArray(v?.meta?.m9_numbers) ? v.meta.m9_numbers.map(n=>n|0).filter(n=>n>=1 && n<=12) : null;
+    const faceDown = Array.isArray(v?.meta?.m9_faceDown) ? v.meta.m9_faceDown.map(n=>n|0) : [];
+    if (!nums || nums.length < 4) {
+      if (state.isHost && state.roomCode){
+        const pool = MATERIALS.numbers.slice(); shuffle(pool);
+        update(ref(db, `rooms/${state.roomCode}/meta`), { m9_numbers: pool.slice(0,4), m9_faceDown: [], m9_rule: 'arrowright' });
+      }
+      return;
+    }
+
+    const current = nums.slice(0,4);
+    const updateOrder = async(next)=>{
+      if (!state.roomCode) return;
+      const clean = next.map(n=>n|0).filter((n,idx,arr)=> n>=1 && n<=12 && arr.indexOf(n)===idx).slice(0,4);
+      if (clean.length !== 4) return;
+      state._m9SelectedNum = null;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), { m9_numbers: clean });
+    };
+    const swapNums = async(a,b)=>{
+      a = a|0; b = b|0;
+      if (a === b) return;
+      const next = current.slice();
+      const ai = next.indexOf(a), bi = next.indexOf(b);
+      if (ai < 0 || bi < 0) return;
+      [next[ai], next[bi]] = [next[bi], next[ai]];
+      await updateOrder(next);
+    };
+
+    if (old) old.remove();
     const lane = document.createElement('div');
-    lane.className = 'numlane';
+    lane.id = 'm9Row';
+    lane.className = 'numlane m9-lane';
 
-    const ruleCard = document.createElement('div');
-    ruleCard.className = 'rulecard';
-    ruleCard.style.backgroundImage = `url('${imgRule(rule)}')`;
-    lane.appendChild(ruleCard);
+    const arrow = document.createElement('div');
+    arrow.className = 'rulecard m9-arrow-right';
+    arrow.style.backgroundImage = `url('./exright.jpg')`;
+    arrow.title = '左から右へ順番に切断';
+    lane.appendChild(arrow);
 
-    nums.slice(0,3).forEach(n=>{
+    current.forEach(n=>{
       const node = document.createElement('div');
-      node.className = 'numcard';
+      node.className = 'numcard m9-numcard';
+      if ((state._m9SelectedNum|0) === (n|0)) node.classList.add('m9-selected');
       const isFaceDown = faceDown.includes(n|0);
       node.style.backgroundImage = `url('${isFaceDown ? imgBack : imgNumber(n)}')`;
-      node.style.cursor = 'pointer';
-      node.onclick = async (ev)=>{
+      node.draggable = true;
+      node.dataset.num = String(n|0);
+      node.title = 'ドラッグ＆ドロップ、または2枚を順にクリックして並び替え（ダブルクリックで表/裏）';
+
+      node.addEventListener('click', async (ev)=>{
+        ev.stopPropagation();
+        const selected = state._m9SelectedNum == null ? null : (state._m9SelectedNum|0);
+        if (selected == null){
+          state._m9SelectedNum = n|0;
+          node.classList.add('m9-selected');
+          return;
+        }
+        if (selected === (n|0)){
+          state._m9SelectedNum = null;
+          node.classList.remove('m9-selected');
+          return;
+        }
+        await swapNums(selected, n);
+      });
+
+      node.addEventListener('dblclick', async (ev)=>{
+        ev.preventDefault();
         ev.stopPropagation();
         const now = state.watching;
         if (((now?.mission?.id|0) !== 9)) return;
-        const cur = Array.isArray(now?.meta?.m9_faceDown) ? now.meta.m9_faceDown.slice() : [];
+        const cur = Array.isArray(now?.meta?.m9_faceDown) ? now.meta.m9_faceDown.map(x=>x|0) : [];
         const has = cur.includes(n|0);
         const next = has ? cur.filter(x=>x!==(n|0)) : cur.concat([n|0]);
+        state._m9SelectedNum = null;
         await update(ref(db, `rooms/${state.roomCode}/meta`), { m9_faceDown: next });
-      };
+      });
+
+      node.addEventListener('dragstart', (ev)=>{
+        ev.dataTransfer?.setData('text/plain', String(n|0));
+        if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
+      });
+      node.addEventListener('dragover', (ev)=>{
+        ev.preventDefault();
+        node.classList.add('m9-drag-over');
+        if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+      });
+      node.addEventListener('dragleave', ()=> node.classList.remove('m9-drag-over'));
+      node.addEventListener('drop', async (ev)=>{
+        ev.preventDefault();
+        ev.stopPropagation();
+        node.classList.remove('m9-drag-over');
+        const from = Number(ev.dataTransfer?.getData('text/plain'));
+        await swapNums(from, n);
+      });
       lane.appendChild(node);
     });
-    lane.id = 'm9Row';
+
     mountLaneUnderItemsBar(lane);
   }
 
@@ -14051,11 +14122,10 @@ function missionInfo(id, opts={}){
         display: [
           '#9',
           ...linesForMix, // ← 赤1・黄2の結果（赤[1.5] / 黄[2.1][…] など）
-          '一番目（左側）の数値のコードを2本切断するまでは二番目のカードを、二番目の数値のコードを2本切断するまでは三番目のカードを切断できない。',
-　　　　　'他の数値のコードは任意の順番で切断できる。',
-          '手番に切断できるコードがなければ爆弾が爆発する。'
+          '最初に4枚の数値カードを任意の順で並べる。',
+          '左の数値カードの数字のコードが切断された時から、必ず左から順番に4本ずつ、数値カードの数字のコードのみを切断しなければならない。'
         ],
-        flags: { needsRuleRow:true, rule: { type:'R2with2', rightCount:2 } }
+        flags: { needsRuleRow:true, rule: { type:'arrowright4', rightCount:4 } }
       };
     }
     case 10: {
