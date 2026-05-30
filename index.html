@@ -290,6 +290,40 @@
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
+  .numcard.draggable { position:relative; cursor:grab; touch-action:none; user-select:none; }
+  .numcard.draggable.dragging { visibility:hidden; }
+  .numcard.m109-insert-left::before,
+  .numcard.m109-insert-right::after{
+    content:'';
+    position:absolute;
+    top:-3px;
+    bottom:-3px;
+    width:4px;
+    border-radius:999px;
+    background:#111;
+    box-shadow:0 0 0 2px rgba(255,255,255,.9);
+    pointer-events:none;
+    z-index:6;
+  }
+  .numcard.m109-insert-left::before{ left:-5px; }
+  .numcard.m109-insert-right::after{ right:-5px; }
+  html.m109-drag-active, body.m109-drag-active{ overflow:hidden !important; }
+  .m109-drag-ghost{
+    position:fixed;
+    left:0;
+    top:0;
+    width:32px;
+    height:48px;
+    border-radius:6px;
+    border:1px solid #ddd;
+    background:#fff center/cover no-repeat;
+    box-shadow:0 8px 18px rgba(0,0,0,.28);
+    pointer-events:none;
+    z-index:10050;
+    will-change:transform;
+    contain:layout paint;
+    transform:translate(-9999px,-9999px) scale(1.04);
+  }
 
   /* ★ 数値カードの「重ね」用ホルダー＆オーバーレイ */
   .numcard-holder { position:relative; width:32px; height:48px; flex:0 0 auto; }
@@ -1750,6 +1784,7 @@ main:not(:has(#lobby.hidden)) > * {
   <option value="49">#49</option>
   <option value="107">@7 信じるべき仲間</option>
   <option value="108">@8 近ければ近いほどいい</option>
+  <option value="109">@9 準備ができたら突っ走れ</option>
 </select>
   </div>
   <div class="row" style="justify-content:flex-end">
@@ -1939,7 +1974,8 @@ const STAGE_STORIES = {
   105: { title:'時間がなさすぎる', body:'見たこともない爆弾だ。さっきまで3つとも光っていたのに。急がないと危ない気がするぞ。' },
   106: { title:'CODE IN ORDER', body:'コードは静かに順番待ちをしている。自分の仕事が片付くまで、次のコードには触れないことだ。' },
   107: { title:'信じるべき仲間', body:'爆弾処理班に必要なのは、鋼のニッパーだけではない。君たちは、命を仲間に託せるか。' },
-  108: { title:'近ければ近いほどいい', body:'気をつけろ。離れすぎると爆発するぞ。声を掛け合って、仲間との距離を見失うな。' }
+  108: { title:'近ければ近いほどいい', body:'気をつけろ。離れすぎると爆発するぞ。声を掛け合って、仲間との距離を見失うな。' },
+  109: { title:'準備ができたら突っ走れ', body:'爆弾の内部でコードが一列に並び、合図を待っている。準備を整えたら、迷わず順番どおりに突っ走れ。' }
 };
 
 function missionLabel(missionId){
@@ -3179,6 +3215,8 @@ function buildMixPlan(missionId){
     108: [ // @8 赤2
       {type:'redPick', k:2},
     ],
+    109: [ // @9
+    ],
 };
 return plans[missionId] || [];
 
@@ -3524,6 +3562,7 @@ renderM55(state.watching);
     renderM63(v);
     renderM65(v);
     renderM106(v);
+    renderM109(v);
     renderM66(v);
 enforceM31to66(v);
 
@@ -11566,6 +11605,13 @@ async function setupMissionOnStart(code){
     });
   }
 
+  if ((v.mission?.id|0) === 109) {
+    const pool = MATERIALS.numbers.slice(); shuffle(pool);
+    await update(ref(db, `rooms/${code}/meta`), {
+      m109_numbers: pool.slice(0,4)
+    });
+  }
+
     /* ★ #12：各アイテムの“真下”に置く数字を決定→metaへ保存（ホストのみ・一度だけ） */
     if ((v.mission?.id|0) === 12) {
     if (!Array.isArray(v?.meta?.m12_under)) {
@@ -13673,6 +13719,161 @@ function renderM39(v){
 
 
   
+
+/* ==== @9：右4 + 並び替え可能な数値4枚 ==== */
+function normalizeM109Numbers(v){
+  const nums = Array.isArray(v?.meta?.m109_numbers) ? v.meta.m109_numbers.map(n=>n|0).filter(n=>n>=1 && n<=12) : [];
+  const uniq = [];
+  nums.forEach(n=>{ if (!uniq.includes(n)) uniq.push(n); });
+  return uniq.slice(0,4);
+}
+
+async function ensureM109MetaInit(v){
+  if (!state.isHost || !state.roomCode) return;
+  if ((v?.mission?.id|0) !== 109) return;
+  const nums = normalizeM109Numbers(v);
+  if (nums.length === 4) return;
+  const used = new Set(nums);
+  const pool = MATERIALS.numbers.filter(n => !used.has(n));
+  shuffle(pool);
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m109_numbers: nums.concat(pool).slice(0,4) });
+}
+
+async function setM109Order(nums){
+  if (!state.roomCode) return;
+  const next = Array.isArray(nums) ? nums.map(n=>n|0).filter(n=>n>=1 && n<=12).slice(0,4) : [];
+  if (next.length !== 4) return;
+  await update(ref(db, `rooms/${state.roomCode}/meta`), { m109_numbers: next });
+}
+
+function renderM109(v){
+  const isM109 = ((v?.mission?.id|0) === 109);
+  const old = document.getElementById('m109Row');
+  if (!isM109){ if (old) old.remove(); return; }
+
+  const nums = normalizeM109Numbers(v);
+  if (nums.length < 4){
+    ensureM109MetaInit(v).catch(console.error);
+    if (old) old.remove();
+    return;
+  }
+  if (old) old.remove();
+
+  const lane = document.createElement('div');
+  lane.id = 'm109Row';
+  lane.className = 'numlane';
+
+  const rule = document.createElement('div');
+  rule.className = 'rulecard';
+  rule.style.backgroundImage = `url('${imgRule('right4')}')`;
+  lane.appendChild(rule);
+
+  const clearInsertHelper = ()=> lane.querySelectorAll('.m109-insert-left,.m109-insert-right').forEach(el=>{
+    el.classList.remove('m109-insert-left', 'm109-insert-right');
+  });
+  const getNumberCards = ()=> Array.from(lane.querySelectorAll('.numcard.draggable'));
+  const currentNumbers = ()=> {
+    const latest = normalizeM109Numbers(state.watching);
+    return latest.length === 4 ? latest : nums.slice();
+  };
+  const insertionFromPoint = (clientX)=>{
+    const cards = getNumberCards();
+    const visible = cards.filter(card => !card.classList.contains('dragging'));
+    if (!visible.length) return { index:0, helper:null, side:'left' };
+    const beforeIdx = visible.findIndex(card => clientX < (card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2));
+    if (beforeIdx >= 0) return { index:beforeIdx, helper:visible[beforeIdx], side:'left' };
+    return { index:visible.length, helper:visible[visible.length - 1], side:'right' };
+  };
+  const applyInsertHelper = (clientX)=>{
+    clearInsertHelper();
+    const pos = insertionFromPoint(clientX);
+    if (pos.helper) pos.helper.classList.add(pos.side === 'right' ? 'm109-insert-right' : 'm109-insert-left');
+    return pos;
+  };
+  const setGhostPoint = (ghost, x, y)=>{
+    const maxX = Math.max(16, window.innerWidth - 16);
+    const maxY = Math.max(24, window.innerHeight - 24);
+    const clampedX = Math.max(16, Math.min(maxX, x));
+    const clampedY = Math.max(24, Math.min(maxY, y));
+    ghost.style.transform = `translate(${clampedX - 16}px, ${clampedY - 24}px) scale(1.04)`;
+  };
+  const reorderToIndex = (fromNum, rawIndex)=>{
+    fromNum = fromNum|0;
+    if (!fromNum) return;
+    const cur = currentNumbers();
+    const fromIdx = cur.indexOf(fromNum);
+    if (fromIdx < 0) return;
+    const without = cur.filter(n => (n|0) !== fromNum);
+    const insertIdx = Math.max(0, Math.min(without.length, rawIndex|0));
+    const next = without.slice();
+    next.splice(insertIdx, 0, fromNum);
+    if (next.join(',') === cur.join(',')) return;
+    setM109Order(next).catch(console.error);
+  };
+
+  nums.forEach(n=>{
+    const node = document.createElement('div');
+    node.className = 'numcard draggable';
+    node.draggable = false;
+    node.dataset.num = String(n);
+    node.title = 'ドラッグして並び替え';
+    node.style.backgroundImage = `url('${imgNumber(n)}')`;
+
+    let drag = null;
+    const finishDrag = (ev, shouldApply)=>{
+      if (!drag) return;
+      window.removeEventListener('pointermove', onPointerMove, true);
+      window.removeEventListener('pointerup', onPointerUp, true);
+      window.removeEventListener('pointercancel', onPointerCancel, true);
+      try{ node.releasePointerCapture?.(ev?.pointerId); }catch(_e){}
+      if (shouldApply) reorderToIndex(drag.n, drag.lastIndex);
+      drag.ghost.remove();
+      document.documentElement.classList.remove('m109-drag-active');
+      document.body.classList.remove('m109-drag-active');
+      node.classList.remove('dragging');
+      clearInsertHelper();
+      drag = null;
+    };
+    const onPointerMove = (ev)=>{
+      if (!drag) return;
+      ev.preventDefault();
+      setGhostPoint(drag.ghost, ev.clientX, ev.clientY);
+      const pos = applyInsertHelper(ev.clientX);
+      drag.lastIndex = pos.index;
+    };
+    const onPointerUp = (ev)=>{
+      ev.preventDefault();
+      finishDrag(ev, true);
+    };
+    const onPointerCancel = (ev)=> finishDrag(ev, false);
+
+    node.addEventListener('pointerdown', ev=>{
+      if (ev.button != null && ev.button !== 0) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const ghost = document.createElement('div');
+      ghost.className = 'm109-drag-ghost';
+      ghost.style.backgroundImage = node.style.backgroundImage;
+      document.body.appendChild(ghost);
+      document.documentElement.classList.add('m109-drag-active');
+      document.body.classList.add('m109-drag-active');
+      setGhostPoint(ghost, ev.clientX, ev.clientY);
+      node.classList.add('dragging');
+      try{ node.setPointerCapture?.(ev.pointerId); }catch(_e){}
+      drag = { n:n|0, ghost, lastIndex:nums.indexOf(n) };
+      const pos = applyInsertHelper(ev.clientX);
+      drag.lastIndex = pos.index;
+      window.addEventListener('pointermove', onPointerMove, true);
+      window.addEventListener('pointerup', onPointerUp, true);
+      window.addEventListener('pointercancel', onPointerCancel, true);
+    });
+
+    lane.appendChild(node);
+  });
+
+  mountLaneUnderItemsBar(lane);
+}
+
 /* ===== #16：数値3 + 右4（全員同期） ===== */
 function renderM16(v){
   const isM16 = ((v?.mission?.id|0) === 16);
@@ -14962,6 +15163,20 @@ case 108: {
       '手番にこの条件を満たして切断を行えない場合は、起爆ダイヤルを1つ進める。'
     ],
     flags:{}
+  };
+}
+
+case 109: {
+  return {
+    id:109, name:'@9', desc:'',
+    display:[
+      '@9 準備ができたら突っ走れ',
+      ...linesForMix,
+      '最初に4枚の数値カードを任意の順で並べる。',
+      '左の数値カードの数字のコードが全て切断される前に右側の数値のコードを切断した場合、爆弾が爆発する。',
+      '左の数値カードの数字のコードが切断された時から、必ず左から順番に4本ずつ、数値カードの数字のコードのみを切断しなければならない。'
+    ],
+    flags:{ m109_orderedRight4:true }
   };
 }
 
