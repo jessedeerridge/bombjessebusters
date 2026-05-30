@@ -290,9 +290,37 @@
 
   /* ★ 右2/左2/右4/左4 を横向きに（横長） */
   .rulecard { width:48px; height:32px; border-radius:6px; border:1px solid #ddd; background:#fff center/contain no-repeat; flex:0 0 auto; }
-  .numcard.draggable { cursor:grab; touch-action:none; }
-  .numcard.draggable.dragging { opacity:.45; cursor:grabbing; transform:translateY(-2px); }
-  .numcard.drag-over { outline:2px solid #111; outline-offset:2px; }
+  .numcard.draggable { position:relative; cursor:grab; touch-action:none; user-select:none; }
+  .numcard.draggable.dragging { visibility:hidden; }
+  .numcard.m109-insert-left::before,
+  .numcard.m109-insert-right::after{
+    content:'';
+    position:absolute;
+    top:-3px;
+    bottom:-3px;
+    width:4px;
+    border-radius:999px;
+    background:#111;
+    box-shadow:0 0 0 2px rgba(255,255,255,.9);
+    pointer-events:none;
+    z-index:6;
+  }
+  .numcard.m109-insert-left::before{ left:-5px; }
+  .numcard.m109-insert-right::after{ right:-5px; }
+  .m109-drag-ghost{
+    position:fixed;
+    left:0;
+    top:0;
+    width:32px;
+    height:48px;
+    border-radius:6px;
+    border:1px solid #ddd;
+    background:#fff center/cover no-repeat;
+    box-shadow:0 8px 18px rgba(0,0,0,.28);
+    pointer-events:none;
+    z-index:10050;
+    transform:translate(-50%,-50%) scale(1.04);
+  }
 
   /* ★ 数値カードの「重ね」用ホルダー＆オーバーレイ */
   .numcard-holder { position:relative; width:32px; height:48px; flex:0 0 auto; }
@@ -13737,61 +13765,96 @@ function renderM109(v){
   rule.style.backgroundImage = `url('${imgRule('right4')}')`;
   lane.appendChild(rule);
 
-  let dragNum = null;
-  const clearDragOver = ()=> lane.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
-  const reorder = (fromNum, toNum)=>{
-    fromNum = fromNum|0; toNum = toNum|0;
-    if (!fromNum || !toNum || fromNum === toNum) return;
-    const cur = normalizeM109Numbers(state.watching).length === 4 ? normalizeM109Numbers(state.watching) : nums.slice();
+  const clearInsertHelper = ()=> lane.querySelectorAll('.m109-insert-left,.m109-insert-right').forEach(el=>{
+    el.classList.remove('m109-insert-left', 'm109-insert-right');
+  });
+  const getNumberCards = ()=> Array.from(lane.querySelectorAll('.numcard.draggable'));
+  const currentNumbers = ()=> {
+    const latest = normalizeM109Numbers(state.watching);
+    return latest.length === 4 ? latest : nums.slice();
+  };
+  const insertionFromPoint = (clientX)=>{
+    const cards = getNumberCards();
+    const visible = cards.filter(card => !card.classList.contains('dragging'));
+    if (!visible.length) return { index:0, helper:null, side:'left' };
+    const beforeIdx = visible.findIndex(card => clientX < (card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2));
+    if (beforeIdx >= 0) return { index:beforeIdx, helper:visible[beforeIdx], side:'left' };
+    return { index:visible.length, helper:visible[visible.length - 1], side:'right' };
+  };
+  const applyInsertHelper = (clientX)=>{
+    clearInsertHelper();
+    const pos = insertionFromPoint(clientX);
+    if (pos.helper) pos.helper.classList.add(pos.side === 'right' ? 'm109-insert-right' : 'm109-insert-left');
+    return pos;
+  };
+  const setGhostPoint = (ghost, x, y)=>{
+    ghost.style.transform = `translate(${x - 16}px, ${y - 24}px) scale(1.04)`;
+  };
+  const reorderToIndex = (fromNum, rawIndex)=>{
+    fromNum = fromNum|0;
+    if (!fromNum) return;
+    const cur = currentNumbers();
     const fromIdx = cur.indexOf(fromNum);
-    const toIdx = cur.indexOf(toNum);
-    if (fromIdx < 0 || toIdx < 0) return;
-    const [moved] = cur.splice(fromIdx, 1);
-    cur.splice(toIdx, 0, moved);
-    setM109Order(cur).catch(console.error);
+    if (fromIdx < 0) return;
+    const without = cur.filter(n => (n|0) !== fromNum);
+    const insertIdx = Math.max(0, Math.min(without.length, rawIndex|0));
+    const next = without.slice();
+    next.splice(insertIdx, 0, fromNum);
+    if (next.join(',') === cur.join(',')) return;
+    setM109Order(next).catch(console.error);
   };
 
   nums.forEach(n=>{
     const node = document.createElement('div');
     node.className = 'numcard draggable';
-    node.draggable = true;
+    node.draggable = false;
     node.dataset.num = String(n);
     node.title = 'ドラッグして並び替え';
     node.style.backgroundImage = `url('${imgNumber(n)}')`;
 
-    node.addEventListener('dragstart', ev=>{
-      dragNum = n|0;
-      node.classList.add('dragging');
-      try{ ev.dataTransfer.setData('text/plain', String(n)); ev.dataTransfer.effectAllowed = 'move'; }catch(_e){}
-    });
-    node.addEventListener('dragend', ()=>{
-      dragNum = null;
+    let drag = null;
+    const finishDrag = (ev, shouldApply)=>{
+      if (!drag) return;
+      window.removeEventListener('pointermove', onPointerMove, true);
+      window.removeEventListener('pointerup', onPointerUp, true);
+      window.removeEventListener('pointercancel', onPointerCancel, true);
+      try{ node.releasePointerCapture?.(ev?.pointerId); }catch(_e){}
+      if (shouldApply) reorderToIndex(drag.n, drag.lastIndex);
+      drag.ghost.remove();
       node.classList.remove('dragging');
-      clearDragOver();
-    });
-    node.addEventListener('dragover', ev=>{
+      clearInsertHelper();
+      drag = null;
+    };
+    const onPointerMove = (ev)=>{
+      if (!drag) return;
       ev.preventDefault();
-      if ((dragNum|0) !== (n|0)) node.classList.add('drag-over');
-    });
-    node.addEventListener('dragleave', ()=> node.classList.remove('drag-over'));
-    node.addEventListener('drop', ev=>{
+      setGhostPoint(drag.ghost, ev.clientX, ev.clientY);
+      const pos = applyInsertHelper(ev.clientX);
+      drag.lastIndex = pos.index;
+    };
+    const onPointerUp = (ev)=>{
       ev.preventDefault();
-      const from = (dragNum || parseInt(ev.dataTransfer?.getData('text/plain') || '0', 10))|0;
-      node.classList.remove('drag-over');
-      reorder(from, n);
-    });
+      finishDrag(ev, true);
+    };
+    const onPointerCancel = (ev)=> finishDrag(ev, false);
 
-    let pointerStart = null;
     node.addEventListener('pointerdown', ev=>{
-      pointerStart = { x:ev.clientX, y:ev.clientY, n };
-      node.setPointerCapture?.(ev.pointerId);
-    });
-    node.addEventListener('pointerup', ev=>{
-      if (!pointerStart) return;
-      const moved = Math.hypot(ev.clientX - pointerStart.x, ev.clientY - pointerStart.y);
-      const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('#m109Row .numcard');
-      if (moved > 8 && target && target !== node) reorder(pointerStart.n, parseInt(target.dataset.num || '0', 10));
-      pointerStart = null;
+      if (ev.button != null && ev.button !== 0) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const ghost = document.createElement('div');
+      ghost.className = 'm109-drag-ghost';
+      ghost.style.backgroundImage = node.style.backgroundImage;
+      document.body.appendChild(ghost);
+      setGhostPoint(ghost, ev.clientX, ev.clientY);
+      node.classList.add('dragging');
+      try{ node.setPointerCapture?.(ev.pointerId); }catch(_e){}
+      drag = { n:n|0, ghost, lastIndex:nums.indexOf(n) };
+      const pos = applyInsertHelper(ev.clientX);
+      drag.lastIndex = pos.index;
+      window.addEventListener('pointermove', onPointerMove, true);
+      window.addEventListener('pointerup', onPointerUp, true);
+      window.addEventListener('pointercancel', onPointerCancel, true);
     });
 
     lane.appendChild(node);
