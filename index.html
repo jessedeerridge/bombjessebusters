@@ -924,7 +924,7 @@
 
 /* ▼ ミッション専用トークン */
   .token.yellow { background:#000; color:#ffd400; }  /* 黄コード「▧」 */
-  .token.blue { background:#2563eb; color:#fff; }     /* 青コード「🔵」 */
+  .token.blue { background:transparent; color:#2563eb; border:none; font-size:18px; } /* 青コード「●」 */
   .token.x2 { background:#e5e7eb; color:#000; }      /* x2 */
   .token.x3 { background:#e5e7eb; color:#000; }      /* x3 */
   .token.even { background:#cfe8ff; color:#000; }    /* 偶数 2/4 */
@@ -1041,7 +1041,7 @@
 .check-item .check-dot.is-maybe-blue{ color:#111; }
 .check-item .check-dot.is-certain-yellow,
 .check-item .check-dot.is-maybe-yellow{ border-radius:3px; }
-.check-item .check-dot.left{ left:-11.5px; right:auto; }
+.check-item .check-dot.left{ left:2px; right:auto; }
 .check-mark{
   position:absolute; inset:0; margin:auto;
   width:18px; height:18px; border-radius:50%;
@@ -2515,7 +2515,7 @@ function getTokenDisplayText(tk){
     case 'x2':     return 'x2';
     case 'x3':     return 'x3';
     case 'yellow': return '▧';
-    case 'blue':   return '🔵';
+    case 'blue':   return '●';
     case 'even':   return '2/4';
     case 'odd':    return '1/3';
     case 'xmark':  return '✕';
@@ -3276,7 +3276,7 @@ function executeMixPlan(planList){
       const src = Array.isArray(p.fromList) && p.fromList.length ? p.fromList : MATERIALS.blueCodes;
       const cand = pickK(src, p.k);
       cand.forEach(n=> toAdd.push({num:n, kind:'blue'}));
-      mixLines.push('<span style="color:#2563eb;">🔵</span>' + cand.map(v=>`[${v}]`).join(''));
+      mixLines.push('<span style="color:#2563eb;">●</span>' + cand.map(v=>`[${v}]`).join(''));
     }
         if(p.type==='yellowFixed'){
       const cand = (p.list || []).slice();
@@ -3300,7 +3300,7 @@ function executeMixPlan(planList){
     if(p.type==='blueChoose'){
       const src = Array.isArray(p.fromList) && p.fromList.length ? p.fromList : MATERIALS.blueCodes;
       const cand = pickK(src, p.from);
-      chooseLines.push(`<span style="color:#2563eb;">🔵</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
+      chooseLines.push(`<span style="color:#2563eb;">●</span> ${cand.map(v=>`[${v}]`).join(' ')} のうち${p.take}つ`);
       const take = pickK(cand, p.take);
       take.forEach(n=> toAdd.push({num:n, kind:'blue'}));
     }
@@ -4345,9 +4345,9 @@ function deriveChecklistCodeHints(displayLines){
   };
   (displayLines||[]).forEach(raw=>{
     const line = String(raw||'');
-    const isRed = line.includes('●');
+    const isRed = line.includes('color:red') || (line.includes('●') && !line.includes('#2563eb') && !line.includes('color:blue'));
     const isYellow = line.includes('▧');
-    const isBlue = line.includes('🔵');
+    const isBlue = line.includes('#2563eb') || line.includes('color:blue');
     if(!isRed && !isYellow && !isBlue) return;
 
     const nums = Array.from(line.matchAll(/\[(\d+(?:\.\d+)?)\]/g))
@@ -4938,10 +4938,11 @@ if (c.markUntil && now() < c.markUntil) {
       let img='codenumber.jpg'; if(c.kind==='red') img='redcode.png'; if(c.kind==='yellow') img='yellowcode.png';
       if(c.kind==='blue'){
         bot.style.backgroundImage='none';
-        bot.textContent='🔵';
+        bot.textContent='●';
         bot.style.display='grid';
         bot.style.placeItems='center';
-        bot.style.fontSize='14px';
+        bot.style.fontSize='16px';
+        bot.style.color='#2563eb';
         bot.style.backgroundColor='#dbeafe';
       } else {
         bot.style.backgroundImage=`url("./${img}")`;
@@ -5025,11 +5026,11 @@ if(!hasGroup && (flags.useYellowToken || c.kind === 'yellow')){
    }});
  }
 
- // 青コードトークン（🔵）
+ // 青コードトークン（●）
 if(!hasGroup && (flags.useBlueToken || c.kind === 'blue')){
-   entries.push({label:'🔵', action: async ()=>{
+   entries.push({label:'●', action: async ()=>{
     if (hasGroup || has('blue')) return;
-    const updated = [...tokens, {type:'blue', value:'🔵', style:'blue'}];
+    const updated = [...tokens, {type:'blue', value:'●', style:'blue'}];
      await update(ref(db, cardPath), { tokens: updated });
      box.classList.add('elevated');
    }});
