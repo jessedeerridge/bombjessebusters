@@ -235,6 +235,9 @@
 /* ▼ 数値カードの表示帯（アイテム下など） */
   .numlane { display:flex; gap:6px; margin-top:6px; align-items:center; overflow-x:auto; }
   .numcard { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff center/cover no-repeat; flex:0 0 auto; }
+  .numcard.m9-sortable-num{ cursor:grab; }
+  .numcard.m9-sortable-num:active{ cursor:grabbing; }
+  .numcard.m9-sortable-num.dragging{ opacity:.55; }
   .numdeck { width:32px; height:48px; border-radius:6px; border:1px solid #ddd; background:#fff url('./numberdeck.png') center/contain no-repeat; cursor:pointer; user-select:none; display:grid; place-items:center; }
   .numrest { font-size:11px; opacity:.7; margin-left:2px; }
   .m109-lane{ position:relative; overflow:visible; }
@@ -1774,7 +1777,7 @@ main:not(:has(#lobby.hidden)) > * {
   <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
   <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
   <option value="8">#8</option>
-  <option value="9">#9 aaa</option>
+  <option value="9">#9 準備ができたら突っ走れ</option>
   <option value="10">#10 bbb</option>
   <option value="11">#11 ccc</option>
   <option value="12">#12</option>
@@ -1908,7 +1911,7 @@ const STAGE_STORIES = {
   6: { title:'実地訓練 3日目', body:'君たちを待ち受けている黄色いものはなんだ？ 時間内に切断すべき4本の黄色いコードだ！' },
   7: { title:'訓練課程の最終科目', body:'赤コードには良い赤コードと悪い赤コードがある……。' },
   8: { title:'最終試験', body:'今日は大切な日だ！ 爆弾処理試験に合格する心構えはできているか？' },
-  9: { title:'優先順位の判断', body:'恐るべきマッドサイエンティストが爆弾を改造したようだ。この爆弾は特定のコードを順番に切断しなければ解除できない。焦ったり冷静さを失ったりしないように！' },
+  9: { title:'準備ができたら突っ走れ', body:'爆弾の奥で、4つの数字が静かに走り出すタイミングを待っている。最初の一歩を踏み出したら、もう立ち止まることはできない。準備ができたら、左から順に突っ走れ！' },
   10: { title:'時間制限', body:'解きったコードを解くだけではなく、仲間との「すれ違い」も解く必要がありそうだ。チームの絆を信じること。コードはみんなで分け合えるほどたっぷりあるのだから！' },
   11: { title:'赤のような青、万策尽きたようだ', body:'「隊長、私は失読症で、色の見分けもつきません」' },
   12: { title:'失われた装備', body:'「コードだ、コードが金槌で殴りかかってくる！」　ところで金槌と言えば、工具箱はどこに行った？' },
@@ -11626,14 +11629,14 @@ async function setupMissionOnStart(code){
   const snap = await get(ref(db, `rooms/${code}`));
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
-  /* #9：右2 + 異なる数値2枚を決定して meta に保存（ホストのみ実行） */
+  /* #9：右4 + 異なる数値4枚を決定して meta に保存（ホストのみ実行） */
   if ((v.mission?.id|0) === 9) {
    const pool = MATERIALS.numbers.slice(); shuffle(pool);
-    const picks = pool.slice(0,3);            // 異なる3枚
+    const picks = pool.slice(0,4);            // 異なる4枚
    await update(ref(db, `rooms/${code}/meta`), {
       m9_numbers: picks,
       m9_faceDown: [],
-     m9_rule: 'right2'
+     m9_rule: 'right4'
     });
   }
 
@@ -12245,34 +12248,63 @@ function buildFixedLane(list){
   return buildNumLaneDOM(list.map(n=>({kind:'num',img:imgNumber(n)})));
 }
 
-  /* ===== #9：右2 + 異なる数値2枚（同期表示） ===== */
+  /* ===== #9：右4 + 異なる数値4枚（同期表示・並び替え可） ===== */
   function renderM9(v){
     const isM9 = ((v?.mission?.id|0) === 9);
    const old = document.getElementById('m9Row');
     if (!isM9){ if(old) old.remove(); return; }
     // メタ（ホストが開始時に保存）
     const nums = Array.isArray(v?.meta?.m9_numbers) ? v.meta.m9_numbers : null;
-    const rule = v?.meta?.m9_rule || 'right2';
+    const rule = v?.meta?.m9_rule || 'right4';
     const faceDown = Array.isArray(v?.meta?.m9_faceDown) ? v.meta.m9_faceDown : [];
-    if (!nums || nums.length < 3) return; // 未準備なら何もしない（次のonValueで描画）
+    if (!nums || nums.length < 4) return; // 未準備なら何もしない（次のonValueで描画）
    if (old) old.remove();
-    // [右2][数][数] をアイテム列の直下に表示
+    // [右4][数][数][数][数] をアイテム列の直下に表示
     const lane = document.createElement('div');
     lane.className = 'numlane';
 
+    let skipNextM9Click = false;
     const ruleCard = document.createElement('div');
     ruleCard.className = 'rulecard';
     ruleCard.style.backgroundImage = `url('${imgRule(rule)}')`;
     lane.appendChild(ruleCard);
 
-    nums.slice(0,3).forEach(n=>{
+    nums.slice(0,4).forEach((n, idx)=>{
       const node = document.createElement('div');
-      node.className = 'numcard';
+      node.className = 'numcard m9-sortable-num';
+      node.draggable = true;
+      node.dataset.index = String(idx);
+      node.title = 'ドラッグで並び替え／クリックで裏返す';
       const isFaceDown = faceDown.includes(n|0);
       node.style.backgroundImage = `url('${isFaceDown ? imgBack : imgNumber(n)}')`;
       node.style.cursor = 'pointer';
+      node.addEventListener('dragstart', (ev)=>{
+        skipNextM9Click = true;
+        ev.dataTransfer?.setData('text/plain', String(idx));
+        ev.dataTransfer?.setDragImage?.(node, 16, 24);
+        node.classList.add('dragging');
+      });
+      node.addEventListener('dragend', ()=>{
+        node.classList.remove('dragging');
+      });
+      node.addEventListener('dragover', (ev)=>{ ev.preventDefault(); });
+      node.addEventListener('drop', async (ev)=>{
+        ev.preventDefault();
+        ev.stopPropagation();
+        skipNextM9Click = true;
+        const from = Number(ev.dataTransfer?.getData('text/plain'));
+        const to = idx;
+        const now = state.watching;
+        if (((now?.mission?.id|0) !== 9)) return;
+        const curNums = Array.isArray(now?.meta?.m9_numbers) ? now.meta.m9_numbers.slice(0,4) : [];
+        if (!Number.isInteger(from) || from < 0 || from >= curNums.length || to < 0 || to >= curNums.length || from === to) return;
+        const [moved] = curNums.splice(from, 1);
+        curNums.splice(to, 0, moved);
+        await update(ref(db, `rooms/${state.roomCode}/meta`), { m9_numbers: curNums });
+      });
       node.onclick = async (ev)=>{
         ev.stopPropagation();
+        if (skipNextM9Click) { skipNextM9Click = false; return; }
         const now = state.watching;
         if (((now?.mission?.id|0) !== 9)) return;
         const cur = Array.isArray(now?.meta?.m9_faceDown) ? now.meta.m9_faceDown.slice() : [];
@@ -14267,11 +14299,10 @@ function missionInfo(id, opts={}){
         display: [
           '#9',
           ...linesForMix, // ← 赤1・黄2の結果（赤[1.5] / 黄[2.1][…] など）
-          '一番目（左側）の数値のコードを2本切断するまでは二番目のカードを、二番目の数値のコードを2本切断するまでは三番目のカードを切断できない。',
-　　　　　'他の数値のコードは任意の順番で切断できる。',
-          '手番に切断できるコードがなければ爆弾が爆発する。'
+          '最初に4枚の数値カードを任意の順で並べる。',
+          '左の数値カードの数字のコードが切断された時から、必ず左から順番に4本ずつ、数値カードの数字のコードのみを切断しなければならない。'
         ],
-        flags: { needsRuleRow:true, rule: { type:'R2with2', rightCount:2 } }
+        flags: { needsRuleRow:true, rule: { type:'R4with4', rightCount:4 } }
       };
     }
     case 10: {
