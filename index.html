@@ -2485,9 +2485,10 @@ function cardSortNum(card){
   const n = Number(card?.num);
   return Number.isFinite(n) ? n : 0;
 }
-function findSortedInsertIndex(hand, cardOrNum, { afterEqual = false } = {}){
+function findSortedInsertIndex(hand, cardOrNum, { afterEqual = true } = {}){
   const n = typeof cardOrNum === 'number' ? cardOrNum : cardSortNum(cardOrNum);
   let pos = 0;
+  // 同じ数値は右端に入れつつ、小数コード（例: 7.1 / 7.5）の手前で止める
   while (pos < hand.length && (afterEqual ? cardSortNum(hand[pos]) <= n : cardSortNum(hand[pos]) < n)) pos++;
   return pos;
 }
@@ -7270,7 +7271,7 @@ function renderM43(v){
           markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
         };
 
-        // 数値順に入れる（7 は 7.1 / 7.5 より左）
+        // 同値は右端、かつ小数コード（例: 7.1 / 7.5）の手前に入れる
         const insertIndex = findSortedInsertIndex(hand, newCard);
         hand.splice(insertIndex, 0, newCard);
 
