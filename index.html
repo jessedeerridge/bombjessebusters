@@ -11070,7 +11070,6 @@ function itemDeckNumbers(missionId){
   // 43以降は 1..18 を使用
   if(missionId >= 43){
     pool = Array.from({length:18}, (_,i)=> i+1);
-    if (missionId >= 101) pool.push(50);
   } else {
     // 〜42は 1..13（黄コードあり） / 1..12（黄コードなし）
     const maxNo = useYellow ? 13 : 12;
@@ -11573,7 +11572,9 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
        ? (()=>{
            const randomPool = Array.from({length:18}, (_,i)=>i+1).filter(n=>n!==7 && n!==2);
            shuffle(randomPool);
-           return [7,2,randomPool[0]].map(no => ({ id: crypto.randomUUID(), no, used:false, faceUp:faceUpStart }));
+          const extraCount = Math.max(0, playerCount - 2);
+           return [2, 7, ...randomPool.slice(0, extraCount)].map(no => ({ id: crypto.randomUUID(), no, used:false, faceUp:faceUpStart }));
+
          })()
        : pool
          .slice(0, Math.min(playerCount, pool.length))
