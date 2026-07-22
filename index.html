@@ -2481,6 +2481,16 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function cssNum(name){const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return parseFloat(v.replace('px',''))||0;}
 const now=()=>Date.now();
+function cardSortNum(card){
+  const n = Number(card?.num);
+  return Number.isFinite(n) ? n : 0;
+}
+function findSortedInsertIndex(hand, cardOrNum, { afterEqual = false } = {}){
+  const n = typeof cardOrNum === 'number' ? cardOrNum : cardSortNum(cardOrNum);
+  let pos = 0;
+  while (pos < hand.length && (afterEqual ? cardSortNum(hand[pos]) <= n : cardSortNum(hand[pos]) < n)) pos++;
+  return pos;
+}
 
 const LINKABLE_TOKEN_TYPES = new Set(['equal','noteq']);
 function getTokenDisplayText(tk){
@@ -7260,9 +7270,8 @@ function renderM43(v){
           markUntil: Date.now() + 5000   // ← 5秒間「▼」表示
         };
 
-        // 同値は「右端」に入れる
-        let insertIndex = 0;
-        while (insertIndex < hand.length && (hand[insertIndex]?.num|0) <= n) insertIndex++;
+        // 数値順に入れる（7 は 7.1 / 7.5 より左）
+        const insertIndex = findSortedInsertIndex(hand, newCard);
         hand.splice(insertIndex, 0, newCard);
 
         const alpha = 'abcdefghijklmnopqrstuvwxyz';
@@ -10749,12 +10758,7 @@ async function playHookSwapAnimation(A, B, tables){
     const aIdx = aHand.findIndex(c=>c?.id===A.cardId);
     const bIdx = bHand.findIndex(c=>c?.id===B.cardId);
 
-    const insertPos = (hand, card)=>{
-      const n = card.num|0;
-      let pos = 0;
-      while(pos < hand.length && ((hand[pos]?.num|0) <= n)) pos++;
-      return pos;
-    };
+    const insertPos = (hand, card)=> findSortedInsertIndex(hand, card);
 
     const aWithout = aHand.filter(c=>c?.id!==A.cardId);
     const bWithout = bHand.filter(c=>c?.id!==B.cardId);
@@ -10847,10 +10851,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
     const srcIdx = srcHand.findIndex(c=> c?.id===sel.cardId);
     if (srcIdx<0) return;
     const movingCard = srcHand[srcIdx];
-    const n = movingCard?.num|0;
-    let ins = 0;
-    while(ins<dstHand.length && (dstHand[ins]?.num|0) < n) ins++;
-    while(ins>0 && (dstHand[ins-1]?.num|0)===n) ins--;
+    const ins = findSortedInsertIndex(dstHand, movingCard);
 
     const rs = ws.getBoundingClientRect();
     const fly = ws.querySelector('.card')?.cloneNode(true);
@@ -10936,10 +10937,8 @@ async function doItem2Swap(A, B, usingByUserId=null){
 
   a.hand.splice(a.index,1); b.hand.splice(b.index,1);
 
-  const insertSortedRight = (hand, card)=>{
-    const n = card.num;
-    let pos = 0;
-    while(pos < hand.length && (hand[pos]?.num|0) <= n) pos++;
+  const insertSorted = (hand, card)=>{
+    const pos = findSortedInsertIndex(hand, card);
     hand.splice(pos,0,card);
   };
 
@@ -10948,8 +10947,8 @@ async function doItem2Swap(A, B, usingByUserId=null){
   const srcAlphaB = String(b.card?.alpha || '');
  const toB = {...a.card, ownerId: tables[B.table].playerId || null, markUntil: mark, markSrc:'i2', hookGray:true};
    const toA = {...b.card, ownerId: tables[A.table].playerId || null, markUntil: mark, markSrc:'i2', hookGray:true};
-  insertSortedRight(b.hand, toB);
-  insertSortedRight(a.hand, toA);
+  insertSorted(b.hand, toB);
+  insertSorted(a.hand, toA);
 
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
   realpha(a.hand); realpha(b.hand);
@@ -11001,8 +11000,7 @@ async function doItem18Take(sel){
   const card = srcHand.splice(si,1)[0];
 
   const dstHand = (tables[myTable]?.hand)||[];
-  const n = card.num;
-  let pos = 0; while(pos<dstHand.length && dstHand[pos].num < n) pos++; while(pos>0 && dstHand[pos-1].num===n) pos--; 
+  const pos = findSortedInsertIndex(dstHand, card);
   const mark = now()+10000;
 dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark, markSrc:'i18'});
   const realpha = (hand)=>{ const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((c,i)=> c.alpha = alpha[i%alpha.length]); };
