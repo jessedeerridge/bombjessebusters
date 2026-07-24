@@ -628,10 +628,16 @@
     outline:2px solid #38bdf8;
     outline-offset:-2px;
   }
-  .table.i2-stand-selectable{outline:3px solid #2563eb;outline-offset:-2px;cursor:pointer}
-  .i2-stand-prompt{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:850;
-    padding:16px 22px;border-radius:10px;background:#111;color:#fff;font-weight:700;text-align:center;
-    box-shadow:0 14px 32px rgba(0,0,0,.35);cursor:pointer}
+  .table.i2-stand-selectable{outline:2px dashed #38bdf8;outline-offset:-2px;cursor:pointer}
+  .table.i2-stand-selectable .card{pointer-events:none}
+  .i2-stand-prompt{position:fixed;inset:0;z-index:850;display:grid;place-items:center;cursor:pointer}
+  .i2-stand-prompt span{padding:16px 22px;border-radius:10px;background:#111;color:#fff;font-weight:700;
+    text-align:center;box-shadow:0 14px 32px rgba(0,0,0,.35)}
+  .i2-stand-confirm-label{font-size:13px;white-space:nowrap;margin-bottom:7px}
+  .i2-stand-confirm-actions{display:flex;gap:8px}
+  .i2-stand-confirm-actions .btn{flex:1;color:#fff;border-color:transparent}
+  .i2-stand-confirm-actions .yes{background:#2563eb}
+  .i2-stand-confirm-actions .no{background:#6b7280}
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
   .title{text-decoration:underline;padding-right:4px}
@@ -4385,7 +4391,9 @@ function renderI2StandPlacement(v){
     const prompt = document.createElement('div');
     prompt.id = 'i2StandPrompt';
     prompt.className = 'i2-stand-prompt';
-    prompt.textContent = 'どちらのスタンドに置きますか。';
+    const text = document.createElement('span');
+    text.textContent = 'どちらのスタンドに置きますか。';
+    prompt.appendChild(text);
     prompt.onclick = ()=>{ state._i2StandPromptDismissed = promptKey; prompt.remove(); };
     document.body.appendChild(prompt);
   }
@@ -4396,17 +4404,24 @@ function renderI2StandPlacement(v){
     tableEl.classList.add('i2-stand-selectable');
     tableEl.onclick = (ev)=>{
       ev.stopPropagation();
-      openMenu(ev.clientX, ev.clientY, [
-        {label:'このスタンドに配置しますか。'},
-        {label:'はい', action:async ()=>{
-          const base = `rooms/${state.roomCode}/meta/i2Flow`;
-          await update(ref(db, base), {
-            [`placements/${state.userId}`]:tableIdx,
-            [`approvals/${state.userId}`]:true
-          });
-        }},
-        {label:'いいえ', action:()=>{}}
-      ]);
+      const pop=document.createElement('div'); pop.className='mini-pop';
+      pop.onclick=e=>e.stopPropagation();
+      const label=document.createElement('div'); label.className='i2-stand-confirm-label';
+      label.textContent='このスタンドに配置しますか。';
+      const actions=document.createElement('div'); actions.className='i2-stand-confirm-actions';
+      const yes=document.createElement('button'); yes.className='btn small yes'; yes.textContent='はい';
+      const no=document.createElement('button'); no.className='btn small no'; no.textContent='いいえ';
+      yes.onclick=async ()=>{
+        pop.remove();
+        const base = `rooms/${state.roomCode}/meta/i2Flow`;
+        await update(ref(db, base), {
+          [`placements/${state.userId}`]:tableIdx,
+          [`approvals/${state.userId}`]:true
+        });
+      };
+      no.onclick=()=>pop.remove();
+      actions.append(yes,no); pop.append(label,actions);
+      placeInsideViewport(pop,ev.clientX,ev.clientY);
     };
   });
 
@@ -4890,7 +4905,16 @@ if (c.markUntil && now() < c.markUntil) {
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
-          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther', selB:null, viewerTable:null });
+          const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+          const opponentTable = isTwoPlayer
+            ? (v.tables||[]).findIndex(table=>table?.playerId && table.playerId!==state.userId)
+            : -1;
+          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
+            selA:{table:idx, cardId:c.id},
+            phase:(isTwoPlayer && opponentTable>=0) ? 'pickViewerSelf' : 'pickOther',
+            selB:null,
+            viewerTable:(isTwoPlayer && opponentTable>=0) ? opponentTable : null
+          });
         };
       }else if(canViewerPickSelf){
         card.classList.add('i2-selectable');
@@ -11029,8 +11053,8 @@ async function doItem2Swap(A, B, usingByUserId=null, placements=null){
     const cardB=removeCard(B.table,B.cardId);
     if (!cardA || !cardB){ await update(ref(db, `rooms/${state.roomCode}/meta`), {i2Flow:null,i2Anim:null}); return; }
     const mark=now()+10000;
-    hands[receiverTarget].splice(findSortedInsertIndex(hands[receiverTarget],cardA),0,{...cardA,ownerId:receiverId,markUntil:mark,markSrc:'i2',hookGray:true});
-    hands[actorTarget].splice(findSortedInsertIndex(hands[actorTarget],cardB),0,{...cardB,ownerId:usingByUserId,markUntil:mark,markSrc:'i2',hookGray:true});
+    hands[receiverTarget].splice(findSortedInsertIndex(hands[receiverTarget],cardA),0,{...cardA,ownerId:receiverId,open:false,openedAt:null,markUntil:mark,markSrc:'i2',hookGray:true});
+    hands[actorTarget].splice(findSortedInsertIndex(hands[actorTarget],cardB),0,{...cardB,ownerId:usingByUserId,open:false,openedAt:null,markUntil:mark,markSrc:'i2',hookGray:true});
     const changed=[...new Set([A.table,B.table,actorTarget,receiverTarget])];
     const updates={};
     changed.forEach(tableIdx=>{
