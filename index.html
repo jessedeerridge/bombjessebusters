@@ -629,7 +629,9 @@
     outline-offset:-2px;
   }
   .table.i2-stand-selectable{outline:2px dashed #38bdf8;outline-offset:-2px;cursor:pointer}
-  .table.i2-stand-selectable .card{pointer-events:none}
+  .table.i2-stand-selectable .card,
+  .table.i2-stand-selectable .alpha,
+  .table.i2-stand-selectable .token{pointer-events:none}
   .i2-stand-prompt{position:fixed;inset:0;z-index:850;display:grid;place-items:center;cursor:pointer}
   .i2-stand-prompt span{padding:16px 22px;border-radius:10px;background:#111;color:#fff;font-weight:700;
     text-align:center;box-shadow:0 14px 32px rgba(0,0,0,.35)}
@@ -638,6 +640,7 @@
   .i2-stand-confirm-actions .btn{flex:1;color:#fff;border-color:transparent}
   .i2-stand-confirm-actions .yes{background:#2563eb}
   .i2-stand-confirm-actions .no{background:#6b7280}
+  .mini-pop.i2-stand-confirm{flex-direction:column;flex-wrap:nowrap;align-items:stretch;transform:none}
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
   .title{text-decoration:underline;padding-right:4px}
@@ -4404,7 +4407,7 @@ function renderI2StandPlacement(v){
     tableEl.classList.add('i2-stand-selectable');
     tableEl.onclick = (ev)=>{
       ev.stopPropagation();
-      const pop=document.createElement('div'); pop.className='mini-pop';
+      const pop=document.createElement('div'); pop.className='mini-pop i2-stand-confirm';
       pop.onclick=e=>e.stopPropagation();
       const label=document.createElement('div'); label.className='i2-stand-confirm-label';
       label.textContent='このスタンドに配置しますか。';
@@ -10850,17 +10853,14 @@ async function playHookSwapAnimation(A, B, tables){
 
     const insertPos = (hand, card)=> findSortedInsertIndex(hand, card);
 
-    const aWithout = aHand.filter(c=>c?.id!==A.cardId);
-    const bWithout = bHand.filter(c=>c?.id!==B.cardId);
     const toA = bHand[bIdx];
     const toB = aHand[aIdx];
-    const insA = toA ? insertPos(aWithout, toA) : 0;
-    const insB = toB ? insertPos(bWithout, toB) : 0;
 
-    // 2) 詰める + 挿入位置を空ける（右スライド）
+    // 2) 取り出し元を詰め、実際の配置先に挿入スペースを空ける。
+    // 取り出し元と配置先が別テーブルの場合も、配置先の既存カードをスライドする。
     const shift = cardW + gap;
-    const qa = Array.from(handEl(A.table)?.querySelectorAll('.card-wrap')||[]);
-    const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
+    const aDestination = Number.isInteger(A.toTable) ? A.toTable : B.table;
+    const bDestination = Number.isInteger(B.toTable) ? B.toTable : A.table;
 
     const slideCardBody = (w, dx)=>{
       const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
@@ -10870,21 +10870,25 @@ async function playHookSwapAnimation(A, B, tables){
       });
     };
 
-    qa.forEach((w,i)=>{
-      if (w.dataset.cardId===A.cardId) return;
-      let dx = 0;
-      if (aIdx>=0 && i>aIdx) dx -= shift;
-      const ni = i - (i>aIdx?1:0);
-      if (ni>=insA) dx += shift;
-      if (dx!==0) slideCardBody(w, dx);
-    });
-    qb.forEach((w,i)=>{
-      if (w.dataset.cardId===B.cardId) return;
-      let dx = 0;
-      if (bIdx>=0 && i>bIdx) dx -= shift;
-      const ni = i - (i>bIdx?1:0);
-      if (ni>=insB) dx += shift;
-      if (dx!==0) slideCardBody(w, dx);
+    const affectedTables=[...new Set([A.table,B.table,aDestination,bDestination])];
+    affectedTables.forEach(tableIdx=>{
+      const original=(tables[tableIdx]?.hand)||[];
+      const outgoingIds=new Set([
+        ...(tableIdx===A.table ? [A.cardId] : []),
+        ...(tableIdx===B.table ? [B.cardId] : [])
+      ]);
+      const remaining=original.filter(card=>!outgoingIds.has(card?.id));
+      const incoming=tableIdx===aDestination ? toB : (tableIdx===bDestination ? toA : null);
+      const insertion=incoming ? insertPos(remaining,incoming) : -1;
+      const wraps=Array.from(handEl(tableIdx)?.querySelectorAll('.card-wrap')||[]);
+      wraps.forEach((wrap,oldIndex)=>{
+        if (outgoingIds.has(wrap.dataset.cardId)) return;
+        const card=original[oldIndex];
+        let newIndex=remaining.findIndex(entry=>entry?.id===card?.id);
+        if (incoming && newIndex>=insertion) newIndex+=1;
+        const dx=(newIndex-oldIndex)*shift;
+        if (dx!==0) slideCardBody(wrap,dx);
+      });
     });
     await sleep(HOOK_STEP_MS);
 
@@ -10901,8 +10905,6 @@ async function playHookSwapAnimation(A, B, tables){
       return {x: first.left + (clamped * shift), y: first.top};
     };
 
-    const aDestination = Number.isInteger(A.toTable) ? A.toTable : B.table;
-    const bDestination = Number.isInteger(B.toTable) ? B.toTable : A.table;
     const aDestHand = (tables[aDestination]?.hand||[]).filter(c=>c?.id!==A.cardId && c?.id!==B.cardId);
     const bDestHand = (tables[bDestination]?.hand||[]).filter(c=>c?.id!==A.cardId && c?.id!==B.cardId);
     const aDestPos = toB ? insertPos(aDestHand,toB) : 0;
@@ -11063,6 +11065,13 @@ async function doItem2Swap(A, B, usingByUserId=null, placements=null){
     });
     updates[`rooms/${state.roomCode}/meta/i2Flow`]=null;
     updates[`rooms/${state.roomCode}/meta/i2Anim`]=null;
+    // 使用元も確実に裏向きにする（アイテム2、または member(9) の能力）。
+    const item2Index=(state.watching?.items||[]).findIndex(item=>(item?.no|0)===2 && item?.used===true);
+    if (item2Index>=0) updates[`rooms/${state.roomCode}/items/${item2Index}/used`]=true;
+    const actorCharacterIndex=(tables||[]).findIndex(table=>
+      table?.playerId===usingByUserId && String(table?.character?.face||'').includes('member (9).jpg')
+    );
+    if (actorCharacterIndex>=0) updates[`rooms/${state.roomCode}/tables/${actorCharacterIndex}/character/flipped`]=true;
     await update(ref(db),updates);
     return;
   }
