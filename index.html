@@ -4482,7 +4482,12 @@ if ((v.mission?.id|0) === 23) {
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
   const i2All=v.meta?.i2Flow;
   const i18All=v.meta?.i18Flow;
-  const myTableIndex = (v.tables||[]).findIndex(T => T.playerId===state.userId);
+  // 2人プレイでは同じプレイヤーが2テーブルを所有するため、選ばれた
+  // テーブル番号ではなく、そのテーブルの所有者で受け手本人かを判定する。
+  const i2ViewerIsMe = !!(
+    i2All?.viewerTable != null &&
+    (v.tables||[])[i2All.viewerTable]?.playerId === state.userId
+  );
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table'; box.dataset.tableIdx = String(idx);
@@ -4767,7 +4772,7 @@ wrap.dataset.cardKey = cardKey;
 const ownerBlindSpecial = (m38Special || m56Special || m64Special);
 
         const i2ViewerCanSeeSelA = !!(
-          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2All.viewerTable===myTableIndex &&
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2ViewerIsMe &&
           i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
         );
         const i2ActorCanSeeSelB = !!(
@@ -4823,7 +4828,7 @@ if (c.markUntil && now() < c.markUntil) {
       const isI2Actor = i2All && i2All.usingBy===state.userId;
       const canPickSelf  = isI2Actor && i2All?.phase==='pickSelf'  && t.playerId===state.userId;
       const canPickOther = isI2Actor && i2All?.phase==='pickOther' && t.playerId!==state.userId;
-      const canViewerPickSelf = !!(i2All && i2All.phase==='pickViewerSelf' && i2All.viewerTable===myTableIndex && t.playerId===state.userId && !c.open);
+      const canViewerPickSelf = !!(i2All && i2All.phase==='pickViewerSelf' && i2ViewerIsMe && t.playerId===state.userId && !c.open);
 
       const isI18Actor = i18All && i18All.usingBy===state.userId;
       const canI18Pick = isI18Actor && i18All?.phase==='pickOther' && t.playerId!==state.userId;
@@ -4898,7 +4903,7 @@ if (c.markUntil && now() < c.markUntil) {
         num.textContent = String(c.num);
         num.classList.toggle('tight-code', [10.1, 10.2, 10.5, 11.1, 11.2, 11.5].includes(Number(c.num)));
         const i2ViewerCanSeeSelA = !!(
-          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2All.viewerTable===myTableIndex &&
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2ViewerIsMe &&
           i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
         );
         const i2ActorCanSeeSelB = !!(
