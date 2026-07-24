@@ -628,6 +628,10 @@
     outline:2px solid #38bdf8;
     outline-offset:-2px;
   }
+  .table.i2-stand-selectable{outline:3px solid #2563eb;outline-offset:-2px;cursor:pointer}
+  .i2-stand-prompt{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:850;
+    padding:16px 22px;border-radius:10px;background:#111;color:#fff;font-weight:700;text-align:center;
+    box-shadow:0 14px 32px rgba(0,0,0,.35);cursor:pointer}
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
   .title{text-decoration:underline;padding-right:4px}
@@ -3528,6 +3532,7 @@ if (v) {
       renderM29(v);
       renderM34(v);
       renderTables(v);
+      renderI2StandPlacement(v);
 
 
       // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
@@ -4366,6 +4371,54 @@ function deriveChecklistCodeHints(displayLines){
   return out;
 }
 
+function renderI2StandPlacement(v){
+  document.getElementById('i2StandPrompt')?.remove();
+  document.querySelectorAll('#tables .table.i2-stand-selectable').forEach(el=>el.classList.remove('i2-stand-selectable'));
+  const flow = v?.meta?.i2Flow;
+  if ((v?.meta?.playerCount|0) !== 2 || flow?.phase !== 'placeStand') return;
+
+  const myTables = (v.tables||[]).map((t,i)=>t?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+  if (!myTables.length) return;
+
+  const promptKey = `${flow.usingBy}:${flow.selA?.cardId}:${flow.selB?.cardId}`;
+  if (state._i2StandPromptDismissed !== promptKey){
+    const prompt = document.createElement('div');
+    prompt.id = 'i2StandPrompt';
+    prompt.className = 'i2-stand-prompt';
+    prompt.textContent = 'どちらのスタンドに置きますか。';
+    prompt.onclick = ()=>{ state._i2StandPromptDismissed = promptKey; prompt.remove(); };
+    document.body.appendChild(prompt);
+  }
+
+  myTables.forEach(tableIdx=>{
+    const tableEl = document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
+    if (!tableEl) return;
+    tableEl.classList.add('i2-stand-selectable');
+    tableEl.onclick = (ev)=>{
+      ev.stopPropagation();
+      openMenu(ev.clientX, ev.clientY, [
+        {label:'このスタンドに配置しますか。'},
+        {label:'はい', action:async ()=>{
+          const base = `rooms/${state.roomCode}/meta/i2Flow`;
+          await update(ref(db, base), {
+            [`placements/${state.userId}`]:tableIdx,
+            [`approvals/${state.userId}`]:true
+          });
+        }},
+        {label:'いいえ', action:()=>{}}
+      ]);
+    };
+  });
+
+  const participantIds = [...new Set([flow.usingBy, (v.tables||[])[flow.selB?.table]?.playerId].filter(Boolean))];
+  const ready = participantIds.length===2 && participantIds.every(uid=>flow.approvals?.[uid]===true && Number.isInteger(flow.placements?.[uid]));
+  if (ready && flow.usingBy===state.userId && !flow.moveStarted){
+    update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {moveStarted:true, phase:'resolving'}).then(()=>
+      doItem2Swap(flow.selA, flow.selB, flow.usingBy, flow.placements)
+    ).catch(console.error);
+  }
+}
+
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
     const seatedNow = (v?.tables||[]).some(T => T.playerId === state.userId);
@@ -4772,11 +4825,11 @@ wrap.dataset.cardKey = cardKey;
 const ownerBlindSpecial = (m38Special || m56Special || m64Special);
 
         const i2ViewerCanSeeSelA = !!(
-          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2ViewerIsMe &&
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='placeStand' || i2All.phase==='resolving') && i2ViewerIsMe &&
           i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
         );
         const i2ActorCanSeeSelB = !!(
-          i2All && i2All.phase==='resolving' && i2All.usingBy===state.userId &&
+          i2All && (i2All.phase==='placeStand' || i2All.phase==='resolving') && i2All.usingBy===state.userId &&
           i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
         );
 
@@ -4843,7 +4896,12 @@ if (c.markUntil && now() < c.markUntil) {
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
-          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
+          const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
+            selB:{table:idx, cardId:c.id},
+            ...(isTwoPlayer ? {phase:'placeStand', placements:null, approvals:null, moveStarted:false} : {})
+          });
+          if (isTwoPlayer) return;
           openMenuAtClick([
             {label:'カードを渡す', action: async ()=>{
               const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
@@ -4903,11 +4961,11 @@ if (c.markUntil && now() < c.markUntil) {
         num.textContent = String(c.num);
         num.classList.toggle('tight-code', [10.1, 10.2, 10.5, 11.1, 11.2, 11.5].includes(Number(c.num)));
         const i2ViewerCanSeeSelA = !!(
-          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2ViewerIsMe &&
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='placeStand' || i2All.phase==='resolving') && i2ViewerIsMe &&
           i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
         );
         const i2ActorCanSeeSelB = !!(
-          i2All && i2All.phase==='resolving' && i2All.usingBy===state.userId &&
+          i2All && (i2All.phase==='placeStand' || i2All.phase==='resolving') && i2All.usingBy===state.userId &&
           i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
         );
         num.style.visibility = (c.open || isMine || i2ViewerCanSeeSelA || i2ActorCanSeeSelB) ? 'visible' : 'hidden';
@@ -10819,8 +10877,14 @@ async function playHookSwapAnimation(A, B, tables){
       return {x: first.left + (clamped * shift), y: first.top};
     };
 
-    const ta = targetPoint(A.table, insA);
-    const tb = targetPoint(B.table, insB);
+    const aDestination = Number.isInteger(A.toTable) ? A.toTable : B.table;
+    const bDestination = Number.isInteger(B.toTable) ? B.toTable : A.table;
+    const aDestHand = (tables[aDestination]?.hand||[]).filter(c=>c?.id!==A.cardId && c?.id!==B.cardId);
+    const bDestHand = (tables[bDestination]?.hand||[]).filter(c=>c?.id!==A.cardId && c?.id!==B.cardId);
+    const aDestPos = toB ? insertPos(aDestHand,toB) : 0;
+    const bDestPos = toA ? insertPos(bDestHand,toA) : 0;
+    const ta = targetPoint(bDestination, bDestPos);
+    const tb = targetPoint(aDestination, aDestPos);
 
     // 3) 空き位置へ挿入
     // ca は A から抜いたカードなので B 側へ、cb は B から抜いたカードなので A 側へ移動
@@ -10924,7 +10988,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
 }
 
 /* ===== Item 2 swap ===== */
-async function doItem2Swap(A, B, usingByUserId=null){
+async function doItem2Swap(A, B, usingByUserId=null, placements=null){
   if(!A || !B) return;
   const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
   const tables = snap.val() || [];
@@ -10938,6 +11002,46 @@ async function doItem2Swap(A, B, usingByUserId=null){
   const a = pickCard(A.table, A.cardId);
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
+
+  if (placements){
+    const receiverId = tables[B.table]?.playerId;
+    const actorTarget = Number(placements[usingByUserId]);
+    const receiverTarget = Number(placements[receiverId]);
+    const actorOwnsTarget = Number.isInteger(actorTarget) && tables[actorTarget]?.playerId===usingByUserId;
+    const receiverOwnsTarget = Number.isInteger(receiverTarget) && tables[receiverTarget]?.playerId===receiverId;
+    if (!actorOwnsTarget || !receiverOwnsTarget){
+      await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {phase:'placeStand', moveStarted:false});
+      return;
+    }
+
+    const animId = `i2-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      i2Anim:{id:animId, A:{...A,toTable:receiverTarget}, B:{...B,toTable:actorTarget}, at:Date.now()}
+    });
+    await sleep(HOOK_ANIM_TOTAL_MS);
+
+    const hands = tables.map(t=>Array.isArray(t?.hand) ? t.hand.slice() : []);
+    const removeCard = (tableIdx, cardId)=>{
+      const pos=hands[tableIdx].findIndex(card=>card?.id===cardId);
+      return pos>=0 ? hands[tableIdx].splice(pos,1)[0] : null;
+    };
+    const cardA=removeCard(A.table,A.cardId);
+    const cardB=removeCard(B.table,B.cardId);
+    if (!cardA || !cardB){ await update(ref(db, `rooms/${state.roomCode}/meta`), {i2Flow:null,i2Anim:null}); return; }
+    const mark=now()+10000;
+    hands[receiverTarget].splice(findSortedInsertIndex(hands[receiverTarget],cardA),0,{...cardA,ownerId:receiverId,markUntil:mark,markSrc:'i2',hookGray:true});
+    hands[actorTarget].splice(findSortedInsertIndex(hands[actorTarget],cardB),0,{...cardB,ownerId:usingByUserId,markUntil:mark,markSrc:'i2',hookGray:true});
+    const changed=[...new Set([A.table,B.table,actorTarget,receiverTarget])];
+    const updates={};
+    changed.forEach(tableIdx=>{
+      hands[tableIdx].forEach((card,i)=>card.alpha='abcdefghijklmnopqrstuvwxyz'[i%26]);
+      updates[`rooms/${state.roomCode}/tables/${tableIdx}/hand`]=hands[tableIdx];
+    });
+    updates[`rooms/${state.roomCode}/meta/i2Flow`]=null;
+    updates[`rooms/${state.roomCode}/meta/i2Anim`]=null;
+    await update(ref(db),updates);
+    return;
+  }
 
   const animId = `i2-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Anim:{ id:animId, A, B, at: Date.now() } });
