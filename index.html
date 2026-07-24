@@ -4604,6 +4604,7 @@ const rolePicked = isRoleSelectionDone(t, midNow);
 const amSeated = seatedNow;           // 先頭で算出済み
 const seatEmpty = !t.playerId;        // 空席判定
 const hiddenByMission2728 = isMission27Or28RoleHidden(v, idx, t);
+const isTwoPlayerPartnerTable = (v?.meta?.playerCount|0) === 2 && (idx === 1 || idx === 3);
 if (!amSeated || seatEmpty || (needRolePick && !rolePicked) || hiddenByMission2728) {
   char.classList.add('blank');
   char.removeAttribute('style');
@@ -4648,7 +4649,8 @@ if (amSeated && !seatEmpty && !hiddenByMission2728 && showRoleTextDecorations &&
       }
     }
 
-charCol.appendChild(char);
+// 2人プレイの2つ目の担当テーブル（2・4）は、キャラカードの枠も表示しない。
+if (!isTwoPlayerPartnerTable) charCol.appendChild(char);
 
 // ★ #13：初期情報トークンはキャラの「下」に小さく表示（meta.m13_header をそのまま使う）
 if (m13HeaderNum != null) {
@@ -11221,16 +11223,22 @@ gear.onclick=()=> {
 /* ★ 共通の離席処理 */
 async function leaveSeatNow(){
   if(state.seatedTable==null || !state.watching?.tables) return;
-  const idx=state.seatedTable; const hand=(state.watching.tables[idx].hand||[]);
+  const seatIndices = (state.watching.tables||[])
+    .map((table, tableIdx)=>table?.playerId === state.userId ? tableIdx : -1)
+    .filter(tableIdx=>tableIdx >= 0);
   try{
-    await onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}`)).cancel();
-    await Promise.all(hand.map((_,i)=>
-      onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`)).cancel()
-    ));
+    await Promise.all(seatIndices.map(async tableIdx=>{
+      const hand = state.watching.tables[tableIdx]?.hand || [];
+      await onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`)).cancel();
+      await Promise.all(hand.map((_,i)=> onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${i}`)).cancel()));
+    }));
   }catch(_e){}
 
-  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
-  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
+  await Promise.all(seatIndices.map(async tableIdx=>{
+    const hand = state.watching.tables[tableIdx]?.hand || [];
+    await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), {playerId:null, playerName:null});
+    await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${i}`), {ownerId:null})));
+  }));
   state.seatedTable=null; updateMenuButtons();
 }
 
@@ -11263,11 +11271,12 @@ async function setupAutoLeaveOnDisconnect(tableIdx){
     if(!state.isHost || !v?.tables || tableIdx==null) return;
     const T = v.tables[tableIdx] || {};
     if(!T.playerId) return; // 空席は何もしない
-    const hand = Array.isArray(T.hand) ? T.hand : [];
-    await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { playerId:null, playerName:null });
-    await Promise.all(hand.map((_,i)=>
-      update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${i}`), { ownerId:null })
-    ));
+    const ownedIndices = (v.tables||[]).map((table, i)=>table?.playerId === T.playerId ? i : -1).filter(i=>i >= 0);
+    await Promise.all(ownedIndices.map(async ownedIdx=>{
+      const hand = Array.isArray(v.tables[ownedIdx]?.hand) ? v.tables[ownedIdx].hand : [];
+      await update(ref(db, `rooms/${state.roomCode}/tables/${ownedIdx}`), { playerId:null, playerName:null });
+      await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${ownedIdx}/hand/${i}`), { ownerId:null })));
+    }));
   }
 
   
@@ -11275,22 +11284,22 @@ async function setupAutoLeaveOnDisconnect(tableIdx){
 function renderSeatTabs(v){
   if(!v?.started) return;
   seatTabs.innerHTML='';
-  (v.tables||[]).forEach((t,i)=>{
+  const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+  const seatStarts = isTwoPlayer ? [0, 2] : (v.tables||[]).map((_, i)=>i);
+  seatStarts.forEach((i, seatNumber)=>{
+    const group = isTwoPlayer ? [i, i + 1] : [i];
     const tab=document.createElement('div'); 
     tab.className='tab';
-tab.textContent = String(i + 1);
-    if(t.playerId) tab.classList.add('disabled');
+    tab.textContent = String(seatNumber + 1);
+    if(group.some(tableIdx=>v.tables?.[tableIdx]?.playerId)) tab.classList.add('disabled');
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
-      await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {
-        playerId:state.userId, playerName:state.userName
-      });
-      const hRef = ref(db, `rooms/${state.roomCode}/tables/${i}/hand`);
-      const hSnap = await get(hRef);
-      const hand = hSnap.val() || [];
-      await Promise.all(hand.map((_,idx)=> 
-        update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), { ownerId: state.userId })
-      ));
+      await Promise.all(group.map(async tableIdx=>{
+        await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { playerId:state.userId, playerName:state.userName });
+        const hSnap = await get(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand`));
+        const hand = hSnap.val() || [];
+        await Promise.all(hand.map((_,idx)=> update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${idx}`), { ownerId:state.userId })));
+      }));
 // await setupAutoLeaveOnDisconnect(i);   // ★自動退席を無効化
       state.seatedTable=i; H(seatPop,true); H(stageStoryPop, true); updateMenuButtons();
 maybeOpenRolePickerAfterSeat();
@@ -11308,18 +11317,17 @@ btnSit.onclick = async ()=>{
   // ★ 自動着席：同じ名前の席を探す
   const sameNameIdx = (v.tables || []).findIndex(t => t.playerName === state.userName);
   if (sameNameIdx >= 0) {
+    const sameNameGroup = ((v?.meta?.playerCount|0) === 2)
+      ? (sameNameIdx < 2 ? [0, 1] : [2, 3])
+      : [sameNameIdx];
     // 名前が一致する席があれば自動着席
-    await update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}`), {
-      playerId: state.userId,
-      playerName: state.userName
-    });
-    const hRef = ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand`);
-    const hSnap = await get(hRef);
-    const hand = hSnap.val() || [];
-    await Promise.all(hand.map((_, idx) => 
-      update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand/${idx}`), { ownerId: state.userId })
-    ));
-    state.seatedTable = sameNameIdx;
+    await Promise.all(sameNameGroup.map(async tableIdx=>{
+      await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { playerId:state.userId, playerName:state.userName });
+      const hSnap = await get(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand`));
+      const hand = hSnap.val() || [];
+      await Promise.all(hand.map((_, idx)=> update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${idx}`), { ownerId:state.userId })));
+    }));
+    state.seatedTable = sameNameGroup[0];
     H(seatPop, true); 
     H(stageStoryPop, true);
     updateMenuButtons();
@@ -11473,9 +11481,13 @@ async function startGame(playerCount, missionId){
   const code = state.roomCode;
 
 
-  const captainIndex = Math.floor(Math.random()*playerCount);
+  // 2人プレイでは各プレイヤーが隣接する2テーブルを担当する。
+  const tableSlots = playerCount === 2 ? 4 : playerCount;
+  const captainIndex = playerCount === 2
+    ? [0, 2][Math.floor(Math.random()*2)]
+    : Math.floor(Math.random()*tableSlots);
   const faces=[1,2,3,4]; shuffle(faces);
-  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false, picked:false}, hand:[] }); }
+  const tables=[]; for(let i=0;i<tableSlots;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false, picked:false}, hand:[] }); }
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
@@ -11544,7 +11556,7 @@ m29Rest = nums.slice(pi);
   
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
-  let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
+  let p=0; while(p<deck.length){ for(let t=0; t<tableSlots && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
   tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
 
 // アイテム（人数ぶん） — ミッション規則に合わせて山札を作る
@@ -11586,7 +11598,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
-    started:true, tableCount:playerCount, tables, items,
+    started:true, tableCount:tableSlots, tables, items,
   di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : playerCount), max:6 },
   captainTable: captainIndex, mission: missionMeta,     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
@@ -11599,6 +11611,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
       i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
       missionPickerOpen:false,
       missionPickerCount: playerCount,
+      playerCount,
       m105_slots:(missionId===105 ? 1 : 0),
       m105_pool:(missionId===105 ? 0 : 0),
       m55_deck:null, m55_shown:null, m55_c8Sides:null, m55_backByIndex:null
