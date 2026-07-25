@@ -628,6 +628,17 @@
     outline:2px solid #38bdf8;
     outline-offset:-2px;
   }
+  .table.i2-stand-selectable{outline:2px dashed #38bdf8;outline-offset:-2px;cursor:pointer}
+  .table.i2-stand-selectable .card,
+  .table.i2-stand-selectable .alpha,
+  .table.i2-stand-selectable .token{pointer-events:none}
+  .i2-stand-prompt{position:fixed;inset:0;z-index:850;display:grid;place-items:center;cursor:pointer}
+  .i2-stand-prompt span{padding:16px 22px;border-radius:10px;background:#111;color:#fff;font-weight:700;
+    text-align:center;box-shadow:0 14px 32px rgba(0,0,0,.35)}
+  .i2-stand-confirm-label{font-size:13px;white-space:nowrap;margin-bottom:7px}
+  .i2-stand-confirm-actions{display:flex;gap:6px;justify-content:flex-start}
+  .i2-stand-confirm-actions .btn{flex:0 0 auto;padding:4px 8px;font-size:11px}
+  .mini-pop.i2-stand-confirm{flex-direction:column;flex-wrap:nowrap;align-items:stretch;transform:none}
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
   .title{text-decoration:underline;padding-right:4px}
@@ -3528,6 +3539,8 @@ if (v) {
       renderM29(v);
       renderM34(v);
       renderTables(v);
+      renderI2StandPlacement(v);
+      renderI18StandPlacement(v);
 
 
       // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
@@ -4366,6 +4379,104 @@ function deriveChecklistCodeHints(displayLines){
   return out;
 }
 
+function renderI2StandPlacement(v){
+  document.getElementById('i2StandPrompt')?.remove();
+  document.querySelectorAll('#tables .table.i2-stand-selectable').forEach(el=>el.classList.remove('i2-stand-selectable'));
+  const flow = v?.meta?.i2Flow;
+  if ((v?.meta?.playerCount|0) !== 2 || flow?.phase !== 'placeStand') return;
+
+  const myTables = (v.tables||[]).map((t,i)=>t?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+  if (!myTables.length) return;
+
+  const promptKey = `${flow.usingBy}:${flow.selA?.cardId}:${flow.selB?.cardId}`;
+  if (state._i2StandPromptDismissed !== promptKey){
+    const prompt = document.createElement('div');
+    prompt.id = 'i2StandPrompt';
+    prompt.className = 'i2-stand-prompt';
+    const text = document.createElement('span');
+    text.textContent = 'どちらのスタンドに置きますか。';
+    prompt.appendChild(text);
+    prompt.onclick = ()=>{ state._i2StandPromptDismissed = promptKey; prompt.remove(); };
+    document.body.appendChild(prompt);
+  }
+
+  myTables.forEach(tableIdx=>{
+    const tableEl = document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
+    if (!tableEl) return;
+    tableEl.classList.add('i2-stand-selectable');
+    tableEl.onclick = (ev)=>{
+      ev.stopPropagation();
+      const pop=document.createElement('div'); pop.className='mini-pop i2-stand-confirm';
+      pop.onclick=e=>e.stopPropagation();
+      const label=document.createElement('div'); label.className='i2-stand-confirm-label';
+      label.textContent='このスタンドに配置しますか。';
+      const actions=document.createElement('div'); actions.className='i2-stand-confirm-actions';
+      const yes=document.createElement('button'); yes.className='btn small primary'; yes.textContent='はい';
+      const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
+      yes.onclick=async ()=>{
+        pop.remove();
+        const base = `rooms/${state.roomCode}/meta/i2Flow`;
+        await update(ref(db, base), {
+          [`placements/${state.userId}`]:tableIdx,
+          [`approvals/${state.userId}`]:true
+        });
+      };
+      no.onclick=()=>pop.remove();
+      actions.append(yes,no); pop.append(label,actions);
+      placeInsideViewport(pop,ev.clientX,ev.clientY);
+    };
+  });
+
+  const participantIds = [...new Set([flow.usingBy, (v.tables||[])[flow.selB?.table]?.playerId].filter(Boolean))];
+  const ready = participantIds.length===2 && participantIds.every(uid=>flow.approvals?.[uid]===true && Number.isInteger(flow.placements?.[uid]));
+  if (ready && flow.usingBy===state.userId && !flow.moveStarted){
+    update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {moveStarted:true, phase:'resolving'}).then(()=>
+      doItem2Swap(flow.selA, flow.selB, flow.usingBy, flow.placements)
+    ).catch(console.error);
+  }
+}
+
+function renderI18StandPlacement(v){
+  document.getElementById('i18StandPrompt')?.remove();
+  const flow=v?.meta?.i18Flow;
+  if ((v?.meta?.playerCount|0)!==2 || flow?.phase!=='placeStand' || flow?.usingBy!==state.userId) return;
+  const myTables=(v.tables||[]).map((table,i)=>table?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+  if (!myTables.length) return;
+
+  const promptKey=`${flow.usingBy}:${flow.sel?.cardId}`;
+  if (state._i18StandPromptDismissed!==promptKey){
+    const prompt=document.createElement('div'); prompt.id='i18StandPrompt'; prompt.className='i2-stand-prompt';
+    const text=document.createElement('span'); text.textContent='どちらのスタンドに配置しますか。';
+    prompt.appendChild(text);
+    prompt.onclick=()=>{ state._i18StandPromptDismissed=promptKey; prompt.remove(); };
+    document.body.appendChild(prompt);
+  }
+
+  myTables.forEach(tableIdx=>{
+    const tableEl=document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
+    if (!tableEl) return;
+    tableEl.classList.add('i2-stand-selectable');
+    tableEl.onclick=ev=>{
+      ev.stopPropagation();
+      const pop=document.createElement('div'); pop.className='mini-pop i2-stand-confirm';
+      pop.onclick=e=>e.stopPropagation();
+      const label=document.createElement('div'); label.className='i2-stand-confirm-label';
+      label.textContent='このスタンドに配置しますか。';
+      const actions=document.createElement('div'); actions.className='i2-stand-confirm-actions';
+      const yes=document.createElement('button'); yes.className='btn small primary'; yes.textContent='はい';
+      const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
+      yes.onclick=async ()=>{
+        pop.remove();
+        await update(ref(db,`rooms/${state.roomCode}/meta/i18Flow`),{phase:'resolving',destinationTable:tableIdx});
+        await doItem18Take(flow.sel,tableIdx);
+      };
+      no.onclick=()=>pop.remove();
+      actions.append(yes,no); pop.append(label,actions);
+      placeInsideViewport(pop,ev.clientX,ev.clientY);
+    };
+  });
+}
+
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
     const seatedNow = (v?.tables||[]).some(T => T.playerId === state.userId);
@@ -4482,7 +4593,12 @@ if ((v.mission?.id|0) === 23) {
   const counts = v.meta?.tokenCounts || {equal:0,noteq:0,x1:0};
   const i2All=v.meta?.i2Flow;
   const i18All=v.meta?.i18Flow;
-  const myTableIndex = (v.tables||[]).findIndex(T => T.playerId===state.userId);
+  // 2人プレイでは同じプレイヤーが2テーブルを所有するため、選ばれた
+  // テーブル番号ではなく、そのテーブルの所有者で受け手本人かを判定する。
+  const i2ViewerIsMe = !!(
+    i2All?.viewerTable != null &&
+    (v.tables||[])[i2All.viewerTable]?.playerId === state.userId
+  );
 
   (v.tables||[]).forEach((t, idx)=>{
     const box=document.createElement('div'); box.className='table'; box.dataset.tableIdx = String(idx);
@@ -4604,6 +4720,7 @@ const rolePicked = isRoleSelectionDone(t, midNow);
 const amSeated = seatedNow;           // 先頭で算出済み
 const seatEmpty = !t.playerId;        // 空席判定
 const hiddenByMission2728 = isMission27Or28RoleHidden(v, idx, t);
+const isTwoPlayerPartnerTable = (v?.meta?.playerCount|0) === 2 && (idx === 1 || idx === 3);
 if (!amSeated || seatEmpty || (needRolePick && !rolePicked) || hiddenByMission2728) {
   char.classList.add('blank');
   char.removeAttribute('style');
@@ -4648,7 +4765,8 @@ if (amSeated && !seatEmpty && !hiddenByMission2728 && showRoleTextDecorations &&
       }
     }
 
-charCol.appendChild(char);
+// 2人プレイの2つ目の担当テーブル（2・4）は、キャラカードの枠も表示しない。
+if (!isTwoPlayerPartnerTable) charCol.appendChild(char);
 
 // ★ #13：初期情報トークンはキャラの「下」に小さく表示（meta.m13_header をそのまま使う）
 if (m13HeaderNum != null) {
@@ -4765,16 +4883,20 @@ wrap.dataset.cardKey = cardKey;
 const ownerBlindSpecial = (m38Special || m56Special || m64Special);
 
         const i2ViewerCanSeeSelA = !!(
-          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2All.viewerTable===myTableIndex &&
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='placeStand' || i2All.phase==='resolving') && i2ViewerIsMe &&
           i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
         );
         const i2ActorCanSeeSelB = !!(
-          i2All && i2All.phase==='resolving' && i2All.usingBy===state.userId &&
+          i2All && (i2All.phase==='placeStand' || i2All.phase==='resolving') && i2All.usingBy===state.userId &&
           i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
+        );
+        const i18ActorCanSeeSel = !!(
+          i18All && (i18All.phase==='placeStand' || i18All.phase==='resolving') && i18All.usingBy===state.userId &&
+          i18All.sel && i18All.sel.table===idx && i18All.sel.cardId===c.id
         );
 
         if (!c.open) {
-          if (i2ViewerCanSeeSelA || i2ActorCanSeeSelB) {
+          if (i2ViewerCanSeeSelA || i2ActorCanSeeSelB || i18ActorCanSeeSel) {
             // i2 表示中は、見せられたカードを選ばれたプレイヤーだけ表として見る
           } else if (ownerBlindSpecial) {
             if (t.playerId === state.userId) {
@@ -4793,6 +4915,7 @@ const ownerBlindSpecial = (m38Special || m56Special || m64Special);
             card.classList.add('back');
           }
         }
+        if (i18ActorCanSeeSel) card.classList.add('open');
       }
 
       if (c.open) card.classList.add('open');
@@ -4821,7 +4944,7 @@ if (c.markUntil && now() < c.markUntil) {
       const isI2Actor = i2All && i2All.usingBy===state.userId;
       const canPickSelf  = isI2Actor && i2All?.phase==='pickSelf'  && t.playerId===state.userId;
       const canPickOther = isI2Actor && i2All?.phase==='pickOther' && t.playerId!==state.userId;
-      const canViewerPickSelf = !!(i2All && i2All.phase==='pickViewerSelf' && i2All.viewerTable===myTableIndex && t.playerId===state.userId && !c.open);
+      const canViewerPickSelf = !!(i2All && i2All.phase==='pickViewerSelf' && i2ViewerIsMe && t.playerId===state.userId && !c.open);
 
       const isI18Actor = i18All && i18All.usingBy===state.userId;
       const canI18Pick = isI18Actor && i18All?.phase==='pickOther' && t.playerId!==state.userId;
@@ -4830,13 +4953,27 @@ if (c.markUntil && now() < c.markUntil) {
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
-          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selA:{table:idx, cardId:c.id}, phase:'pickOther', selB:null, viewerTable:null });
+          const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+          const opponentTable = isTwoPlayer
+            ? (v.tables||[]).findIndex(table=>table?.playerId && table.playerId!==state.userId)
+            : -1;
+          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
+            selA:{table:idx, cardId:c.id},
+            phase:(isTwoPlayer && opponentTable>=0) ? 'pickViewerSelf' : 'pickOther',
+            selB:null,
+            viewerTable:(isTwoPlayer && opponentTable>=0) ? opponentTable : null
+          });
         };
       }else if(canViewerPickSelf){
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
-          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), { selB:{table:idx, cardId:c.id} });
+          const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+          await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {
+            selB:{table:idx, cardId:c.id},
+            ...(isTwoPlayer ? {phase:'placeStand', placements:null, approvals:null, moveStarted:false} : {})
+          });
+          if (isTwoPlayer) return;
           openMenuAtClick([
             {label:'カードを渡す', action: async ()=>{
               const i2 = (await get(ref(db, `rooms/${state.roomCode}/meta/i2Flow`))).val();
@@ -4859,7 +4996,12 @@ if (c.markUntil && now() < c.markUntil) {
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
-          await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:{table:idx, cardId:c.id} });
+          const isTwoPlayer=(v?.meta?.playerCount|0)===2;
+          await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {
+            sel:{table:idx, cardId:c.id},
+            ...(isTwoPlayer ? {phase:'placeStand',destinationTable:null} : {})
+          });
+          if (isTwoPlayer) return;
       openMenuAtClick([
   {label:'とる', action: async ()=>{ const i18=(await get(ref(db, `rooms/${state.roomCode}/meta/i18Flow`))).val(); if(i18?.sel) await doItem18Take(i18.sel); }},
   {label:'やり直す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:null, phase:'pickOther' }); }}
@@ -4896,14 +5038,18 @@ if (c.markUntil && now() < c.markUntil) {
         num.textContent = String(c.num);
         num.classList.toggle('tight-code', [10.1, 10.2, 10.5, 11.1, 11.2, 11.5].includes(Number(c.num)));
         const i2ViewerCanSeeSelA = !!(
-          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='resolving') && i2All.viewerTable===myTableIndex &&
+          i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='placeStand' || i2All.phase==='resolving') && i2ViewerIsMe &&
           i2All.selA && i2All.selA.table===idx && i2All.selA.cardId===c.id
         );
         const i2ActorCanSeeSelB = !!(
-          i2All && i2All.phase==='resolving' && i2All.usingBy===state.userId &&
+          i2All && (i2All.phase==='placeStand' || i2All.phase==='resolving') && i2All.usingBy===state.userId &&
           i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
         );
-        num.style.visibility = (c.open || isMine || i2ViewerCanSeeSelA || i2ActorCanSeeSelB) ? 'visible' : 'hidden';
+        const i18ActorCanSeeSel = !!(
+          i18All && (i18All.phase==='placeStand' || i18All.phase==='resolving') && i18All.usingBy===state.userId &&
+          i18All.sel && i18All.sel.table===idx && i18All.sel.cardId===c.id
+        );
+        num.style.visibility = (c.open || isMine || i2ViewerCanSeeSelA || i2ActorCanSeeSelB || i18ActorCanSeeSel) ? 'visible' : 'hidden';
       } else {
         num.textContent = '';
         num.style.visibility = 'hidden';
@@ -10761,17 +10907,14 @@ async function playHookSwapAnimation(A, B, tables){
 
     const insertPos = (hand, card)=> findSortedInsertIndex(hand, card);
 
-    const aWithout = aHand.filter(c=>c?.id!==A.cardId);
-    const bWithout = bHand.filter(c=>c?.id!==B.cardId);
     const toA = bHand[bIdx];
     const toB = aHand[aIdx];
-    const insA = toA ? insertPos(aWithout, toA) : 0;
-    const insB = toB ? insertPos(bWithout, toB) : 0;
 
-    // 2) 詰める + 挿入位置を空ける（右スライド）
+    // 2) 取り出し元を詰め、実際の配置先に挿入スペースを空ける。
+    // 取り出し元と配置先が別テーブルの場合も、配置先の既存カードをスライドする。
     const shift = cardW + gap;
-    const qa = Array.from(handEl(A.table)?.querySelectorAll('.card-wrap')||[]);
-    const qb = Array.from(handEl(B.table)?.querySelectorAll('.card-wrap')||[]);
+    const aDestination = Number.isInteger(A.toTable) ? A.toTable : B.table;
+    const bDestination = Number.isInteger(B.toTable) ? B.toTable : A.table;
 
     const slideCardBody = (w, dx)=>{
       const bodyNodes = [w.querySelector('.card'), w.querySelector('.tok-col')].filter(Boolean);
@@ -10781,21 +10924,25 @@ async function playHookSwapAnimation(A, B, tables){
       });
     };
 
-    qa.forEach((w,i)=>{
-      if (w.dataset.cardId===A.cardId) return;
-      let dx = 0;
-      if (aIdx>=0 && i>aIdx) dx -= shift;
-      const ni = i - (i>aIdx?1:0);
-      if (ni>=insA) dx += shift;
-      if (dx!==0) slideCardBody(w, dx);
-    });
-    qb.forEach((w,i)=>{
-      if (w.dataset.cardId===B.cardId) return;
-      let dx = 0;
-      if (bIdx>=0 && i>bIdx) dx -= shift;
-      const ni = i - (i>bIdx?1:0);
-      if (ni>=insB) dx += shift;
-      if (dx!==0) slideCardBody(w, dx);
+    const affectedTables=[...new Set([A.table,B.table,aDestination,bDestination])];
+    affectedTables.forEach(tableIdx=>{
+      const original=(tables[tableIdx]?.hand)||[];
+      const outgoingIds=new Set([
+        ...(tableIdx===A.table ? [A.cardId] : []),
+        ...(tableIdx===B.table ? [B.cardId] : [])
+      ]);
+      const remaining=original.filter(card=>!outgoingIds.has(card?.id));
+      const incoming=tableIdx===aDestination ? toB : (tableIdx===bDestination ? toA : null);
+      const insertion=incoming ? insertPos(remaining,incoming) : -1;
+      const wraps=Array.from(handEl(tableIdx)?.querySelectorAll('.card-wrap')||[]);
+      wraps.forEach((wrap,oldIndex)=>{
+        if (outgoingIds.has(wrap.dataset.cardId)) return;
+        const card=original[oldIndex];
+        let newIndex=remaining.findIndex(entry=>entry?.id===card?.id);
+        if (incoming && newIndex>=insertion) newIndex+=1;
+        const dx=(newIndex-oldIndex)*shift;
+        if (dx!==0) slideCardBody(wrap,dx);
+      });
     });
     await sleep(HOOK_STEP_MS);
 
@@ -10812,8 +10959,12 @@ async function playHookSwapAnimation(A, B, tables){
       return {x: first.left + (clamped * shift), y: first.top};
     };
 
-    const ta = targetPoint(A.table, insA);
-    const tb = targetPoint(B.table, insB);
+    const aDestHand = (tables[aDestination]?.hand||[]).filter(c=>c?.id!==A.cardId && c?.id!==B.cardId);
+    const bDestHand = (tables[bDestination]?.hand||[]).filter(c=>c?.id!==A.cardId && c?.id!==B.cardId);
+    const aDestPos = toB ? insertPos(aDestHand,toB) : 0;
+    const bDestPos = toA ? insertPos(bDestHand,toA) : 0;
+    const ta = targetPoint(bDestination, bDestPos);
+    const tb = targetPoint(aDestination, aDestPos);
 
     // 3) 空き位置へ挿入
     // ca は A から抜いたカードなので B 側へ、cb は B から抜いたカードなので A 側へ移動
@@ -10917,7 +11068,7 @@ async function playHookTakeAnimation(sel, myTable, tables){
 }
 
 /* ===== Item 2 swap ===== */
-async function doItem2Swap(A, B, usingByUserId=null){
+async function doItem2Swap(A, B, usingByUserId=null, placements=null){
   if(!A || !B) return;
   const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
   const tables = snap.val() || [];
@@ -10931,6 +11082,53 @@ async function doItem2Swap(A, B, usingByUserId=null){
   const a = pickCard(A.table, A.cardId);
   const b = pickCard(B.table, B.cardId);
   if(!a.card || !b.card){ await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Flow:null }); return; }
+
+  if (placements){
+    const receiverId = tables[B.table]?.playerId;
+    const actorTarget = Number(placements[usingByUserId]);
+    const receiverTarget = Number(placements[receiverId]);
+    const actorOwnsTarget = Number.isInteger(actorTarget) && tables[actorTarget]?.playerId===usingByUserId;
+    const receiverOwnsTarget = Number.isInteger(receiverTarget) && tables[receiverTarget]?.playerId===receiverId;
+    if (!actorOwnsTarget || !receiverOwnsTarget){
+      await update(ref(db, `rooms/${state.roomCode}/meta/i2Flow`), {phase:'placeStand', moveStarted:false});
+      return;
+    }
+
+    const animId = `i2-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      i2Anim:{id:animId, A:{...A,toTable:receiverTarget}, B:{...B,toTable:actorTarget}, at:Date.now()}
+    });
+    await sleep(HOOK_ANIM_TOTAL_MS);
+
+    const hands = tables.map(t=>Array.isArray(t?.hand) ? t.hand.slice() : []);
+    const removeCard = (tableIdx, cardId)=>{
+      const pos=hands[tableIdx].findIndex(card=>card?.id===cardId);
+      return pos>=0 ? hands[tableIdx].splice(pos,1)[0] : null;
+    };
+    const cardA=removeCard(A.table,A.cardId);
+    const cardB=removeCard(B.table,B.cardId);
+    if (!cardA || !cardB){ await update(ref(db, `rooms/${state.roomCode}/meta`), {i2Flow:null,i2Anim:null}); return; }
+    const mark=now()+10000;
+    hands[receiverTarget].splice(findSortedInsertIndex(hands[receiverTarget],cardA),0,{...cardA,ownerId:receiverId,open:false,openedAt:null,markUntil:mark,markSrc:'i2',hookGray:true});
+    hands[actorTarget].splice(findSortedInsertIndex(hands[actorTarget],cardB),0,{...cardB,ownerId:usingByUserId,open:false,openedAt:null,markUntil:mark,markSrc:'i2',hookGray:true});
+    const changed=[...new Set([A.table,B.table,actorTarget,receiverTarget])];
+    const updates={};
+    changed.forEach(tableIdx=>{
+      hands[tableIdx].forEach((card,i)=>card.alpha='abcdefghijklmnopqrstuvwxyz'[i%26]);
+      updates[`rooms/${state.roomCode}/tables/${tableIdx}/hand`]=hands[tableIdx];
+    });
+    updates[`rooms/${state.roomCode}/meta/i2Flow`]=null;
+    updates[`rooms/${state.roomCode}/meta/i2Anim`]=null;
+    // 使用元も確実に裏向きにする（アイテム2、または member(9) の能力）。
+    const item2Index=(state.watching?.items||[]).findIndex(item=>(item?.no|0)===2 && item?.used===true);
+    if (item2Index>=0) updates[`rooms/${state.roomCode}/items/${item2Index}/used`]=true;
+    const actorCharacterIndex=(tables||[]).findIndex(table=>
+      table?.playerId===usingByUserId && String(table?.character?.face||'').includes('member (9).jpg')
+    );
+    if (actorCharacterIndex>=0) updates[`rooms/${state.roomCode}/tables/${actorCharacterIndex}/character/flipped`]=true;
+    await update(ref(db),updates);
+    return;
+  }
 
   const animId = `i2-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
   await update(ref(db, `rooms/${state.roomCode}/meta`), { i2Anim:{ id:animId, A, B, at: Date.now() } });
@@ -10984,9 +11182,11 @@ async function doItem2Swap(A, B, usingByUserId=null){
 }
 
 /* ===== Item 18 take ===== */
-async function doItem18Take(sel){
-  const myTable = state.watching?.tables?.findIndex(t=> t.playerId===state.userId);
-  if(myTable==null || myTable<0){ alert('席に座ってから使用してください'); await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
+async function doItem18Take(sel,destinationTable=null){
+  const myTable = Number.isInteger(destinationTable)
+    ? destinationTable
+    : state.watching?.tables?.findIndex(t=> t.playerId===state.userId);
+  if(myTable==null || myTable<0 || state.watching?.tables?.[myTable]?.playerId!==state.userId){ alert('席に座ってから使用してください'); await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
   const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
   const tables = snap.val() || [];
 
@@ -11221,16 +11421,22 @@ gear.onclick=()=> {
 /* ★ 共通の離席処理 */
 async function leaveSeatNow(){
   if(state.seatedTable==null || !state.watching?.tables) return;
-  const idx=state.seatedTable; const hand=(state.watching.tables[idx].hand||[]);
+  const seatIndices = (state.watching.tables||[])
+    .map((table, tableIdx)=>table?.playerId === state.userId ? tableIdx : -1)
+    .filter(tableIdx=>tableIdx >= 0);
   try{
-    await onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}`)).cancel();
-    await Promise.all(hand.map((_,i)=>
-      onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`)).cancel()
-    ));
+    await Promise.all(seatIndices.map(async tableIdx=>{
+      const hand = state.watching.tables[tableIdx]?.hand || [];
+      await onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`)).cancel();
+      await Promise.all(hand.map((_,i)=> onDisconnect(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${i}`)).cancel()));
+    }));
   }catch(_e){}
 
-  await update(ref(db, `rooms/${state.roomCode}/tables/${idx}`), {playerId:null, playerName:null});
-  await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${idx}/hand/${i}`), {ownerId:null})));
+  await Promise.all(seatIndices.map(async tableIdx=>{
+    const hand = state.watching.tables[tableIdx]?.hand || [];
+    await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), {playerId:null, playerName:null});
+    await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${i}`), {ownerId:null})));
+  }));
   state.seatedTable=null; updateMenuButtons();
 }
 
@@ -11263,11 +11469,12 @@ async function setupAutoLeaveOnDisconnect(tableIdx){
     if(!state.isHost || !v?.tables || tableIdx==null) return;
     const T = v.tables[tableIdx] || {};
     if(!T.playerId) return; // 空席は何もしない
-    const hand = Array.isArray(T.hand) ? T.hand : [];
-    await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { playerId:null, playerName:null });
-    await Promise.all(hand.map((_,i)=>
-      update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${i}`), { ownerId:null })
-    ));
+    const ownedIndices = (v.tables||[]).map((table, i)=>table?.playerId === T.playerId ? i : -1).filter(i=>i >= 0);
+    await Promise.all(ownedIndices.map(async ownedIdx=>{
+      const hand = Array.isArray(v.tables[ownedIdx]?.hand) ? v.tables[ownedIdx].hand : [];
+      await update(ref(db, `rooms/${state.roomCode}/tables/${ownedIdx}`), { playerId:null, playerName:null });
+      await Promise.all(hand.map((_,i)=> update(ref(db, `rooms/${state.roomCode}/tables/${ownedIdx}/hand/${i}`), { ownerId:null })));
+    }));
   }
 
   
@@ -11275,22 +11482,22 @@ async function setupAutoLeaveOnDisconnect(tableIdx){
 function renderSeatTabs(v){
   if(!v?.started) return;
   seatTabs.innerHTML='';
-  (v.tables||[]).forEach((t,i)=>{
+  const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+  const seatStarts = isTwoPlayer ? [0, 2] : (v.tables||[]).map((_, i)=>i);
+  seatStarts.forEach((i, seatNumber)=>{
+    const group = isTwoPlayer ? [i, i + 1] : [i];
     const tab=document.createElement('div'); 
     tab.className='tab';
-tab.textContent = String(i + 1);
-    if(t.playerId) tab.classList.add('disabled');
+    tab.textContent = String(seatNumber + 1);
+    if(group.some(tableIdx=>v.tables?.[tableIdx]?.playerId)) tab.classList.add('disabled');
     tab.onclick=async ()=>{
       if(tab.classList.contains('disabled')) return;
-      await update(ref(db, `rooms/${state.roomCode}/tables/${i}`), {
-        playerId:state.userId, playerName:state.userName
-      });
-      const hRef = ref(db, `rooms/${state.roomCode}/tables/${i}/hand`);
-      const hSnap = await get(hRef);
-      const hand = hSnap.val() || [];
-      await Promise.all(hand.map((_,idx)=> 
-        update(ref(db, `rooms/${state.roomCode}/tables/${i}/hand/${idx}`), { ownerId: state.userId })
-      ));
+      await Promise.all(group.map(async tableIdx=>{
+        await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { playerId:state.userId, playerName:state.userName });
+        const hSnap = await get(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand`));
+        const hand = hSnap.val() || [];
+        await Promise.all(hand.map((_,idx)=> update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${idx}`), { ownerId:state.userId })));
+      }));
 // await setupAutoLeaveOnDisconnect(i);   // ★自動退席を無効化
       state.seatedTable=i; H(seatPop,true); H(stageStoryPop, true); updateMenuButtons();
 maybeOpenRolePickerAfterSeat();
@@ -11308,18 +11515,17 @@ btnSit.onclick = async ()=>{
   // ★ 自動着席：同じ名前の席を探す
   const sameNameIdx = (v.tables || []).findIndex(t => t.playerName === state.userName);
   if (sameNameIdx >= 0) {
+    const sameNameGroup = ((v?.meta?.playerCount|0) === 2)
+      ? (sameNameIdx < 2 ? [0, 1] : [2, 3])
+      : [sameNameIdx];
     // 名前が一致する席があれば自動着席
-    await update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}`), {
-      playerId: state.userId,
-      playerName: state.userName
-    });
-    const hRef = ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand`);
-    const hSnap = await get(hRef);
-    const hand = hSnap.val() || [];
-    await Promise.all(hand.map((_, idx) => 
-      update(ref(db, `rooms/${state.roomCode}/tables/${sameNameIdx}/hand/${idx}`), { ownerId: state.userId })
-    ));
-    state.seatedTable = sameNameIdx;
+    await Promise.all(sameNameGroup.map(async tableIdx=>{
+      await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { playerId:state.userId, playerName:state.userName });
+      const hSnap = await get(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand`));
+      const hand = hSnap.val() || [];
+      await Promise.all(hand.map((_, idx)=> update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}/hand/${idx}`), { ownerId:state.userId })));
+    }));
+    state.seatedTable = sameNameGroup[0];
     H(seatPop, true); 
     H(stageStoryPop, true);
     updateMenuButtons();
@@ -11473,9 +11679,13 @@ async function startGame(playerCount, missionId){
   const code = state.roomCode;
 
 
-  const captainIndex = Math.floor(Math.random()*playerCount);
+  // 2人プレイでは各プレイヤーが隣接する2テーブルを担当する。
+  const tableSlots = playerCount === 2 ? 4 : playerCount;
+  const captainIndex = playerCount === 2
+    ? [0, 2][Math.floor(Math.random()*2)]
+    : Math.floor(Math.random()*tableSlots);
   const faces=[1,2,3,4]; shuffle(faces);
-  const tables=[]; for(let i=0;i<playerCount;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false, picked:false}, hand:[] }); }
+  const tables=[]; for(let i=0;i<tableSlots;i++){ const face=(i===captainIndex)?'member (5).jpg':`member (${faces[i%4]}).jpg`; tables.push({ titleNumber:i+1, playerId:null, playerName:null, character:{face, flipped:false, picked:false}, hand:[] }); }
 
   // ===== デッキ構築 =====
   let deck=[]; let missionMeta;
@@ -11544,7 +11754,7 @@ m29Rest = nums.slice(pi);
   
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
-  let p=0; while(p<deck.length){ for(let t=0; t<playerCount && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
+  let p=0; while(p<deck.length){ for(let t=0; t<tableSlots && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
   tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
 
 // アイテム（人数ぶん） — ミッション規則に合わせて山札を作る
@@ -11586,7 +11796,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
   await set(ref(db, `rooms/${code}`), {
     ...(state.watching||baseRoom(state.userId)),
     hostId: state.watching?.hostId || state.userId,
-    started:true, tableCount:playerCount, tables, items,
+    started:true, tableCount:tableSlots, tables, items,
   di:{ value: ((missionId===51 || missionId===55 || missionId===60 || missionId===62 || missionId===41) ? 1 : playerCount), max:6 },
   captainTable: captainIndex, mission: missionMeta,     /* ▼▼ ここから追加：#29 センター初期化 ▼▼ */
     m29_center: (missionMeta?.id===29 ? [] : null),
@@ -11599,6 +11809,7 @@ const faceUpStart = !(missionMeta?.flags?.itemsFaceDownStart);
       i2Flow:null, i18Flow:null, i2Anim:null, i18Anim:null, i16Badge:null,
       missionPickerOpen:false,
       missionPickerCount: playerCount,
+      playerCount,
       m105_slots:(missionId===105 ? 1 : 0),
       m105_pool:(missionId===105 ? 0 : 0),
       m55_deck:null, m55_shown:null, m55_c8Sides:null, m55_backByIndex:null
