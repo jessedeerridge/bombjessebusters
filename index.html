@@ -47,6 +47,33 @@
   .btn.ghost{background:transparent}
   .hidden{display:none!important}
 
+  /* Pre-room screen: keep the controls fixed while only the room list scrolls. */
+  body:not(.in-room)>header{display:none}
+  body:not(.in-room) main{height:100dvh;min-height:100vh;padding:0;display:block}
+  body:not(.in-room) main>.col{height:100%}
+  .room-browser{
+    width:min(88vw,420px);height:min(72dvh,620px);margin:0 auto;
+    padding-top:clamp(11vh,16vh,180px);display:flex;flex-direction:column;
+  }
+  .room-action{
+    width:100%;min-height:76px;border:1px solid rgba(255,255,255,.7);border-radius:12px;
+    background:rgba(17,17,17,.84);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.2);
+  }
+  button.room-action{font:700 16px/1 system-ui,-apple-system,sans-serif;letter-spacing:.06em;cursor:pointer}
+  .room-action.create{flex:0 0 76px}
+  .room-list-viewport{min-height:0;overflow-y:auto;overscroll-behavior:contain;margin-top:10px;padding-bottom:12px;scrollbar-width:none}
+  .room-list-viewport::-webkit-scrollbar{display:none}
+  .room-loading{height:28px;color:#fff;text-align:center;font-size:13px;text-shadow:0 1px 4px #000}
+  .room-list{display:flex;flex-direction:column;gap:10px}
+  .room-entry{position:relative;text-align:left;padding:12px 14px 25px;letter-spacing:normal}
+  button.room-entry{height:76px}
+  .room-players{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+  .room-meta{position:absolute;right:12px;bottom:8px;font-size:11px;font-weight:500;letter-spacing:.02em;opacity:.82}
+  .name-entry{display:flex;align-items:center;padding:10px;background:rgba(17,17,17,.9)}
+  .name-entry input{min-width:0;flex:1;height:42px;border:0;border-radius:7px 0 0 7px;padding:0 12px;font-size:16px;outline:none}
+  .name-entry button{height:42px;border:0;border-left:1px solid #ddd;border-radius:0 7px 7px 0;padding:0 16px;background:#fff;color:#111;font-weight:700;cursor:pointer}
+  .name-entry button:disabled{opacity:.55;cursor:progress}
+
   .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:900}
   .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08);z-index:210}
   .menu .btn{width:220px;text-align:left}
@@ -1707,11 +1734,16 @@ main:not(:has(#lobby.hidden)) > * {
 
 <main>
   <div class="col">
-<div class="join-box" id="joinBox">
-  <!-- ★追加：名前（4文字以内）※未入力でも入室可 -->
-  <input id="userName" placeholder="名前（4文字以内）" maxlength="4" />
-  <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-  <button class="btn primary" id="btnJoin">入室</button>
+<div class="room-browser" id="joinBox">
+  <button class="room-action create" id="btnCreateRoom">CREATE ROOM</button>
+  <div class="room-list-viewport" id="roomListViewport">
+    <div class="room-loading" id="roomLoading">loading...</div>
+    <div class="room-list" id="roomList"></div>
+    <div id="roomListSentinel" aria-hidden="true"></div>
+  </div>
+  <input id="roomCode" type="hidden" />
+  <input id="userName" type="hidden" maxlength="4" />
+  <button class="hidden" id="btnJoin" type="button">決定</button>
 </div>
 
 
@@ -2069,6 +2101,10 @@ const inputName = document.getElementById('userName'); // ★追加
 const inputCode = document.getElementById('roomCode');
 
 const btnJoin = document.getElementById('btnJoin');
+const btnCreateRoom = document.getElementById('btnCreateRoom');
+const roomListViewport = document.getElementById('roomListViewport');
+const roomListEl = document.getElementById('roomList');
+const roomLoading = document.getElementById('roomLoading');
 
 const lobby   = document.getElementById('lobby');
 // ▼ 追加：クイックミッションピッカー起動ボタン
@@ -2085,12 +2121,98 @@ try{
   if (qRoom) inputCode.value = qRoom.slice(0, 12);
   if (qName) inputName.value = qName.slice(0, 4);
 }catch(_e){}
-  if (!inputName.value) {
+if (!inputName.value) {
   try {
     const saved = localStorage.getItem("savedUserName");
     if (saved) inputName.value = saved.slice(0, 4);
   } catch(_e){}
 }
+let roomBrowserRows = [];
+let visibleRoomCount = 5;
+
+function roomDateLabel(timestamp){
+  const date = new Date(Number(timestamp) || 0);
+  if (!Number.isFinite(date.getTime()) || !timestamp) return '';
+  const pad = value => String(value).padStart(2, '0');
+  return `${date.getMonth()+1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function renderRoomBrowser(){
+  roomListEl.replaceChildren();
+  roomBrowserRows.slice(0, visibleRoomCount).forEach(room => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'room-action room-entry';
+    button.dataset.roomCode = room.code;
+    const players = document.createElement('span');
+    players.className = 'room-players';
+    players.textContent = Object.values(room.players || {}).map(player => String(player?.name || '').trim()).filter(Boolean).join('・');
+    const meta = document.createElement('span');
+    meta.className = 'room-meta';
+    meta.textContent = `${room.code}　${roomDateLabel(room.createdAt)}`;
+    button.append(players, meta);
+    roomListEl.appendChild(button);
+  });
+}
+
+function openNameEntry(target, roomCode){
+  if (!target || target.classList.contains('name-entry')) return;
+  const form = document.createElement('form');
+  form.className = `${target.className} name-entry`;
+  const nameField = document.createElement('input');
+  nameField.maxLength = 4;
+  nameField.autocomplete = 'name';
+  nameField.setAttribute('aria-label', '名前');
+  nameField.value = inputName.value;
+  const confirm = document.createElement('button');
+  confirm.type = 'submit';
+  confirm.textContent = '決定';
+  form.append(nameField, confirm);
+  target.replaceWith(form);
+  nameField.focus();
+  nameField.addEventListener('input', () => {
+    inputName.value = nameField.value.slice(0, 4);
+    try { localStorage.setItem('savedUserName', inputName.value); } catch(_e){}
+  });
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    inputName.value = nameField.value.slice(0, 4);
+    confirm.disabled = true;
+    try{
+      if (roomCode){
+        inputCode.value = roomCode;
+      } else {
+        do { inputCode.value = randomRoomCode(5); }
+        while ((await get(ref(db, `rooms/${inputCode.value}`))).exists());
+      }
+      await btnJoin.onclick();
+    } finally {
+      if (!document.body.classList.contains('in-room')) confirm.disabled = false;
+    }
+  });
+}
+
+btnCreateRoom.addEventListener('click', () => openNameEntry(btnCreateRoom, null));
+roomListEl.addEventListener('click', event => {
+  const button = event.target.closest('[data-room-code]');
+  if (button) openNameEntry(button, button.dataset.roomCode);
+});
+roomListViewport.addEventListener('scroll', () => {
+  const nearBottom = roomListViewport.scrollTop + roomListViewport.clientHeight >= roomListViewport.scrollHeight - 24;
+  if (nearBottom && visibleRoomCount < roomBrowserRows.length){
+    visibleRoomCount += 5;
+    renderRoomBrowser();
+  }
+});
+
+onValue(ref(db, 'rooms'), snapshot => {
+  roomBrowserRows = Object.entries(snapshot.val() || {}).map(([code, room]) => ({ code, ...(room || {}) }))
+    .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+  roomLoading.classList.add('hidden');
+  if (!roomListEl.querySelector('.name-entry')) renderRoomBrowser();
+}, () => {
+  roomLoading.textContent = 'loading...';
+});
 const tablesEl= document.getElementById('tables');
 const gear    = document.getElementById('gear');
 const menuPop = document.getElementById('menuPopup');
@@ -3495,7 +3617,7 @@ async function enter(mode){
   });
   listenRoom(code);
   // ★ 自動離席の遅延クリア役（Janitor）を起動
-  H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
+  H(joinBox,true); H(lobby,false); H(gear,false); document.body.classList.add('in-room'); updateHeaderInfo();
 }
 
 function updateHeaderInfo(){
