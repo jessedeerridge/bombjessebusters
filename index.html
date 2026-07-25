@@ -3540,6 +3540,7 @@ if (v) {
       renderM34(v);
       renderTables(v);
       renderI2StandPlacement(v);
+      renderI18StandPlacement(v);
 
 
       // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
@@ -4435,6 +4436,34 @@ function renderI2StandPlacement(v){
   }
 }
 
+function renderI18StandPlacement(v){
+  document.getElementById('i18StandPrompt')?.remove();
+  const flow=v?.meta?.i18Flow;
+  if ((v?.meta?.playerCount|0)!==2 || flow?.phase!=='placeStand' || flow?.usingBy!==state.userId) return;
+  const myTables=(v.tables||[]).map((table,i)=>table?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+  if (!myTables.length) return;
+
+  const promptKey=`${flow.usingBy}:${flow.sel?.cardId}`;
+  if (state._i18StandPromptDismissed!==promptKey){
+    const prompt=document.createElement('div'); prompt.id='i18StandPrompt'; prompt.className='i2-stand-prompt';
+    const text=document.createElement('span'); text.textContent='どちらのスタンドに配置しますか。';
+    prompt.appendChild(text);
+    prompt.onclick=()=>{ state._i18StandPromptDismissed=promptKey; prompt.remove(); };
+    document.body.appendChild(prompt);
+  }
+
+  myTables.forEach(tableIdx=>{
+    const tableEl=document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
+    if (!tableEl) return;
+    tableEl.classList.add('i2-stand-selectable');
+    tableEl.onclick=async ev=>{
+      ev.stopPropagation();
+      await update(ref(db,`rooms/${state.roomCode}/meta/i18Flow`),{phase:'resolving',destinationTable:tableIdx});
+      await doItem18Take(flow.sel,tableIdx);
+    };
+  });
+}
+
 function renderTables(v){
   tablesEl.innerHTML=''; if(!v) return;
     const seatedNow = (v?.tables||[]).some(T => T.playerId === state.userId);
@@ -4848,9 +4877,13 @@ const ownerBlindSpecial = (m38Special || m56Special || m64Special);
           i2All && (i2All.phase==='placeStand' || i2All.phase==='resolving') && i2All.usingBy===state.userId &&
           i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
         );
+        const i18ActorCanSeeSel = !!(
+          i18All && (i18All.phase==='placeStand' || i18All.phase==='resolving') && i18All.usingBy===state.userId &&
+          i18All.sel && i18All.sel.table===idx && i18All.sel.cardId===c.id
+        );
 
         if (!c.open) {
-          if (i2ViewerCanSeeSelA || i2ActorCanSeeSelB) {
+          if (i2ViewerCanSeeSelA || i2ActorCanSeeSelB || i18ActorCanSeeSel) {
             // i2 表示中は、見せられたカードを選ばれたプレイヤーだけ表として見る
           } else if (ownerBlindSpecial) {
             if (t.playerId === state.userId) {
@@ -4869,6 +4902,7 @@ const ownerBlindSpecial = (m38Special || m56Special || m64Special);
             card.classList.add('back');
           }
         }
+        if (i18ActorCanSeeSel) card.classList.add('open');
       }
 
       if (c.open) card.classList.add('open');
@@ -4949,7 +4983,12 @@ if (c.markUntil && now() < c.markUntil) {
         card.classList.add('i2-selectable');
         card.onclick = async (ev)=>{
           ev.stopPropagation();
-          await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:{table:idx, cardId:c.id} });
+          const isTwoPlayer=(v?.meta?.playerCount|0)===2;
+          await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {
+            sel:{table:idx, cardId:c.id},
+            ...(isTwoPlayer ? {phase:'placeStand',destinationTable:null} : {})
+          });
+          if (isTwoPlayer) return;
       openMenuAtClick([
   {label:'とる', action: async ()=>{ const i18=(await get(ref(db, `rooms/${state.roomCode}/meta/i18Flow`))).val(); if(i18?.sel) await doItem18Take(i18.sel); }},
   {label:'やり直す', action: async ()=>{ await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), { sel:null, phase:'pickOther' }); }}
@@ -4993,7 +5032,11 @@ if (c.markUntil && now() < c.markUntil) {
           i2All && (i2All.phase==='placeStand' || i2All.phase==='resolving') && i2All.usingBy===state.userId &&
           i2All.selB && i2All.selB.table===idx && i2All.selB.cardId===c.id
         );
-        num.style.visibility = (c.open || isMine || i2ViewerCanSeeSelA || i2ActorCanSeeSelB) ? 'visible' : 'hidden';
+        const i18ActorCanSeeSel = !!(
+          i18All && (i18All.phase==='placeStand' || i18All.phase==='resolving') && i18All.usingBy===state.userId &&
+          i18All.sel && i18All.sel.table===idx && i18All.sel.cardId===c.id
+        );
+        num.style.visibility = (c.open || isMine || i2ViewerCanSeeSelA || i2ActorCanSeeSelB || i18ActorCanSeeSel) ? 'visible' : 'hidden';
       } else {
         num.textContent = '';
         num.style.visibility = 'hidden';
@@ -11126,9 +11169,11 @@ async function doItem2Swap(A, B, usingByUserId=null, placements=null){
 }
 
 /* ===== Item 18 take ===== */
-async function doItem18Take(sel){
-  const myTable = state.watching?.tables?.findIndex(t=> t.playerId===state.userId);
-  if(myTable==null || myTable<0){ alert('席に座ってから使用してください'); await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
+async function doItem18Take(sel,destinationTable=null){
+  const myTable = Number.isInteger(destinationTable)
+    ? destinationTable
+    : state.watching?.tables?.findIndex(t=> t.playerId===state.userId);
+  if(myTable==null || myTable<0 || state.watching?.tables?.[myTable]?.playerId!==state.userId){ alert('席に座ってから使用してください'); await update(ref(db, `rooms/${state.roomCode}/meta/i18Flow`), {sel:null, phase:'pickOther'}); return; }
   const snap = await get(ref(db, `rooms/${state.roomCode}/tables`));
   const tables = snap.val() || [];
 
