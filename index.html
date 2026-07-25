@@ -47,6 +47,74 @@
   .btn.ghost{background:transparent}
   .hidden{display:none!important}
 
+  /* 入室前画面 */
+  body.pre-entry header{display:none}
+  body.pre-entry main{
+    min-height:100dvh;
+    padding:0;
+    overflow:hidden;
+  }
+  .join-box{
+    width:100%;
+    height:100dvh;
+    display:grid;
+    place-items:center;
+    position:relative;
+  }
+  .room-browser{
+    width:min(88vw, 430px);
+    height:min(58dvh, 520px);
+    margin-top:8dvh;
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .create-room{
+    width:100%;
+    min-height:54px;
+    border:1px solid rgba(255,255,255,.7);
+    border-radius:12px;
+    background:rgba(0,0,0,.82);
+    color:#fff;
+    font-size:18px;
+    font-weight:800;
+    letter-spacing:.08em;
+    cursor:pointer;
+  }
+  .room-loading{color:#111;text-align:center;font-weight:700;padding:18px 0 8px}
+  .room-list{
+    margin-top:10px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    scrollbar-width:none;
+  }
+  .room-list::-webkit-scrollbar{display:none}
+  .room-entry{
+    position:relative;
+    flex:0 0 70px;
+    width:100%;
+    padding:12px 58px 21px 14px;
+    border:1px solid rgba(255,255,255,.8);
+    border-radius:12px;
+    background:rgba(255,255,255,.86);
+    color:#111;
+    text-align:left;
+    cursor:pointer;
+    box-shadow:0 3px 14px rgba(0,0,0,.12);
+  }
+  .room-players{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;font-weight:700}
+  .room-code{position:absolute;right:10px;bottom:7px;font-size:11px;font-weight:700;opacity:.68;letter-spacing:.06em}
+  .name-entry{
+    display:flex;
+    width:min(88vw, 360px);
+    gap:7px;
+  }
+  .name-entry input{min-width:0;flex:1;padding:12px;border:1px solid #bbb;border-radius:8px;font-size:16px}
+  .name-entry .btn{flex:0 0 auto;padding-inline:18px}
+
   .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:900}
   .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08);z-index:210}
   .menu .btn{width:220px;text-align:left}
@@ -1511,7 +1579,7 @@ main{
 }
 
 /* 入室画面だけ：画像を半透明に敷く */
-main:has(#lobby.hidden)::before{
+body.pre-entry main::before{
   content:"";
   position:absolute; inset:0;
   background: url('./bbback.jpg') center/cover no-repeat;
@@ -1521,13 +1589,13 @@ main:has(#lobby.hidden)::before{
 }
 
 /* コンテンツは常に前面＆不透明 */
-main:has(#lobby.hidden) > *{
+body.pre-entry main > *{
   position: relative;
   z-index: 1;
 }
 
 /* 画面いっぱいに見せたい場合だけ */
-main:has(#lobby.hidden){
+body.pre-entry main{
   min-height: calc(100vh - 56px);
 }
 
@@ -1699,7 +1767,7 @@ main:not(:has(#lobby.hidden)) > * {
 
 </style>
 </head>
-<body>
+<body class="pre-entry">
 <header>
   <h1>BOMB　BUSTERS</h1>
   <div class="small" id="roomInfo"></div>
@@ -1708,10 +1776,16 @@ main:not(:has(#lobby.hidden)) > * {
 <main>
   <div class="col">
 <div class="join-box" id="joinBox">
-  <!-- ★追加：名前（4文字以内）※未入力でも入室可 -->
-  <input id="userName" placeholder="名前（4文字以内）" maxlength="4" />
-  <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-  <button class="btn primary" id="btnJoin">入室</button>
+  <div class="room-browser" id="roomBrowser">
+    <button class="create-room" id="btnCreateRoom">CREATE ROOM</button>
+    <div class="room-loading" id="roomLoading">loading...</div>
+    <div class="room-list" id="roomList" aria-label="存在する部屋"></div>
+  </div>
+  <div class="name-entry hidden" id="nameEntry">
+    <input id="userName" aria-label="名前" maxlength="4" autocomplete="nickname" />
+    <input id="roomCode" type="hidden" maxlength="12" />
+    <button class="btn primary" id="btnJoin">決定</button>
+  </div>
 </div>
 
 
@@ -2067,7 +2141,11 @@ const roomInfo = document.getElementById('roomInfo');
 const joinBox= document.getElementById('joinBox');
 const inputName = document.getElementById('userName'); // ★追加
 const inputCode = document.getElementById('roomCode');
-
+const roomBrowser = document.getElementById('roomBrowser');
+const roomList = document.getElementById('roomList');
+const roomLoading = document.getElementById('roomLoading');
+const nameEntry = document.getElementById('nameEntry');
+const btnCreateRoom = document.getElementById('btnCreateRoom');
 const btnJoin = document.getElementById('btnJoin');
 
 const lobby   = document.getElementById('lobby');
@@ -2091,6 +2169,66 @@ try{
     if (saved) inputName.value = saved.slice(0, 4);
   } catch(_e){}
 }
+
+let availableRooms = [];
+let visibleRoomCount = 5;
+
+function participantNames(room){
+  return Object.values(room?.players || {})
+    .map(player => String(player?.name || '').trim())
+    .filter(Boolean);
+}
+
+function renderAvailableRooms(){
+  roomList.replaceChildren();
+  availableRooms.slice(0, visibleRoomCount).forEach(({code, room})=>{
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'room-entry';
+    const names = participantNames(room);
+    const players = document.createElement('span');
+    players.className = 'room-players';
+    players.textContent = names.join('・');
+    const codeLabel = document.createElement('span');
+    codeLabel.className = 'room-code';
+    codeLabel.textContent = code;
+    button.append(players, codeLabel);
+    button.onclick = ()=> openNameEntry(code);
+    roomList.appendChild(button);
+  });
+}
+
+function openNameEntry(code){
+  inputCode.value = code;
+  H(roomBrowser, true);
+  H(nameEntry, false);
+  inputName.focus();
+}
+
+inputName.addEventListener('input', ()=>{
+  try{ localStorage.setItem('savedUserName', inputName.value.slice(0, 4)); }catch(_e){}
+});
+
+btnCreateRoom.onclick = ()=> openNameEntry(randomRoomCode(5));
+roomList.addEventListener('scroll', ()=>{
+  if (roomList.scrollTop + roomList.clientHeight < roomList.scrollHeight - 40) return;
+  if (visibleRoomCount >= availableRooms.length) return;
+  visibleRoomCount = Math.min(visibleRoomCount + 5, availableRooms.length);
+  renderAvailableRooms();
+});
+
+onValue(ref(db, 'rooms'), snap=>{
+  availableRooms = Object.entries(snap.val() || {})
+    .map(([code, room])=>({code, room}))
+    .sort((a,b)=> Number(b.room?.createdAt || 0) - Number(a.room?.createdAt || 0));
+  roomLoading.classList.add('hidden');
+  renderAvailableRooms();
+}, ()=>{
+  roomLoading.textContent = 'loading...';
+});
+
+// 共有リンクから来た場合も、同じ最小構成の名前入力だけを表示する。
+if (inputCode.value) openNameEntry(inputCode.value);
 const tablesEl= document.getElementById('tables');
 const gear    = document.getElementById('gear');
 const menuPop = document.getElementById('menuPopup');
@@ -3495,7 +3633,7 @@ async function enter(mode){
   });
   listenRoom(code);
   // ★ 自動離席の遅延クリア役（Janitor）を起動
-  H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
+  H(joinBox,true); H(lobby,false); H(gear,false); document.body.classList.remove('pre-entry'); updateHeaderInfo();
 }
 
 function updateHeaderInfo(){
