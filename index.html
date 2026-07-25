@@ -4400,7 +4400,9 @@ function renderI2StandPlacement(v){
     const text = document.createElement('span');
     text.textContent = 'どちらのスタンドに置きますか。';
     prompt.appendChild(text);
-    prompt.onclick = ()=>{ state._i2StandPromptDismissed = promptKey; prompt.remove(); };
+    prompt.onclick = (ev)=>dismissStandPromptAndForward(ev,prompt,()=>{
+      state._i2StandPromptDismissed = promptKey;
+    });
     document.body.appendChild(prompt);
   }
 
@@ -4452,7 +4454,9 @@ function renderI18StandPlacement(v){
     const prompt=document.createElement('div'); prompt.id='i18StandPrompt'; prompt.className='i2-stand-prompt';
     const text=document.createElement('span'); text.textContent='どちらのスタンドに配置しますか。';
     prompt.appendChild(text);
-    prompt.onclick=()=>{ state._i18StandPromptDismissed=promptKey; prompt.remove(); };
+    prompt.onclick=ev=>dismissStandPromptAndForward(ev,prompt,()=>{
+      state._i18StandPromptDismissed=promptKey;
+    });
     document.body.appendChild(prompt);
   }
 
@@ -4479,6 +4483,24 @@ function renderI18StandPlacement(v){
       placeInsideViewport(pop,ev.clientX,ev.clientY);
     };
   });
+}
+
+function dismissStandPromptAndForward(ev,prompt,onDismiss){
+  const clientX=ev.clientX;
+  const clientY=ev.clientY;
+  onDismiss?.();
+  prompt.remove();
+
+  const target=document.elementFromPoint(clientX,clientY);
+  const table=target?.closest('.table.i2-stand-selectable, .table.m54-stand-selectable');
+  if (!table) return;
+  table.dispatchEvent(new MouseEvent('click',{
+    bubbles:true,
+    cancelable:true,
+    clientX,
+    clientY,
+    view:window
+  }));
 }
 
 function renderTables(v){
@@ -9585,7 +9607,7 @@ function beginM54StandSelection(tableIndices,onConfirm){
   const text=document.createElement('span');
   text.textContent='どちらのスタンドに置きますか。';
   prompt.appendChild(text);
-  prompt.onclick=()=>prompt.remove();
+  prompt.onclick=ev=>dismissStandPromptAndForward(ev,prompt);
   document.body.appendChild(prompt);
 
   tableIndices.forEach(tableIdx=>{
