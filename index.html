@@ -9430,8 +9430,14 @@ async function renderM54(v){
     const n = (v?.tables?.length|0);
     const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
     const per = isTwoPlayer ? 9 : (n<=2)?9 : (n===3)?6 : (n===4)?3 : 2;
-    const by  = {}; for (let i=0;i<n;i++) by[i]=per;
-    const pool = Math.max(0, 30 - n*per);
+    // 2人プレイでは各プレイヤーが2スタンドを持つため、着席先となる
+    // 先頭側（0・2）だけに酸素を配る。
+    const oxygenTables = isTwoPlayer
+      ? Array.from({length:n}, (_,i)=>i).filter(i=>i % 2 === 0)
+      : Array.from({length:n}, (_,i)=>i);
+    const by = {};
+    oxygenTables.forEach(i=>{ by[i] = per; });
+    const pool = Math.max(0, 30 - oxygenTables.length*per);
 
 const deck = Array.from({length:11}, (_,i)=> (i+1) + 0.5);
     shuffle(deck);
@@ -9510,9 +9516,10 @@ poolRow.onclick = (ev)=>{
   (v.tables||[]).forEach((T, ti)=>{
     const box = tableNodes[ti]; if (!box) return;
 
-    // 2人プレイでは、酸素は実際に着席しているスタンドだけに表示する。
-    if ((v?.meta?.playerCount|0) === 2 && !T?.playerId) {
+    // 2人プレイでは、各プレイヤーが着席した先頭側のスタンドだけに表示する。
+    if ((v?.meta?.playerCount|0) === 2 && (ti % 2 !== 0 || !T?.playerId)) {
       box.querySelector('.ox-row[data-owner="1"][data-m54="1"]')?.remove();
+      box.onclick = null;
       return;
     }
 
@@ -10056,8 +10063,12 @@ if (Number.isInteger(idx) && idx === ti){
       };
       const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
       const per = isTwoPlayer ? 7 : map(n);
-      const by  = {};
-      for (let i=0;i<n;i++) by[i] = per;
+      // 2人プレイでは各プレイヤーの着席先となる先頭側（0・2）だけに配る。
+      const oxygenTables = isTwoPlayer
+        ? Array.from({length:n}, (_,i)=>i).filter(i=>i % 2 === 0)
+        : Array.from({length:n}, (_,i)=>i);
+      const by = {};
+      oxygenTables.forEach(i=>{ by[i] = per; });
 
       // ミッション44で使っていた oxItem（プール）は使わないので 0 に
   update(ref(db, `rooms/${state.roomCode}/meta`), {
@@ -10075,9 +10086,10 @@ if (Number.isInteger(idx) && idx === ti){
       const box = tableNodes[ti];
       if (!box) return;
 
-      // 2人プレイでは、酸素は実際に着席しているスタンドだけに表示する。
-      if ((v?.meta?.playerCount|0) === 2 && !T?.playerId) {
+      // 2人プレイでは、各プレイヤーが着席した先頭側のスタンドだけに表示する。
+      if ((v?.meta?.playerCount|0) === 2 && (ti % 2 !== 0 || !T?.playerId)) {
         box.querySelector('.ox-row[data-owner="1"]')?.remove();
+        box.onclick = null;
         return;
       }
 
