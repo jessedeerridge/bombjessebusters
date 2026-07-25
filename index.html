@@ -3541,6 +3541,7 @@ if (v) {
       renderTables(v);
       renderI2StandPlacement(v);
       renderI18StandPlacement(v);
+      renderM54StandPlacement(v);
 
 
       // 席ポップアップが開いていれば、他端末の着席/離席を即時反映
@@ -4469,6 +4470,46 @@ function renderI18StandPlacement(v){
         pop.remove();
         await update(ref(db,`rooms/${state.roomCode}/meta/i18Flow`),{phase:'resolving',destinationTable:tableIdx});
         await doItem18Take(flow.sel,tableIdx);
+      };
+      no.onclick=()=>pop.remove();
+      actions.append(yes,no); pop.append(label,actions);
+      placeInsideViewport(pop,ev.clientX,ev.clientY);
+    };
+  });
+}
+
+function renderM54StandPlacement(v){
+  document.getElementById('m54StandPrompt')?.remove();
+  const flow=v?.meta?.m54_placeFlow;
+  if ((v?.mission?.id|0)!==54 || (v?.meta?.playerCount|0)!==2 || flow?.phase!=='placeStand' || flow?.usingBy!==state.userId) return;
+  const myTables=(v.tables||[]).map((table,i)=>table?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+  if (!myTables.length) return;
+
+  const promptKey=`${flow.usingBy}:${flow.requestId}`;
+  if (state._m54StandPromptDismissed!==promptKey){
+    const prompt=document.createElement('div'); prompt.id='m54StandPrompt'; prompt.className='i2-stand-prompt';
+    const text=document.createElement('span'); text.textContent='どちらのスタンドに配置しますか。';
+    prompt.appendChild(text);
+    prompt.onclick=()=>{ state._m54StandPromptDismissed=promptKey; prompt.remove(); };
+    document.body.appendChild(prompt);
+  }
+
+  myTables.forEach(tableIdx=>{
+    const tableEl=document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
+    if (!tableEl) return;
+    tableEl.classList.add('i2-stand-selectable');
+    tableEl.onclick=ev=>{
+      ev.stopPropagation();
+      const pop=document.createElement('div'); pop.className='mini-pop i2-stand-confirm';
+      pop.onclick=e=>e.stopPropagation();
+      const label=document.createElement('div'); label.className='i2-stand-confirm-label'; label.textContent='このスタンドに配置しますか。';
+      const actions=document.createElement('div'); actions.className='i2-stand-confirm-actions';
+      const yes=document.createElement('button'); yes.className='btn small primary'; yes.textContent='はい';
+      const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
+      yes.onclick=async ()=>{
+        pop.remove();
+        await update(ref(db,`rooms/${state.roomCode}/meta/m54_placeFlow`),{phase:'resolving',destinationTable:tableIdx});
+        await addM54RedCardToTable(tableIdx,flow.num);
       };
       no.onclick=()=>pop.remove();
       actions.append(yes,no); pop.append(label,actions);
@@ -9246,6 +9287,42 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
 
   
 /* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
+async function addM54RedCardToTable(tableIdx,expectedNum){
+  const roomSnap=await get(ref(db,`rooms/${state.roomCode}`));
+  const room=roomSnap.val()||{};
+  const meta=room.meta||{};
+  const table=room.tables?.[tableIdx];
+  if ((room?.mission?.id|0)!==54 || !table || table.playerId!==state.userId){
+    await update(ref(db,`rooms/${state.roomCode}/meta`),{m54_placeFlow:null});
+    return;
+  }
+  const deck=Array.isArray(meta.m54_redDeck)?meta.m54_redDeck.slice():[];
+  const used=Array.isArray(meta.m54_redUsed)?meta.m54_redUsed.slice():[];
+  const top=deck.find(num=>!used.includes(num));
+  if (top==null || Number(top)!==Number(expectedNum)){
+    await update(ref(db,`rooms/${state.roomCode}/meta`),{m54_placeFlow:null});
+    return;
+  }
+
+  const hand=Array.isArray(table.hand)?table.hand.slice():[];
+  const cardId=crypto.randomUUID();
+  const card={id:cardId,num:top,kind:'red',open:false,ownerId:state.userId,tokens:[],markUntil:Date.now()+5000};
+  let insertIndex=0;
+  while(insertIndex<hand.length && Number(hand[insertIndex]?.num)<=Number(top)) insertIndex++;
+  hand.splice(insertIndex,0,card);
+  const alpha='abcdefghijklmnopqrstuvwxyz'; hand.forEach((entry,i)=>entry.alpha=alpha[i%alpha.length]);
+  used.push(top);
+
+  const updates={};
+  updates[`rooms/${state.roomCode}/tables/${tableIdx}/hand`]=hand;
+  updates[`rooms/${state.roomCode}/meta/m54_redUsed`]=used;
+  updates[`rooms/${state.roomCode}/meta/m54_placeFlow`]=null;
+  updates[`rooms/${state.roomCode}/meta/m54_insertAnim`]={
+    id:`${Date.now()}_${cardId}`,table:tableIdx,insertIndex,cardId,num:top,startedAt:Date.now()
+  };
+  await update(ref(db),updates);
+}
+
 async function renderM54(v){
   const isM54 = ((v?.mission?.id|0) === 54);
   // 画面要素の片付け
@@ -9488,6 +9565,14 @@ poolRow.onclick = (ev)=>{
           // 次の1枚
           const top = D.find(n=> !U.includes(n));
           if (top==null) return;
+
+          // 2人プレイでは追加先を即決せず、所有する2スタンドから選ぶ。
+          if ((meta?.playerCount|0)===2){
+            await update(mRef,{
+              m54_placeFlow:{usingBy:state.userId,phase:'placeStand',num:top,requestId:crypto.randomUUID(),destinationTable:null}
+            });
+            return;
+          }
 
           // 自分のテーブル番号
           const myTable = (()=>{
