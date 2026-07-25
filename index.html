@@ -47,6 +47,70 @@
   .btn.ghost{background:transparent}
   .hidden{display:none!important}
 
+  body.pre-entry header{display:none}
+  body.pre-entry main{min-height:100dvh!important;padding:0}
+  .room-browser{
+    width:min(560px, calc(100vw - 32px));
+    height:calc(100dvh - 72px);
+    margin:clamp(42px, 11vh, 104px) auto 0;
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .create-room{
+    align-self:center;
+    border:0;
+    background:#111;
+    color:#fff;
+    border-radius:999px;
+    padding:13px 28px;
+    font-size:16px;
+    font-weight:800;
+    letter-spacing:.08em;
+    cursor:pointer;
+    box-shadow:0 5px 18px rgba(0,0,0,.2);
+  }
+  .room-loading{height:28px;padding-top:8px;text-align:center;font-size:13px;font-weight:600}
+  .room-list{
+    min-height:0;
+    overflow-y:auto;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:9px;
+    padding:8px 2px 36px;
+  }
+  .room-list::-webkit-scrollbar{display:none}
+  .room-card{
+    position:relative;
+    flex:0 0 78px;
+    width:100%;
+    border:1px solid rgba(255,255,255,.7);
+    border-radius:13px;
+    padding:14px 16px 27px;
+    background:rgba(255,255,255,.88);
+    color:#111;
+    cursor:pointer;
+    text-align:left;
+    box-shadow:0 4px 16px rgba(0,0,0,.13);
+    backdrop-filter:blur(5px);
+  }
+  .room-players{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:650}
+  .room-meta{position:absolute;right:13px;bottom:7px;display:flex;gap:8px;align-items:center;font-size:11px;opacity:.72}
+  .room-code{font-weight:800;letter-spacing:.08em}
+  .name-entry{
+    position:fixed;
+    inset:0;
+    z-index:2147483640;
+    display:grid;
+    place-items:center;
+    background:rgba(0,0,0,.25);
+  }
+  .name-entry-inner{display:flex;gap:7px;padding:12px;border-radius:12px;background:rgba(255,255,255,.94);box-shadow:0 10px 34px rgba(0,0,0,.25)}
+  .name-entry input{width:180px;padding:10px;border:1px solid #bbb;border-radius:8px;font-size:16px}
+  .name-entry .btn{padding-inline:16px}
+
   .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:900}
   .menu{position:fixed;right:12px;bottom:64px;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;box-shadow:0 12px 24px rgba(0,0,0,.08);z-index:210}
   .menu .btn{width:220px;text-align:left}
@@ -1699,7 +1763,7 @@ main:not(:has(#lobby.hidden)) > * {
 
 </style>
 </head>
-<body>
+<body class="pre-entry">
 <header>
   <h1>BOMB　BUSTERS</h1>
   <div class="small" id="roomInfo"></div>
@@ -1707,11 +1771,17 @@ main:not(:has(#lobby.hidden)) > * {
 
 <main>
   <div class="col">
-<div class="join-box" id="joinBox">
-  <!-- ★追加：名前（4文字以内）※未入力でも入室可 -->
-  <input id="userName" placeholder="名前（4文字以内）" maxlength="4" />
-  <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-  <button class="btn primary" id="btnJoin">入室</button>
+<section class="room-browser" id="roomBrowser" aria-label="ルーム一覧">
+  <button class="create-room" id="btnCreateRoom" type="button">CREATE ROOM</button>
+  <div class="room-loading" id="roomLoading">loading...</div>
+  <div class="room-list" id="roomList"></div>
+</section>
+<div class="name-entry hidden" id="joinBox">
+  <div class="name-entry-inner">
+    <input id="userName" placeholder="名前" maxlength="4" autocomplete="nickname" aria-label="名前" />
+    <input id="roomCode" type="hidden" maxlength="12" />
+    <button class="btn primary" id="btnJoin">決定</button>
+  </div>
 </div>
 
 
@@ -2069,6 +2139,10 @@ const inputName = document.getElementById('userName'); // ★追加
 const inputCode = document.getElementById('roomCode');
 
 const btnJoin = document.getElementById('btnJoin');
+const roomBrowser = document.getElementById('roomBrowser');
+const roomList = document.getElementById('roomList');
+const roomLoading = document.getElementById('roomLoading');
+const btnCreateRoom = document.getElementById('btnCreateRoom');
 
 const lobby   = document.getElementById('lobby');
 // ▼ 追加：クイックミッションピッカー起動ボタン
@@ -2098,6 +2172,72 @@ const btnSit  = document.getElementById('btnSit');
 const btnLeave= document.getElementById('btnLeaveSeat');
 // ▼ やり直すを廃止し、ミッションピックに変更
 const btnPickMission = document.getElementById('btnPickMission');
+
+let availableRooms = [];
+let visibleRoomCount = 5;
+
+function formatRoomCreatedAt(value){
+  const date = new Date(Number(value) || Date.now());
+  return `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+}
+
+function openNameEntry(code){
+  inputCode.value = code;
+  H(joinBox, false);
+  requestAnimationFrame(()=> inputName.focus());
+}
+
+function renderAvailableRooms(){
+  roomList.replaceChildren();
+  availableRooms.slice(0, visibleRoomCount).forEach(({ code, room })=>{
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'room-card';
+    const names = Object.values(room.players || {}).map(player=>String(player?.name || '').trim()).filter(Boolean);
+    const players = document.createElement('span');
+    players.className = 'room-players';
+    players.textContent = names.join('・') || '　';
+    const meta = document.createElement('span');
+    meta.className = 'room-meta';
+    const time = document.createElement('span');
+    time.textContent = formatRoomCreatedAt(room.createdAt);
+    const codeLabel = document.createElement('span');
+    codeLabel.className = 'room-code';
+    codeLabel.textContent = code;
+    meta.append(time, codeLabel);
+    button.append(players, meta);
+    button.onclick = ()=> openNameEntry(code);
+    roomList.appendChild(button);
+  });
+}
+
+onValue(ref(db, 'rooms'), snap=>{
+  availableRooms = Object.entries(snap.val() || {})
+    .map(([code, room])=>({ code, room:room || {} }))
+    .sort((a,b)=>(Number(b.room.createdAt)||0) - (Number(a.room.createdAt)||0));
+  roomLoading.classList.add('hidden');
+  renderAvailableRooms();
+}, ()=>{
+  roomLoading.textContent = 'loading...';
+});
+
+roomList.addEventListener('scroll', ()=>{
+  if (roomList.scrollTop + roomList.clientHeight >= roomList.scrollHeight - 40 && visibleRoomCount < availableRooms.length){
+    visibleRoomCount = Math.min(visibleRoomCount + 5, availableRooms.length);
+    renderAvailableRooms();
+  }
+});
+
+btnCreateRoom.onclick = ()=> openNameEntry(randomRoomCode(5));
+joinBox.addEventListener('click', event=>{
+  if (event.target === joinBox) H(joinBox, true);
+});
+inputName.addEventListener('input', ()=>{
+  try { localStorage.setItem('savedUserName', inputName.value.slice(0,4)); } catch(_e){}
+});
+inputName.addEventListener('keydown', event=>{
+  if (event.key === 'Enter') btnJoin.click();
+});
 // ▼ 既存のrestartPop系は残すが使用しない（互換維持）
 const restartPop=document.getElementById('restartPop');
 const btnRestartOk=document.getElementById('btnRestartOk');
@@ -3495,7 +3635,7 @@ async function enter(mode){
   });
   listenRoom(code);
   // ★ 自動離席の遅延クリア役（Janitor）を起動
-  H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
+  H(joinBox,true); H(roomBrowser,true); H(lobby,false); H(gear,false); document.body.classList.remove('pre-entry'); updateHeaderInfo();
 }
 
 function updateHeaderInfo(){
