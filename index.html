@@ -636,6 +636,9 @@
   .table.m54-stand-selectable .card,
   .table.m54-stand-selectable .alpha,
   .table.m54-stand-selectable .token{pointer-events:none}
+  .table.i2-stand-selected,
+  .table.i18-stand-selected,
+  .table.m54-stand-selected{outline:1px dashed #b8b8b8;outline-offset:-1px}
   .i2-stand-prompt{position:fixed;inset:0;z-index:850;display:grid;place-items:center;cursor:pointer}
   .i2-stand-prompt span{padding:16px 22px;border-radius:10px;background:#111;color:#fff;font-weight:700;
     text-align:center;box-shadow:0 14px 32px rgba(0,0,0,.35)}
@@ -4386,10 +4389,14 @@ function deriveChecklistCodeHints(displayLines){
 function renderI2StandPlacement(v){
   document.getElementById('i2StandPrompt')?.remove();
   document.querySelectorAll('#tables .table.i2-stand-selectable').forEach(el=>el.classList.remove('i2-stand-selectable'));
+  document.querySelectorAll('#tables .table.i2-stand-selected').forEach(el=>el.classList.remove('i2-stand-selected'));
   const flow = v?.meta?.i2Flow;
+  const myTables = (v.tables||[]).map((t,i)=>t?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+  if (flow?.approvals?.[state.userId]===true && Number.isInteger(flow?.placements?.[state.userId])){
+    document.querySelector(`.table[data-table-idx="${flow.placements[state.userId]}"]`)?.classList.add('i2-stand-selected');
+  }
   if ((v?.meta?.playerCount|0) !== 2 || flow?.phase !== 'placeStand') return;
 
-  const myTables = (v.tables||[]).map((t,i)=>t?.playerId===state.userId ? i : -1).filter(i=>i>=0);
   if (!myTables.length) return;
 
   const promptKey = `${flow.usingBy}:${flow.selA?.cardId}:${flow.selB?.cardId}`;
@@ -4409,6 +4416,7 @@ function renderI2StandPlacement(v){
   myTables.forEach(tableIdx=>{
     const tableEl = document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
     if (!tableEl) return;
+    if (flow.approvals?.[state.userId]===true) return;
     tableEl.classList.add('i2-stand-selectable');
     tableEl.onclick = (ev)=>{
       ev.stopPropagation();
@@ -4421,6 +4429,7 @@ function renderI2StandPlacement(v){
       const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
       yes.onclick=async ()=>{
         pop.remove();
+        markStandSelected(tableIdx,'i2');
         const base = `rooms/${state.roomCode}/meta/i2Flow`;
         await update(ref(db, base), {
           [`placements/${state.userId}`]:tableIdx,
@@ -4444,7 +4453,11 @@ function renderI2StandPlacement(v){
 
 function renderI18StandPlacement(v){
   document.getElementById('i18StandPrompt')?.remove();
+  document.querySelectorAll('#tables .table.i18-stand-selected').forEach(el=>el.classList.remove('i18-stand-selected'));
   const flow=v?.meta?.i18Flow;
+  if (flow?.phase==='resolving' && flow?.usingBy===state.userId && Number.isInteger(flow.destinationTable)){
+    document.querySelector(`.table[data-table-idx="${flow.destinationTable}"]`)?.classList.add('i18-stand-selected');
+  }
   if ((v?.meta?.playerCount|0)!==2 || flow?.phase!=='placeStand' || flow?.usingBy!==state.userId) return;
   const myTables=(v.tables||[]).map((table,i)=>table?.playerId===state.userId ? i : -1).filter(i=>i>=0);
   if (!myTables.length) return;
@@ -4475,6 +4488,7 @@ function renderI18StandPlacement(v){
       const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
       yes.onclick=async ()=>{
         pop.remove();
+        markStandSelected(tableIdx,'i18');
         await update(ref(db,`rooms/${state.roomCode}/meta/i18Flow`),{phase:'resolving',destinationTable:tableIdx});
         await doItem18Take(flow.sel,tableIdx);
       };
@@ -4483,6 +4497,13 @@ function renderI18StandPlacement(v){
       placeInsideViewport(pop,ev.clientX,ev.clientY);
     };
   });
+}
+
+function markStandSelected(tableIdx,kind){
+  document.querySelectorAll(`#tables .table.${kind}-stand-selectable`).forEach(table=>table.classList.remove(`${kind}-stand-selectable`));
+  document.querySelectorAll(`#tables .table.${kind}-stand-selected`).forEach(table=>table.classList.remove(`${kind}-stand-selected`));
+  const selected=document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
+  selected?.classList.add(`${kind}-stand-selected`);
 }
 
 function dismissStandPromptAndForward(ev,prompt,onDismiss){
@@ -7627,6 +7648,8 @@ function runM54InsertAnimation(v){
     if (!deckBtn || !targetWrap){
       if (hiddenWrap) hiddenWrap.classList.remove('m54-pending-arrival');
       state._m54AnimRunningId = null;
+      state._m54SelectedStand = null;
+      document.querySelectorAll('.table.m54-stand-selected').forEach(table=>table.classList.remove('m54-stand-selected'));
       return;
     }
 
@@ -7639,6 +7662,8 @@ function runM54InsertAnimation(v){
     if (!Number.isFinite(a.left) || !Number.isFinite(b.left)) {
       targetWrap.classList.remove('m54-pending-arrival');
       state._m54AnimRunningId = null;
+      state._m54SelectedStand = null;
+      document.querySelectorAll('.table.m54-stand-selected').forEach(table=>table.classList.remove('m54-stand-selected'));
       return;
     }
 
@@ -7672,6 +7697,8 @@ function runM54InsertAnimation(v){
       hiddenWrap = null;
       state._m54AnimFinishedId = anim.id;
       state._m54AnimRunningId = null;
+      state._m54SelectedStand = null;
+      document.querySelectorAll('.table.m54-stand-selected').forEach(table=>table.classList.remove('m54-stand-selected'));
     }, flyMs + 80);
   }, shiftMs + settleDelayMs);
 }
@@ -9277,6 +9304,7 @@ async function renderM54(v){
   // 画面要素の片付け
   if (!isM54){
     clearM54StandSelection();
+    state._m54SelectedStand=null;
     const x = document.getElementById('m54OxPool'); if (x) x.remove();
     const y = document.getElementById('m54RedBox'); if (y) y.remove();
     state._m54AnimRunningId = null;
@@ -9311,6 +9339,9 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
   // --- 1) アイテム列の直下に「リザーブ」を出す（左に ox2 画像） ---
   const itemsBar = document.getElementById('itemsBar');
   if (!itemsBar) return;
+  if (Number.isInteger(state._m54SelectedStand)){
+    document.querySelector(`.table[data-table-idx="${state._m54SelectedStand}"]`)?.classList.add('m54-stand-selected');
+  }
 
   let poolRow = document.getElementById('m54OxPool');
   if (!poolRow){
@@ -9633,6 +9664,8 @@ function beginM54StandSelection(tableIndices,onConfirm){
       no.textContent='いいえ';
       yes.onclick=async ()=>{
         clearM54StandSelection();
+        state._m54SelectedStand=tableIdx;
+        markStandSelected(tableIdx,'m54');
         await onConfirm(tableIdx);
       };
       no.onclick=()=>pop.remove();
