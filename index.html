@@ -38,6 +38,60 @@
 
   .join-box{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
   .join-box input{padding:8px;border:1px solid #ddd;border-radius:6px; font-size:16px;}
+  .room-browser{
+    width:min(560px, 100%);
+    min-height:100%;
+    margin:clamp(52px, 12vh, 120px) auto 0;
+    padding:0 16px 40px;
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:12px;
+  }
+  .create-room-btn{
+    align-self:center;
+    min-width:190px;
+    padding:13px 24px;
+    border:1px solid #111;
+    border-radius:10px;
+    background:#111;
+    color:#fff;
+    font-size:16px;
+    font-weight:800;
+    letter-spacing:.08em;
+    cursor:pointer;
+  }
+  .room-loading{min-height:20px;text-align:center;font-size:13px;font-weight:700}
+  .room-list{display:flex;flex-direction:column;gap:10px;max-height:400px;overflow-y:auto;scrollbar-width:none}
+  .room-list::-webkit-scrollbar{display:none}
+  .room-choice{
+    position:relative;
+    width:100%;
+    min-height:72px;
+    padding:15px 64px 24px 16px;
+    border:1px solid rgba(17,17,17,.24);
+    border-radius:12px;
+    background:rgba(255,255,255,.9);
+    color:#111;
+    text-align:left;
+    cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,.08);
+  }
+  .room-members{font-size:16px;font-weight:700;overflow-wrap:anywhere}
+  .room-code{position:absolute;right:10px;bottom:8px;font-size:11px;font-weight:700;opacity:.7}
+  .room-empty{text-align:center;padding:18px;background:rgba(255,255,255,.72);border-radius:10px}
+  .name-dialog{
+    width:min(340px, calc(100vw - 32px));
+    border:0;
+    border-radius:14px;
+    padding:22px;
+    box-shadow:0 20px 60px rgba(0,0,0,.3);
+  }
+  .name-dialog::backdrop{background:rgba(0,0,0,.45)}
+  .name-dialog-form{display:flex;flex-direction:column;gap:14px}
+  .name-dialog label{font-size:13px;font-weight:700}
+  .name-dialog input{width:100%;padding:11px;border:1px solid #bbb;border-radius:8px;font-size:16px}
+  .name-dialog-actions{display:flex;justify-content:flex-end;gap:8px}
   .btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#f8f8f8;cursor:pointer}
   .btn.primary{background:#111;color:#fff;border-color:#111}
   .btn.loading{opacity:.55;cursor:progress}
@@ -1528,8 +1582,12 @@ main:has(#lobby.hidden) > *{
 
 /* 画面いっぱいに見せたい場合だけ */
 main:has(#lobby.hidden){
-  min-height: calc(100vh - 56px);
+  min-height: 100vh;
 }
+body:has(#lobby.hidden) header{display:none}
+body:has(#lobby.hidden){scrollbar-width:none}
+body:has(#lobby.hidden)::-webkit-scrollbar{display:none}
+main:has(#lobby.hidden){padding:0;overflow:visible}
 
 .tab{
   padding:6px 10px;
@@ -1708,10 +1766,22 @@ main:not(:has(#lobby.hidden)) > * {
 <main>
   <div class="col">
 <div class="join-box" id="joinBox">
-  <!-- ★追加：名前（4文字以内）※未入力でも入室可 -->
-  <input id="userName" placeholder="名前（4文字以内）" maxlength="4" />
-  <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-  <button class="btn primary" id="btnJoin">入室</button>
+  <section class="room-browser" aria-label="ルーム一覧">
+    <button class="create-room-btn" id="btnCreateRoom" type="button">CREATE ROOM</button>
+    <div class="room-loading" id="roomLoading" role="status">loading...</div>
+    <div class="room-list" id="roomList"></div>
+  </section>
+  <dialog class="name-dialog" id="nameDialog">
+    <form class="name-dialog-form" id="nameDialogForm">
+      <label for="userName">名前（4文字以内）</label>
+      <input id="userName" placeholder="名前" maxlength="4" autocomplete="nickname" />
+      <div class="name-dialog-actions">
+        <button class="btn" id="btnNameCancel" type="button">キャンセル</button>
+        <button class="btn primary" id="btnJoin" type="submit">決定</button>
+      </div>
+    </form>
+  </dialog>
+  <input id="roomCode" type="hidden" />
 </div>
 
 
@@ -2069,6 +2139,15 @@ const inputName = document.getElementById('userName'); // ★追加
 const inputCode = document.getElementById('roomCode');
 
 const btnJoin = document.getElementById('btnJoin');
+const btnCreateRoom = document.getElementById('btnCreateRoom');
+const roomList = document.getElementById('roomList');
+const roomLoading = document.getElementById('roomLoading');
+const nameDialog = document.getElementById('nameDialog');
+const nameDialogForm = document.getElementById('nameDialogForm');
+const btnNameCancel = document.getElementById('btnNameCancel');
+let roomPageSize = 5;
+let availableRooms = [];
+let entryIntent = null;
 
 const lobby   = document.getElementById('lobby');
 // ▼ 追加：クイックミッションピッカー起動ボタン
@@ -2084,6 +2163,7 @@ try{
   const qName = (qs.get('name')||'').trim();
   if (qRoom) inputCode.value = qRoom.slice(0, 12);
   if (qName) inputName.value = qName.slice(0, 4);
+  if (qRoom) setTimeout(()=> openNameDialog('join', inputCode.value), 0);
 }catch(_e){}
   if (!inputName.value) {
   try {
@@ -2091,6 +2171,80 @@ try{
     if (saved) inputName.value = saved.slice(0, 4);
   } catch(_e){}
 }
+
+function openNameDialog(intent, code=''){
+  entryIntent = intent;
+  inputCode.value = code;
+  if (!nameDialog.open) nameDialog.showModal();
+  requestAnimationFrame(()=> inputName.focus());
+}
+
+function renderRoomList(){
+  const previousScrollTop = roomList.scrollTop;
+  roomList.replaceChildren();
+  const rooms = availableRooms.slice(0, roomPageSize);
+  if (!rooms.length){
+    const empty = document.createElement('div');
+    empty.className = 'room-empty';
+    empty.textContent = '現在、参加できる部屋はありません。';
+    roomList.appendChild(empty);
+    return;
+  }
+  rooms.forEach(room => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'room-choice';
+    const members = document.createElement('span');
+    members.className = 'room-members';
+    members.textContent = room.names.length ? room.names.join('・') : '参加者なし';
+    const code = document.createElement('span');
+    code.className = 'room-code';
+    code.textContent = room.code;
+    button.append(members, code);
+    button.addEventListener('click', ()=> openNameDialog('join', room.code));
+    roomList.appendChild(button);
+  });
+  roomList.scrollTop = previousScrollTop;
+}
+
+onValue(ref(db, 'rooms'), snap => {
+  const rooms = snap.val() || {};
+  availableRooms = Object.entries(rooms)
+    .map(([code, room]) => ({
+      code,
+      createdAt: Number(room?.createdAt || 0),
+      names: Object.values(room?.players || {})
+        .filter(player => player?.online !== false)
+        .map(player => String(player?.name || '').trim())
+        .filter(Boolean)
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt);
+  roomPageSize = Math.max(5, Math.min(roomPageSize, availableRooms.length));
+  roomLoading.classList.add('hidden');
+  renderRoomList();
+}, () => {
+  roomLoading.textContent = '部屋を読み込めませんでした。';
+});
+
+window.addEventListener('scroll', ()=>{
+  if (joinBox.classList.contains('hidden') || roomPageSize >= availableRooms.length) return;
+  const nearBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 120;
+  if (nearBottom){
+    roomPageSize = Math.min(roomPageSize + 5, availableRooms.length);
+    renderRoomList();
+  }
+}, {passive:true});
+roomList.addEventListener('scroll', ()=>{
+  if (roomPageSize >= availableRooms.length) return;
+  if (roomList.scrollTop + roomList.clientHeight >= roomList.scrollHeight - 80){
+    roomPageSize = Math.min(roomPageSize + 5, availableRooms.length);
+    renderRoomList();
+  }
+}, {passive:true});
+
+btnCreateRoom.addEventListener('click', ()=> openNameDialog('create'));
+btnNameCancel.addEventListener('click', ()=> nameDialog.close());
+nameDialog.addEventListener('cancel', ()=> { entryIntent = null; });
 const tablesEl= document.getElementById('tables');
 const gear    = document.getElementById('gear');
 const menuPop = document.getElementById('menuPopup');
@@ -3433,7 +3587,8 @@ function openBottomMenu(entries){
 
 
 /* enter */
-btnJoin.onclick   = async ()=>{
+nameDialogForm.addEventListener('submit', async event => {
+  event.preventDefault();
   if (btnJoin.dataset.loading === '1') return;
   btnJoin.dataset.loading = '1';
   btnJoin.classList.add('loading');
@@ -3445,19 +3600,23 @@ btnJoin.onclick   = async ()=>{
   state.userId = loadStableUserIdByName(state.userName);
   saveStableUserIdByName(state.userName, state.userId);
 
-  // ★ルームコード未入力なら英数字5文字を自動採番
-  if (!inputCode.value.trim()) {
-    inputCode.value = randomRoomCode(5);
+  if (entryIntent === 'create') {
+    let code;
+    do {
+      code = randomRoomCode(5);
+    } while ((await get(ref(db, `rooms/${code}`))).exists());
+    inputCode.value = code;
   }
 
   try{
     await enter('player');
+    nameDialog.close();
   } finally {
     btnJoin.dataset.loading = '0';
     btnJoin.classList.remove('loading');
     btnJoin.disabled = false;
   }
-};
+});
 
 
 async function enter(mode){
