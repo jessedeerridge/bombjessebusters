@@ -4456,10 +4456,23 @@ function renderI18StandPlacement(v){
     const tableEl=document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
     if (!tableEl) return;
     tableEl.classList.add('i2-stand-selectable');
-    tableEl.onclick=async ev=>{
+    tableEl.onclick=ev=>{
       ev.stopPropagation();
-      await update(ref(db,`rooms/${state.roomCode}/meta/i18Flow`),{phase:'resolving',destinationTable:tableIdx});
-      await doItem18Take(flow.sel,tableIdx);
+      const pop=document.createElement('div'); pop.className='mini-pop i2-stand-confirm';
+      pop.onclick=e=>e.stopPropagation();
+      const label=document.createElement('div'); label.className='i2-stand-confirm-label';
+      label.textContent='このスタンドに配置しますか。';
+      const actions=document.createElement('div'); actions.className='i2-stand-confirm-actions';
+      const yes=document.createElement('button'); yes.className='btn small primary'; yes.textContent='はい';
+      const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
+      yes.onclick=async ()=>{
+        pop.remove();
+        await update(ref(db,`rooms/${state.roomCode}/meta/i18Flow`),{phase:'resolving',destinationTable:tableIdx});
+        await doItem18Take(flow.sel,tableIdx);
+      };
+      no.onclick=()=>pop.remove();
+      actions.append(yes,no); pop.append(label,actions);
+      placeInsideViewport(pop,ev.clientX,ev.clientY);
     };
   });
 }
