@@ -682,6 +682,9 @@
   .m61-stack > .m61-mini{
     margin-top:calc(var(--char-h) * -0.5);
   }
+  /* #31（2人用）：2枚目の制約は1枚目の直下、正体カードだけ半分重ねる */
+  .char-col > .m31-second{ margin-top:0; z-index:2; }
+  .char-col > .m31-second + .m31-character{ margin-top:calc(var(--char-h) * -0.5); }
   .char-col > .char-card,
   .m61-stack > .m61-con{
     position:relative;
@@ -3015,6 +3018,14 @@ function buildMixPlan(missionId, playerCount = (state.watching?.meta?.playerCoun
     24: [{type:'redPick', k:3}],
     25: [{type:'redPick', k:3}],
     28: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
+    32: [{type:'redPick', k:3}],
+    33: [{type:'redPick', k:3}],
+    35: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
+    36: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
+    37: [{type:'redPick', k:3}],
+    38: [{type:'redPick', k:3}],
+    39: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
+    41: [{type:'redChoose', from:3, take:2}],
   };
   if (playerCount === 2 && twoPlayerPlans[missionId]) return twoPlayerPlans[missionId];
 
@@ -5194,9 +5205,16 @@ const countSame = myHand.filter(cc => cc.num===c.num).length;
  const cap   = state.watching?.captainTable ?? 0;
  const total = (state.watching?.tables?.length||0);
  const order = ((idx - cap + total) % total) + 1; // 1始まり
+ const isTwoPlayer40 = _m40 && (state.watching?.meta?.playerCount|0) === 2;
+ const captainPlayerId = state.watching?.tables?.[cap]?.playerId;
+ const tablePlayerId = state.watching?.tables?.[idx]?.playerId;
  // x系許可：1,3,5番手／ 偶奇許可：2,4番手／ それ以外（6番手など）はどちらも不可
- const USE_X      = (!!flags.useXTokens)   || (_m40 && [1,3,5].includes(order));
- const USE_PARITY = (!!flags.useParityToken)|| (_m40 && [2,4].includes(order));
+ const USE_X = (!!flags.useXTokens) || (_m40 && (
+   isTwoPlayer40 ? tablePlayerId === captainPlayerId : [1,3,5].includes(order)
+ ));
+ const USE_PARITY = (!!flags.useParityToken) || (_m40 && (
+   isTwoPlayer40 ? tablePlayerId !== captainPlayerId : [2,4].includes(order)
+ ));
 const isColorCode = (c.kind === 'red' || c.kind === 'yellow' || c.kind === 'blue');
 
  // 黄コードトークン（▧）
@@ -6328,7 +6346,7 @@ function renderM31(v){
   }
 
 const taken = new Set(
-  (v?.tables || []).map(t => t?.m31Con).filter(Boolean)
+  (v?.tables || []).flatMap(t => [t?.m31Con, t?.m31Con2]).filter(Boolean)
 );
 const pool = ['A','B','C','D','E'].filter(ch => !taken.has(ch));
 
@@ -6372,6 +6390,7 @@ pool.forEach(ch=>{
     const mid31 = (v?.mission?.id|0);
     const rolePicked31 = isRoleSelectionDone(t, mid31);
     const picked = t?.m31Con;
+    const picked2 = t?.m31Con2;
     const face   = t?.m31Face || 'front';
     const faceName = String(t?.character?.face || '');
     const isMember5Card = /member\s*\(5\)\./i.test(faceName);
@@ -6441,8 +6460,20 @@ pool.forEach(ch=>{
       else openConstraintZoomView(picked);
     };
 
+    if ((v?.meta?.playerCount|0) === 2 && picked2) {
+      const second = document.createElement('div');
+      second.className = 'm61-mini m31-mini m31-second';
+      paintConstraintCard(second, picked2);
+      second.onclick = (ev)=>{
+        ev.stopPropagation();
+        if (isMine) openConstraintZoom31Owned(picked2, ti);
+        else openConstraintZoomView(picked2);
+      };
+      charCol.appendChild(second);
+    }
+
     const mini = document.createElement('div');
-    mini.className = 'm61-mini m31-mini';
+    mini.className = 'm61-mini m31-mini m31-character';
     if (seatEmpty || !rolePicked31){
       mini.classList.add('blank');
       mini.style.backgroundImage = 'none';
@@ -6581,8 +6612,12 @@ function openConstraintZoom31(letter, myIdx){
       btnPick.onclick = async (ev)=>{
         ev.stopPropagation();
         try{
-          // 自分のテーブルに m31Con を保存（上書きOK仕様）
-          await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m31Con: letter });
+          const current = state?.watching?.tables?.[myIdx] || {};
+          const isTwoPlayer = (state?.watching?.meta?.playerCount|0) === 2;
+          const patch = !current.m31Con
+            ? { m31Con:letter }
+            : (isTwoPlayer && !current.m31Con2 ? { m31Con2:letter } : { m31Con:letter });
+          await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), patch);
         }catch(err){ console.error(err); }
         closeConstraintZoom();
       };
@@ -10777,10 +10812,10 @@ function countNumTokenUsage(n, v){
 async function consumeM22IfMatches(tableIdx, n){
   try{
     const latest = state.watching || {};
-    const isTwoPlayerM22 = (latest?.mission?.id|0) === 22
+    const pairedHintMission = [22,39,41].includes(latest?.mission?.id|0)
       && (latest?.meta?.playerCount|0) === 2;
     const ownerId = latest?.tables?.[tableIdx]?.playerId;
-    const tokenTableIndices = isTwoPlayerM22 && ownerId
+    const tokenTableIndices = pairedHintMission && ownerId
       ? (latest.tables||[])
           .map((table, idx)=>table?.playerId === ownerId ? idx : -1)
           .filter(idx=>idx >= 0)
@@ -11438,7 +11473,7 @@ dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark, markSrc:'
 function missionUsesYellow(missionId, playerCount){
   const plan = buildMixPlan(missionId, playerCount) || [];
   // yellowPick / yellowChoose を含むか、#2（黄コード）なら true
-  return missionId===2 || plan.some(p => p.type==='yellowPick' || p.type==='yellowChoose' || p.type==='yellowFixed');
+  return missionId===2 || missionId===41 || plan.some(p => p.type==='yellowPick' || p.type==='yellowChoose' || p.type==='yellowFixed');
 }
 
 function missionNumberRange(missionId){
@@ -12100,8 +12135,11 @@ async function setupMissionOnStart(code){
     const cap    = v.captainTable|0;
 
     // 受け取り先：4人→全員 / 5人→隊長以外 / その他→先頭から最大4人
+    const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
     const recipients =
-      (tcount === 5)
+      isTwoPlayer
+        ? [0, 2].map(start=>start + Math.floor(Math.random()*2))
+      : (tcount === 5)
         ? Array.from({length:tcount}, (_,i)=>i).filter(i => i !== cap)
         : (tcount === 4)
             ? [0,1,2,3]
@@ -12145,10 +12183,12 @@ async function setupMissionOnStart(code){
     try{
       const pool = MATERIALS.numbers.slice();  // [1..12]
       shuffle(pool);
-      for (let ti = 0; ti < tbls.length; ti++){
+      const hintRecipients = isTwoPlayer ? [0, 2] : tbls.map((_, idx)=>idx);
+      for (let pos = 0; pos < hintRecipients.length; pos++){
+        const ti = hintRecipients[pos];
         if (!tbls[ti]) continue;
-        const n = pool[ti % pool.length];      // 人数>12 の場合も循環配布（重複可）
-        tbls[ti].m22Tokens = [ n ];            // 1枚だけ持たせる
+        const n = pool[pos % pool.length];
+        tbls[ti].m22Tokens = [ n ];
       }
     }catch(_){}
 
@@ -12374,7 +12414,9 @@ if ((v.mission?.id|0) === 39) {
   const tbls    = tblSnap.val() || [];
   const allNums = MATERIALS.numbers.slice();
 
-  tbls.forEach(T=>{
+  const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+  tbls.forEach((T, idx)=>{
+    if (isTwoPlayer && idx % 2 === 1) return;
     const tok = allNums[(Math.random()*allNums.length)|0]; // ← 手札は見ない
     const row = Array.isArray(T.m22Tokens) ? T.m22Tokens.slice() : [];
     if (!row.includes(tok)) row.push(tok);                 // 既存は保持しつつ1つ追加
@@ -14427,6 +14469,18 @@ function renderM16(v){
       T.m22Tokens = row;
     });
 
+    if ((R?.meta?.playerCount|0) === 2) {
+      [0, 2].forEach(primaryIdx=>{
+        const secondaryIdx = primaryIdx + 1;
+        const combined = [
+          ...(tables[primaryIdx]?.m22Tokens || []),
+          ...(tables[secondaryIdx]?.m22Tokens || [])
+        ];
+        if (tables[primaryIdx]) tables[primaryIdx].m22Tokens = [...new Set(combined)];
+        if (tables[secondaryIdx]) tables[secondaryIdx].m22Tokens = [];
+      });
+    }
+
     await update(ref(db, `rooms/${state.roomCode}/meta`), { m39_dealt: true });
     await set(ref(db, `rooms/${state.roomCode}/tables`), tables);
   }catch(e){ console.error('performM39Deal', e); }
@@ -15000,7 +15054,12 @@ function missionInfo(id, opts={}){
         id:31, name:'#31', desc:'',
         display:[
           '#31',...linesForMix,
-          '隊長から順に、A～Eの制約カードを1枚選んで表向きで自分の前に置く。',
+          isTwoPlayer
+            ? '隊長から順に、A～Eの制約カードを2枚選んで表向きで自分の前に置く。'
+            : '隊長から順に、A～Eの制約カードを1枚選んで表向きで自分の前に置く。',
+          ...(isTwoPlayer ? [
+            'A+BまたはC+Dの組み合わせで選ばないほうがよい。'
+          ] : []),
           '各プレイヤーは自分の制約を必ず守らなければならない。',
           '自分のコードを見て、完全に自分の制約を守れなくなれば、制約カードを裏向き（クリック）にして、それ以降は通常通りプレイする。'
         ],
@@ -15038,6 +15097,13 @@ function missionInfo(id, opts={}){
     }
 
     case 34: {
+      if (isTwoPlayer) {
+        return {
+          id:34, name:'#34', desc:'',
+          display:['#34', 'このミッションは2人でプレイすることはできない。'],
+          flags:{}
+        };
+      }
       return {
         id:34, name:'#34', desc:'',
         display:[
@@ -15139,8 +15205,14 @@ function missionInfo(id, opts={}){
         id:40, name:'#40', desc:'',
         display:[
           '#40',...linesForMix,
-          '隊長と3,5番手のプレイヤーはx1,x2,x3トークンのみ使用する。',
-          '2,4番手のプレイヤーは奇数、偶数トークンのみ使用する。'
+          ...(isTwoPlayer ? [
+            '隊長は準備中に情報トークンを置かない。もう一人は奇数/偶数トークンを置く。',
+            '隊長はどちらのスタンドにもx1,x2,x3トークンのみ使用する。',
+            'もう一人のプレイヤーはどちらのスタンドにも奇数、偶数トークンのみ使用する。'
+          ] : [
+            '隊長と3,5番手のプレイヤーはx1,x2,x3トークンのみ使用する。',
+            '2,4番手のプレイヤーは奇数、偶数トークンのみ使用する。'
+          ])
        ],
         flags:{  }
       };
@@ -15151,7 +15223,9 @@ function missionInfo(id, opts={}){
         display:[
           '#41',...linesForMix,
           '最初に起爆ダイヤルを残り1まで進める。',
-          '全員に黄コードを1枚ずつ配る。ただし、5人プレイ時は隊長には黄コードを配らない。',
+          isTwoPlayer
+            ? '各プレイヤーのどちらか一方のスタンドに黄コードを1枚ずつ配る。'
+            : '全員に黄コードを1枚ずつ配る。ただし、5人プレイ時は隊長には黄コードを配らない。',
           '最初の情報トークンはランダムに得て、その数値のコードを持っていなければ手元に置いて全員に見せる。',
           'このミッションの黄コードは、共同で切断を行わず、1本ずつ切断する。',
 　　　　　'チームメイトの黄コードの場所を1つ選んで、切断できる。',
