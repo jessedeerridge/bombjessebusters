@@ -4418,8 +4418,10 @@ function renderI2StandPlacement(v){
     if (!tableEl) return;
     if (flow.approvals?.[state.userId]===true) return;
     tableEl.classList.add('i2-stand-selectable');
-    tableEl.onclick = (ev)=>{
-      ev.stopPropagation();
+    tableEl.addEventListener('click', (ev)=>{
+      // 酸素トークン行など子要素のクリック処理より先にスタンド選択を処理する。
+      // 特に2人プレイでは、自分のスタンドを選んだ際に酸素メニューを開かせない。
+      ev.stopImmediatePropagation();
       const pop=document.createElement('div'); pop.className='mini-pop i2-stand-confirm';
       pop.onclick=e=>e.stopPropagation();
       const label=document.createElement('div'); label.className='i2-stand-confirm-label';
@@ -4439,7 +4441,7 @@ function renderI2StandPlacement(v){
       no.onclick=()=>pop.remove();
       actions.append(yes,no); pop.append(label,actions);
       placeInsideViewport(pop,ev.clientX,ev.clientY);
-    };
+    }, {capture:true});
   });
 
   const participantIds = [...new Set([flow.usingBy, (v.tables||[])[flow.selB?.table]?.playerId].filter(Boolean))];
@@ -4477,8 +4479,9 @@ function renderI18StandPlacement(v){
     const tableEl=document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
     if (!tableEl) return;
     tableEl.classList.add('i2-stand-selectable');
-    tableEl.onclick=ev=>{
-      ev.stopPropagation();
+    tableEl.addEventListener('click', ev=>{
+      // スタンド内の酸素トークン行へイベントが届く前に選択操作として確定する。
+      ev.stopImmediatePropagation();
       const pop=document.createElement('div'); pop.className='mini-pop i2-stand-confirm';
       pop.onclick=e=>e.stopPropagation();
       const label=document.createElement('div'); label.className='i2-stand-confirm-label';
@@ -4495,7 +4498,7 @@ function renderI18StandPlacement(v){
       no.onclick=()=>pop.remove();
       actions.append(yes,no); pop.append(label,actions);
       placeInsideViewport(pop,ev.clientX,ev.clientY);
-    };
+    }, {capture:true});
   });
 }
 
