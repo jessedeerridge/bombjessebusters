@@ -974,6 +974,9 @@
 .m22-panel .cap{ font-size:12px; opacity:.75; margin-right:6px; }
 .m22-panel .token{ cursor:pointer; }
 .m22-panel .token.disabled{ opacity:.35; cursor:default; }
+.m22-panel .m22-stand-row{
+  display:flex; gap:6px; align-items:center; flex-wrap:wrap; flex-basis:100%;
+}
 
 .m22-under{
   display:flex; gap:2px; margin-top:2px;
@@ -3006,6 +3009,12 @@ function buildMixPlan(missionId, playerCount = (state.watching?.meta?.playerCoun
     16: [{type:'redPick', k:2}, {type:'yellowPick', k:4}],
     17: [{type:'redPick', k:3}],
     18: [{type:'redPick', k:3}],
+    20: [{type:'redChoose', from:3, take:2}, {type:'yellowPick', k:4}],
+    21: [{type:'redPick', k:2}],
+    23: [{type:'redChoose', from:3, take:2}],
+    24: [{type:'redPick', k:3}],
+    25: [{type:'redPick', k:3}],
+    28: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
   };
   if (playerCount === 2 && twoPlayerPlans[missionId]) return twoPlayerPlans[missionId];
 
@@ -5510,6 +5519,51 @@ function renderM22PickPanel(v){
   // 自分が未着席なら消す
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
   if (myIdx < 0) { if (m22PickPanel) m22PickPanel.classList.add('hidden'); return; }
+
+  // 2人プレイでは、所有する上下それぞれのスタンドから1枚ずつ選ぶ。
+  if ((v?.meta?.playerCount|0) === 2) {
+    const myIndices = (v.tables||[])
+      .map((table, idx)=>table?.playerId === state.userId ? idx : -1)
+      .filter(idx=>idx >= 0)
+      .slice(0, 2);
+    const pending = myIndices.filter(idx=>!v.tables?.[idx]?.m22Done);
+    if (pending.length === 0) { m22PickPanel.classList.add('hidden'); return; }
+
+    m22PickPanel.innerHTML = '';
+    pending.forEach((tableIdx)=>{
+      const table = v.tables[tableIdx] || {};
+      const handInts = new Set((table.hand||[])
+        .filter(card=>Number.isInteger(card.num))
+        .map(card=>card.num|0));
+      const candidates = Array.from({length:12}, (_, i)=>i+1)
+        .filter(num=>!handInts.has(num));
+      const row = document.createElement('div');
+      row.className = 'm22-stand-row';
+      const label = document.createElement('span');
+      label.className = 'cap';
+      const standLabel = myIndices.indexOf(tableIdx) === 0 ? '上' : '下';
+      label.textContent = `持っていない数値の情報トークンを2つまで選んでください。${standLabel}のスタンド`;
+      row.appendChild(label);
+      candidates.forEach(num=>{
+        const token = document.createElement('div');
+        token.className = 'token black';
+        token.textContent = String(num);
+        token.onclick = async ()=>{
+          await update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), {
+            m22Tokens:[num],
+            m22Done:true
+          });
+        };
+        row.appendChild(token);
+      });
+      m22PickPanel.appendChild(row);
+      if (candidates.length === 0) {
+        update(ref(db, `rooms/${state.roomCode}/tables/${tableIdx}`), { m22Done:true });
+      }
+    });
+    m22PickPanel.classList.remove('hidden');
+    return;
+  }
 
   const myTable = v.tables[myIdx] || {};
   // すでに完了しているなら表示しない
@@ -14660,7 +14714,7 @@ function missionInfo(id, opts={}){
           ...linesForMix,
           'この数値カードと同じ数値のコードは全て赤コードと見なされる。',
           '手札がこの数値のコードだけになった場合、公開して手番を終えられる。',
-          ...(isTwoPlayer ? ['隊長は情報トークンを置かない。'] : [])
+          ...(isTwoPlayer ? ['隊長は準備中に情報トークンを置かない。'] : [])
         ],
         flags: { numberAsRed:true, needsNumberLane:true, pattern:'P1' }
       };
@@ -14684,7 +14738,7 @@ function missionInfo(id, opts={}){
           '#13',
           ...linesForMix,
           '情報トークンを選ぶ代わりに、情報トークンをランダムに1枚得て、同じ数値のコードがあればその前に置き、なければ手元に残す。',
-          ...(isTwoPlayer ? ['隊長は情報トークンを置かない。'] : []),
+          ...(isTwoPlayer ? ['隊長は準備中に情報トークンを置かない。'] : []),
           '赤コードを3つ、隊長から始めて3人に配る。',
           '誰でも赤コードの場所を3つ同時に指摘することで、赤コードを切断できるが、間違えると爆発する。',
           '赤コードの切断に装備/個人装備は使えない。'
@@ -14798,7 +14852,9 @@ function missionInfo(id, opts={}){
         id:22, name:'#22', desc:'',
         display:[
           '#22', ...linesForMix,
-          '通常通りに情報トークンを選ぶ代わりに、上から所持していない数値の情報トークンを2枚まで選び、手元に置いて全員に見せる。',
+          isTwoPlayer
+            ? '通常通りに情報トークンを選ぶ代わりに、上からそれぞれのスタンドで所持していない数値の情報トークンを1枚選び、手元に置いて全員に見せる。'
+            : '通常通りに情報トークンを選ぶ代わりに、上から所持していない数値の情報トークンを2枚まで選び、手元に置いて全員に見せる。',
           '最初の2本の黄コードが切断された時、各プレイヤーは残っている情報トークンから1枚選び、次手番のプレイヤーに渡す。',
           'そして、前手番のプレイヤーから情報トークンを渡されたプレイヤーは、その数値のコードがあればコードの前に置き、なければ手元に置いて見せる。'
         ],
@@ -14870,7 +14926,8 @@ function missionInfo(id, opts={}){
           '#27', ...linesForMix,
           '全てのキャラクターカードを箱に戻す。',
           'つまり、全員「フツーノ探知機」を持っていない。',
-          '最初の2本の黄コードが切断された時、プレイ人数に等しい情報トークンをランダムで取り、隊長から順番に選んで取る。'
+          '最初の2本の黄コードが切断された時、プレイ人数に等しい情報トークンをランダムで取り、隊長から順番に選んで取る。',
+          ...(isTwoPlayer ? ['隊長は準備中に情報トークンを置かない。'] : [])
         ],
         flags:{ m27_poolAfter2Yellows:true }
       };
@@ -14898,7 +14955,8 @@ function missionInfo(id, opts={}){
           '切断アクションの後、切断に成功した数値と数値カードの数値が同じだった場合のみ、起爆ダイヤルが1進む。',
           '手番の最後に、切断アクションをしたプレイヤーは場の数値カードを回収する（クリック）。',
     　　  '手元の数値カードが1枚以下になったプレイヤーは数値カードの山札から1枚追加される。',
-          '既に4つ切断された数値の数値カードは捨て札にする。'
+          '既に4つ切断された数値の数値カードは捨て札にする。',
+          ...(isTwoPlayer ? ['隊長は準備中に情報トークンを置かない。'] : [])
         ],
         // ※UIは段階導入。初回は説明のみ（今後のPRでアクション実装予定）
         flags:{}
