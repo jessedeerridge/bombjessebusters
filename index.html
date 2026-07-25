@@ -3030,6 +3030,15 @@ function buildMixPlan(missionId, playerCount = (state.watching?.meta?.playerCoun
     38: [{type:'redPick', k:3}],
     39: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
     41: [{type:'redChoose', from:3, take:2}],
+    45: [{type:'redPick', k:3}],
+    47: [{type:'redPick', k:3}],
+    // #48 の黄3本は setupMissionOnStart で隊長から順に直接配る。
+    48: [{type:'redPick', k:3}],
+    49: [{type:'redPick', k:3}],
+    50: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
+    51: [{type:'redPick', k:2}],
+    52: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
+    53: [{type:'redPick', k:3}],
   };
   if (playerCount === 2 && twoPlayerPlans[missionId]) return twoPlayerPlans[missionId];
 
@@ -9419,7 +9428,8 @@ async function renderM54(v){
   // ⑥赤デッキ：1..11 をシャッフルして m54_redDeck に、使用済みは m54_redUsed
   if (state.isHost && v?.meta?.m54_init !== true){
     const n = (v?.tables?.length|0);
-    const per = (n<=2)?9 : (n===3)?6 : (n===4)?3 : 2;
+    const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+    const per = isTwoPlayer ? 9 : (n<=2)?9 : (n===3)?6 : (n===4)?3 : 2;
     const by  = {}; for (let i=0;i<n;i++) by[i]=per;
     const pool = Math.max(0, 30 - n*per);
 
@@ -9499,6 +9509,12 @@ poolRow.onclick = (ev)=>{
   const n = (v?.tables?.length|0);
   (v.tables||[]).forEach((T, ti)=>{
     const box = tableNodes[ti]; if (!box) return;
+
+    // 2人プレイでは、酸素は実際に着席しているスタンドだけに表示する。
+    if ((v?.meta?.playerCount|0) === 2 && !T?.playerId) {
+      box.querySelector('.ox-row[data-owner="1"][data-m54="1"]')?.remove();
+      return;
+    }
 
     let row = box.querySelector('.ox-row[data-owner="1"][data-m54="1"]');
     if (!row){
@@ -9843,7 +9859,7 @@ function renderM44(v){
   
   // --- 1) 初期セット（ホストのみ）：人数×2 を全体プールに用意 ---
   if (state.isHost && (!v.meta || typeof v.meta.oxItem !== 'number')) {
-    const init = (v.tables?.length || 0) * 2;
+    const init = (v?.meta?.playerCount|0) === 2 ? 4 : (v.tables?.length || 0) * 2;
     update(ref(db, `rooms/${state.roomCode}/meta`), { oxItem:init, oxByTable:{} });
     return; // 次回 onValue で描画
   }
@@ -10038,7 +10054,8 @@ if (Number.isInteger(idx) && idx === ti){
         if (m===4) return 5;
         return 4; // 5 or 6
       };
-      const per = map(n);
+      const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+      const per = isTwoPlayer ? 7 : map(n);
       const by  = {};
       for (let i=0;i<n;i++) by[i] = per;
 
@@ -10057,6 +10074,12 @@ if (Number.isInteger(idx) && idx === ti){
     (v.tables||[]).forEach((T, ti)=>{
       const box = tableNodes[ti];
       if (!box) return;
+
+      // 2人プレイでは、酸素は実際に着席しているスタンドだけに表示する。
+      if ((v?.meta?.playerCount|0) === 2 && !T?.playerId) {
+        box.querySelector('.ox-row[data-owner="1"]')?.remove();
+        return;
+      }
 
       // 既存行を再利用 or 生成
       let row = box.querySelector('.ox-row[data-owner="1"]');
@@ -12084,6 +12107,16 @@ async function setupMissionOnStart(code){
   const snap = await get(ref(db, `rooms/${code}`));
   const v = snap.val(); if(!v?.mission) return;
   const flags = v.mission.flags || {};
+
+  // #43（2人）：隊長へランダムな情報トークンを1枚配る。
+  if ((v.mission?.id|0) === 43 && (v?.meta?.playerCount|0) === 2) {
+    const captain = v.captainTable|0;
+    const tables = (v.tables || []).map(table=>({ ...table }));
+    if (tables[captain]) {
+      tables[captain].m22Tokens = [MATERIALS.numbers[(Math.random() * MATERIALS.numbers.length)|0]];
+      await set(ref(db, `rooms/${code}/tables`), tables);
+    }
+  }
   /* #9：右2 + 異なる数値2枚を決定して meta に保存（ホストのみ実行） */
   if ((v.mission?.id|0) === 9) {
    const pool = MATERIALS.numbers.slice(); shuffle(pool);
@@ -15239,6 +15272,7 @@ function missionInfo(id, opts={}){
           '#43',...linesForMix,
           'ロボットのナノをボード上のスペース1に置く。',
           'コードを配る時、ナノに指定の数のコードを置く。',
+          ...(isTwoPlayer ? ['隊長は準備中に情報トークンをランダムに取って置く。'] : []),
           'プレイヤーの手番終了時にナノは1マス進み、12で方向転換する。',
           'ナノがいるスペースの数値に対応するコードを切断した時に、ナノのコードを1枚回収できる。',
           '爆弾を解除するには全てのコードを回収して切断しなければならない。',
@@ -15280,6 +15314,7 @@ function missionInfo(id, opts={}){
         id:46, name:'#46', desc:'',
         display:[
           '#46',...linesForMix,
+          ...(isTwoPlayer ? ['隊長は準備中に情報トークンを置かない。'] : []),
           '7のコードは最後に切断しなければならない。',
           '手札に7しかない場合、4本の7を同時に切断しなければならず、失敗すれば爆発する。',
           'それより前の段階で7が見つかった場合は、通常通り失敗として、ダイヤルを進める。',
@@ -15347,6 +15382,7 @@ case 51: {
     display:[
       '#51',
       ...linesForMix,
+      ...(isTwoPlayer ? ['隊長は準備中に情報トークンを置かない。'] : []),
       '数値カード12枚を裏向きの山札にして置く。',
       '起爆ダイヤルを1後退させる。',
       '手番プレイヤーは「サー」となる。',
