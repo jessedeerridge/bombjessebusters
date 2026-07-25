@@ -684,13 +684,10 @@
   }
   /* #31（2人用）：2枚目の制約は1枚目の直下、正体カードだけ半分重ねる */
   .char-col > .m31-second{
-    width:var(--item-w); height:var(--item-h); margin-top:0; z-index:2;
+    width:var(--item-w); height:var(--item-h); margin-top:-2px; z-index:2;
   }
   .char-col > .m31-second + .m31-character{ margin-top:calc(var(--char-h) * -0.5); }
-  .table.m31-overflow{
-    overflow:visible;
-    margin-bottom:calc(var(--item-h) + 30px);
-  }
+  .table.m31-overflow{ overflow:visible; }
   .char-col > .char-card,
   .m61-stack > .m61-con{
     position:relative;
@@ -6337,7 +6334,10 @@ function renderM31(v){
     const lane = document.getElementById(rowId);
     if (lane) lane.remove();
     document.querySelectorAll('.m31-mini').forEach(n=>n.remove());
-    document.querySelectorAll('.table.m31-overflow').forEach(n=>n.classList.remove('m31-overflow'));
+    document.querySelectorAll('.table.m31-overflow').forEach(n=>{
+      n.classList.remove('m31-overflow');
+      n.style.removeProperty('z-index');
+    });
     return;
   }
 
@@ -6400,6 +6400,8 @@ pool.forEach(ch=>{
     const picked = t?.m31Con;
     const picked2 = t?.m31Con2;
     tbEl.classList.toggle('m31-overflow', isTwoPlayer && !!picked2);
+    if (isTwoPlayer && picked2) tbEl.style.zIndex = String(100 - ti);
+    else tbEl.style.removeProperty('z-index');
     const face   = t?.m31Face || 'front';
     const faceName = String(t?.character?.face || '');
     const isMember5Card = /member\s*\(5\)\./i.test(faceName);
@@ -15234,7 +15236,7 @@ function missionInfo(id, opts={}){
         display:[
           '#41',...linesForMix,
           '最初に起爆ダイヤルを残り1まで進める。',
-          ...(!isTwoPlayer ? ['全員に黄コードを1枚ずつ配る。ただし、5人プレイ時は隊長には黄コードを配らない。'] : []),
+          '全員に黄コードを1枚ずつ配る。ただし、5人プレイ時は隊長には黄コードを配らない。',
           '最初の情報トークンはランダムに得て、その数値のコードを持っていなければ手元に置いて全員に見せる。',
           'このミッションの黄コードは、共同で切断を行わず、1本ずつ切断する。',
 　　　　　'チームメイトの黄コードの場所を1つ選んで、切断できる。',
