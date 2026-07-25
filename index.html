@@ -2995,7 +2995,20 @@ function pickK(arr, k){
 /**
  * ミッションごとの「赤/黄の混入仕様」をここで定義
  */
-function buildMixPlan(missionId){
+function buildMixPlan(missionId, playerCount = (state.watching?.meta?.playerCount|0)){
+  // ミッション9〜18の2人用構成は、通常人数の構成とは別に管理する。
+  const twoPlayerPlans = {
+    9:  [{type:'redPick', k:2}, {type:'yellowPick', k:4}],
+    11: [{type:'redPick', k:2}, {type:'yellowPick', k:4}],
+    12: [{type:'redPick', k:2}, {type:'yellowPick', k:4}],
+    14: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
+    15: [{type:'redChoose', from:3, take:2}],
+    16: [{type:'redPick', k:2}, {type:'yellowPick', k:4}],
+    17: [{type:'redPick', k:3}],
+    18: [{type:'redPick', k:3}],
+  };
+  if (playerCount === 2 && twoPlayerPlans[missionId]) return twoPlayerPlans[missionId];
+
   const plans = {
     1:  [
     ],
@@ -11348,8 +11361,8 @@ dstHand.splice(pos,0,{...card, ownerId: state.userId, markUntil: mark, markSrc:'
 /* ==== アイテムデッキ制御（ミッション別） ==== */
 
 /* このミッションで黄コードを使うか？ */
-function missionUsesYellow(missionId){
-  const plan = buildMixPlan(missionId) || [];
+function missionUsesYellow(missionId, playerCount){
+  const plan = buildMixPlan(missionId, playerCount) || [];
   // yellowPick / yellowChoose を含むか、#2（黄コード）なら true
   return missionId===2 || plan.some(p => p.type==='yellowPick' || p.type==='yellowChoose' || p.type==='yellowFixed');
 }
@@ -11392,9 +11405,9 @@ function missionNumberRange(missionId){
     
 /* ===== Item helpers ===== */
 /* missionId と “黄コードを使うか”で山札を決定し、除外も適用 */
-function itemDeckNumbers(missionId){
+function itemDeckNumbers(missionId, playerCount){
   let pool;
-  const useYellow = missionUsesYellow(missionId);
+  const useYellow = missionUsesYellow(missionId, playerCount);
 
   // 43以降は 1..18 を使用
   if(missionId >= 43){
@@ -11824,7 +11837,7 @@ let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
   shuffle(base);
 
   // ▼ ミッション別：赤/黄の混入プランを取得＆実行
-  const planList = buildMixPlan(missionId);
+  const planList = buildMixPlan(missionId, playerCount);
   const { toAdd, mixLines, chooseLines } = executeMixPlan(planList);
 
 
@@ -11835,7 +11848,7 @@ let m29Rest = null; // ★追加：#29 の残り山（12枚で打ち止め用）
   shuffle(deck);
 
   // ミッション表示メタ生成（赤/黄の結果行を先頭に差し込む）
-  missionMeta = missionInfo(missionId, { mixLines, chooseLines });
+  missionMeta = missionInfo(missionId, { mixLines, chooseLines, playerCount });
 
   if (missionId === 101){
     const candidates = deck.filter(c => c.kind !== 'yellow');
@@ -11887,7 +11900,7 @@ m29Rest = nums.slice(pi);
   tables.forEach(T=>{ T.hand.sort((a,b)=> a.num - b.num); T.hand.forEach((c,i)=>{ c.alpha = alpha[i % alpha.length]; }); });
 
 // アイテム（人数ぶん） — ミッション規則に合わせて山札を作る
-let pool = itemDeckNumbers(missionId);
+let pool = itemDeckNumbers(missionId, playerCount);
 
 if (missionMeta?.flags?.noItems) pool = [];
 
@@ -12147,8 +12160,11 @@ try{
       tbls[ti].hand = hand;
     });
 
-    // 名前の右のランダム数字（各テーブル）
-    const header = Array.from({length:tcount}, ()=> MATERIALS.numbers[(Math.random()*12)|0]);
+    // 名前の右のランダム数字（2人プレイ時だけ隊長には配布しない）
+    const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+    const header = Array.from({length:tcount}, (_, idx)=>
+      isTwoPlayer && idx === cap ? null : MATERIALS.numbers[(Math.random()*12)|0]
+    );
 
     await Promise.all([
       set(ref(db, `rooms/${code}/tables`), tbls),
@@ -14547,6 +14563,7 @@ function missionInfo(id, opts={}){
   const mixLines = opts.mixLines || [];     // 例: ['赤[1.5]', '黄[2.1][5.1]']
   const chooseLines = opts.chooseLines || [];// 例: ['赤コード[1.5] [3.5] のうち1つ']
   const linesForMix = [...mixLines, ...chooseLines]; // 表示の先頭に差し込む
+  const isTwoPlayer = Number(opts.playerCount) === 2;
 
   switch(id){
     case 1:{
@@ -14620,7 +14637,7 @@ function missionInfo(id, opts={}){
         display: [
           '#10',
           ...linesForMix,
-          '15分以内に解除しなければならない！',
+          `${isTwoPlayer ? 12 : 15}分以内に解除しなければならない！`,
           '時計回りではなく、手番を行いたいプレイヤーが「チョキン！」と言ってから、切断を実行する。',
           '2人になった場合を除いて、連続で手番をプレイできない。'
         ],
@@ -14634,7 +14651,8 @@ function missionInfo(id, opts={}){
           '#11',
           ...linesForMix,
           'この数値カードと同じ数値のコードは全て赤コードと見なされる。',
-          '手札がこの数値のコードだけになった場合、公開して手番を終えられる。'
+          '手札がこの数値のコードだけになった場合、公開して手番を終えられる。',
+          ...(isTwoPlayer ? ['隊長は情報トークンを置かない。'] : [])
         ],
         flags: { numberAsRed:true, needsNumberLane:true, pattern:'P1' }
       };
@@ -14658,6 +14676,7 @@ function missionInfo(id, opts={}){
           '#13',
           ...linesForMix,
           '情報トークンを選ぶ代わりに、情報トークンをランダムに1枚得て、同じ数値のコードがあればその前に置き、なければ手元に残す。',
+          ...(isTwoPlayer ? ['隊長は情報トークンを置かない。'] : []),
           '赤コードを3つ、隊長から始めて3人に配る。',
           '誰でも赤コードの場所を3つ同時に指摘することで、赤コードを切断できるが、間違えると爆発する。',
           '赤コードの切断に装備/個人装備は使えない。'
