@@ -38,6 +38,35 @@
 
   .join-box{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
   .join-box input{padding:8px;border:1px solid #ddd;border-radius:6px; font-size:16px;}
+  body:not(.in-room) > header{display:none}
+  body:not(.in-room) main{padding:0;display:block;min-height:100dvh;overflow:hidden}
+  .room-browser{
+    width:min(520px, calc(100% - 32px));height:100dvh;margin:0 auto;padding:14vh 0 40px;
+    display:flex;flex-direction:column;align-items:stretch;
+  }
+  .create-room{
+    align-self:center;border:0;background:transparent;padding:12px 24px;margin:0 0 12px;
+    color:#111;font-size:18px;font-weight:800;letter-spacing:.08em;cursor:pointer;
+  }
+  .room-loading{height:24px;text-align:center;font-size:13px;font-weight:700}
+  .room-list{
+    min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 2px 20vh;
+    scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior:contain;
+  }
+  .room-list::-webkit-scrollbar{display:none}
+  .room-card{
+    position:relative;flex:0 0 82px;width:100%;padding:14px 16px 27px;border:1px solid rgba(17,17,17,.4);
+    border-radius:10px;background:rgba(255,255,255,.84);color:#111;text-align:left;cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,.08);backdrop-filter:blur(3px);
+  }
+  .room-players{display:block;overflow:hidden;font-size:15px;font-weight:700;white-space:nowrap;text-overflow:ellipsis}
+  .room-meta{position:absolute;right:12px;bottom:8px;display:flex;gap:9px;font-size:11px;font-weight:700}
+  .name-entry{
+    position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:rgba(255,255,255,.2);
+  }
+  .name-entry-form{display:flex;gap:7px;width:min(360px, calc(100% - 36px))}
+  .name-entry input{min-width:0;flex:1;padding:11px 12px;border:1px solid #aaa;border-radius:7px;background:rgba(255,255,255,.94);font-size:16px}
+  .name-entry button{padding:10px 17px;border:1px solid #111;border-radius:7px;background:#111;color:#fff;font-size:15px;font-weight:700;cursor:pointer}
   .btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#f8f8f8;cursor:pointer}
   .btn.primary{background:#111;color:#fff;border-color:#111}
   .btn.loading{opacity:.55;cursor:progress}
@@ -1528,7 +1557,7 @@ main:has(#lobby.hidden) > *{
 
 /* 画面いっぱいに見せたい場合だけ */
 main:has(#lobby.hidden){
-  min-height: calc(100vh - 56px);
+  min-height: 100vh;
 }
 
 .tab{
@@ -1708,10 +1737,18 @@ main:not(:has(#lobby.hidden)) > * {
 <main>
   <div class="col">
 <div class="join-box" id="joinBox">
-  <!-- ★追加：名前（4文字以内）※未入力でも入室可 -->
-  <input id="userName" placeholder="名前（4文字以内）" maxlength="4" />
-  <input id="roomCode" placeholder="ルームコード" maxlength="12" />
-  <button class="btn primary" id="btnJoin">入室</button>
+  <section class="room-browser" aria-label="ルーム一覧">
+    <button class="create-room" id="btnCreateRoom" type="button">CREATE ROOM</button>
+    <div class="room-loading" id="roomLoading">loading...</div>
+    <div class="room-list" id="roomList"></div>
+  </section>
+  <div class="name-entry hidden" id="nameEntry">
+    <form class="name-entry-form" id="nameEntryForm">
+      <input id="userName" placeholder="名前" maxlength="4" autocomplete="nickname" aria-label="名前" />
+      <button id="btnJoin" type="submit">決定</button>
+    </form>
+  </div>
+  <input id="roomCode" type="hidden" />
 </div>
 
 
@@ -2069,6 +2106,75 @@ const inputName = document.getElementById('userName'); // ★追加
 const inputCode = document.getElementById('roomCode');
 
 const btnJoin = document.getElementById('btnJoin');
+const btnCreateRoom = document.getElementById('btnCreateRoom');
+const roomList = document.getElementById('roomList');
+const roomLoading = document.getElementById('roomLoading');
+const nameEntry = document.getElementById('nameEntry');
+const nameEntryForm = document.getElementById('nameEntryForm');
+let roomChoices = [];
+let shownRoomCount = 0;
+let choosingNewRoom = false;
+
+function formatRoomCreatedAt(value){
+  const date = new Date(Number(value) || Date.now());
+  const two = number => String(number).padStart(2, '0');
+  return `${date.getMonth() + 1}/${date.getDate()} ${two(date.getHours())}:${two(date.getMinutes())}`;
+}
+
+function renderNextRooms(){
+  const next = roomChoices.slice(shownRoomCount, shownRoomCount + 5);
+  next.forEach(({code, room})=>{
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'room-card';
+    const names = Object.values(room?.players || {}).map(player => String(player?.name || '').trim()).filter(Boolean);
+    const players = document.createElement('span');
+    players.className = 'room-players';
+    players.textContent = names.join('・');
+    const meta = document.createElement('span');
+    meta.className = 'room-meta';
+    const codeText = document.createElement('span');
+    codeText.textContent = code;
+    const timeText = document.createElement('time');
+    timeText.dateTime = new Date(Number(room?.createdAt) || Date.now()).toISOString();
+    timeText.textContent = formatRoomCreatedAt(room?.createdAt);
+    meta.append(codeText, timeText);
+    button.append(players, meta);
+    button.addEventListener('click', ()=> openNameEntry(code, false));
+    roomList.appendChild(button);
+  });
+  shownRoomCount += next.length;
+  roomLoading.classList.add('hidden');
+}
+
+function openNameEntry(code, isNew){
+  choosingNewRoom = isNew;
+  inputCode.value = code;
+  nameEntry.classList.remove('hidden');
+  requestAnimationFrame(()=> inputName.focus());
+}
+
+btnCreateRoom.addEventListener('click', ()=> openNameEntry(randomRoomCode(5), true));
+inputName.addEventListener('input', ()=>{
+  try{ localStorage.setItem('savedUserName', inputName.value.slice(0, 4)); }catch(_e){}
+});
+roomList.addEventListener('scroll', ()=>{
+  if (shownRoomCount >= roomChoices.length) return;
+  if (roomList.scrollTop + roomList.clientHeight < roomList.scrollHeight - 80) return;
+  roomLoading.classList.remove('hidden');
+  requestAnimationFrame(renderNextRooms);
+});
+
+get(ref(db, 'rooms')).then(snap=>{
+  const rooms = snap.val() || {};
+  roomChoices = Object.entries(rooms)
+    .map(([code, room])=>({code, room:room || {}}))
+    .sort((a, b)=> Number(b.room.createdAt || 0) - Number(a.room.createdAt || 0));
+  shownRoomCount = 0;
+  roomList.replaceChildren();
+  roomLoading.classList.remove('hidden');
+  requestAnimationFrame(renderNextRooms);
+}).catch(()=> roomLoading.classList.add('hidden'));
 
 const lobby   = document.getElementById('lobby');
 // ▼ 追加：クイックミッションピッカー起動ボタン
@@ -2091,6 +2197,7 @@ try{
     if (saved) inputName.value = saved.slice(0, 4);
   } catch(_e){}
 }
+if (inputCode.value) openNameEntry(inputCode.value, false);
 const tablesEl= document.getElementById('tables');
 const gear    = document.getElementById('gear');
 const menuPop = document.getElementById('menuPopup');
@@ -3433,7 +3540,8 @@ function openBottomMenu(entries){
 
 
 /* enter */
-btnJoin.onclick   = async ()=>{
+nameEntryForm.addEventListener('submit', async event=>{
+  event.preventDefault();
   if (btnJoin.dataset.loading === '1') return;
   btnJoin.dataset.loading = '1';
   btnJoin.classList.add('loading');
@@ -3445,19 +3553,24 @@ btnJoin.onclick   = async ()=>{
   state.userId = loadStableUserIdByName(state.userName);
   saveStableUserIdByName(state.userName, state.userId);
 
-  // ★ルームコード未入力なら英数字5文字を自動採番
+  // CREATE ROOM では新しいコード、既存ルームでは選択したコードを使う。
   if (!inputCode.value.trim()) {
     inputCode.value = randomRoomCode(5);
   }
 
   try{
+    if (choosingNewRoom) {
+      while ((await get(ref(db, `rooms/${inputCode.value}`))).exists()) {
+        inputCode.value = randomRoomCode(5);
+      }
+    }
     await enter('player');
   } finally {
     btnJoin.dataset.loading = '0';
     btnJoin.classList.remove('loading');
     btnJoin.disabled = false;
   }
-};
+});
 
 
 async function enter(mode){
@@ -3495,6 +3608,7 @@ async function enter(mode){
   });
   listenRoom(code);
   // ★ 自動離席の遅延クリア役（Janitor）を起動
+  document.body.classList.add('in-room');
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
 }
 
