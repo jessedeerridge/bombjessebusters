@@ -631,7 +631,16 @@
   .table.i2-stand-selectable{outline:2px dashed #38bdf8;outline-offset:-2px;cursor:pointer}
   .table.i2-stand-selectable .card,
   .table.i2-stand-selectable .alpha,
-  .table.i2-stand-selectable .token{pointer-events:none}
+  .table.i2-stand-selectable .token,
+  .table.i2-stand-selectable .ox-row{pointer-events:none}
+  .table.m54-stand-selectable{outline:2px dashed #38bdf8;outline-offset:-2px;cursor:pointer}
+  .table.m54-stand-selectable .card,
+  .table.m54-stand-selectable .alpha,
+  .table.m54-stand-selectable .token,
+  .table.m54-stand-selectable .ox-row{pointer-events:none}
+  .table.i2-stand-selected,
+  .table.i18-stand-selected,
+  .table.m54-stand-selected{outline:1px dashed #b8b8b8;outline-offset:-1px}
   .i2-stand-prompt{position:fixed;inset:0;z-index:850;display:grid;place-items:center;cursor:pointer}
   .i2-stand-prompt span{padding:16px 22px;border-radius:10px;background:#111;color:#fff;font-weight:700;
     text-align:center;box-shadow:0 14px 32px rgba(0,0,0,.35)}
@@ -4382,10 +4391,14 @@ function deriveChecklistCodeHints(displayLines){
 function renderI2StandPlacement(v){
   document.getElementById('i2StandPrompt')?.remove();
   document.querySelectorAll('#tables .table.i2-stand-selectable').forEach(el=>el.classList.remove('i2-stand-selectable'));
+  document.querySelectorAll('#tables .table.i2-stand-selected').forEach(el=>el.classList.remove('i2-stand-selected'));
   const flow = v?.meta?.i2Flow;
+  const myTables = (v.tables||[]).map((t,i)=>t?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+  if (flow?.approvals?.[state.userId]===true && Number.isInteger(flow?.placements?.[state.userId])){
+    document.querySelector(`.table[data-table-idx="${flow.placements[state.userId]}"]`)?.classList.add('i2-stand-selected');
+  }
   if ((v?.meta?.playerCount|0) !== 2 || flow?.phase !== 'placeStand') return;
 
-  const myTables = (v.tables||[]).map((t,i)=>t?.playerId===state.userId ? i : -1).filter(i=>i>=0);
   if (!myTables.length) return;
 
   const promptKey = `${flow.usingBy}:${flow.selA?.cardId}:${flow.selB?.cardId}`;
@@ -4396,13 +4409,16 @@ function renderI2StandPlacement(v){
     const text = document.createElement('span');
     text.textContent = 'どちらのスタンドに置きますか。';
     prompt.appendChild(text);
-    prompt.onclick = ()=>{ state._i2StandPromptDismissed = promptKey; prompt.remove(); };
+    prompt.onclick = (ev)=>dismissStandPromptAndForward(ev,prompt,()=>{
+      state._i2StandPromptDismissed = promptKey;
+    });
     document.body.appendChild(prompt);
   }
 
   myTables.forEach(tableIdx=>{
     const tableEl = document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
     if (!tableEl) return;
+    if (flow.approvals?.[state.userId]===true) return;
     tableEl.classList.add('i2-stand-selectable');
     tableEl.onclick = (ev)=>{
       ev.stopPropagation();
@@ -4415,6 +4431,7 @@ function renderI2StandPlacement(v){
       const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
       yes.onclick=async ()=>{
         pop.remove();
+        markStandSelected(tableIdx,'i2');
         const base = `rooms/${state.roomCode}/meta/i2Flow`;
         await update(ref(db, base), {
           [`placements/${state.userId}`]:tableIdx,
@@ -4438,7 +4455,11 @@ function renderI2StandPlacement(v){
 
 function renderI18StandPlacement(v){
   document.getElementById('i18StandPrompt')?.remove();
+  document.querySelectorAll('#tables .table.i18-stand-selected').forEach(el=>el.classList.remove('i18-stand-selected'));
   const flow=v?.meta?.i18Flow;
+  if (flow?.phase==='resolving' && flow?.usingBy===state.userId && Number.isInteger(flow.destinationTable)){
+    document.querySelector(`.table[data-table-idx="${flow.destinationTable}"]`)?.classList.add('i18-stand-selected');
+  }
   if ((v?.meta?.playerCount|0)!==2 || flow?.phase!=='placeStand' || flow?.usingBy!==state.userId) return;
   const myTables=(v.tables||[]).map((table,i)=>table?.playerId===state.userId ? i : -1).filter(i=>i>=0);
   if (!myTables.length) return;
@@ -4448,7 +4469,9 @@ function renderI18StandPlacement(v){
     const prompt=document.createElement('div'); prompt.id='i18StandPrompt'; prompt.className='i2-stand-prompt';
     const text=document.createElement('span'); text.textContent='どちらのスタンドに配置しますか。';
     prompt.appendChild(text);
-    prompt.onclick=()=>{ state._i18StandPromptDismissed=promptKey; prompt.remove(); };
+    prompt.onclick=ev=>dismissStandPromptAndForward(ev,prompt,()=>{
+      state._i18StandPromptDismissed=promptKey;
+    });
     document.body.appendChild(prompt);
   }
 
@@ -4467,6 +4490,7 @@ function renderI18StandPlacement(v){
       const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
       yes.onclick=async ()=>{
         pop.remove();
+        markStandSelected(tableIdx,'i18');
         await update(ref(db,`rooms/${state.roomCode}/meta/i18Flow`),{phase:'resolving',destinationTable:tableIdx});
         await doItem18Take(flow.sel,tableIdx);
       };
@@ -4475,6 +4499,31 @@ function renderI18StandPlacement(v){
       placeInsideViewport(pop,ev.clientX,ev.clientY);
     };
   });
+}
+
+function markStandSelected(tableIdx,kind){
+  document.querySelectorAll(`#tables .table.${kind}-stand-selectable`).forEach(table=>table.classList.remove(`${kind}-stand-selectable`));
+  document.querySelectorAll(`#tables .table.${kind}-stand-selected`).forEach(table=>table.classList.remove(`${kind}-stand-selected`));
+  const selected=document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
+  selected?.classList.add(`${kind}-stand-selected`);
+}
+
+function dismissStandPromptAndForward(ev,prompt,onDismiss){
+  const clientX=ev.clientX;
+  const clientY=ev.clientY;
+  onDismiss?.();
+  prompt.remove();
+
+  const target=document.elementFromPoint(clientX,clientY);
+  const table=target?.closest('.table.i2-stand-selectable, .table.m54-stand-selectable');
+  if (!table) return;
+  table.dispatchEvent(new MouseEvent('click',{
+    bubbles:true,
+    cancelable:true,
+    clientX,
+    clientY,
+    view:window
+  }));
 }
 
 function renderTables(v){
@@ -7601,6 +7650,8 @@ function runM54InsertAnimation(v){
     if (!deckBtn || !targetWrap){
       if (hiddenWrap) hiddenWrap.classList.remove('m54-pending-arrival');
       state._m54AnimRunningId = null;
+      state._m54SelectedStand = null;
+      document.querySelectorAll('.table.m54-stand-selected').forEach(table=>table.classList.remove('m54-stand-selected'));
       return;
     }
 
@@ -7613,6 +7664,8 @@ function runM54InsertAnimation(v){
     if (!Number.isFinite(a.left) || !Number.isFinite(b.left)) {
       targetWrap.classList.remove('m54-pending-arrival');
       state._m54AnimRunningId = null;
+      state._m54SelectedStand = null;
+      document.querySelectorAll('.table.m54-stand-selected').forEach(table=>table.classList.remove('m54-stand-selected'));
       return;
     }
 
@@ -7646,6 +7699,8 @@ function runM54InsertAnimation(v){
       hiddenWrap = null;
       state._m54AnimFinishedId = anim.id;
       state._m54AnimRunningId = null;
+      state._m54SelectedStand = null;
+      document.querySelectorAll('.table.m54-stand-selected').forEach(table=>table.classList.remove('m54-stand-selected'));
     }, flyMs + 80);
   }, shiftMs + settleDelayMs);
 }
@@ -9250,6 +9305,8 @@ async function renderM54(v){
   const isM54 = ((v?.mission?.id|0) === 54);
   // 画面要素の片付け
   if (!isM54){
+    clearM54StandSelection();
+    state._m54SelectedStand=null;
     const x = document.getElementById('m54OxPool'); if (x) x.remove();
     const y = document.getElementById('m54RedBox'); if (y) y.remove();
     state._m54AnimRunningId = null;
@@ -9284,6 +9341,9 @@ update(ref(db, `rooms/${state.roomCode}/meta`), {
   // --- 1) アイテム列の直下に「リザーブ」を出す（左に ox2 画像） ---
   const itemsBar = document.getElementById('itemsBar');
   if (!itemsBar) return;
+  if (Number.isInteger(state._m54SelectedStand)){
+    document.querySelector(`.table[data-table-idx="${state._m54SelectedStand}"]`)?.classList.add('m54-stand-selected');
+  }
 
   let poolRow = document.getElementById('m54OxPool');
   if (!poolRow){
@@ -9476,6 +9536,7 @@ poolRow.onclick = (ev)=>{
     // ⑥ クリック → 「追加」タブ → 山札の上から1枚を自分の手札に昇順挿入
     deckBtn.onclick = (ev)=>{
       openOneMini(ev.clientX, ev.clientY, '追加', async ()=>{
+        const addRedCode = async (destinationTable)=>{
         try{
           const mRef = ref(db, `rooms/${state.roomCode}/meta`);
           const rRef = ref(db, `rooms/${state.roomCode}`);
@@ -9490,13 +9551,13 @@ poolRow.onclick = (ev)=>{
           if (top==null) return;
 
           // 自分のテーブル番号
-          const myTable = (()=>{
+          const myTable = Number.isInteger(destinationTable) ? destinationTable : (()=>{
             const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
             if (Number.isInteger(sNum)) return sNum;
             const idx = (room.tables||[]).findIndex(t=> t?.playerId===state.userId);
             return idx>=0? idx : null;
           })();
-          if (myTable==null || !Array.isArray(room.tables)) return;
+          if (myTable==null || !Array.isArray(room.tables) || room.tables[myTable]?.playerId!==state.userId) return;
 
           // 手札へ（昇順・alpha再付番） — #43 の追加処理と同じ流儀
           const tbls = room.tables.slice();
@@ -9537,6 +9598,17 @@ poolRow.onclick = (ev)=>{
             })
           ]);
         }catch(e){ console.error(e); }
+        };
+
+        const current = state.watching || v;
+        const myTables = (current?.tables||[])
+          .map((table,index)=>table?.playerId===state.userId ? index : -1)
+          .filter(index=>index>=0);
+        if ((current?.meta?.playerCount|0)===2 && myTables.length>1){
+          beginM54StandSelection(myTables, addRedCode);
+        }else{
+          await addRedCode(null);
+        }
       });
     };
   }else{
@@ -9548,6 +9620,62 @@ poolRow.onclick = (ev)=>{
       restLbl.textContent = `残:${D.filter(x=>!U.includes(x)).length}`;
     }
   }
+}
+
+function clearM54StandSelection(){
+  document.getElementById('m54StandPrompt')?.remove();
+  document.querySelectorAll('.mini-pop.m54-stand-confirm').forEach(pop=>pop.remove());
+  document.querySelectorAll('#tables .table.m54-stand-selectable').forEach(table=>{
+    table.classList.remove('m54-stand-selectable');
+    table.onclick = null;
+  });
+}
+
+function beginM54StandSelection(tableIndices,onConfirm){
+  clearM54StandSelection();
+
+  const prompt=document.createElement('div');
+  prompt.id='m54StandPrompt';
+  prompt.className='i2-stand-prompt';
+  const text=document.createElement('span');
+  text.textContent='どちらのスタンドに置きますか。';
+  prompt.appendChild(text);
+  prompt.onclick=ev=>dismissStandPromptAndForward(ev,prompt);
+  document.body.appendChild(prompt);
+
+  tableIndices.forEach(tableIdx=>{
+    const tableEl=document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
+    if (!tableEl) return;
+    tableEl.classList.add('m54-stand-selectable');
+    tableEl.onclick=ev=>{
+      ev.stopPropagation();
+      document.querySelectorAll('.mini-pop.m54-stand-confirm').forEach(pop=>pop.remove());
+      const pop=document.createElement('div');
+      pop.className='mini-pop i2-stand-confirm m54-stand-confirm';
+      pop.onclick=e=>e.stopPropagation();
+      const label=document.createElement('div');
+      label.className='i2-stand-confirm-label';
+      label.textContent='このスタンドに配置しますか。';
+      const actions=document.createElement('div');
+      actions.className='i2-stand-confirm-actions';
+      const yes=document.createElement('button');
+      yes.className='btn small primary';
+      yes.textContent='はい';
+      const no=document.createElement('button');
+      no.className='btn small';
+      no.textContent='いいえ';
+      yes.onclick=async ()=>{
+        clearM54StandSelection();
+        state._m54SelectedStand=tableIdx;
+        markStandSelected(tableIdx,'m54');
+        await onConfirm(tableIdx);
+      };
+      no.onclick=()=>pop.remove();
+      actions.append(yes,no);
+      pop.append(label,actions);
+      placeInsideViewport(pop,ev.clientX,ev.clientY);
+    };
+  });
 }
 /* ここまで追加：ミッション54 */
 
