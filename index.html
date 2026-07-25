@@ -637,9 +637,7 @@
     text-align:center;box-shadow:0 14px 32px rgba(0,0,0,.35)}
   .i2-stand-confirm-label{font-size:13px;white-space:nowrap;margin-bottom:7px}
   .i2-stand-confirm-actions{display:flex;gap:6px;justify-content:flex-start}
-  .i2-stand-confirm-actions .btn{flex:0 0 auto;color:#fff;border-color:transparent;padding:4px 8px;font-size:11px}
-  .i2-stand-confirm-actions .yes{background:#4b5563}
-  .i2-stand-confirm-actions .no{background:#6b7280}
+  .i2-stand-confirm-actions .btn{flex:0 0 auto;padding:4px 8px;font-size:11px}
   .mini-pop.i2-stand-confirm{flex-direction:column;flex-wrap:nowrap;align-items:stretch;transform:none}
 
   .t-header{height:var(--header-h);display:flex;align-items:center;gap:6px;font-size:12px;margin-top:0;}
@@ -4412,8 +4410,8 @@ function renderI2StandPlacement(v){
       const label=document.createElement('div'); label.className='i2-stand-confirm-label';
       label.textContent='このスタンドに配置しますか。';
       const actions=document.createElement('div'); actions.className='i2-stand-confirm-actions';
-      const yes=document.createElement('button'); yes.className='btn small yes'; yes.textContent='はい';
-      const no=document.createElement('button'); no.className='btn small no'; no.textContent='いいえ';
+      const yes=document.createElement('button'); yes.className='btn small primary'; yes.textContent='はい';
+      const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
       yes.onclick=async ()=>{
         pop.remove();
         const base = `rooms/${state.roomCode}/meta/i2Flow`;
