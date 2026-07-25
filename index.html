@@ -8324,9 +8324,25 @@ function renderM63(v){
   // ===== 各テーブルに所持酸素を表示（#44と同じ位置に出す） =====
   const tableNodes = document.querySelectorAll('.table'); // renderTables と同順
   const n = (v?.tables?.length|0);
+  const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+  // 2人プレイでは各プレイヤーの上側（最初）のテーブルだけを
+  // 酸素の所持先として扱う。
+  const oxygenTableIndices = isTwoPlayer
+    ? (v.tables||[]).map((table, index)=>(
+        table?.playerId && (v.tables||[]).findIndex(t=>t?.playerId === table.playerId) === index
+          ? index
+          : -1
+      )).filter(index=>index >= 0)
+    : Array.from({length:n}, (_, index)=>index);
+  const oxygenTableSet = new Set(oxygenTableIndices);
 
   (v.tables||[]).forEach((T, ti)=>{
     const box = tableNodes[ti]; if (!box) return;
+
+    if (!oxygenTableSet.has(ti)) {
+      box.querySelector('.ox-row[data-owner="1"][data-m63="1"]')?.remove();
+      return;
+    }
 
     // 既存の行を再利用 or 生成（#44流用）
     let row = box.querySelector('.ox-row[data-owner="1"][data-m63="1"]');
@@ -8400,11 +8416,15 @@ function renderM63(v){
             setTimeout(async ()=>{
               const s2 = await get(mRef);
               const m2 = s2.val()||{};
-              const nTables = Math.max(0, v?.tables?.length|0);
-              if (nTables <= 0) return;
+              if (oxygenTableIndices.length <= 0) return;
               const cap = Math.max(0, v?.captainTable|0);
               const me = ti;
-              const prevOfCap = (cap - 1 + nTables) % nTables;
+              const meOrder = oxygenTableIndices.indexOf(me);
+              const capOrder = oxygenTableIndices.indexOf(cap);
+              if (meOrder < 0 || capOrder < 0) return;
+              const prevOfCap = oxygenTableIndices[
+                (capOrder - 1 + oxygenTableIndices.length) % oxygenTableIndices.length
+              ];
               const nowMine = Math.max(0, m2?.oxByTable?.[me]||0);
               if (me === prevOfCap){
                 const poolNow = Math.max(0, m2?.oxItem|0);
@@ -8420,7 +8440,7 @@ function renderM63(v){
               }
 
               if (nowMine <= 0) return;
-              const next = (me + 1) % nTables;
+              const next = oxygenTableIndices[(meOrder + 1) % oxygenTableIndices.length];
               const nextNow = Math.max(0, m2?.oxByTable?.[next]||0);
               const upd2 = {};
               upd2[`oxByTable/${me}`] = 0;
@@ -8437,7 +8457,7 @@ function renderM63(v){
     }
 
     // 他プレイヤーの「テーブル全体」に渡す判定を付与（ターゲット側のboxで出す）
-    if (Number.isInteger(myIdx) && myIdx !== ti && !box.dataset.m63Bind){
+    if (Number.isInteger(myIdx) && myIdx !== ti && oxygenTableSet.has(ti) && !box.dataset.m63Bind){
       box.dataset.m63Bind = '1';
       box.addEventListener('click', (ev)=>{
         const mineNow = Math.max(0, v?.meta?.oxByTable?.[myIdx]||0);
