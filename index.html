@@ -9335,7 +9335,11 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
       if (capIdx === idx) tb.dataset.cap = '1'; else tb.removeAttribute('data-cap');
 
       const charEl = tb.querySelector('.char-card');
-      const miniEl = tb.querySelector('.m61-mini'); // 小さい表示（特にM61で使用）
+      // #31には2枚目の制約カードも .m61-mini が付くため、正体カードを明示して取得する。
+      // 汎用セレクタだと隊長枠や秘匿処理が2枚目の制約カードへ誤適用される。
+      const miniEl = mid === 31
+        ? tb.querySelector('.m31-character')
+        : tb.querySelector('.m61-mini');
 
       // 未選択 or（隊長テーブルで未着席）→ 初期画像を確実に消す（オーバーレイと二重化で保険）
       const mustHide = (!picked) || (capIdx === idx && !seatedThere);
@@ -9375,7 +9379,9 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
         if (capPickedNot5){
           const capTableEl = tEls[capIdx];
           if (capTableEl){
-            const miniEl = capTableEl.querySelector('.m61-mini');
+            const miniEl = mid === 31
+              ? capTableEl.querySelector('.m31-character')
+              : capTableEl.querySelector('.m61-mini');
             const bigEl  = capTableEl.querySelector('.char-card');
   
             // #34 例外：隊長本人には常に黒枠を表示。未場出しの間は他者には非表示。
