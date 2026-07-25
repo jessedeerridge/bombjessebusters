@@ -12136,7 +12136,16 @@ if ((v.mission?.id|0) === 48) {
   if(v.mission?.flags?.m13_distributeRedToCaptain3){
     const tcount = v.tableCount|0;
     const cap = v.captainTable|0;
-    const targets = [cap, (cap+1)%tcount, (cap+2)%tcount];
+    const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+    const captainTables = isTwoPlayer
+      ? [Math.floor(cap / 2) * 2, Math.floor(cap / 2) * 2 + 1]
+      : [cap];
+    // 2人プレイでは隊長が所有する両テーブルを避け、相手側の2テーブルに配る。
+    const otherTables = Array.from({length:tcount}, (_, idx)=>idx)
+      .filter(idx=>!captainTables.includes(idx));
+    const targets = isTwoPlayer
+      ? [otherTables[0], otherTables[1], otherTables[0]]
+      : [cap, (cap+1)%tcount, (cap+2)%tcount];
     
     // ランダムに赤コード 3 つ
     const redList = MATERIALS.redCodes.slice(); shuffle(redList);
@@ -12160,10 +12169,9 @@ try{
       tbls[ti].hand = hand;
     });
 
-    // 名前の右のランダム数字（2人プレイ時だけ隊長には配布しない）
-    const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+    // 名前の右のランダム数字（2人プレイ時は隊長の両テーブルに配布しない）
     const header = Array.from({length:tcount}, (_, idx)=>
-      isTwoPlayer && idx === cap ? null : MATERIALS.numbers[(Math.random()*12)|0]
+      isTwoPlayer && captainTables.includes(idx) ? null : MATERIALS.numbers[(Math.random()*12)|0]
     );
 
     await Promise.all([
