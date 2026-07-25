@@ -7838,9 +7838,37 @@ async function renderM59(v){
     nums = MATERIALS.numbers.slice();
     shuffle(nums);
     if (state.isHost){
-      await update(ref(db, `rooms/${state.roomCode}/meta`), { m59Nums: nums });
+      const sevenPos = nums.indexOf(7) + 1;
+      const twelvePos = nums.indexOf(12) + 1;
+      await update(ref(db, `rooms/${state.roomCode}/meta`), {
+        m59Nums: nums,
+        m59_row: 0,
+        m59_pos: sevenPos,
+        m59_left: twelvePos < sevenPos,
+        m59_updatedAt: Date.now()
+      });
     }
+  }else if (!(v?.meta?.m59_pos > 0) && state.isHost){
+    const sevenPos = nums.indexOf(7) + 1;
+    const twelvePos = nums.indexOf(12) + 1;
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m59_row: 0,
+      m59_pos: sevenPos,
+      m59_left: twelvePos < sevenPos,
+      m59_updatedAt: Date.now()
+    });
   }
+
+  // 公開された通常コードを数える。対応する数字が4枚公開されたカードは自動で裏になる。
+  const openCountByNum = {};
+  (v?.tables || []).forEach(table => {
+    (table?.hand || []).forEach(code => {
+      if (code?.kind === 'normal' && code.open === true){
+        const n = code.num | 0;
+        openCountByNum[n] = (openCountByNum[n] || 0) + 1;
+      }
+    });
+  });
 
   // 既存レーンを掃除
   document.querySelectorAll('.m59-row').forEach(n => n.remove());
@@ -7865,8 +7893,7 @@ async function renderM59(v){
       cell.style.placeItems = 'center';
 
       const pos = idx + 1;
-      const flipKey = `${rowIdx}:${pos}`;
-      const isFaceDown = !!(v?.meta?.m59Flips?.[flipKey]);
+      const isFaceDown = (openCountByNum[n] || 0) >= 4;
 
       const card = document.createElement('div');
       card.className = 'numcard m59num';
@@ -7877,42 +7904,8 @@ async function renderM59(v){
         : `url('${imgNumber(n)}')`;
       card.title = String(n);
 
-      // ミッション59：
-      // - 数値カードの長押しで表/裏を切替
-      // - 数値カードのワンクリックで nano の位置を指定
-      const LONG_PRESS_MS = 450;
-      let m59LongPressTimer = null;
-      let m59LongPressed = false;
-
-      const clearM59LongPress = ()=>{
-        if (m59LongPressTimer){
-          clearTimeout(m59LongPressTimer);
-          m59LongPressTimer = null;
-        }
-      };
-
-      card.onpointerdown = ()=>{
-        m59LongPressed = false;
-        clearM59LongPress();
-        m59LongPressTimer = setTimeout(async ()=>{
-          m59LongPressTimer = null;
-          m59LongPressed = true;
-          const cur = !!(state.watching?.meta?.m59Flips?.[flipKey]);
-          await update(ref(db, `rooms/${state.roomCode}/meta`), {
-            [`m59Flips/${flipKey}`]: !cur,
-            m59_updatedAt: Date.now()
-          });
-        }, LONG_PRESS_MS);
-      };
-      card.onpointerup = clearM59LongPress;
-      card.onpointerleave = clearM59LongPress;
-      card.onpointercancel = clearM59LongPress;
-
+      // 数値カードのクリックで nano の位置を指定（長押しによる裏返しは行わない）。
       card.onclick = async () => {
-        if (m59LongPressed){
-          m59LongPressed = false;
-          return;
-        }
         await update(ref(db, `rooms/${state.roomCode}/meta`), {
           m59_row: rowIdx,        // 0-based
           m59_pos: pos,           // 1..12
@@ -7928,9 +7921,13 @@ async function renderM59(v){
   });
 
   // === nano を描画（セル内相対配置） ===
+  const defaultPos = nums.indexOf(7) + 1;
+  const twelvePos = nums.indexOf(12) + 1;
   const rowIndex = (v?.meta?.m59_row ?? 0) | 0;
-  const posIndex = (v?.meta?.m59_pos | 0);  // 1..12
-  const goLeft   = !!(v?.meta?.m59_left);
+  const posIndex = (v?.meta?.m59_pos | 0) || defaultPos;  // 1..12
+  const goLeft   = v?.meta?.m59_pos
+    ? !!v?.meta?.m59_left
+    : twelvePos < defaultPos;
 
   const lanes = Array.from(tablesEl.querySelectorAll('.m59-row'));
   if (!posIndex || !lanes[rowIndex]){ document.getElementById('m59Nano')?.remove(); return; }
@@ -7952,18 +7949,14 @@ async function renderM59(v){
   node.style.transform = 'translate(-50%, -50%)';
   node.style.pointerEvents = 'auto';
 
-  // クリックで向きトグル
-  node.onclick = (ev)=>{
-    openMenu(ev.clientX, ev.clientY, [
-      { label: (goLeft ? '右向きにする' : '左向きにする'),
-        action: async ()=>{
-          await update(ref(db, `rooms/${state.roomCode}/meta`), {
-            m59_left: !goLeft,
-            m59_updatedAt: Date.now()
-          });
-        }
-      }
-    ]);
+  // クリックだけで左右を反転する。
+  node.onclick = async ()=>{
+    await update(ref(db, `rooms/${state.roomCode}/meta`), {
+      m59_row: rowIndex,
+      m59_pos: posIndex,
+      m59_left: !goLeft,
+      m59_updatedAt: Date.now()
+    });
   };
 
   targetCell.appendChild(node);
@@ -15561,9 +15554,9 @@ case 59: {
       '#59',
       ...linesForMix,
       '数値カード12枚をランダムに並べて、7の位置に12の方向を向くようにナノを配置する。',
-      '❶ナノを動かさないか、一つ前方に移動させることができ、ナノが置いてあるカードの数字を宣言して切断できる。',
-      '❷その後、ナノを右向きにするか左向きにするか自由に決める。',
-      '選択できる数値がない場合は、ナノを反転させてから起爆ダイヤルを1進める。その後、選択できる場合は切断を行う。',
+      '❶ナノが今いるマスか、前方にあるカードのうち1枚選んで移動させ、その数値で切断を行う。',
+      '❷その後、ナノを左右任意の方向に向ける。',
+      '選択できる数値がない場合、起爆ダイヤルを1進める。それから、ナノを反転させて、切断を行う。',
       '「いつでもコーヒー」は手番全体を飛ばす。',
     ],
     flags:{}
