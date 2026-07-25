@@ -628,10 +628,14 @@
     outline:2px solid #38bdf8;
     outline-offset:-2px;
   }
-  .table.i2-stand-selectable{outline:2px dashed #38bdf8;outline-offset:-2px;cursor:pointer}
+  .table.i2-stand-selectable,
+  .table.m54-stand-selectable{outline:2px dashed #38bdf8;outline-offset:-2px;cursor:pointer}
   .table.i2-stand-selectable .card,
   .table.i2-stand-selectable .alpha,
-  .table.i2-stand-selectable .token{pointer-events:none}
+  .table.i2-stand-selectable .token,
+  .table.m54-stand-selectable .card,
+  .table.m54-stand-selectable .alpha,
+  .table.m54-stand-selectable .token{pointer-events:none}
   .i2-stand-prompt{position:fixed;inset:0;z-index:850;display:grid;place-items:center;cursor:pointer}
   .i2-stand-prompt span{padding:16px 22px;border-radius:10px;background:#111;color:#fff;font-weight:700;
     text-align:center;box-shadow:0 14px 32px rgba(0,0,0,.35)}
@@ -9246,6 +9250,119 @@ body[data-privacy="m31-66"] #tables .table[data-cap="1"][data-seated="0"] .char-
 
   
 /* ここから追加：ミッション54（酸素リザーブ＋赤デッキ） */
+function clearM54StandPlacement(){
+  state._m54RedPlacement = null;
+  document.getElementById('m54StandPrompt')?.remove();
+  document.querySelectorAll('#tables .table.m54-stand-selectable').forEach(el=>{
+    el.classList.remove('m54-stand-selectable');
+    el.onclick = null;
+  });
+}
+
+async function addM54RedCard(destinationTable){
+  try{
+    const rRef = ref(db, `rooms/${state.roomCode}`);
+    const rSnap = await get(rRef);
+    const room = rSnap.val()||{};
+    const meta = room.meta||{};
+    const D = Array.isArray(meta.m54_redDeck)? meta.m54_redDeck.slice() : [];
+    const U = Array.isArray(meta.m54_redUsed)? meta.m54_redUsed.slice() : [];
+    const top = D.find(n=> !U.includes(n));
+    if (top==null) return;
+
+    const myTables = (room.tables||[]).map((table,i)=>table?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+    const myTable = Number.isInteger(destinationTable) && myTables.includes(destinationTable)
+      ? destinationTable
+      : myTables[0];
+    if (!Number.isInteger(myTable)) return;
+
+    const tbls = room.tables.slice();
+    const T = {...tbls[myTable]};
+    const hand = Array.isArray(T.hand)? T.hand.slice() : [];
+    const newId = crypto.randomUUID();
+    const newCard = {
+      id: newId,
+      num: top,
+      kind: 'red',
+      open: false,
+      ownerId: T.playerId || null,
+      tokens: [],
+      markUntil: Date.now() + 5000
+    };
+    let insertIndex = 0;
+    while (insertIndex < hand.length && Number(hand[insertIndex]?.num) <= Number(top)) insertIndex++;
+    hand.splice(insertIndex, 0, newCard);
+    const alpha = 'abcdefghijklmnopqrstuvwxyz';
+    hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
+    T.hand = hand;
+    tbls[myTable] = T;
+    U.push(top);
+
+    await update(ref(db), {
+      [`rooms/${state.roomCode}/tables`]: tbls,
+      [`rooms/${state.roomCode}/meta/m54_redUsed`]: U,
+      [`rooms/${state.roomCode}/meta/m54_insertAnim`]: {
+        id: `${Date.now()}_${newId}`,
+        table: myTable,
+        insertIndex,
+        cardId: newId,
+        num: top,
+        startedAt: Date.now()
+      }
+    });
+  }catch(e){ console.error(e); }
+}
+
+function renderM54StandPlacement(v){
+  document.getElementById('m54StandPrompt')?.remove();
+  document.querySelectorAll('#tables .table.m54-stand-selectable').forEach(el=>{
+    el.classList.remove('m54-stand-selectable');
+    el.onclick = null;
+  });
+  if ((v?.mission?.id|0)!==54 || (v?.meta?.playerCount|0)!==2 || !state._m54RedPlacement) return;
+
+  const myTables=(v.tables||[]).map((table,i)=>table?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+  if (myTables.length<2){ clearM54StandPlacement(); return; }
+
+  if (!state._m54RedPlacement.promptDismissed){
+    const prompt=document.createElement('div');
+    prompt.id='m54StandPrompt';
+    prompt.className='i2-stand-prompt';
+    const text=document.createElement('span');
+    text.textContent='どちらのスタンドに配置しますか。';
+    prompt.appendChild(text);
+    prompt.onclick=()=>{
+      if (state._m54RedPlacement) state._m54RedPlacement.promptDismissed=true;
+      prompt.remove();
+    };
+    document.body.appendChild(prompt);
+  }
+
+  myTables.forEach(tableIdx=>{
+    const tableEl=document.querySelector(`.table[data-table-idx="${tableIdx}"]`);
+    if (!tableEl) return;
+    tableEl.classList.add('m54-stand-selectable');
+    tableEl.onclick=ev=>{
+      ev.stopPropagation();
+      const pop=document.createElement('div'); pop.className='mini-pop i2-stand-confirm';
+      pop.onclick=e=>e.stopPropagation();
+      const label=document.createElement('div'); label.className='i2-stand-confirm-label';
+      label.textContent='このスタンドに配置しますか。';
+      const actions=document.createElement('div'); actions.className='i2-stand-confirm-actions';
+      const yes=document.createElement('button'); yes.className='btn small primary'; yes.textContent='はい';
+      const no=document.createElement('button'); no.className='btn small'; no.textContent='いいえ';
+      yes.onclick=async ()=>{
+        pop.remove();
+        clearM54StandPlacement();
+        await addM54RedCard(tableIdx);
+      };
+      no.onclick=()=>pop.remove();
+      actions.append(yes,no); pop.append(label,actions);
+      placeInsideViewport(pop,ev.clientX,ev.clientY);
+    };
+  });
+}
+
 async function renderM54(v){
   const isM54 = ((v?.mission?.id|0) === 54);
   // 画面要素の片付け
@@ -9254,6 +9371,7 @@ async function renderM54(v){
     const y = document.getElementById('m54RedBox'); if (y) y.remove();
     state._m54AnimRunningId = null;
     state._m54AnimFinishedId = null;
+    clearM54StandPlacement();
     return;
   }
 
@@ -9473,70 +9591,16 @@ poolRow.onclick = (ev)=>{
     };
     refreshRed();
 
-    // ⑥ クリック → 「追加」タブ → 山札の上から1枚を自分の手札に昇順挿入
+    // ⑥ クリック → 「追加」タブ。2人プレイでは配置するスタンドを選んでから追加
     deckBtn.onclick = (ev)=>{
       openOneMini(ev.clientX, ev.clientY, '追加', async ()=>{
-        try{
-          const mRef = ref(db, `rooms/${state.roomCode}/meta`);
-          const rRef = ref(db, `rooms/${state.roomCode}`);
-          const [mSnap, rSnap] = await Promise.all([get(mRef), get(rRef)]);
-          const meta = mSnap.val()||{};
-          const room = rSnap.val()||{};
-          const D = Array.isArray(meta.m54_redDeck)? meta.m54_redDeck.slice() : [];
-          const U = Array.isArray(meta.m54_redUsed)? meta.m54_redUsed.slice() : [];
-
-          // 次の1枚
-          const top = D.find(n=> !U.includes(n));
-          if (top==null) return;
-
-          // 自分のテーブル番号
-          const myTable = (()=>{
-            const sNum = (state?.seatedTable==null)? null : Number(state.seatedTable);
-            if (Number.isInteger(sNum)) return sNum;
-            const idx = (room.tables||[]).findIndex(t=> t?.playerId===state.userId);
-            return idx>=0? idx : null;
-          })();
-          if (myTable==null || !Array.isArray(room.tables)) return;
-
-          // 手札へ（昇順・alpha再付番） — #43 の追加処理と同じ流儀
-          const tbls = room.tables.slice();
-          const T = tbls[myTable];
-          const hand = Array.isArray(T.hand)? T.hand.slice() : [];
-          const newId = crypto.randomUUID();
-          const newCard = {
-            id: newId,
-            num: top,
-            kind: 'red',     // ← 種別は red としておく（必要なら 'normal' に変更）
-            open: false,
-            ownerId: T.playerId || null,
-            tokens: [],
-            markUntil: Date.now() + 5000
-          };
-          let insertIndex = 0;
-          while (insertIndex < hand.length && Number(hand[insertIndex]?.num) <= Number(top)) insertIndex++;
-          hand.splice(insertIndex, 0, newCard);
-          const alpha = 'abcdefghijklmnopqrstuvwxyz';
-          hand.forEach((c,i)=> c.alpha = alpha[i % alpha.length]);
-          T.hand = hand;
-
-          // 使用済みへ記録
-          U.push(top);
-
-          await Promise.all([
-            set(ref(db, `rooms/${state.roomCode}/tables`), tbls),
-            update(mRef, {
-              m54_redUsed: U,
-              m54_insertAnim: {
-                id: `${Date.now()}_${newId}`,
-                table: myTable,
-                insertIndex,
-                cardId: newId,
-                num: top,
-                startedAt: Date.now()
-              }
-            })
-          ]);
-        }catch(e){ console.error(e); }
+        const myTables=(v.tables||[]).map((table,i)=>table?.playerId===state.userId ? i : -1).filter(i=>i>=0);
+        if ((v?.meta?.playerCount|0)===2 && myTables.length>=2){
+          state._m54RedPlacement={promptDismissed:false};
+          renderM54StandPlacement(v);
+          return;
+        }
+        await addM54RedCard(myTables[0]);
       });
     };
   }else{
@@ -9548,6 +9612,7 @@ poolRow.onclick = (ev)=>{
       restLbl.textContent = `残:${D.filter(x=>!U.includes(x)).length}`;
     }
   }
+  renderM54StandPlacement(v);
 }
 /* ここまで追加：ミッション54 */
 
