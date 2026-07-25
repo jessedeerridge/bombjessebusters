@@ -3039,6 +3039,16 @@ function buildMixPlan(missionId, playerCount = (state.watching?.meta?.playerCoun
     51: [{type:'redPick', k:2}],
     52: [{type:'redPick', k:3}, {type:'yellowPick', k:4}],
     53: [{type:'redPick', k:3}],
+    55: [{type:'redChoose', from:3, take:2}],
+    56: [{type:'redPick', k:3}],
+    57: [{type:'redPick', k:2}],
+    58: [{type:'redPick', k:3}],
+    59: [{type:'redPick', k:3}],
+    60: [{type:'redPick', k:3}],
+    61: [{type:'redPick', k:2}],
+    62: [{type:'redPick', k:3}],
+    63: [{type:'redPick', k:3}],
+    64: [{type:'redPick', k:2}],
   };
   if (playerCount === 2 && twoPlayerPlans[missionId]) return twoPlayerPlans[missionId];
 
@@ -8176,6 +8186,16 @@ async function ensureM61MetaInit(vNow){
   const v = vNow || state.watching; if(!v) return;
   if ((v?.mission?.id|0) !== 61) return;
   const n = (v?.tables?.length|0); if (n<=0) return;
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+  if (isTwoPlayer) {
+    const seatedPlayerIds = [...new Set(tables.map(t=>t?.playerId).filter(Boolean))];
+    const bothPlayersPicked = seatedPlayerIds.length === 2 && seatedPlayerIds.every(playerId =>
+      tables.some(t=>t?.playerId === playerId && isRoleSelectionDone(t, 61))
+    );
+    // 2人用では、2人の着席とキャラクター選択が終わるまで配布しない。
+    if (!bothPlayersPicked) return;
+  }
   // 既に配り済みなら何もしない
   if (Array.isArray(v?.meta?.m61_byTable) && v.meta.m61_byTable.length === n) return;
   if (!state.isHost) return;
@@ -8205,16 +8225,17 @@ async function ensureM63MetaInit(vNow){
   if (!state.isHost) return;
 
   // 人数 → 初期配布数（隊長のみ）
-  const per = (m)=>{
-    if (m===2) return 14;
-    if (m===3) return 18;
-    if (m===4) return 24;
+  const per = (playerCount)=>{
+    if (playerCount===2) return 14;
+    if (playerCount===3) return 18;
+    if (playerCount===4) return 24;
     return 30; // 5 or 6
   };
 
   const cap = Math.max(0, v?.captainTable|0);
   const by = {};
-  for (let i=0;i<n;i++) by[i] = (i===cap ? per(n) : 0);
+  const playerCount = Math.max(0, v?.meta?.playerCount|0) || n;
+  for (let i=0;i<n;i++) by[i] = (i===cap ? per(playerCount) : 0);
 
   await update(ref(db, `rooms/${state.roomCode}/meta`), {
     oxItem: 0,
@@ -9067,7 +9088,13 @@ function renderM61(v){
 
   const by = v.meta.m61_byTable.slice();
   const tables = Array.isArray(v?.tables) ? v.tables : [];
-  const allRolePicked = tables.length > 0 && tables.every(t => isRoleSelectionDone(t, 61));
+  const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
+  const seatedPlayerIds = [...new Set(tables.map(t=>t?.playerId).filter(Boolean))];
+  const allRolePicked = isTwoPlayer
+    ? seatedPlayerIds.length === 2 && seatedPlayerIds.every(playerId =>
+        tables.some(t=>t?.playerId === playerId && isRoleSelectionDone(t, 61))
+      )
+    : tables.length > 0 && tables.every(t => isRoleSelectionDone(t, 61));
   const myIdx = (v.tables||[]).findIndex(T => T.playerId === state.userId);
 
   // 全員のキャラ選択完了までは通常位置の正体カードのみ（下段レーンは作らない）
@@ -9105,6 +9132,12 @@ function renderM61(v){
     const amSeatedHere = (t.playerId && t.playerId === state.userId);
     const mid61 = (v?.mission?.id|0);
     const rolePicked61 = isRoleSelectionDone(t, mid61);
+    const isTwoPlayerEmptyTable = isTwoPlayer && !rolePicked61;
+    // 2人用の空きテーブルは制約カードだけを、半透明かつ3度傾けて表示する。
+    if (isTwoPlayerEmptyTable) {
+      con.style.opacity = '0.3';
+      con.style.transform = 'rotate(-5deg)';
+    }
     if (seatEmpty || !rolePicked61){
       mini.classList.add('blank');
       mini.style.backgroundImage = 'none';
@@ -9144,9 +9177,9 @@ function renderM61(v){
       }
 
       if (!amSeatedHere) mini.style.cursor = 'default';
-   }
+    }
     stack.appendChild(con);
-    stack.appendChild(mini);
+    if (!isTwoPlayerEmptyTable) stack.appendChild(mini);
     // 旧 .char-col を物理削除して詰める
     content.insertBefore(stack, charCol);
     charCol.remove();
@@ -15587,6 +15620,13 @@ case 64: {
   };
 }
 case 65: {
+  if (isTwoPlayer) {
+    return {
+      id:65, name:'#65', desc:'',
+      display:['#65', 'このミッションは2人でプレイすることはできない。'],
+      flags:{}
+    };
+  }
   return {
     id:65, name:'#65', desc:'',
     display:[
