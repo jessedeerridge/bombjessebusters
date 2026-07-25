@@ -6354,7 +6354,7 @@ function renderM31(v){
   }
 
 const taken = new Set(
-  (v?.tables || []).flatMap(t => [t?.m31Con, t?.m31Con2]).filter(Boolean)
+  (v?.tables || []).map(t => t?.m31Con).filter(Boolean)
 );
 const pool = ['A','B','C','D','E'].filter(ch => !taken.has(ch));
 
@@ -6393,17 +6393,13 @@ pool.forEach(ch=>{
     if (!big) return;
 
     const t = (v.tables||[])[ti] || {};
-    const isTwoPlayer = (v?.meta?.playerCount|0) === 2;
     const seatEmpty = !t.playerId;
     const amMe = !!t.playerId && t.playerId === state.userId;
     const mid31 = (v?.mission?.id|0);
     const rolePicked31 = isRoleSelectionDone(t, mid31);
     const picked = t?.m31Con;
-    const picked2 = t?.m31Con2;
-    tbEl.classList.toggle('m31-overflow', isTwoPlayer && !!picked2);
-    // 下側のスタンドを選択して elevated になっても、上からはみ出したカードを隠さない。
-    if (isTwoPlayer) tbEl.style.zIndex = String(1000 - ti);
-    else tbEl.style.removeProperty('z-index');
+    tbEl.classList.remove('m31-overflow');
+    tbEl.style.removeProperty('z-index');
     const face   = t?.m31Face || 'front';
     const faceName = String(t?.character?.face || '');
     const isMember5Card = /member\s*\(5\)\./i.test(faceName);
@@ -6473,18 +6469,6 @@ pool.forEach(ch=>{
       else openConstraintZoomView(picked);
     };
 
-    if (isTwoPlayer && picked2) {
-      const second = document.createElement('div');
-      second.className = 'm61-mini m31-mini m31-second';
-      paintConstraintCard(second, picked2);
-      second.onclick = (ev)=>{
-        ev.stopPropagation();
-        if (isMine) openConstraintZoom31Owned(picked2, ti);
-        else openConstraintZoomView(picked2);
-      };
-      charCol.appendChild(second);
-    }
-
     const mini = document.createElement('div');
     mini.className = 'm61-mini m31-mini m31-character';
     if (seatEmpty || !rolePicked31){
@@ -6519,14 +6503,10 @@ pool.forEach(ch=>{
       }
     }
     charCol.appendChild(mini);
-    if (isTwoPlayer && picked2) {
-      applyTableHeight(tbEl, 96);
-    } else {
-      const rBox  = tbEl.getBoundingClientRect();
-      const rMini = mini.getBoundingClientRect();
-      const needPx = Math.max(96, Math.ceil(rMini.bottom - rBox.top + 6));
-      applyTableHeight(tbEl, needPx);
-    }
+    const rBox  = tbEl.getBoundingClientRect();
+    const rMini = mini.getBoundingClientRect();
+    const needPx = Math.max(96, Math.ceil(rMini.bottom - rBox.top + 6));
+    applyTableHeight(tbEl, needPx);
   });
 }
 
@@ -6627,12 +6607,7 @@ function openConstraintZoom31(letter, myIdx){
       btnPick.onclick = async (ev)=>{
         ev.stopPropagation();
         try{
-          const current = state?.watching?.tables?.[myIdx] || {};
-          const isTwoPlayer = (state?.watching?.meta?.playerCount|0) === 2;
-          const patch = !current.m31Con
-            ? { m31Con:letter }
-            : (isTwoPlayer && !current.m31Con2 ? { m31Con2:letter } : { m31Con:letter });
-          await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), patch);
+          await update(ref(db, `rooms/${state.roomCode}/tables/${myIdx}`), { m31Con:letter });
         }catch(err){ console.error(err); }
         closeConstraintZoom();
       };
@@ -15075,12 +15050,7 @@ function missionInfo(id, opts={}){
         id:31, name:'#31', desc:'',
         display:[
           '#31',...linesForMix,
-          isTwoPlayer
-            ? '隊長から順に、A～Eの制約カードを2枚選んで表向きで自分の前に置く。'
-            : '隊長から順に、A～Eの制約カードを1枚選んで表向きで自分の前に置く。',
-          ...(isTwoPlayer ? [
-            'A+BまたはC+Dの組み合わせで選ばないほうがよい。'
-          ] : []),
+          '隊長から順に、A～Eの制約カードを1枚選んで表向きで自分の前に置く。',
           '各プレイヤーは自分の制約を必ず守らなければならない。',
           '自分のコードを見て、完全に自分の制約を守れなくなれば、制約カードを裏向き（クリック）にして、それ以降は通常通りプレイする。'
         ],
@@ -15212,11 +15182,9 @@ function missionInfo(id, opts={}){
         display:[
           '#39',...linesForMix,
           '最初の情報トークンはランダムに得て、その数値のコードを持っていなければ手元に置いて全員に見せる。',
-          '数値カードを1枚表向きで置いて、残りの数値カードから8枚取って山札を作る。',
-          '表向きの数値カードと同じ数値のコードが4本切断されるまで、隊長の手番の直前に数値カードの山札から1枚捨て札にする。',
-          '最初の数値カードと同じ数値のコードが4本切断されたら、山札に残っている数値カードを裏向きで全員に配る。',
-          'そして、配られた数値カードと同じ数値のコードが手元にあれば、情報トークンをもらってコードの前に置くことができる。なければ、情報トークンはもらえない。',
-          '要約：数値カードと同じ数値のコード4本を早く切断しよう。早ければ早いほど、多くの情報が得られる。'
+          '数値カードの数字は装備カードを使わずに4本同時に切断しなければならない。その数値のコードを持っていないプレイヤーでも実行できる。',
+          'この特殊アクションが実行されるまで、隊長の各手番の前に数値カード8枚の山札から1枚捨て札にする。',
+          'この特殊アクションが実行されたら、山札に残ってる数値カードを裏向きで隊長から順に配り、受け取った数値カードに対応する数字のヒントをつけることができる。'
           ],
         flags:{  }
       };
@@ -15247,7 +15215,7 @@ function missionInfo(id, opts={}){
           '全員に黄コードを1枚ずつ配る。ただし、5人プレイ時は隊長には黄コードを配らない。',
           '最初の情報トークンはランダムに得て、その数値のコードを持っていなければ手元に置いて全員に見せる。',
           'このミッションの黄コードは、共同で切断を行わず、1本ずつ切断する。',
-　　　　　'チームメイトの黄コードの場所を1つ選んで、切断できる。',
+　　　'チームメイトの黄コードの場所を1つ選んで、切断できる。',
           '黄コードの切断に成功すると起爆ダイヤルが1後退する。',
           '手元に黄/赤コードしかない場合は手番を飛ばす。',
        ],
