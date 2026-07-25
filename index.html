@@ -1922,6 +1922,14 @@ function getMySeatedTableIndex(v){
   const idx = tables.findIndex(t => t?.playerId === state.userId);
   return (idx >= 0 ? idx : null);
 }
+
+function isPrimarySeatedTable(v, tableIndex){
+  const tables = Array.isArray(v?.tables) ? v.tables : [];
+  const table = tables[tableIndex];
+  if (!table?.playerId) return false;
+  if ((v?.meta?.playerCount|0) !== 2) return true;
+  return tables.findIndex(t => t?.playerId === table.playerId) === tableIndex;
+}
 // ▼ #13 ヘッダートークンの遅延更新用ガード（レンダー中にDBを書かないため）
 let m13HeaderUpdateScheduled = false;
 let m13HeaderClearIndices = null; // null → Set(index)（消す対象のテーブルindexを貯める）
@@ -8437,7 +8445,12 @@ function renderM63(v){
     }
 
     // 他プレイヤーの「テーブル全体」に渡す判定を付与（ターゲット側のboxで出す）
-    if (Number.isInteger(myIdx) && myIdx !== ti && !box.dataset.m63Bind){
+    // 2人プレイでは各プレイヤーが担当する2台のうち、着席先の上側テーブルだけを渡し先にする。
+    const canReceiveOxygen = Number.isInteger(myIdx)
+      && myIdx !== ti
+      && T?.playerId !== state.userId
+      && isPrimarySeatedTable(v, ti);
+    if (canReceiveOxygen && !box.dataset.m63Bind){
       box.dataset.m63Bind = '1';
       box.addEventListener('click', (ev)=>{
         const mineNow = Math.max(0, v?.meta?.oxByTable?.[myIdx]||0);
@@ -10120,7 +10133,7 @@ if (Number.isInteger(idx) && idx === ti){
       if (!box) return;
 
       // 2人プレイでは、各プレイヤーが着席した先頭側のスタンドだけに表示する。
-      if ((v?.meta?.playerCount|0) === 2 && (ti % 2 !== 0 || !T?.playerId)) {
+      if ((v?.meta?.playerCount|0) === 2 && !isPrimarySeatedTable(v, ti)) {
         box.querySelector('.ox-row[data-owner="1"]')?.remove();
         box.onclick = null;
         return;
@@ -10179,7 +10192,11 @@ if (Number.isInteger(idx) && idx === ti){
   const alt = (v.tables || []).findIndex(t => t?.playerId === state.userId);
   return (alt >= 0 ? alt : null);      })();
 
-  if (myIdx !== null && myIdx !== ti){
+  const canReceiveOxygen = myIdx !== null
+    && myIdx !== ti
+    && T?.playerId !== state.userId
+    && isPrimarySeatedTable(v, ti);
+  if (canReceiveOxygen){
 
   // 共通ハンドラ：row/box から呼ぶ。二重発火防止のため stopPropagation
   const openGiveMenu = async (ev)=>{
