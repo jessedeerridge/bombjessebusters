@@ -83,6 +83,7 @@
     flex:0 0 auto;background:rgba(0,0,0,.72);color:#fff;
     display:grid;place-items:center;font-weight:700;letter-spacing:.08em;
   }
+  .create-room-label{font-size:calc(1em + 5px)}
   .room-card{display:block;background:rgba(255,255,255,.72);text-align:left}
   .room-members{
     display:block;padding-right:2px;font-size:15px;font-weight:650;
@@ -99,6 +100,7 @@
     min-width:0;flex:1;height:40px;border:1px solid rgba(0,0,0,.55);
     border-radius:7px 0 0 7px;padding:7px 10px;font:inherit;background:rgba(255,255,255,.9);
   }
+  .entrance-name-form input::placeholder{color:#777;opacity:.55}
   .entrance-name-form button{
     height:40px;border:1px solid rgba(0,0,0,.75);border-left:0;
     border-radius:0 7px 7px 0;padding:0 14px;background:#111;color:#fff;cursor:pointer;
@@ -1766,7 +1768,7 @@ main:not(:has(#lobby.hidden)) > * {
   <div class="col">
 <div class="join-box" id="joinBox">
   <div class="room-browser" id="roomBrowser">
-    <button class="entrance-card create-room-card" id="btnCreateRoom" type="button">CREATE ROOM</button>
+    <button class="entrance-card create-room-card" id="btnCreateRoom" type="button"><span class="create-room-label">CREATE ROOM</span></button>
     <div class="room-loading" id="roomLoading">loading...</div>
     <div class="room-list" id="roomList" aria-label="存在する部屋"></div>
   </div>
@@ -2181,6 +2183,7 @@ function makeEntranceNameForm(code, isCreate){
   const name = document.createElement('input');
   name.maxLength = 4;
   name.value = cachedEntranceName() || inputName.value.slice(0, 4);
+  name.placeholder = 'your name';
   name.setAttribute('aria-label', '名前');
   const decide = document.createElement('button');
   decide.type = 'submit';
@@ -2216,7 +2219,10 @@ function renderCreateRoomCard(){
   if (activeEntranceCode === '__create__') {
     btnCreateRoom.appendChild(makeEntranceNameForm('', true));
   } else {
-    btnCreateRoom.textContent = 'CREATE ROOM';
+    const label = document.createElement('span');
+    label.className = 'create-room-label';
+    label.textContent = 'CREATE ROOM';
+    btnCreateRoom.appendChild(label);
   }
 }
 
@@ -2276,7 +2282,10 @@ onValue(ref(db, 'rooms'), snapshot => {
   entranceRooms = Object.entries(snapshot.val() || {}).map(([code, room]) => ({
     code,
     createdAt: Number(room?.createdAt) || 0,
-    names: Object.values(room?.players || {}).map(player => String(player?.name || '').trim()).filter(Boolean)
+    names: Object.entries(room?.players || {})
+      .sort(([leftId], [rightId]) => Number(rightId === room?.hostId) - Number(leftId === room?.hostId))
+      .map(([, player]) => String(player?.name || '').trim())
+      .filter(Boolean)
   })).sort((a, b) => b.createdAt - a.createdAt);
   roomLoading.classList.add('hidden');
   if (document.body.classList.contains('entrance-screen')) renderEntranceRooms();
