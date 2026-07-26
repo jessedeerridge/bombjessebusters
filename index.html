@@ -68,6 +68,11 @@
     width:min(88vw,420px);height:min(70dvh,590px);
     display:flex;flex-direction:column;align-items:center;z-index:2;
   }
+  .room-search{
+    width:100%;box-sizing:border-box;border:1px solid rgba(0,0,0,.28);border-radius:8px;
+    padding:9px 11px;background:rgba(255,255,255,.78);font:inherit;color:#111
+  }
+  .room-search::placeholder{color:#777;opacity:.7}
   .room-list{
     width:100%;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;
     scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior:contain;
@@ -1771,6 +1776,7 @@ main:not(:has(#lobby.hidden)) > * {
   <div class="col">
 <div class="join-box" id="joinBox">
   <div class="room-browser" id="roomBrowser">
+    <input class="room-search" id="roomSearchName" maxlength="4" placeholder="name" aria-label="部屋を検索する名前" />
     <button class="entrance-card create-room-card" id="btnCreateRoom" type="button"><span class="create-room-label">CREATE ROOM</span></button>
     <div class="room-loading" id="roomLoading">loading...</div>
     <div class="room-list" id="roomList" aria-label="存在する部屋"></div>
@@ -2134,6 +2140,7 @@ const entranceInput = { name:'', code:'' };
 const btnCreateRoom = document.getElementById('btnCreateRoom');
 const roomList = document.getElementById('roomList');
 const roomLoading = document.getElementById('roomLoading');
+const roomSearchName = document.getElementById('roomSearchName');
 
 const lobby   = document.getElementById('lobby');
 // ▼ 追加：クイックミッションピッカー起動ボタン
@@ -2156,6 +2163,7 @@ if (!entranceInput.name) {
     if (saved) entranceInput.name = saved.slice(0, 4);
   } catch(_e){}
 }
+roomSearchName.value = entranceInput.name;
 
 let entranceRooms = [];
 let visibleRoomCount = 5;
@@ -2175,6 +2183,21 @@ function cachedEntranceName(){
   try { return (localStorage.getItem('savedUserName') || '').slice(0, 4); }
   catch(_e) { return ''; }
 }
+
+function roomMatchesEntranceSearch(room, now = Date.now()){
+  const searchedName = entranceInput.name.trim();
+  const createdAt = Number(room?.createdAt) || 0;
+  const isRecent = createdAt > 0 && createdAt <= now && now - createdAt <= 2 * 60 * 60 * 1000;
+  return Boolean(searchedName) && isRecent && room.names.includes(searchedName);
+}
+
+roomSearchName.addEventListener('input', ()=>{
+  entranceInput.name = roomSearchName.value.slice(0, 4);
+  try { localStorage.setItem('savedUserName', entranceInput.name); } catch(_e) {}
+  visibleRoomCount = 5;
+  activeEntranceCode = null;
+  renderEntranceRooms();
+});
 
 function makeEntranceNameForm(code, isCreate){
   const form = document.createElement('form');
@@ -2231,7 +2254,8 @@ function renderCreateRoomCard(){
 function renderEntranceRooms(){
   renderCreateRoomCard();
   roomList.replaceChildren();
-  entranceRooms.slice(0, visibleRoomCount).forEach(room => {
+  const matchingRooms = entranceRooms.filter(room => roomMatchesEntranceSearch(room));
+  matchingRooms.slice(0, visibleRoomCount).forEach(room => {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'entrance-card room-card';
@@ -2269,14 +2293,16 @@ btnCreateRoom.addEventListener('click', (event)=>{
 
 roomList.addEventListener('scroll', ()=>{
   if (roomList.scrollTop + roomList.clientHeight < roomList.scrollHeight - 24) return;
-  if (visibleRoomCount >= entranceRooms.length) return;
-  visibleRoomCount = Math.min(visibleRoomCount + 5, entranceRooms.length);
+  const matchingRoomCount = entranceRooms.filter(room => roomMatchesEntranceSearch(room)).length;
+  if (visibleRoomCount >= matchingRoomCount) return;
+  visibleRoomCount = Math.min(visibleRoomCount + 5, matchingRoomCount);
   renderEntranceRooms();
 });
 roomList.addEventListener('wheel', event => {
   if (event.deltaY <= 0 || roomList.scrollHeight > roomList.clientHeight) return;
-  if (visibleRoomCount >= entranceRooms.length) return;
-  visibleRoomCount = Math.min(visibleRoomCount + 5, entranceRooms.length);
+  const matchingRoomCount = entranceRooms.filter(room => roomMatchesEntranceSearch(room)).length;
+  if (visibleRoomCount >= matchingRoomCount) return;
+  visibleRoomCount = Math.min(visibleRoomCount + 5, matchingRoomCount);
   renderEntranceRooms();
 });
 
