@@ -2160,6 +2160,16 @@ if (!entranceInput.name) {
 let entranceRooms = [];
 let visibleRoomCount = 5;
 let activeEntranceCode = null;
+const ENTRANCE_ROOM_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
+function roomsForEntrance(now = Date.now()){
+  const name = entranceInput.name.trim();
+  if (!name) return [];
+  const oldestCreatedAt = now - ENTRANCE_ROOM_MAX_AGE_MS;
+  return entranceRooms.filter(room =>
+    room.createdAt >= oldestCreatedAt && room.createdAt <= now && room.names.includes(name)
+  );
+}
 
 function formatRoomCreatedAt(value){
   const date = new Date(Number(value) || 0);
@@ -2231,7 +2241,7 @@ function renderCreateRoomCard(){
 function renderEntranceRooms(){
   renderCreateRoomCard();
   roomList.replaceChildren();
-  entranceRooms.slice(0, visibleRoomCount).forEach(room => {
+  roomsForEntrance().slice(0, visibleRoomCount).forEach(room => {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'entrance-card room-card';
@@ -2268,15 +2278,17 @@ btnCreateRoom.addEventListener('click', (event)=>{
 });
 
 roomList.addEventListener('scroll', ()=>{
+  const matchingRooms = roomsForEntrance();
   if (roomList.scrollTop + roomList.clientHeight < roomList.scrollHeight - 24) return;
-  if (visibleRoomCount >= entranceRooms.length) return;
-  visibleRoomCount = Math.min(visibleRoomCount + 5, entranceRooms.length);
+  if (visibleRoomCount >= matchingRooms.length) return;
+  visibleRoomCount = Math.min(visibleRoomCount + 5, matchingRooms.length);
   renderEntranceRooms();
 });
 roomList.addEventListener('wheel', event => {
+  const matchingRooms = roomsForEntrance();
   if (event.deltaY <= 0 || roomList.scrollHeight > roomList.clientHeight) return;
-  if (visibleRoomCount >= entranceRooms.length) return;
-  visibleRoomCount = Math.min(visibleRoomCount + 5, entranceRooms.length);
+  if (visibleRoomCount >= matchingRooms.length) return;
+  visibleRoomCount = Math.min(visibleRoomCount + 5, matchingRooms.length);
   renderEntranceRooms();
 });
 
