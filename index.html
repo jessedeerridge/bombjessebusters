@@ -64,9 +64,9 @@
   }
   body.entrance-screen main > .side{display:none}
   .room-browser{
-    position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+    position:absolute;left:50%;top:calc(44% + 50px);transform:translate(-50%,-50%);
     width:min(88vw,420px);height:min(70dvh,590px);
-    display:flex;flex-direction:column;align-items:center;
+    display:flex;flex-direction:column;align-items:center;z-index:2;
   }
   .room-list{
     width:100%;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;
