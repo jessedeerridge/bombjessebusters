@@ -2157,9 +2157,21 @@ if (!entranceInput.name) {
   } catch(_e){}
 }
 
+const ROOM_LIST_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+let allEntranceRooms = [];
 let entranceRooms = [];
 let visibleRoomCount = 5;
 let activeEntranceCode = null;
+
+function refreshEntranceRooms(){
+  const newestAllowed = Date.now() - ROOM_LIST_MAX_AGE_MS;
+  const searchName = entranceInput.name.trim();
+  entranceRooms = allEntranceRooms.filter(room =>
+    room.createdAt >= newestAllowed ||
+    (searchName && room.names.some(name => name === searchName))
+  );
+  visibleRoomCount = 5;
+}
 
 function formatRoomCreatedAt(value){
   const date = new Date(Number(value) || 0);
@@ -2190,6 +2202,10 @@ function makeEntranceNameForm(code, isCreate){
   name.addEventListener('input', ()=>{
     entranceInput.name = name.value.slice(0, 4);
     try { localStorage.setItem('savedUserName', entranceInput.name); } catch(_e) {}
+    refreshEntranceRooms();
+    // The create form is outside the room list, so matching older rooms can be
+    // revealed while typing without replacing the focused input.
+    if (isCreate) renderEntranceRoomList();
   });
   form.addEventListener('submit', async (event)=>{
     event.preventDefault();
@@ -2200,7 +2216,7 @@ function makeEntranceNameForm(code, isCreate){
     let targetCode = code;
     if (isCreate) {
       do { targetCode = randomRoomCode(5); }
-      while (entranceRooms.some(room => room.code === targetCode));
+      while (allEntranceRooms.some(room => room.code === targetCode));
     }
     entranceInput.code = targetCode;
     try {
@@ -2230,6 +2246,10 @@ function renderCreateRoomCard(){
 
 function renderEntranceRooms(){
   renderCreateRoomCard();
+  renderEntranceRoomList();
+}
+
+function renderEntranceRoomList(){
   roomList.replaceChildren();
   entranceRooms.slice(0, visibleRoomCount).forEach(room => {
     const card = document.createElement('button');
@@ -2281,7 +2301,7 @@ roomList.addEventListener('wheel', event => {
 });
 
 onValue(ref(db, 'rooms'), snapshot => {
-  entranceRooms = Object.entries(snapshot.val() || {}).map(([code, room]) => ({
+  allEntranceRooms = Object.entries(snapshot.val() || {}).map(([code, room]) => ({
     code,
     createdAt: Number(room?.createdAt) || 0,
     names: Object.entries(room?.players || {})
@@ -2289,6 +2309,7 @@ onValue(ref(db, 'rooms'), snapshot => {
       .map(([, player]) => String(player?.name || '').trim())
       .filter(Boolean)
   })).sort((a, b) => b.createdAt - a.createdAt);
+  refreshEntranceRooms();
   roomLoading.classList.add('hidden');
   if (document.body.classList.contains('entrance-screen')) renderEntranceRooms();
 }, () => {
