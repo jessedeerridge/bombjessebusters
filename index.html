@@ -64,46 +64,49 @@
   }
   body.entrance-screen main > .side{display:none}
   .room-browser{
-    position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+    position:absolute;left:50%;top:calc(44% + 150px);transform:translate(-50%,-50%);
     width:min(88vw,420px);height:min(70dvh,590px);
-    display:flex;flex-direction:column;align-items:center;
+    display:flex;flex-direction:column;align-items:center;z-index:2;
   }
   .room-list{
-    width:100%;min-height:0;overflow-x:hidden;overflow-y:auto;
+    width:100%;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;
     scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior:contain;
   }
   .room-list::-webkit-scrollbar{display:none}
   .entrance-card{
     position:relative;width:100%;height:76px;min-height:76px;margin:0 0 10px;
     border:1px solid rgba(0,0,0,.7);border-radius:10px;
-    padding:10px 12px;color:#111;font:inherit;cursor:pointer;
+    padding:10px 12px;color:#111;cursor:pointer;
+    font-family:"Noto Sans JP","Yu Gothic",sans-serif;
     box-shadow:0 3px 12px rgba(0,0,0,.1);
   }
   .create-room-card{
     flex:0 0 auto;background:rgba(0,0,0,.72);color:#fff;
-    display:grid;place-items:center;font-weight:700;letter-spacing:.08em;
+    display:grid;place-items:center;font-size:21px;font-weight:700;letter-spacing:.08em;
   }
-  .create-room-label{font-size:calc(1em + 5px)}
+  .create-room-label{font-size:inherit}
   .room-card{display:block;background:rgba(255,255,255,.72);text-align:left}
   .room-members{
     display:block;padding-right:2px;font-size:15px;font-weight:650;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
-  .room-meta{position:absolute;right:10px;bottom:7px;font-size:11px;white-space:nowrap}
+  .room-meta{position:absolute;right:10px;bottom:7px;font-size:11px;color:#111;white-space:nowrap}
   .room-time{margin-left:8px}
-  .room-loading{height:28px;flex:0 0 auto;font-size:13px;display:grid;place-items:center}
+  .room-loading{height:28px;flex:0 0 auto;font-size:13px;color:#555;display:grid;place-items:center}
   .entrance-name-form{
     display:flex;align-items:center;justify-content:center;width:100%;height:100%;
-    padding:0 12px;
+    padding:0;
   }
   .entrance-name-form input{
     min-width:0;flex:1;height:40px;border:1px solid rgba(0,0,0,.55);
-    border-radius:7px 0 0 7px;padding:7px 10px;font:inherit;background:rgba(255,255,255,.9);
+    border-radius:7px 0 0 7px;padding:7px 10px;background:rgba(255,255,255,.9);
+    font-family:"Noto Sans JP","Yu Gothic",sans-serif;font-size:16px;font-weight:500;color:#111;
   }
   .entrance-name-form input::placeholder{color:#777;opacity:.55}
   .entrance-name-form button{
-    height:40px;border:1px solid rgba(0,0,0,.75);border-left:0;
-    border-radius:0 7px 7px 0;padding:0 14px;background:#111;color:#fff;cursor:pointer;
+    height:40px;min-width:62px;border:1px solid rgba(0,0,0,.75);border-left:0;
+    border-radius:0 7px 7px 0;padding:0 14px;background:#111;color:#fff;
+    font-family:"Noto Sans JP","Yu Gothic",sans-serif;font-size:15px;font-weight:700;cursor:pointer;
   }
 
   .fab{position:fixed;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#111;color:#fff;cursor:pointer;z-index:900}
@@ -1772,9 +1775,6 @@ main:not(:has(#lobby.hidden)) > * {
     <div class="room-loading" id="roomLoading">loading...</div>
     <div class="room-list" id="roomList" aria-label="存在する部屋"></div>
   </div>
-  <input id="userName" class="hidden" maxlength="4" />
-  <input id="roomCode" class="hidden" maxlength="12" />
-  <button id="btnJoin" class="hidden" type="button"></button>
 </div>
 
 
@@ -2128,10 +2128,9 @@ const ITEM_TEXTS = {
 /* Elements */
 const roomInfo = document.getElementById('roomInfo');
 const joinBox= document.getElementById('joinBox');
-const inputName = document.getElementById('userName'); // ★追加
-const inputCode = document.getElementById('roomCode');
-
-const btnJoin = document.getElementById('btnJoin');
+// The entrance has no standalone controls; these values bridge its inline forms
+// to the existing room-entry flow.
+const entranceInput = { name:'', code:'' };
 const btnCreateRoom = document.getElementById('btnCreateRoom');
 const roomList = document.getElementById('roomList');
 const roomLoading = document.getElementById('roomLoading');
@@ -2148,13 +2147,13 @@ try{
   const qs = new URLSearchParams(location.search);
   const qRoom = (qs.get('room')||'').trim();
   const qName = (qs.get('name')||'').trim();
-  if (qRoom) inputCode.value = qRoom.slice(0, 12);
-  if (qName) inputName.value = qName.slice(0, 4);
+  if (qRoom) entranceInput.code = qRoom.slice(0, 12);
+  if (qName) entranceInput.name = qName.slice(0, 4);
 }catch(_e){}
-if (!inputName.value) {
+if (!entranceInput.name) {
   try {
     const saved = localStorage.getItem("savedUserName");
-    if (saved) inputName.value = saved.slice(0, 4);
+    if (saved) entranceInput.name = saved.slice(0, 4);
   } catch(_e){}
 }
 
@@ -2182,30 +2181,33 @@ function makeEntranceNameForm(code, isCreate){
   form.className = 'entrance-name-form';
   const name = document.createElement('input');
   name.maxLength = 4;
-  name.value = cachedEntranceName() || inputName.value.slice(0, 4);
-  name.placeholder = 'your name';
+  name.value = cachedEntranceName() || entranceInput.name.slice(0, 4);
+  name.placeholder = 'name';
   name.setAttribute('aria-label', '名前');
   const decide = document.createElement('button');
   decide.type = 'submit';
   decide.textContent = '決定';
   name.addEventListener('input', ()=>{
-    inputName.value = name.value.slice(0, 4);
-    try { localStorage.setItem('savedUserName', inputName.value); } catch(_e) {}
+    entranceInput.name = name.value.slice(0, 4);
+    try { localStorage.setItem('savedUserName', entranceInput.name); } catch(_e) {}
   });
   form.addEventListener('submit', async (event)=>{
     event.preventDefault();
     if (decide.disabled) return;
     decide.disabled = true;
-    inputName.value = name.value.slice(0, 4);
-    try { localStorage.setItem('savedUserName', inputName.value); } catch(_e) {}
+    entranceInput.name = name.value.slice(0, 4);
+    try { localStorage.setItem('savedUserName', entranceInput.name); } catch(_e) {}
     let targetCode = code;
     if (isCreate) {
       do { targetCode = randomRoomCode(5); }
       while (entranceRooms.some(room => room.code === targetCode));
     }
-    inputCode.value = targetCode;
-    await btnJoin.onclick();
-    if (document.body.classList.contains('entrance-screen')) decide.disabled = false;
+    entranceInput.code = targetCode;
+    try {
+      await enterFromEntrance();
+    } finally {
+      if (document.body.classList.contains('entrance-screen')) decide.disabled = false;
+    }
   });
   form.append(name, decide);
   queueMicrotask(()=>{
@@ -3634,12 +3636,11 @@ function openBottomMenu(entries){
 
 
 /* enter */
-btnJoin.onclick   = async ()=>{
-  if (btnJoin.dataset.loading === '1') return;
-  btnJoin.dataset.loading = '1';
-  btnJoin.classList.add('loading');
-  btnJoin.disabled = true;
-  const nm = (inputName?.value || '').trim();
+let entranceIsSubmitting = false;
+async function enterFromEntrance(){
+  if (entranceIsSubmitting) return;
+  entranceIsSubmitting = true;
+  const nm = entranceInput.name.trim();
   // ★名前は4文字以内。未入力ならひらがな4文字を自動採番
   state.userName = nm ? nm.slice(0,4) : hiragana(4);
   try { localStorage.setItem("savedUserName", state.userName); } catch(_e){}
@@ -3647,22 +3648,20 @@ btnJoin.onclick   = async ()=>{
   saveStableUserIdByName(state.userName, state.userId);
 
   // ★ルームコード未入力なら英数字5文字を自動採番
-  if (!inputCode.value.trim()) {
-    inputCode.value = randomRoomCode(5);
+  if (!entranceInput.code.trim()) {
+    entranceInput.code = randomRoomCode(5);
   }
 
   try{
     await enter('player');
   } finally {
-    btnJoin.dataset.loading = '0';
-    btnJoin.classList.remove('loading');
-    btnJoin.disabled = false;
+    entranceIsSubmitting = false;
   }
-};
+}
 
 
 async function enter(mode){
-  const code=(inputCode.value||"").trim();
+  const code=entranceInput.code.trim();
   preloadCardImages();
   if(!code){ alert('コードを入力してください'); return; }
   state.roomCode = code; state.mode=mode;
@@ -3697,6 +3696,9 @@ async function enter(mode){
   listenRoom(code);
   // ★ 自動離席の遅延クリア役（Janitor）を起動
   document.body.classList.remove('entrance-screen');
+  activeEntranceCode = null;
+  btnCreateRoom.replaceChildren();
+  roomList.replaceChildren();
   H(joinBox,true); H(lobby,false); H(gear,false); updateHeaderInfo();
 }
 
