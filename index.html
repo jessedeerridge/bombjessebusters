@@ -68,6 +68,8 @@
     width:min(88vw,420px);height:min(70dvh,590px);
     display:flex;flex-direction:column;align-items:center;z-index:2;
   }
+  .room-browser:not(.rooms-loaded) #btnCreateRoom,
+  .room-browser:not(.rooms-loaded) #roomList{display:none}
   .room-list{
     width:100%;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;
     scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior:contain;
@@ -2131,6 +2133,7 @@ const joinBox= document.getElementById('joinBox');
 // The entrance has no standalone controls; these values bridge its inline forms
 // to the existing room-entry flow.
 const entranceInput = { name:'', code:'' };
+const roomBrowser = document.getElementById('roomBrowser');
 const btnCreateRoom = document.getElementById('btnCreateRoom');
 const roomList = document.getElementById('roomList');
 const roomLoading = document.getElementById('roomLoading');
@@ -2157,7 +2160,7 @@ if (!entranceInput.name) {
   } catch(_e){}
 }
 
-const ROOM_LIST_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+const ROOM_LIST_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 let allEntranceRooms = [];
 let entranceRooms = [];
 let visibleRoomCount = 5;
@@ -2165,11 +2168,7 @@ let activeEntranceCode = null;
 
 function refreshEntranceRooms(){
   const newestAllowed = Date.now() - ROOM_LIST_MAX_AGE_MS;
-  const searchName = entranceInput.name.trim();
-  entranceRooms = allEntranceRooms.filter(room =>
-    room.createdAt >= newestAllowed ||
-    (searchName && room.names.some(name => name === searchName))
-  );
+  entranceRooms = allEntranceRooms.filter(room => room.createdAt >= newestAllowed);
   visibleRoomCount = 5;
 }
 
@@ -2203,8 +2202,7 @@ function makeEntranceNameForm(code, isCreate){
     entranceInput.name = name.value.slice(0, 4);
     try { localStorage.setItem('savedUserName', entranceInput.name); } catch(_e) {}
     refreshEntranceRooms();
-    // The create form is outside the room list, so matching older rooms can be
-    // revealed while typing without replacing the focused input.
+    // Keep the room list current without replacing the focused create form.
     if (isCreate) renderEntranceRoomList();
   });
   form.addEventListener('submit', async (event)=>{
@@ -2310,8 +2308,9 @@ onValue(ref(db, 'rooms'), snapshot => {
       .filter(Boolean)
   })).sort((a, b) => b.createdAt - a.createdAt);
   refreshEntranceRooms();
-  roomLoading.classList.add('hidden');
   if (document.body.classList.contains('entrance-screen')) renderEntranceRooms();
+  roomLoading.classList.add('hidden');
+  roomBrowser.classList.add('rooms-loaded');
 }, () => {
   roomLoading.textContent = 'loading...';
 });
