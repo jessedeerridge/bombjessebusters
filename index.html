@@ -2161,6 +2161,7 @@ if (!entranceInput.name) {
 }
 
 const ROOM_LIST_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const ROOM_LIST_MIN_COUNT = 3;
 let allEntranceRooms = [];
 let entranceRooms = [];
 let visibleRoomCount = 5;
@@ -2168,7 +2169,9 @@ let activeEntranceCode = null;
 
 function refreshEntranceRooms(){
   const newestAllowed = Date.now() - ROOM_LIST_MAX_AGE_MS;
-  entranceRooms = allEntranceRooms.filter(room => room.createdAt >= newestAllowed);
+  entranceRooms = allEntranceRooms.filter((room, index) =>
+    index < ROOM_LIST_MIN_COUNT || room.createdAt >= newestAllowed
+  );
   visibleRoomCount = 5;
 }
 
