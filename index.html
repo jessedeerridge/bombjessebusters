@@ -1864,7 +1864,7 @@ main:not(:has(#lobby.hidden)) > * {
   </div>
   <div class="row"><label>ミッション</label>
 <select id="selMission">
-  <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 黄コード</option><option value="3">#3 さらい爆弾</option>
+  <option value="1">#1 爆弾（赤コード）</option><option value="2">#2 他力本願</option><option value="3">#3 さらい爆弾</option>
   <option value="4">#4</option><option value="5">#5</option><option value="6">#6</option><option value="7">#7</option>
   <option value="8">#8</option>
   <option value="9">#9 aaa</option>
@@ -1994,7 +1994,7 @@ state._mpAutoOnce = false;  // 「参加」後に自動でピッカーを開い�
 
 const STAGE_STORIES = {
   1: { title:'訓練 1日目', body:'レッスン1：コードを切断するには？' },
-  2: { title:'訓練 2日目', body:'レッスン2：黄コードを切断せよ' },
+  2: { title:'他力本願', body:'自分ではどうにもできないこともある。仲間を信じたまえ。' },
   3: { title:'訓練 3日目', body:'レッスン3：赤コードを回避せよ' },
   4: { title:'実地訓練 1日目', body:'理論を実践するときだ！' },
   5: { title:'実地訓練 2日目', body:'それは黄色いレンガ道ではなく、地雷原だ……。' },
@@ -15025,8 +15025,15 @@ function missionInfo(id, opts={}){
     }
     case 2:{
       return {
-        id:2, name:'#2', desc:'',
-        display: ['#2', ...linesForMix, '', '', ''],
+        id:2, name:'#2 他力本願', desc:'',
+        display: [
+          '#2 他力本願',
+          ...linesForMix,
+          'このミッションではいずれのコードも自分だけで切断ができない。',
+          'ただし、自分のコードを含めず、他プレイヤーのコード同士を宣言して切断ができる。',
+          'もし他のプレイヤー1人のスタンドから2本を選び、コードの切断に失敗した場合、どちらかが正しくても、任意の一か所に情報トークンを置いて、起爆ダイヤルを1進める。',
+          'もし自分以外の二人のスタンドから切断を試みて失敗した場合、どちらかが正しくても、その2か所に情報トークンを置いて、起爆ダイヤルを2進める。'
+        ],
         flags: { noItems:true }
       };
     }
