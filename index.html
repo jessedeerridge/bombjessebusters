@@ -1918,18 +1918,18 @@ main:not(:has(#lobby.hidden)) > * {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getDatabase, ref, get, set, update, remove, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { getDatabase, ref, get, set, update, remove, onValue, onDisconnect, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
 /* Firebase */
 const firebaseConfig = {
-  apiKey: "AIzaSyDYiOxUywoIV-6rhtm-slqyykLl2asPXLU",
-  authDomain: "jessegames-s.firebaseapp.com",
-  databaseURL: "https://jessegames-s-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "jessegames-s",
-  storageBucket: "jessegames-s.firebasestorage.app",
-  messagingSenderId: "183304100225",
-  appId: "1:183304100225:web:edbe6e75da8f327a94b080",
-  measurementId: "G-2K23NXP9YT"
+  apiKey: "AIzaSyDUP1foVQnitM45do_UtYLkcc9gvgQC-xw",
+  authDomain: "timebomb-3b0c7.firebaseapp.com",
+  databaseURL: "https://timebomb-3b0c7-default-rtdb.firebaseio.com",
+  projectId: "timebomb-3b0c7",
+  storageBucket: "timebomb-3b0c7.firebasestorage.app",
+  messagingSenderId: "532935786630",
+  appId: "1:532935786630:web:ef1f97c862bfaad67d1107",
+  measurementId: "G-K8NRR8K64Y"
 };
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
@@ -2301,7 +2301,8 @@ roomList.addEventListener('wheel', event => {
   renderEntranceRooms();
 });
 
-onValue(ref(db, 'rooms'), snapshot => {
+const entranceRoomsQuery = query(ref(db, 'roomSummaries'), orderByChild('createdAt'), limitToLast(5));
+onValue(entranceRoomsQuery, snapshot => {
   allEntranceRooms = Object.entries(snapshot.val() || {}).map(([code, room]) => ({
     code,
     createdAt: Number(room?.createdAt) || 0,
@@ -2315,7 +2316,7 @@ onValue(ref(db, 'rooms'), snapshot => {
   roomLoading.classList.add('hidden');
   roomBrowser.classList.add('rooms-loaded');
 }, () => {
-  roomLoading.textContent = 'loading...';
+  roomLoading.textContent = '部屋一覧を取得できません。接続または Firebase のアクセスルールを確認してください。';
 });
 const tablesEl= document.getElementById('tables');
 const gear    = document.getElementById('gear');
@@ -3774,10 +3775,31 @@ function baseRoom(hostId){
     lastActiveAt: Date.now()
   };}
 
+/* Entrance metadata contains no hands, missions, images, or other game state.
+   Existing rooms gain a summary when opened; the entrance never scans /rooms. */
+function makeRoomSummary(room){
+  if (!room) return null;
+  const players = Object.fromEntries(Object.entries(room.players || {}).map(([id, player]) =>
+    [id, { name: String(player?.name || '').trim() }]
+  ));
+  return { createdAt: Number(room.createdAt) || 0, hostId: room.hostId || null, players };
+}
+
 /* watch */
 function listenRoom(code){
+  let lastSummaryJSON;
+
   onValue(ref(db, `rooms/${code}`),(snap)=>{
     const v=snap.val(); state.watching=v;
+    const summary = makeRoomSummary(v);
+    const summaryJSON = JSON.stringify(summary);
+    if (summaryJSON !== lastSummaryJSON){
+      lastSummaryJSON = summaryJSON;
+      set(ref(db, `roomSummaries/${code}`), summary).catch(error => {
+        lastSummaryJSON = undefined;
+        console.error('Room summary update failed:', error);
+      });
+    }
     handleMission27And28AutoHide(v).catch(console.error);
   // ★ #22: 新しいゲーム/ミッション開始時にクライアント側の一度きりガードを解除（全端末）
   const curId = (v?.mission?.id|0) || 0;
@@ -3814,7 +3836,7 @@ if (v) {
     const lastActive = v.lastActiveAt || Date.now();
    const elapsed = Date.now() - lastActive;
     if (elapsed >= 30 * 60 * 1000) {
-      remove(ref(db, `rooms/${code}`));
+      update(ref(db), { [`rooms/${code}`]: null, [`roomSummaries/${code}`]: null }).catch(console.error);
       return;
    } else {
       // active時刻更新
