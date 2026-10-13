@@ -1761,6 +1761,12 @@ main:not(:has(#lobby.hidden)) > * {
 
 
 
+
+  .num.stage-star-code{
+    font-size:min(var(--font-card), calc(var(--card-w) * .42));
+    white-space:nowrap;
+    letter-spacing:0;
+  }
 </style>
 </head>
 <body class="entrance-screen">
@@ -1919,6 +1925,18 @@ main:not(:has(#lobby.hidden)) > * {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getDatabase, ref, get, set, update, remove, onValue, onDisconnect, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+function cardNumberLabel(value){
+  if (value === 0 || value === '0') return '✦';
+  if (value === 13 || value === '13') return '✦✦';
+  return value == null ? '' : String(value);
+}
+
+function displayCardNumber(element, value){
+  const label = cardNumberLabel(value);
+  element.textContent = label;
+  element.classList.toggle('stage-star-code', label === '✦' || label === '✦✦');
+}
 
 /* Firebase */
 const firebaseConfig = {
@@ -4618,7 +4636,12 @@ function renderMissionComplete(v){
 
     // ここから通常の「全公開」判定へ
     if (cards.length === 0) return;
-    const allOpen = unopened === 0;
+    const stageExtras = v.tables.flatMap(T => T.hand || []).filter(c => c?.stageExtra);
+    const extrasOpen = !v.mission?.flags?.stageExtraCards ||
+      (stageExtras.some(c => c.num === 0 && c.open === true) &&
+       stageExtras.some(c => c.num === 13 && c.open === true) &&
+       stageExtras.every(c => c.open === true));
+    const allOpen = unopened === 0 && extrasOpen;
     if (!allOpen) return;
 
     // 同一ミッション内で一度だけ表示
@@ -5261,7 +5284,7 @@ const ownerBlindSpecial = (m38Special || m56Special || m64Special);
               // 他プレイヤー：灰＋数字（＝自分の非公開手札の見え方）
               const numEl = document.createElement('div');
               numEl.className = 'num';
-              numEl.textContent = String(c.num ?? '');
+              displayCardNumber(numEl, c.num);
               card.appendChild(numEl);
               // 背景は .card の #bbb をそのまま利用（back は付けない）
             }
@@ -5390,7 +5413,7 @@ if (c.markUntil && now() < c.markUntil) {
             /*未定義を文字列 "undefined" で出さない */
       const hasNum = (c.num != null && !Number.isNaN(Number(c.num)));
       if (hasNum) {
-        num.textContent = String(c.num);
+        displayCardNumber(num, c.num);
         num.classList.toggle('tight-code', [10.1, 10.2, 10.5, 11.1, 11.2, 11.5].includes(Number(c.num)));
         const i2ViewerCanSeeSelA = !!(
           i2All && (i2All.phase==='pickViewerSelf' || i2All.phase==='placeStand' || i2All.phase==='resolving') && i2ViewerIsMe &&
@@ -5586,7 +5609,7 @@ if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captain
     }
   }else{
     // 通常：そのカードの数字
-    entries.push({label:String(c.num), action: async ()=>{
+    entries.push({label:cardNumberLabel(c.num), action: async ()=>{
       const updated=[...(tokens), {type:'num', value:c.num, style:'black'}];
       await update(ref(db, cardPath), { tokens: updated });
       await consumeM22IfMatches(idx, c.num);   // ← 追加
@@ -5608,7 +5631,7 @@ if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captain
                       const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
                       box.classList.toggle('elevated', afterHas);
                     }},
-                  { label:String(c.num), action: async ()=>{
+                  { label:cardNumberLabel(c.num), action: async ()=>{
                       if(!has('num')){
                         const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
                         await update(ref(db, cardPath), { tokens: next });
@@ -5640,7 +5663,7 @@ if(!_m52 && !suppressNumberPop_m40 && canNum){  if(v.mission?.flags?.m17_captain
                       const afterHas = (t.hand||[]).some(cc => (cc.tokens||[]).length>0);
                       box.classList.toggle('elevated', afterHas);
                     }},
-                  { label:String(c.num), action: async ()=>{
+                  { label:cardNumberLabel(c.num), action: async ()=>{
                       if(!has('num')){
                         const next=[...(tokens), {type:'num', value:c.num, style:'black'}];
                         await update(ref(db, cardPath), { tokens: next });
@@ -7415,7 +7438,7 @@ const onRotate = ()=>{
   const dragMeta = v?.meta?.m42_drag || null;
   if (dragMeta){
     const g = ensureGhost();
-    g.querySelector('.num').textContent = String(dragMeta.num ?? '');
+    displayCardNumber(g.querySelector('.num'), dragMeta.num);
     g.style.left = `${dragMeta.x}px`;
     g.style.top  = `${dragMeta.y}px`;
     blankOrigin(dragMeta.table, dragMeta.cardId, true);
@@ -7460,7 +7483,7 @@ const onRotate = ()=>{
         if (!moved && (dx>2 || dy>2)) moved = true;
 
         const g = ensureGhost();
-        g.querySelector('.num').textContent = String(num);
+        displayCardNumber(g.querySelector('.num'), num);
         g.style.left = `${x}px`;
         g.style.top  = `${y}px`;
         update(ref(db, `rooms/${state.roomCode}/meta`), {
@@ -7943,7 +7966,7 @@ function runM43InsertAnimation(v){
     if (showFront){
       const num = document.createElement('div');
       num.className = 'num';
-      num.textContent = String(anim.num ?? '');
+      displayCardNumber(num, anim.num);
       num.classList.toggle('tight-code', [10.1, 10.5, 11.1, 11.5].includes(Number(anim.num)));
       fly.appendChild(num);
 
@@ -8038,7 +8061,7 @@ function runM54InsertAnimation(v){
     if (showFront){
       const num = document.createElement('div');
       num.className = 'num';
-      num.textContent = String(anim.num ?? '');
+      displayCardNumber(num, anim.num);
       num.classList.toggle('tight-code', [10.1, 10.5, 11.1, 11.5].includes(Number(anim.num)));
       fly.appendChild(num);
 
@@ -12138,8 +12161,43 @@ btnStartOk.onclick = async ()=>{ const count=clamp(parseInt(selCount.value,10),1
 
 /* ▼▼ ミッションピッカー実装 ▼▼ */
 let mpSelectedCount = 4;
+const STAGE_DOUBLE_TAP_MS = 300;
+let pendingStageTap = null;
+let stageStartInProgress = false;
+
+function cancelPendingStageTap(){
+  if (pendingStageTap) clearTimeout(pendingStageTap.timer);
+  pendingStageTap = null;
+}
+
+function selectStage(id){
+  if (stageStartInProgress) return;
+  const doubleTap = pendingStageTap?.id === id;
+  cancelPendingStageTap();
+  const playerCount = mpSelectedCount;
+  const start = async (extraCards)=>{
+    cancelPendingStageTap();
+    stageStartInProgress = true;
+    try{
+      await leaveSeatNow();
+      closeMissionPicker();
+      await startGame(playerCount, id, extraCards);
+    }catch(error){
+      console.error('Stage start failed:', error);
+      alert('ステージを開始できませんでした。接続を確認して再試行してください。');
+    }finally{
+      stageStartInProgress = false;
+    }
+  };
+  if (doubleTap){
+    void start(true);
+  }else{
+    pendingStageTap = { id, timer: setTimeout(()=>void start(false), STAGE_DOUBLE_TAP_MS) };
+  }
+}
 
 function openMissionPicker(opts = {}){
+  cancelPendingStageTap();
   const readOnly = !!opts.readOnly;
   // 初期人数は現在のテーブル数 or 4
   const v = state.watching;
@@ -12171,11 +12229,10 @@ missionIds.forEach(id=>{
   const b = document.createElement('button');
   b.className = 'btn small';
   b.textContent = (id >= 101) ? `@${id-100}` : `#${id}`;
-  b.onclick = async ()=>{
+  b.style.touchAction = 'manipulation';
+  b.onclick = ()=>{
     if (readOnly) return;
-    await leaveSeatNow();
-    closeMissionPicker();
-    await startGame(mpSelectedCount, id);
+    selectStage(id);
   };
   if (readOnly) b.disabled = true;
   mpMissions.appendChild(b);
@@ -12199,6 +12256,7 @@ missionIds.forEach(id=>{
 }
 
 function closeMissionPicker(){
+  cancelPendingStageTap();
   H(mp, true);
   if (state.isHost){
     update(ref(db, `rooms/${state.roomCode}/meta`), { missionPickerOpen:false }).catch(()=>{});
@@ -12230,7 +12288,7 @@ function syncMissionPickerCountTabs(v){
   });
 }
 
-async function startGame(playerCount, missionId){
+async function startGame(playerCount, missionId, extraCards = false){
   if(!state.isHost) return;
 
   // ★ 前のゲーム由来のDOM＆レジスタを完全クリア
@@ -12329,6 +12387,16 @@ m29Rest = nums.slice(pi);
   }
 
   
+  // Stage double-tap adds exactly one of each after mission-specific removals.
+  if (extraCards){
+    deck.push(...[0, 13].map(num => ({
+      id: crypto.randomUUID(), num, kind:'normal', open:false,
+      ownerId:null, stageExtra:true
+    })));
+    shuffle(deck);
+    missionMeta.flags = { ...(missionMeta.flags || {}), stageExtraCards:true };
+  }
+
   // ===== 配布 → 手札昇順 → α付与 =====
   const alpha="abcdefghijklmnopqrstuvwxyz";
   let p=0; while(p<deck.length){ for(let t=0; t<tableSlots && p<deck.length; t++){ const c=deck[p++]; tables[t].hand.push({...c, alpha:'', tokens:[], markUntil:null}); } }
