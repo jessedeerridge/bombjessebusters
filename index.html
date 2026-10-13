@@ -68,6 +68,8 @@
     width:min(88vw,420px);height:min(70dvh,590px);
     display:flex;flex-direction:column;align-items:center;z-index:2;
   }
+  .room-browser:not(.rooms-loaded) #btnCreateRoom,
+  .room-browser:not(.rooms-loaded) #roomList{display:none}
   .room-list{
     width:100%;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;
     scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior:contain;
@@ -1772,7 +1774,7 @@ main:not(:has(#lobby.hidden)) > * {
 <div class="join-box" id="joinBox">
   <div class="room-browser" id="roomBrowser">
     <button class="entrance-card create-room-card" id="btnCreateRoom" type="button"><span class="create-room-label">CREATE ROOM</span></button>
-    <div class="room-loading" id="roomLoading" role="status">loading...</div>
+    <div class="room-loading" id="roomLoading">loading...</div>
     <div class="room-list" id="roomList" aria-label="存在する部屋"></div>
   </div>
 </div>
@@ -2160,17 +2162,7 @@ if (!entranceInput.name) {
 
 const ROOM_LIST_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const ROOM_LIST_MIN_COUNT = 3;
-const ROOM_LIST_CACHE_KEY = 'entranceRoomsCache';
 let allEntranceRooms = [];
-try {
-  const cached = JSON.parse(localStorage.getItem(ROOM_LIST_CACHE_KEY) || '[]');
-  if (Array.isArray(cached)) {
-    allEntranceRooms = cached.filter(room =>
-      room && typeof room.code === 'string' && Number.isFinite(room.createdAt)
-      && Array.isArray(room.names) && room.names.every(name => typeof name === 'string')
-    ).sort((a, b) => b.createdAt - a.createdAt);
-  }
-} catch(_e) {}
 let entranceRooms = [];
 let visibleRoomCount = 5;
 let activeEntranceCode = null;
@@ -2309,18 +2301,6 @@ roomList.addEventListener('wheel', event => {
   renderEntranceRooms();
 });
 
-// Firebase can keep retrying an offline connection without invoking its error callback.
-// Show cached rooms immediately and stop the loading indicator after a bounded wait.
-refreshEntranceRooms();
-renderEntranceRooms();
-function showEntranceConnectionError(){
-  roomLoading.textContent = allEntranceRooms.length
-    ? 'DBに接続できません。保存済みのルームを表示しています。'
-    : 'DBに接続できません。ルーム一覧を取得できませんでした。';
-  roomLoading.classList.remove('hidden');
-}
-const entranceLoadingTimeout = setTimeout(showEntranceConnectionError, 8000);
-
 onValue(ref(db, 'rooms'), snapshot => {
   allEntranceRooms = Object.entries(snapshot.val() || {}).map(([code, room]) => ({
     code,
@@ -2330,14 +2310,12 @@ onValue(ref(db, 'rooms'), snapshot => {
       .map(([, player]) => String(player?.name || '').trim())
       .filter(Boolean)
   })).sort((a, b) => b.createdAt - a.createdAt);
-  clearTimeout(entranceLoadingTimeout);
-  try { localStorage.setItem(ROOM_LIST_CACHE_KEY, JSON.stringify(allEntranceRooms)); } catch(_e) {}
   refreshEntranceRooms();
   if (document.body.classList.contains('entrance-screen')) renderEntranceRooms();
   roomLoading.classList.add('hidden');
+  roomBrowser.classList.add('rooms-loaded');
 }, () => {
-  clearTimeout(entranceLoadingTimeout);
-  showEntranceConnectionError();
+  roomLoading.textContent = 'loading...';
 });
 const tablesEl= document.getElementById('tables');
 const gear    = document.getElementById('gear');
